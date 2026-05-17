@@ -100,14 +100,11 @@ function textToFileAttachment(text: string, filename?: string): Attachment {
   };
 }
 
-// WORKING COPY FUNCTION - NO Clipboard API
+// WORKING COPY FUNCTION - Single copy only
 function copyToClipboard(text: string): boolean {
   try {
-    // Create a temporary textarea element
     const textArea = document.createElement('textarea');
     textArea.value = text;
-    
-    // Make it invisible but attached to DOM
     textArea.style.position = 'fixed';
     textArea.style.top = '-999999px';
     textArea.style.left = '-999999px';
@@ -115,14 +112,10 @@ function copyToClipboard(text: string): boolean {
     textArea.style.pointerEvents = 'none';
     
     document.body.appendChild(textArea);
-    
-    // Select and copy
     textArea.select();
     textArea.setSelectionRange(0, text.length);
     
     const success = document.execCommand('copy');
-    
-    // Clean up
     document.body.removeChild(textArea);
     
     return success;
@@ -132,7 +125,7 @@ function copyToClipboard(text: string): boolean {
   }
 }
 
-// ============= TOAST NOTIFICATION =============
+// ============= TOAST NOTIFICATION - WHITE VERSION =============
 function ToastNotification({ message, onClose }: { message: string; onClose: () => void }) {
   useEffect(() => {
     const timer = setTimeout(onClose, 4000);
@@ -146,16 +139,16 @@ function ToastNotification({ message, onClose }: { message: string; onClose: () 
       exit={{ opacity: 0, y: -50, scale: 0.9 }}
       className="fixed top-4 left-1/2 -translate-x-1/2 z-50"
     >
-      <div className="bg-zinc-900/95 backdrop-blur-sm border border-yellow-500/30 rounded-xl shadow-2xl p-4 flex items-center gap-3 min-w-[320px] max-w-md">
-        <div className="w-8 h-8 rounded-full bg-yellow-500/10 flex items-center justify-center flex-shrink-0">
-          <AlertCircle className="h-4 w-4 text-yellow-500" />
+      <div className="bg-zinc-800/95 backdrop-blur-sm border border-white/20 rounded-xl shadow-2xl p-4 flex items-center gap-3 min-w-[320px] max-w-md">
+        <div className="w-8 h-8 rounded-full bg-white/10 flex items-center justify-center flex-shrink-0">
+          <FileText className="h-4 w-4 text-white" />
         </div>
         <div className="flex-1">
-          <p className="text-sm font-medium text-yellow-400">Message Converted to File</p>
-          <p className="text-xs text-zinc-400">{message}</p>
+          <p className="text-sm font-medium text-white">Message Converted to File</p>
+          <p className="text-xs text-zinc-300">{message}</p>
         </div>
-        <button onClick={onClose} className="p-1 rounded-lg hover:bg-zinc-800 transition-colors">
-          <X className="h-3.5 w-3.5 text-zinc-500" />
+        <button onClick={onClose} className="p-1 rounded-lg hover:bg-white/10 transition-colors">
+          <X className="h-3.5 w-3.5 text-zinc-400" />
         </button>
       </div>
     </motion.div>
@@ -365,52 +358,46 @@ function NetworkErrorBanner({ error, onRetry }: { error: string; onRetry?: () =>
   );
 }
 
-// ============= MESSAGE ACTIONS WITH WORKING COPY =============
+// ============= MESSAGE ACTIONS WITH SINGLE COPY =============
 function MessageActions({ message, isAssistant, onCopy, onRegenerate, onEdit, onDislike }: { message: Message; isAssistant: boolean; onCopy: () => void; onRegenerate?: () => void; onEdit?: () => void; onDislike?: () => void }) {
   const [copied, setCopied] = useState(false);
   const [feedback, setFeedback] = useState<'like' | 'dislike' | null>(null);
+  const copyTimeoutRef = useRef<NodeJS.Timeout | null>(null);
 
   useEffect(() => { if (isAssistant) { getFeedbackFromSupabase(message.id).then(setFeedback); } }, [message.id, isAssistant]);
 
-  // FIXED: Using ONLY execCommand fallback, NO Clipboard API
+  // FIXED: Single copy only - no double calls
   const handleCopy = useCallback(() => {
+    // Clear any existing timeout
+    if (copyTimeoutRef.current) {
+      clearTimeout(copyTimeoutRef.current);
+    }
+    
     const success = copyToClipboard(message.content);
     if (success) {
       onCopy();
       setCopied(true);
-      setTimeout(() => setCopied(false), 2000);
-    } else {
-      // Last resort: show text selection for manual copy
-      const tempDiv = document.createElement('div');
-      tempDiv.textContent = message.content;
-      tempDiv.style.position = 'fixed';
-      tempDiv.style.top = '0';
-      tempDiv.style.left = '0';
-      tempDiv.style.width = '100%';
-      tempDiv.style.height = '100%';
-      tempDiv.style.backgroundColor = 'rgba(0,0,0,0.9)';
-      tempDiv.style.color = 'white';
-      tempDiv.style.padding = '20px';
-      tempDiv.style.zIndex = '99999';
-      tempDiv.style.overflow = 'auto';
-      tempDiv.style.whiteSpace = 'pre-wrap';
-      document.body.appendChild(tempDiv);
-      const range = document.createRange();
-      range.selectNodeContents(tempDiv);
-      const selection = window.getSelection();
-      selection?.removeAllRanges();
-      selection?.addRange(range);
-      alert('Press Ctrl+C to copy, then click anywhere to close');
-      tempDiv.onclick = () => document.body.removeChild(tempDiv);
+      copyTimeoutRef.current = setTimeout(() => setCopied(false), 2000);
     }
   }, [onCopy, message.content]);
+
+  // Cleanup timeout on unmount
+  useEffect(() => {
+    return () => {
+      if (copyTimeoutRef.current) {
+        clearTimeout(copyTimeoutRef.current);
+      }
+    };
+  }, []);
 
   const handleLike = useCallback(async () => { await saveFeedbackToSupabase(message.id, 'like', message.content); setFeedback('like'); }, [message.id, message.content]);
   const handleDislike = useCallback(() => { onDislike?.(); }, [onDislike]);
 
   return (
     <div className={cn('flex items-center gap-1 mt-1 transition-opacity', 'opacity-100 md:opacity-0 md:group-hover:opacity-100', isAssistant ? 'ml-0' : 'mr-0 flex-row-reverse')}>
-      <Button variant="ghost" size="icon" className="h-7 w-7 text-muted-foreground" onClick={handleCopy}>{copied ? <Check className="h-3.5 w-3.5" /> : <Copy className="h-3.5 w-3.5" />}</Button>
+      <Button variant="ghost" size="icon" className="h-7 w-7 text-muted-foreground" onClick={handleCopy}>
+        {copied ? <Check className="h-3.5 w-3.5" /> : <Copy className="h-3.5 w-3.5" />}
+      </Button>
       {isAssistant && (<><Button variant="ghost" size="icon" className={cn("h-7 w-7", feedback === 'like' ? "text-green-500" : "text-muted-foreground hover:text-green-500")} onClick={handleLike} title="Good response"><ThumbsUp className="h-3.5 w-3.5" /></Button><Button variant="ghost" size="icon" className={cn("h-7 w-7", feedback === 'dislike' ? "text-red-500" : "text-muted-foreground hover:text-red-500")} onClick={handleDislike} title="Bad response - provide feedback"><ThumbsDown className="h-3.5 w-3.5" /></Button></>)}
       {onRegenerate && (<Button variant="ghost" size="icon" className="h-7 w-7 text-muted-foreground" onClick={onRegenerate}><RefreshCw className="h-3.5 w-3.5" /></Button>)}
       {onEdit && (<Button variant="ghost" size="icon" className="h-7 w-7 text-muted-foreground" onClick={onEdit}><Pencil className="h-3.5 w-3.5" /></Button>)}
@@ -484,6 +471,7 @@ export function ChatMessages({ messages, isStreaming, isThinking, onRegenerate, 
   }, [feedbackMessage]);
 
   // Process messages - convert any message over 1000 bytes to file attachment
+  // REMOVED the long text message - now just shows empty content with file attachment
   const processedMessages = useMemo(() => {
     return messages.map(msg => {
       if (msg.role === 'user' && msg.content && (!msg.attachments || msg.attachments.length === 0)) {
@@ -495,7 +483,7 @@ export function ChatMessages({ messages, isStreaming, isThinking, onRegenerate, 
           return { 
             ...msg, 
             attachments: [fileAtt], 
-            content: `📎 **Large message converted to file**\n\nYour message (${(bytes.length / 1024).toFixed(1)} KB) has been automatically converted to an attached file for better readability.\n\n**File:** ${fileAtt.name}\n**Size:** ${(bytes.length / 1024).toFixed(1)} KB\n**Language:** ${fileAtt.language}\n\nClick the file attachment above to view the full content.` 
+            content: '' // Empty content - just show the file attachment
           };
         }
       }
@@ -520,8 +508,8 @@ export function ChatMessages({ messages, isStreaming, isThinking, onRegenerate, 
                   <div className={cn('flex flex-col max-w-[92%] sm:max-w-[85%] md:max-w-[78%] lg:max-w-[72%]', isAssistant ? 'items-start' : 'items-end')}>
                     {message.attachments?.some(a => a.type === 'image') && (<div className="mb-2 flex flex-row flex-wrap gap-1.5 justify-end max-w-full">{message.attachments.filter(a => a.type === 'image').map((att, i) => (<AttachmentPreview key={`img-${i}`} attachment={att} onView={setViewingAttachment} compact />))}</div>)}
                     <div className={cn('rounded-2xl px-3.5 py-2 text-[13px] sm:text-sm leading-relaxed shadow-sm w-full', isAssistant ? 'bg-zinc-900/50 border border-zinc-800 text-zinc-200' : 'bg-zinc-800 text-zinc-100')}>
-                      <MessageContent content={message.content} />
-                      {message.attachments?.some(a => a.type !== 'image') && (<div className="mt-3 space-y-2">{message.attachments.filter(a => a.type !== 'image').map((att, i) => (<AttachmentPreview key={`file-${i}`} attachment={att} onView={setViewingAttachment} />))}</div>)}
+                      {message.content && <MessageContent content={message.content} />}
+                      {message.attachments?.some(a => a.type !== 'image') && (<div className="space-y-2">{message.attachments.filter(a => a.type !== 'image').map((att, i) => (<AttachmentPreview key={`file-${i}`} attachment={att} onView={setViewingAttachment} />))}</div>)}
                       {message.image && (<motion.div initial={{ opacity: 0, scale: 0.9 }} animate={{ opacity: 1, scale: 1 }} className="mt-3 rounded-lg overflow-hidden max-w-sm">{message.image.startsWith('data:') ? <img src={message.image} alt="Generated image" className="w-full h-auto object-cover rounded-lg bg-muted" /> : <NextImage src={message.image} alt="Generated image" width={400} height={300} className="w-full h-auto object-cover rounded-lg" loading="lazy" unoptimized={message.image.includes('blob:')} />}</motion.div>)}
                       {message.video && (<motion.div initial={{ opacity: 0, scale: 0.9 }} animate={{ opacity: 1, scale: 1 }} className="mt-3 rounded-lg overflow-hidden max-w-sm"><video src={message.video} controls className="w-full h-auto rounded-lg bg-muted" /></motion.div>)}
                     </div>
