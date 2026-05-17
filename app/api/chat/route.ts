@@ -85,12 +85,6 @@ let currentChatIndex = 0;
 // ============================================================
 const VISION_MODELS = [
   "meta-llama/llama-4-scout-17b-16e-instruct",  // Primary Groq vision model (FREE TIER)
-  "meta-llama/llama-4-maverick-17b-128e-instruct", // Better vision, still free // DEPRECATED April 2025 - do not use
-  "@cf/moonshot/kimi-k2.6",
-  "@cf/moonshot/kimi-k2.5",
-  "claude-3-opus",
-  "claude-3-sonnet",
-  "claude-3-haiku",
 ];
 
 function isVisionModel(model: string): boolean {
