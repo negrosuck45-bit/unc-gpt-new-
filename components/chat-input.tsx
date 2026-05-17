@@ -19,6 +19,7 @@ import {
   LayoutGrid,
   Puzzle,
   Check,
+  Loader2,
 } from 'lucide-react'
 import { motion, AnimatePresence } from 'framer-motion'
 import { cn } from '@/lib/utils'
@@ -381,6 +382,8 @@ export function ChatInput({
   const [iconErrors, setIconErrors] = useState<Set<string>>(new Set())
   const [viewingAttachment, setViewingAttachment] = useState<Attachment | null>(null)
   const [connectorDirOpen, setConnectorDirOpen] = useState(false)
+  // Track which images are still uploading
+  const [uploadingImages, setUploadingImages] = useState<Set<string>>(new Set())
 
   const textareaRef = useRef<HTMLTextAreaElement>(null)
   const fileInputRef = useRef<HTMLInputElement>(null)
@@ -462,6 +465,7 @@ export function ChatInput({
   const uploadImageAsync = useCallback(async (file: File, pid: string) => {
     try {
       uploadQueueRef.current.add(pid)
+      setUploadingImages(prev => new Set([...prev, pid]))
       setIsUploading(true)
       const compressed = await compressImage(file)
       const { url } = await uploadFile(new File([compressed], file.name, { type: 'image/jpeg' }), { folder: 'images' })
@@ -469,6 +473,11 @@ export function ChatInput({
     } catch (e) { console.error(e) }
     finally {
       uploadQueueRef.current.delete(pid)
+      setUploadingImages(prev => {
+        const newSet = new Set(prev)
+        newSet.delete(pid)
+        return newSet
+      })
       if (uploadQueueRef.current.size === 0) setIsUploading(false)
     }
   }, [])
@@ -509,10 +518,12 @@ export function ChatInput({
   }, [initialValue])
 
   const handleSubmit = useCallback(() => {
+    // Allow sending even if images are uploading - they'll be included with their temporary URLs
     if ((input.trim() || attachments.length > 0) && !isStreaming && !disabled) {
       onSend(input.trim(), attachments.length > 0 ? attachments : undefined)
       setInput('')
       setAttachments([])
+      setUploadingImages(new Set()) // Clear uploading tracking
     }
   }, [input, attachments, isStreaming, disabled, onSend])
 
@@ -578,6 +589,11 @@ export function ChatInput({
 
   const removeAttachment = (id: string) => {
     setAttachments((prev) => prev.filter((a) => a.id !== id))
+    setUploadingImages(prev => {
+      const newSet = new Set(prev)
+      newSet.delete(id)
+      return newSet
+    })
     setViewingAttachment(null)
   }
 
@@ -594,14 +610,26 @@ export function ChatInput({
             <motion.div initial={{ opacity: 0, height: 0 }} animate={{ opacity: 1, height: 'auto' }} exit={{ opacity: 0, height: 0 }} className="mb-3 px-3 space-y-2 max-h-56 overflow-y-auto">
               {imageAttachments.length > 0 && (
                 <div className="flex flex-wrap gap-2">
-                  {imageAttachments.map((att) => (
-                    <div key={att.id} className="relative group w-20 h-20 rounded-lg overflow-hidden border border-border">
-                      <img src={att.url} alt={att.name} className="w-full h-full object-cover" />
-                      <button onClick={() => removeAttachment(att.id)} className="absolute top-1 right-1 w-5 h-5 rounded-full bg-destructive flex items-center justify-center opacity-100 md:opacity-0 md:group-hover:opacity-100 transition-opacity">
-                        <X className="h-3 w-3 text-white" />
-                      </button>
-                    </div>
-                  ))}
+                  {imageAttachments.map((att) => {
+                    const isUploading = uploadingImages.has(att.id)
+                    return (
+                      <div key={att.id} className="relative group w-20 h-20 rounded-lg overflow-hidden border border-border">
+                        <img src={att.url} alt={att.name} className="w-full h-full object-cover" />
+                        {/* Loading overlay with spinner */}
+                        {isUploading && (
+                          <div className="absolute inset-0 bg-black/50 flex items-center justify-center">
+                            <Loader2 className="h-6 w-6 text-white animate-spin" />
+                          </div>
+                        )}
+                        <button 
+                          onClick={() => removeAttachment(att.id)} 
+                          className="absolute top-1 right-1 w-5 h-5 rounded-full bg-destructive flex items-center justify-center opacity-100 md:opacity-0 md:group-hover:opacity-100 transition-opacity"
+                        >
+                          <X className="h-3 w-3 text-white" />
+                        </button>
+                      </div>
+                    )
+                  })}
                 </div>
               )}
               {otherAttachments.map((att) => (
@@ -626,7 +654,7 @@ export function ChatInput({
               onKeyDown={handleKeyDown}
               placeholder="Write a message..."
               className="w-full bg-transparent px-4 pt-3 pb-2 resize-none focus:outline-none min-h-[52px]"
-              disabled={isStreaming || disabled || isUploading}
+              disabled={isStreaming || disabled}
               rows={1}
             />
 
@@ -698,13 +726,14 @@ export function ChatInput({
                   <Button onClick={onStop} size="icon" variant="destructive" className="h-9 w-9 rounded-full"><Square className="h-4 w-4" /></Button>
                 ) : (
                   <>
-                    {!input.trim() && attachments.length === 0 ? (
-                      <Button onClick={toggleVoiceInput} size="icon" variant={isRecording ? "destructive" : "ghost"} className="h-8 w-8 rounded-full">
-                        <AudioWaveform className="h-4 w-4" />
+                    {/* Show send button whenever there's text OR attachments (even if uploading) */}
+                    {(input.trim() || attachments.length > 0) ? (
+                      <Button onClick={handleSubmit} disabled={isStreaming || disabled} size="icon" className="h-9 w-9 rounded-full bg-primary hover:bg-primary/90">
+                        <ArrowUp className="h-4 w-4" />
                       </Button>
                     ) : (
-                      <Button onClick={handleSubmit} disabled={isUploading || isStreaming || disabled} size="icon" className="h-9 w-9 rounded-full bg-primary hover:bg-primary/90">
-                        <ArrowUp className="h-4 w-4" />
+                      <Button onClick={toggleVoiceInput} size="icon" variant={isRecording ? "destructive" : "ghost"} className="h-8 w-8 rounded-full">
+                        <AudioWaveform className="h-4 w-4" />
                       </Button>
                     )}
                   </>
