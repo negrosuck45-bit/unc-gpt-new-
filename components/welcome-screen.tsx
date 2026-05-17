@@ -17,13 +17,6 @@ export function WelcomeScreen({ onSelectPrompt, project }: WelcomeScreenProps) {
       {/* Centered content */}
       <div className="flex flex-col items-center text-center max-w-2xl w-full -mt-20">
         {/* Logo / Avatar */}
-        <motion.div
-          initial={{ scale: 0.8, opacity: 0 }}
-          animate={{ scale: 1, opacity: 1 }}
-          transition={{ duration: 0.5 }}
-          className="mb-6"
-        >
-          <div className="w-20 h-20 rounded-full bg-gradient-to-br from-orange-400 to-red-600 flex items-center justify-center shadow-lg shadow-orange-500/20 overflow-hidden">
             <Image
               src="/uncgpt.png"
               alt="UNC GPT"
@@ -33,7 +26,7 @@ export function WelcomeScreen({ onSelectPrompt, project }: WelcomeScreenProps) {
               priority
             />
           </div>
-        </motion.div>
+
 
         {/* Heading */}
         <motion.h1
