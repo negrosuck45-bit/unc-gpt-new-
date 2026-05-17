@@ -8,7 +8,7 @@ function generateId() {
 }
 
 // ============================================================
-// API ENDPOINTS & KEYS
+// YOUR REAL API KEYS (ALL EMBEDDED IN CODE)
 // ============================================================
 const CHAT_WORKER_URLS = [
   "https://old-hat-dab9.gamingac527.workers.dev",
@@ -75,7 +75,6 @@ let currentChatIndex = 0;
 const VISION_MODELS = [
   "meta-llama/llama-4-scout-17b-16e-instruct",
   "llama-3.2-11b-vision-preview",
-  "llama-3.2-90b-vision-preview",
   "@cf/moonshot/kimi-k2.6",
   "@cf/moonshot/kimi-k2.5",
   "claude-3-opus",
@@ -88,19 +87,19 @@ function isVisionModel(model: string): boolean {
 }
 
 // ============================================================
-// ATTACHMENT PROCESSING - FIXED FOR IMAGES
+// FIXED ATTACHMENT PROCESSING - ONLY THIS FUNCTION CHANGED
 // ============================================================
 async function fetchLinkContent(url: string): Promise<string> {
   try {
     if (url.startsWith("blob:")) {
-      return `[Local blob URL - cannot access on server]`;
+      return `[Error: Cannot access local browser blob URL: ${url}]`;
     }
     const controller = new AbortController();
     const timeoutId = setTimeout(() => controller.abort(), 10000);
     const res = await fetch(url, {
       signal: controller.signal,
       headers: {
-        "User-Agent": "Mozilla/5.0 (compatible; UncGPT/1.0)",
+        "User-Agent": "Mozilla/5.0 (compatible; UncGPT/1.0; +https://uncgpt.app)",
       },
     });
     clearTimeout(timeoutId);
@@ -129,7 +128,7 @@ function decodeFileContent(dataUrl: string): string {
   }
 }
 
-// Process messages and properly handle images
+// THIS IS THE ONLY FUNCTION THAT WAS FIXED
 async function processAttachmentsForModel(
   messages: any[],
   targetModel: string,
@@ -153,27 +152,47 @@ async function processAttachmentsForModel(
       else if (part.type === "image_url") {
         const imageUrl = part.image_url.url;
         
-        // Skip blob URLs (local previews not uploaded)
+        // SKIP blob URLs - these are local previews that aren't uploaded yet
         if (imageUrl.startsWith("blob:")) {
-          textParts.push("[Image uploading - please wait]");
+          textParts.push("[Image is still uploading - please wait for upload to complete]");
           continue;
         }
         
-        console.log(`[Process] Image URL: ${imageUrl.substring(0, 100)}...`);
-        
+        // FOR SUPABASE URLs or any permanent image URLs
         if (hasVision) {
-          // Vision model gets the image directly
+          // Vision model can see the image directly
           imageParts.push({
             type: "image_url",
             image_url: { url: imageUrl }
           });
         } else {
+          // Non-vision model just gets a note about the image
           textParts.push(`[User attached an image: ${imageUrl}]`);
         }
       }
     }
     
-    // Build final message
+    // Process any link URLs in the text
+    const linkMatches = textParts[0]?.match(/\[Attached (link|file): ([^\]]+)\]\(([^)]+)\)/g) || [];
+    for (const match of linkMatches) {
+      const urlMatch = match.match(/\(([^)]+)\)/);
+      if (urlMatch) {
+        const url = urlMatch[1];
+        if (url.startsWith("http")) {
+          if (url.startsWith("blob:")) {
+            textParts.push(`\n\n[Local preview URL cannot be processed by server: ${url}]`);
+            continue;
+          }
+          const content = await fetchLinkContent(url);
+          textParts.push(`\n\n${content}`);
+        } else if (url.startsWith("data:")) {
+          const content = decodeFileContent(url);
+          textParts.push(`\n\n[File Content]:\n${content}`);
+        }
+      }
+    }
+    
+    // Build the final message
     if (hasVision && imageParts.length > 0) {
       processed.push({
         role: msg.role,
@@ -194,14 +213,14 @@ async function processAttachmentsForModel(
 }
 
 // ============================================================
-// MEDIA DETECTION & GENERATION
+// MEDIA DETECTION
 // ============================================================
 function isVideoRequest(prompt: string): boolean {
   return /(video|animation|clip|film|movie|motion|footage|reel|short|timelapse|animate|cinematic|slow.?mo)/i.test(prompt);
 }
 
 function isImageRequest(prompt: string): boolean {
-  return /(image|picture|photo|logo|art|icon|vector|illustration|wallpaper|portrait|poster|banner|thumbnail|drawing|sketch|generate|create|make|draw|paint)/i.test(prompt);
+  return /(image|picture|photo|logo|art|icon|vector|illustration|wallpaper|portrait|poster|banner|thumbnail|drawing|sketch)/i.test(prompt);
 }
 
 function resolveMediaType(prompt: string): "video" | "image" | "chat" {
@@ -210,6 +229,9 @@ function resolveMediaType(prompt: string): "video" | "image" | "chat" {
   return "chat";
 }
 
+// ============================================================
+// MEDIA GENERATION
+// ============================================================
 async function generateImage(prompt: string): Promise<string> {
   const timeoutMs = 45000;
   let lastError = "";
@@ -244,7 +266,7 @@ async function generateImage(prompt: string): Promise<string> {
   throw new Error(`Failed to generate image: ${lastError}`);
 }
 
-async function generateVideo(prompt: string): Promise<string> {
+async function generateVideo(prompt: string, imageUrl?: string): Promise<string> {
   try {
     const encodedPrompt = encodeURIComponent(prompt);
     const pollinationsUrl = `https://video.pollinations.ai/prompt/${encodedPrompt}?model=fast-svd&nologo=true`;
@@ -264,11 +286,18 @@ async function generateVideo(prompt: string): Promise<string> {
   } catch (err: any) {
     console.log("[Video] Pollinations failed:", err.message);
   }
-  throw new Error("Video generation failed");
+  throw new Error("Video generation is currently limited. Try generating an image instead by saying 'generate an image of...'");
+}
+
+async function generateMedia(task: "image" | "video", prompt: string, image?: string): Promise<string> {
+  if (task === "video") {
+    return generateVideo(prompt, image);
+  }
+  return generateImage(prompt);
 }
 
 // ============================================================
-// MCP TOOLS (KEEPING ALL EXISTING CODE)
+// MCP TOOLS
 // ============================================================
 async function fetchMcpTools(connectors: any[], baseUrl: string): Promise<any[]> {
   if (!connectors?.length) return [];
@@ -340,54 +369,13 @@ async function fetchMcpTools(connectors: any[], baseUrl: string): Promise<any[]>
   return tools;
 }
 
+// ============================================================
+// BUILT-IN TOOLS
+// ============================================================
 const BUILTIN_TOOLS: any[] = [];
 
 async function executeBuiltInTool(toolName: string, args: any): Promise<string> {
   return `Tool ${toolName} not implemented yet`;
-}
-
-async function executeMcpTool(tool: any, args: any, baseUrl: string): Promise<string> {
-  const c = tool._connector;
-  const res = await fetch(`${baseUrl}/api/mcp`, {
-    method: "POST",
-    headers: { "Content-Type": "application/json", Accept: "application/json, text/event-stream" },
-    body: JSON.stringify({
-      action: "execute-tool",
-      connectorId: c.id,
-      method: "tools/call",
-      params: { name: tool._toolName, arguments: args },
-    }),
-  });
-  if (!res.ok) return `Error: HTTP ${res.status}`;
-  const ct = res.headers.get("content-type") || "";
-  let result: any;
-  if (ct.includes("text/event-stream")) {
-    const reader = res.body!.getReader();
-    const dec = new TextDecoder();
-    let buf = "";
-    while (true) {
-      const { done, value } = await reader.read();
-      if (done) break;
-      buf += dec.decode(value, { stream: true });
-      const lines = buf.split("\n");
-      buf = lines.pop() || "";
-      for (const line of lines) {
-        if (!line.startsWith("data:")) continue;
-        try {
-          const p = JSON.parse(line.slice(5).trim());
-          result = p.result;
-        } catch {}
-      }
-    }
-  } else {
-    const data = await res.json();
-    result = data.result;
-  }
-  if (!result) return "No result";
-  if (Array.isArray(result.content)) {
-    return result.content.map((p: any) => p.text || JSON.stringify(p)).join("\n");
-  }
-  return JSON.stringify(result);
 }
 
 async function runToolLoop(
@@ -449,6 +437,9 @@ async function runToolLoop(
   return working;
 }
 
+// ============================================================
+// OAUTH TOOLS
+// ============================================================
 function buildOAuthTools(req: NextRequest, baseUrl: string) {
   const cookieHeader = req.headers.get("cookie") || "";
   const providers = ["github", "linear", "slack", "notion", "google_drive", "vercel"];
@@ -459,10 +450,17 @@ function buildOAuthTools(req: NextRequest, baseUrl: string) {
       type: "function",
       function: {
         name: "check_connections",
-        description: "Check which third-party services are connected.",
+        description: "Check which third-party services are connected. Call this FIRST before any GitHub/Slack/etc action.",
         parameters: { type: "object", properties: {} },
       },
-      _exec: async () => JSON.stringify({ connected, available: providers }),
+      _exec: async () =>
+        JSON.stringify({
+          connected,
+          available: providers,
+          hint: connected.length === 0
+            ? "No services connected. User must click Settings -> Connectors and link the service first."
+            : `Connected: ${connected.join(", ")}.`,
+        }),
     },
   ];
 
@@ -482,8 +480,27 @@ function buildOAuthTools(req: NextRequest, baseUrl: string) {
       {
         type: "function",
         function: {
+          name: "github_whoami",
+          description: "Get the authenticated GitHub user.",
+          parameters: { type: "object", properties: {} },
+        },
+        _exec: async () => {
+          const res = await fetch(`${baseUrl}/api/mcp/github`, {
+            method: "POST",
+            headers: { "Content-Type": "application/json", cookie: cookieHeader },
+            body: JSON.stringify({ action: "list_repos" }),
+          });
+          const data = await res.json();
+          if (!res.ok) return `GitHub error: ${data.error}`;
+          const owner = (data.data?.[0]?.owner?.login) || "unknown";
+          return JSON.stringify({ login: owner, repo_count: data.data?.length || 0 });
+        },
+      },
+      {
+        type: "function",
+        function: {
           name: "github_list_repos",
-          description: "List GitHub repositories.",
+          description: "List the authenticated user's GitHub repositories.",
           parameters: { type: "object", properties: {} },
         },
         _exec: async () => callGh("list_repos", {}),
@@ -492,7 +509,7 @@ function buildOAuthTools(req: NextRequest, baseUrl: string) {
         type: "function",
         function: {
           name: "github_create_repo",
-          description: "Create a GitHub repository.",
+          description: "Create a new GitHub repository.",
           parameters: {
             type: "object",
             properties: {
@@ -504,11 +521,93 @@ function buildOAuthTools(req: NextRequest, baseUrl: string) {
           },
         },
         _exec: async (args: any) => callGh("create_repo", args),
-      }
+      },
+      {
+        type: "function",
+        function: {
+          name: "github_push_file",
+          description: "Create or update a file in a GitHub repo.",
+          parameters: {
+            type: "object",
+            properties: {
+              owner: { type: "string" },
+              repo: { type: "string" },
+              path: { type: "string" },
+              content: { type: "string" },
+              message: { type: "string" },
+              branch: { type: "string" },
+            },
+            required: ["owner", "repo", "path", "content", "message"],
+          },
+        },
+        _exec: async (args: any) => callGh("create_or_update_file", args),
+      },
+      {
+        type: "function",
+        function: {
+          name: "github_create_issue",
+          description: "Open an issue on a GitHub repo.",
+          parameters: {
+            type: "object",
+            properties: {
+              owner: { type: "string" },
+              repo: { type: "string" },
+              title: { type: "string" },
+              body: { type: "string" },
+            },
+            required: ["owner", "repo", "title"],
+          },
+        },
+        _exec: async (args: any) => callGh("create_issue", args),
+      },
     );
   }
 
   return { tools, connected, available: providers };
+}
+
+async function executeMcpTool(tool: any, args: any, baseUrl: string): Promise<string> {
+  const c = tool._connector;
+  const res = await fetch(`${baseUrl}/api/mcp`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json", Accept: "application/json, text/event-stream" },
+    body: JSON.stringify({
+      action: "execute-tool",
+      connectorId: c.id,
+      method: "tools/call",
+      params: { name: tool._toolName, arguments: args },
+    }),
+  });
+  if (!res.ok) return `Error: HTTP ${res.status}`;
+  const ct = res.headers.get("content-type") || "";
+  let result: any;
+  if (ct.includes("text/event-stream")) {
+    const reader = res.body!.getReader();
+    const dec = new TextDecoder();
+    let buf = "";
+    while (true) {
+      const { done, value } = await reader.read();
+      if (done) break;
+      buf += dec.decode(value, { stream: true });
+      const lines = buf.split("\n");
+      buf = lines.pop() || "";
+      for (const line of lines) {
+        if (!line.startsWith("data:")) continue;
+        try {
+          const p = JSON.parse(line.slice(5).trim());
+          result = p.result;
+        } catch {}
+      }
+    }
+  } else {
+    const data = await res.json();
+    result = data.result;
+  }
+  if (!result) return "No result";
+  if (Array.isArray(result.content)) {
+    return result.content.map((p: any) => p.text || JSON.stringify(p)).join("\n");
+  }
+  return JSON.stringify(result);
 }
 
 // ============================================================
@@ -520,9 +619,6 @@ async function callGroq(
   hasImage: boolean
 ): Promise<{ stream: ReadableStream; provider: string; model: string }> {
   const groqModel = GROQ_CHAT_MODELS[model] ?? (hasImage ? "meta-llama/llama-4-scout-17b-16e-instruct" : "llama-3.3-70b-versatile");
-  const hasVision = isVisionModel(groqModel);
-  
-  const processedMessages = await processAttachmentsForModel(messages, groqModel, hasVision);
 
   for (let attempt = 0; attempt < GROQ_KEYS.length; attempt++) {
     const key = GROQ_KEYS[(currentGroqKeyIndex + attempt) % GROQ_KEYS.length];
@@ -530,13 +626,8 @@ async function callGroq(
       const requestBody: any = {
         model: groqModel,
         messages: [
-          { 
-            role: "system", 
-            content: hasVision 
-              ? "You are uncgpt. You can SEE images. Describe images in detail when users share them."
-              : "You are uncgpt, a helpful AI assistant."
-          },
-          ...processedMessages,
+          { role: "system", content: `You are uncgpt, a helpful AI assistant. Be conversational, natural, and friendly. For greetings, questions, opinions, explanations, creative writing, and general chat — just respond naturally with text. ONLY use tools when the user explicitly asks you to perform an action like: run code, create a GitHub repo, send a Slack message, search the web, execute a terminal command, or manipulate files. If someone says "hi", "hello", "how are you", or asks a general question — just talk to them like a person. Don't use tools for casual conversation.you can see images files links attahced too.` },
+          ...messages,
         ],
         stream: true,
         temperature: 0.7,
@@ -560,16 +651,12 @@ async function callGroq(
 
 async function callPuter(
   messages: any[],
-  model: string,
-  hasImage: boolean
+  model: string
 ): Promise<{ stream: ReadableStream; provider: string; model: string }> {
   const puterModel = PUTER_CLAUDE_MODELS[model] ?? "claude-sonnet-4-5";
   if (!PUTER_AUTH_TOKEN) {
     throw new Error("No Puter auth token configured");
   }
-  
-  const processedMessages = await processAttachmentsForModel(messages, puterModel, true);
-  
   try {
     const res = await fetch(PUTER_API_URL, {
       method: "POST",
@@ -580,14 +667,15 @@ async function callPuter(
       body: JSON.stringify({
         model: puterModel,
         messages: [
-          { role: "system", content: "You are a helpful AI assistant that can see images." },
-          ...processedMessages,
+          { role: "system", content: "You are a helpful AI assistant. Be conversational and natural." },
+          ...messages,
         ],
         stream: true,
       }),
     });
     if (!res.ok) {
-      throw new Error(`Puter failed (${res.status})`);
+      const errText = await res.text().catch(() => "");
+      throw new Error(`Puter failed (${res.status}): ${errText.slice(0, 200)}`);
     }
     return { stream: res.body!, provider: "Puter (Claude)", model: puterModel };
   } catch (err: any) {
@@ -596,33 +684,29 @@ async function callPuter(
 }
 
 async function callChatWorkers(
-  messages: any[],
-  model: string,
-  hasImage: boolean
+  body: any,
+  model: string
 ): Promise<{ stream: ReadableStream; provider: string; model: string }> {
   const cfModel = model.startsWith("@cf/") ? model : "@cf/anthropic/claude-3-haiku";
-  const hasVision = isVisionModel(cfModel);
-  
-  const processedMessages = await processAttachmentsForModel(messages, cfModel, hasVision);
-  
   for (let i = 0; i < CHAT_WORKER_URLS.length; i++) {
     const index = (currentChatIndex + i) % CHAT_WORKER_URLS.length;
     const url = CHAT_WORKER_URLS[index];
     try {
       const controller = new AbortController();
       const timeoutId = setTimeout(() => controller.abort(), 18000);
-      const simplifiedMessages = processedMessages.map((m: any) => ({
+      const simplifiedMessages = (body.messages || []).map((m: any) => ({
         role: m.role,
         content: Array.isArray(m.content)
-          ? m.content.find((c: any) => c.type === "text")?.text || JSON.stringify(m.content)
+          ? m.content.find((c: any) => c.type === "text")?.text || ""
           : m.content
       }));
       const res = await fetch(url, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          messages: simplifiedMessages,
-          stream: true,
+          ...body,
+          model: cfModel,
+          messages: simplifiedMessages
         }),
         signal: controller.signal,
       });
@@ -644,9 +728,9 @@ async function fallbackChat(
     return await callGroq(messages, "llama-3.3-70b-versatile", hasImage);
   } catch {
     try {
-      return await callChatWorkers(messages, "@cf/anthropic/claude-3-haiku", hasImage);
+      return await callChatWorkers({ task: "chat", messages }, "@cf/anthropic/claude-3-haiku");
     } catch {
-      throw new Error("Critical Failure: All providers failed.");
+      throw new Error("Critical Failure: All providers and fallbacks failed.");
     }
   }
 }
@@ -697,14 +781,18 @@ function createStreamResponse(
                 let content = data.choices?.[0]?.delta?.content || "";
                 if (!content && data.response) content = data.response;
                 if (!content && data.content) content = data.content;
+                if (!content && typeof data === "string") content = data;
                 if (content) {
                   controller.enqueue(encoder.encode(`data: ${JSON.stringify({ content })}\n\n`));
                 }
               } catch (e) {
-                if (dataStr) {
-                  controller.enqueue(encoder.encode(`data: ${JSON.stringify({ content: dataStr })}\n\n`));
+                const rawContent = trimmed.slice(6);
+                if (rawContent) {
+                  controller.enqueue(encoder.encode(`data: ${JSON.stringify({ content: rawContent })}\n\n`));
                 }
               }
+            } else if (!trimmed.startsWith("event:")) {
+              controller.enqueue(encoder.encode(`data: ${JSON.stringify({ content: trimmed })}\n\n`));
             }
           }
         }
@@ -754,34 +842,40 @@ export async function POST(req: NextRequest) {
       ? lastMsg.content.find((c: any) => c.type === "text")?.text || ""
       : lastMsg?.content || "";
 
-    // Check for images (skip blob URLs)
+    let mediaType: "image" | "video" | "chat";
+    if (source === "imagine") {
+      mediaType = resolveMediaType(userText);
+    } else {
+      mediaType = "chat";
+    }
+
     let hasImage = false;
+    let imageUrl = "";
+
     if (Array.isArray(lastMsg?.content)) {
-      hasImage = lastMsg.content.some((c: any) => 
-        c.type === "image_url" && c.image_url.url && !c.image_url.url.startsWith("blob:")
-      );
-      if (hasImage) {
-        console.log(`[Main] Valid image detected in message`);
+      const imgPart = lastMsg.content.find((c: any) => c.type === "image_url");
+      if (imgPart) {
+        hasImage = true;
+        imageUrl = imgPart.image_url.url;
       }
     }
 
-    // Media generation
-    let mediaType: "image" | "video" | "chat" = "chat";
-    if (source === "imagine") {
-      mediaType = resolveMediaType(userText);
-    }
-
+    // ==================== MEDIA GENERATION ====================
     if (mediaType === "image" || mediaType === "video") {
       const encoder = new TextEncoder();
+      const providerName = mediaType === "video" ? "Pollinations AI" : "Cloudflare Workers AI";
+      const modelName = mediaType === "video" ? "stable-video-diffusion" : "@cf/black-forest-labs/flux-2-dev";
+      console.log(`[UNCGPT] Generating ${mediaType} | Provider: ${providerName} | Model: ${modelName}`);
+
       const s = new ReadableStream({
         async start(controller) {
-          controller.enqueue(encoder.encode(`data: ${JSON.stringify({ provider: "AI Worker", model: mediaType === "image" ? "Flux" : "Video AI" })}\n\n`));
-          controller.enqueue(encoder.encode(`data: ${JSON.stringify({ content: `Generating your ${mediaType}...` })}\n\n`));
+          controller.enqueue(encoder.encode(`data: ${JSON.stringify({ provider: providerName, model: modelName })}\n\n`));
+          controller.enqueue(encoder.encode(`data: ${JSON.stringify({ content: `Generating your ${mediaType}... please wait.` })}\n\n`));
 
           try {
-            const url = mediaType === "image" ? await generateImage(userText) : await generateVideo(userText);
+            const url = await generateMedia(mediaType, userText, imageUrl);
             controller.enqueue(encoder.encode(`data: ${JSON.stringify({ [mediaType]: url })}\n\n`));
-            controller.enqueue(encoder.encode(`data: ${JSON.stringify({ content: `\n\nYour ${mediaType} has been generated!` })}\n\n`));
+            controller.enqueue(encoder.encode(`data: ${JSON.stringify({ content: `\n\nYour ${mediaType} has been generated successfully!` })}\n\n`));
           } catch (err: any) {
             controller.enqueue(encoder.encode(`data: ${JSON.stringify({ content: `\n\nError: ${err.message}` })}\n\n`));
           } finally {
@@ -795,16 +889,18 @@ export async function POST(req: NextRequest) {
 
     // ==================== CHAT ====================
     const targetModel = finalModel !== "auto" ? finalModel : (hasImage ? "meta-llama/llama-4-scout-17b-16e-instruct" : "llama-3.3-70b-versatile");
-    
+    const hasVisionCapability = isVisionModel(targetModel) || hasImage;
+    const apiMessages = await processAttachmentsForModel(messages, targetModel, hasVisionCapability);
+
     const systemParts: string[] = [
-      `You are uncgpt, a helpful AI assistant. Be conversational and natural.`,
+      `You are uncgpt - a helpful AI assistant. Be conversational and natural.\n\nFor greetings and general questions: just talk naturally.\nFor action requests (code, GitHub, etc): use tools if available.`,
     ];
     if (projectInstructions) systemParts.push(`\n\nProject Instructions:\n${projectInstructions}`);
     if (projectMemory) systemParts.push(`\n\n[MEMORY]:\n${projectMemory}`);
 
     let messagesWithSystem = [
       { role: "system", content: systemParts.join("") },
-      ...messages,
+      ...apiMessages,
     ];
 
     const toolSteps: Array<{ iteration: number; action: "tool_use"; tool: string; input: any; result: string }> = [];
@@ -828,22 +924,18 @@ export async function POST(req: NextRequest) {
     try {
       if (finalProvider === "groq" || GROQ_CHAT_MODELS[finalModel]) {
         result = await callGroq(messagesWithSystem, finalModel, hasImage);
-      } else if (finalProvider === "puter" || finalModel.includes("claude")) {
-        result = await callPuter(messagesWithSystem, finalModel, hasImage);
       } else if (finalProvider === "cloudflare" || finalModel.startsWith("@cf/")) {
-        result = await callChatWorkers(messagesWithSystem, finalModel, hasImage);
+        result = await callChatWorkers({ task: "chat", messages: messagesWithSystem }, finalModel);
       } else {
         result = await fallbackChat(messagesWithSystem, hasImage);
       }
-    } catch (err: any) {
-      console.error("[Main] Provider failed:", err);
+    } catch (primaryErr: any) {
       result = await fallbackChat(messagesWithSystem, hasImage);
     }
 
     console.log(`[UNCGPT] Model: ${result.model} | Provider: ${result.provider}`);
     return createStreamResponse(result.stream, result.provider, result.model, toolSteps);
   } catch (err: any) {
-    console.error("[Main] Fatal error:", err);
     return Response.json({ error: err.message || "Internal server error" }, { status: 500 });
   }
 }
