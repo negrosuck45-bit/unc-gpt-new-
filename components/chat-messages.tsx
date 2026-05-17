@@ -103,14 +103,19 @@ function textToFileAttachment(text: string, filename?: string): Attachment {
   };
 }
 
-// FIXED: Single copy only - prevents double copy
-function copyToClipboard(text: string): boolean {
+// FIXED: Proper clipboard with fallback + no unhandled rejection
+async function copyToClipboard(text: string): Promise<boolean> {
   try {
     if (navigator.clipboard && window.isSecureContext) {
-      navigator.clipboard.writeText(text);
+      await navigator.clipboard.writeText(text);
       return true;
     }
+  } catch (err) {
+    console.warn('Clipboard API failed:', err);
+  }
 
+  // Fallback for non-secure contexts or denied permissions
+  try {
     const textArea = document.createElement('textarea');
     textArea.value = text;
     textArea.style.position = 'fixed';
@@ -128,7 +133,7 @@ function copyToClipboard(text: string): boolean {
 
     return success;
   } catch (err) {
-    console.error('Copy failed:', err);
+    console.error('Fallback copy failed:', err);
     return false;
   }
 }
@@ -326,24 +331,24 @@ function FeedbackModal({ open, onClose, message, onSubmit }: { open: boolean; on
         <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} className="fixed inset-0 z-50 flex items-center justify-center p-4" onClick={onClose}>
           <div className="absolute inset-0 bg-black/60 backdrop-blur-sm" />
           <motion.div initial={{ opacity: 0, scale: 0.95, y: 20 }} animate={{ opacity: 1, scale: 1, y: 0 }} exit={{ opacity: 0, scale: 0.95, y: 20 }} transition={{ type: 'spring', damping: 25, stiffness: 300 }} onClick={(e) => e.stopPropagation()} className="relative w-full max-w-[92vw] sm:max-w-md bg-[#1e1e1e] border border-white/10 rounded-2xl p-4 sm:p-6 shadow-2xl max-h-[85vh] overflow-y-auto">
-            {submitted ? (
-              <motion.div initial={{ opacity: 0, scale: 0.8 }} animate={{ opacity: 1, scale: 1 }} className="text-center py-8">
-                <div className="w-14 h-14 rounded-full bg-green-500/10 flex items-center justify-center mx-auto mb-4"><Check className="h-7 w-7 text-green-400" /></div>
-                <h3 className="text-lg font-semibold text-white mb-1">Thank you!</h3>
-                <p className="text-sm text-white/50">Your feedback has been saved.</p>
-              </motion.div>
-            ) : (
-              <>
-                <div className="flex items-center justify-between mb-3 sm:mb-5"><h2 className="text-lg sm:text-xl font-semibold text-white">Give negative feedback</h2><button onClick={onClose} className="p-1.5 rounded-lg hover:bg-white/10 transition-colors"><X className="h-4 w-4 text-white/60" /></button></div>
-                <div className="space-y-5">
-                  <div className="space-y-2"><label className="text-sm text-white/70">What type of issue do you wish to report? <span className="text-white/40">(optional)</span></label>
-                    <div className="relative"><select value={issueType} onChange={(e) => setIssueType(e.target.value)} className="w-full appearance-none bg-[#2a2a2a] border border-white/10 rounded-xl px-3 sm:px-4 py-2.5 sm:py-3 text-sm text-white focus:outline-none focus:border-white/25 transition-colors cursor-pointer"><option value="" disabled>Select...</option>{ISSUE_TYPES.map((t) => (<option key={t} value={t}>{t}</option>))}</select><ChevronDownIcon className="absolute right-3 top-1/2 -translate-y-1/2 h-4 w-4 text-white/40 pointer-events-none" /></div></div>
-                  <div className="space-y-2"><label className="text-sm text-white/70">Please provide details: <span className="text-white/40">(optional)</span></label><textarea value={details} onChange={(e) => setDetails(e.target.value)} placeholder="What was unsatisfying about this response?" rows={3} className="w-full bg-[#2a2a2a] border border-white/10 rounded-xl px-3 sm:px-4 py-2.5 sm:py-3 text-sm text-white placeholder:text-white/30 resize-none focus:outline-none focus:border-white/25 transition-colors" /></div>
-                  <p className="text-xs text-white/40 italic leading-relaxed">Submitting this report will save the feedback for future improvements to our models.</p>
-                  <div className="flex items-center justify-end gap-2 pt-1"><Button variant="outline" onClick={onClose} className="h-9 sm:h-10 px-4 sm:px-5 bg-transparent border-white/20 text-white hover:bg-white/10 hover:text-white rounded-xl text-sm">Cancel</Button><Button onClick={handleSubmit} className="h-9 sm:h-10 px-5 sm:px-6 bg-white text-black hover:bg-white/90 rounded-xl font-medium text-sm">Submit</Button></div>
-                </div>
-              </>
-            )}
+          {submitted ? (
+            <motion.div initial={{ opacity: 0, scale: 0.8 }} animate={{ opacity: 1, scale: 1 }} className="text-center py-8">
+              <div className="w-14 h-14 rounded-full bg-green-500/10 flex items-center justify-center mx-auto mb-4"><Check className="h-7 w-7 text-green-400" /></div>
+              <h3 className="text-lg font-semibold text-white mb-1">Thank you!</h3>
+              <p className="text-sm text-white/50">Your feedback has been saved.</p>
+            </motion.div>
+          ) : (
+            <>
+              <div className="flex items-center justify-between mb-3 sm:mb-5"><h2 className="text-lg sm:text-xl font-semibold text-white">Give negative feedback</h2><button onClick={onClose} className="p-1.5 rounded-lg hover:bg-white/10 transition-colors"><X className="h-4 w-4 text-white/60" /></button></div>
+              <div className="space-y-5">
+                <div className="space-y-2"><label className="text-sm text-white/70">What type of issue do you wish to report? <span className="text-white/40">(optional)</span></label>
+                  <div className="relative"><select value={issueType} onChange={(e) => setIssueType(e.target.value)} className="w-full appearance-none bg-[#2a2a2a] border border-white/10 rounded-xl px-3 sm:px-4 py-2.5 sm:py-3 text-sm text-white focus:outline-none focus:border-white/25 transition-colors cursor-pointer"><option value="" disabled>Select...</option>{ISSUE_TYPES.map((t) => (<option key={t} value={t}>{t}</option>))}</select><ChevronDownIcon className="absolute right-3 top-1/2 -translate-y-1/2 h-4 w-4 text-white/40 pointer-events-none" /></div></div>
+                <div className="space-y-2"><label className="text-sm text-white/70">Please provide details: <span className="text-white/40">(optional)</span></label><textarea value={details} onChange={(e) => setDetails(e.target.value)} placeholder="What was unsatisfying about this response?" rows={3} className="w-full bg-[#2a2a2a] border border-white/10 rounded-xl px-3 sm:px-4 py-2.5 sm:py-3 text-sm text-white placeholder:text-white/30 resize-none focus:outline-none focus:border-white/25 transition-colors" /></div>
+                <p className="text-xs text-white/40 italic leading-relaxed">Submitting this report will save the feedback for future improvements to our models.</p>
+                <div className="flex items-center justify-end gap-2 pt-1"><Button variant="outline" onClick={onClose} className="h-9 sm:h-10 px-4 sm:px-5 bg-transparent border-white/20 text-white hover:bg-white/10 hover:text-white rounded-xl text-sm">Cancel</Button><Button onClick={handleSubmit} className="h-9 sm:h-10 px-5 sm:px-6 bg-white text-black hover:bg-white/90 rounded-xl font-medium text-sm">Submit</Button></div>
+              </div>
+            </>
+          )}
           </motion.div>
         </motion.div>
       )}
@@ -369,12 +374,12 @@ function MessageActions({ message, isAssistant, onCopy, onRegenerate, onEdit, on
 
   useEffect(() => { if (isAssistant) { getFeedbackFromSupabase(message.id).then(setFeedback); } }, [message.id, isAssistant]);
 
-  // FIXED: Guaranteed single copy with ref guard
-  const handleCopy = useCallback(() => {
+  // FIXED: Guaranteed single copy with ref guard + async clipboard
+  const handleCopy = useCallback(async () => {
     if (hasCopiedRef.current) return;
     hasCopiedRef.current = true;
 
-    const success = copyToClipboard(message.content);
+    const success = await copyToClipboard(message.content);
     if (success) {
       onCopy();
       setCopied(true);
@@ -479,8 +484,7 @@ export function ChatMessages({ messages, isStreaming, isThinking, onRegenerate, 
     await saveFeedbackToSupabase(feedbackMessage.id, 'dislike', feedbackMessage.content, details, issueType);
   }, [feedbackMessage]);
 
-  // FIXED: Convert messages > 4000 bytes to file. NO ugly info card in message bubble.
-  // PRESERVES existing attachments (images, etc.) - appends file attachment to them.
+  // FIXED: Convert messages > 4000 bytes to file. PRESERVES existing attachments.
   const processedMessages = useMemo(() => {
     return messages.map(msg => {
       if (msg.role === 'user' && msg.content) {
@@ -488,21 +492,18 @@ export function ChatMessages({ messages, isStreaming, isThinking, onRegenerate, 
         if (bytes.length > MAX_MESSAGE_BYTES) {
           const fileAtt = textToFileAttachment(msg.content);
 
-          // Show toast only once per message
           if (!shownToastsRef.current.has(msg.id)) {
             shownToastsRef.current.add(msg.id);
-            // Use setTimeout to avoid calling setState during render
             setTimeout(() => {
               setToast("Content exceeds 4000 bytes and has been converted to a txt attachment.");
             }, 0);
           }
 
-          // PRESERVE existing attachments (images, links, etc.) and append the file
           const existingAttachments = msg.attachments || [];
           return { 
             ...msg, 
             attachments: [...existingAttachments, fileAtt], 
-            content: '' // Empty content - just show the file attachment, NO info card
+            content: ''
           };
         }
       }
@@ -546,7 +547,6 @@ export function ChatMessages({ messages, isStreaming, isThinking, onRegenerate, 
                     <div className={cn('rounded-2xl px-3.5 py-2 text-[13px] sm:text-sm leading-relaxed shadow-sm w-full', isAssistant ? 'bg-zinc-900/50 border border-zinc-800 text-zinc-200' : 'bg-zinc-800 text-zinc-100')}>
                       {message.content && message.content.trim().length > 0 && <MessageContent content={message.content} />}
 
-                      {/* Show file attachments - NO "converted to file" info card */}
                       {message.attachments?.some(a => a.type !== 'image') && (
                         <div className="space-y-2">
                           {message.attachments.filter(a => a.type !== 'image').map((att, i) => (
@@ -582,33 +582,4 @@ export function ChatMessages({ messages, isStreaming, isThinking, onRegenerate, 
       <FeedbackModal open={!!feedbackMessage} onClose={() => setFeedbackMessage(null)} message={feedbackMessage} onSubmit={handleFeedbackSubmit} />
     </>
   );
-}
-
-// ============= PASTE HANDLER HOOK (use in your ChatInput component) =============
-export function usePasteHandler(
-  onConvertToFile: (attachment: Attachment) => void,
-  onShowToast: (message: string) => void
-) {
-  const handlePaste = useCallback((event: React.ClipboardEvent<HTMLTextAreaElement>) => {
-    const pastedText = event.clipboardData.getData('text');
-
-    if (!pastedText) return false;
-
-    const bytes = new TextEncoder().encode(pastedText);
-
-    if (bytes.length > MAX_MESSAGE_BYTES) {
-      event.preventDefault();
-      event.stopPropagation();
-
-      const fileAtt = textToFileAttachment(pastedText);
-      onConvertToFile(fileAtt);
-      onShowToast(`Pasted message exceeded 4000 bytes (${(bytes.length / 1024).toFixed(1)} KB). Converting it to a file...`);
-
-      return true;
-    }
-
-    return false;
-  }, [onConvertToFile, onShowToast]);
-
-  return { handlePaste };
 }

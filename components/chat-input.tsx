@@ -47,7 +47,7 @@ import {
   DropdownMenuSeparator,
   DropdownMenuLabel,
 } from '@/components/ui/dropdown-menu'
-import NextImage from 'next/image' // Renamed to avoid conflict
+import NextImage from 'next/image'
 import { createClient } from '@supabase/supabase-js'
 
 // ============= CONSTANTS =============
@@ -120,7 +120,6 @@ async function compressImage(file: File): Promise<File> {
   return new Promise((resolve, reject) => {
     const reader = new FileReader()
     reader.onload = (e) => {
-      // Use native Image constructor (not Next.js Image)
       const img = new window.Image()
       img.onload = () => {
         const canvas = document.createElement('canvas')
@@ -206,7 +205,6 @@ async function uploadToSupabase(file: File, fileName: string): Promise<string> {
     })
   } catch (dbError) {
     console.error('Failed to save metadata:', dbError)
-    // Don't throw - the image is still uploaded
   }
 
   return publicUrl
@@ -316,18 +314,15 @@ export function ChatInput({
   }
 
   const uploadImage = useCallback(async (file: File, attachmentId: string) => {
-    // Set uploading status
     setUploadStatus(prev => new Map(prev).set(attachmentId, { status: 'uploading', progress: 0 }))
 
     try {
-      // Update progress - compressing
       setUploadStatus(prev => {
         const newMap = new Map(prev)
         newMap.set(attachmentId, { status: 'uploading', progress: 20 })
         return newMap
       })
 
-      // Compress image
       const compressed = await compressImage(file)
 
       setUploadStatus(prev => {
@@ -336,7 +331,6 @@ export function ChatInput({
         return newMap
       })
 
-      // Upload to Supabase
       const publicUrl = await uploadToSupabase(compressed, file.name)
 
       setUploadStatus(prev => {
@@ -345,7 +339,6 @@ export function ChatInput({
         return newMap
       })
 
-      // Update attachment with permanent URL
       setAttachments((prev) => 
         prev.map((a) => 
           a.id === attachmentId 
@@ -414,7 +407,6 @@ export function ChatInput({
       const bytes = new TextEncoder().encode(text)
 
       if (bytes.length > MAX_MESSAGE_BYTES) {
-        // Prevent normal paste and convert to file attachment
         e.preventDefault()
         e.stopPropagation()
 
@@ -444,8 +436,8 @@ export function ChatInput({
     }
   }, [initialValue, onClearInitialValue])
 
+  // FIXED: Ensure images are included in the message payload
   const handleSubmit = useCallback(() => {
-    // Check if any images are still uploading
     const hasUploading = Array.from(uploadStatus.values()).some(status => status.status === 'uploading')
 
     if (hasUploading) {
@@ -454,17 +446,23 @@ export function ChatInput({
     }
 
     if ((input.trim() || attachments.length > 0) && !isStreaming && !disabled) {
-      // Filter out attachments that have upload errors
       const validAttachments = attachments.filter(a => !a.uploadError)
 
-      // DEBUG: Log what's being sent
+      // CRITICAL FIX: Ensure image attachments have their permanent URLs
+      const attachmentsToSend = validAttachments.map(att => {
+        if (att.type === 'image' && att.permanentUrl) {
+          return { ...att, url: att.permanentUrl }
+        }
+        return att
+      })
+
       console.log('[ChatInput] Sending message:', {
         text: input.trim(),
-        attachments: validAttachments.map(a => ({ type: a.type, name: a.name, size: a.size, url: a.url?.substring(0, 50) + '...' })),
-        attachmentCount: validAttachments.length
+        attachments: attachmentsToSend.map(a => ({ type: a.type, name: a.name, size: a.size, url: a.url?.substring(0, 50) + '...' })),
+        attachmentCount: attachmentsToSend.length
       });
 
-      onSend(input.trim(), validAttachments.length > 0 ? validAttachments : undefined)
+      onSend(input.trim(), attachmentsToSend.length > 0 ? attachmentsToSend : undefined)
       setInput('')
       setAttachments([])
       setUploadStatus(new Map())
@@ -570,12 +568,10 @@ export function ChatInput({
   const imageAttachments = attachments.filter((a) => a.type === 'image')
   const otherAttachments = attachments.filter((a) => a.type !== 'image')
 
-  // Check if any images are still uploading
   const hasUploadingImages = Array.from(uploadStatus.values()).some(status => status.status === 'uploading')
 
   return (
     <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} className="bg-background">
-      {/* Toast Notification */}
       <AnimatePresence>
         {toast && (
           <ToastNotification 

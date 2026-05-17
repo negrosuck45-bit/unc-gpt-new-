@@ -8,7 +8,7 @@ function generateId() {
 }
 
 // ============================================================
-// YOUR REAL API KEYS (ALL EMBEDDED IN CODE)
+// API KEYS & ENDPOINTS
 // ============================================================
 const CHAT_WORKER_URLS = [
   "https://old-hat-dab9.gamingac527.workers.dev",
@@ -36,6 +36,7 @@ const GROQ_CHAT_MODELS: Record<string, string> = {
   "llama-3.3-70b-versatile": "llama-3.3-70b-versatile",
   "llama-3.1-8b-instant": "llama-3.1-8b-instant",
   "meta-llama/llama-4-scout-17b-16e-instruct": "meta-llama/llama-4-scout-17b-16e-instruct",
+  "meta-llama/llama-4-maverick-17b-128e-instruct": "meta-llama/llama-4-maverick-17b-128e-instruct",
   "deepseek-r1-distill-llama-70b": "deepseek-r1-distill-llama-70b",
   "mixtral-8x7b-32768": "mixtral-8x7b-32768",
 };
@@ -57,11 +58,21 @@ const PUTER_CLAUDE_MODELS: Record<string, string> = {
   "claude-opus-4.6-fast": "claude-opus-4.6-fast",
 };
 
+// GROQ KEYS - These are expired/invalid (returning 401)
+// User needs to get new ones from console.groq.com
 const GROQ_KEYS: string[] = [
   "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",
   "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",
   "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",
 ];
+
+// OPENROUTER - Free tier available, no API key needed for some models
+const OPENROUTER_URL = "https://openrouter.ai/api/v1/chat/completions";
+const OPENROUTER_KEY = ""; // Optional - some models work without key (rate limited)
+
+// CEREBRAS - Free tier with 1M tokens/day
+const CEREBRAS_URL = "https://api.cerebras.ai/v1/chat/completions";
+const CEREBRAS_KEY = "csk-tt4rvyyfwr5ytrm9vn33nhv5myc6p3thynkcv2j9cdtce62d";
 
 const PUTER_API_URL = "https://api.puter.com/puterai/openai/v1/chat/completions";
 const PUTER_AUTH_TOKEN = "";
@@ -70,11 +81,13 @@ let currentGroqKeyIndex = 0;
 let currentChatIndex = 0;
 
 // ============================================================
-// VISION MODELS
+// VISION MODELS - Updated for 2026
 // ============================================================
 const VISION_MODELS = [
-  "meta-llama/llama-4-scout-17b-16e-instruct",
-  "llama-3.2-11b-vision-preview",
+  "meta-llama/llama-4-scout-17b-16e-instruct",  // Primary Groq vision model (FREE TIER)
+  "meta-llama/llama-4-maverick-17b-128e-instruct", // Better vision, still free
+  "llama3.1-8b",  // DEPRECATED April 2025 - do not use
+  "llama-3.2-90b-vision-preview",  // DEPRECATED April 2025 - do not use
   "@cf/moonshot/kimi-k2.6",
   "@cf/moonshot/kimi-k2.5",
   "claude-3-opus",
@@ -87,7 +100,7 @@ function isVisionModel(model: string): boolean {
 }
 
 // ============================================================
-// ATTACHMENT PROCESSING - FIXED FOR IMAGE VISION
+// ATTACHMENT PROCESSING
 // ============================================================
 async function fetchLinkContent(url: string): Promise<string> {
   try {
@@ -128,59 +141,52 @@ function decodeFileContent(dataUrl: string): string {
   }
 }
 
-// THIS IS THE FIXED FUNCTION - PROPERLY HANDLES IMAGES FOR VISION MODELS
 async function processAttachmentsForModel(
   messages: any[],
   targetModel: string,
   hasVision: boolean
 ): Promise<any[]> {
   const processed = [];
-  
+
   for (const msg of messages) {
     if (!Array.isArray(msg.content)) {
       processed.push(msg);
       continue;
     }
-    
+
     const textParts: string[] = [];
     const imageParts: any[] = [];
-    
+
     for (const part of msg.content) {
       if (part.type === "text") {
         textParts.push(part.text);
       } 
       else if (part.type === "image_url") {
         const imageUrl = part.image_url.url;
-        
-        // Skip blob URLs (local previews not uploaded yet)
+
         if (imageUrl.startsWith("blob:")) {
           textParts.push("[Image is still uploading - please wait for upload to complete]");
           console.log("[Process] Skipping blob URL");
           continue;
         }
-        
+
         console.log(`[Process] Found image URL for vision model ${hasVision}: ${imageUrl.substring(0, 80)}...`);
-        
+
         if (hasVision) {
-          // FOR VISION MODELS - Add the image in the correct format
           imageParts.push({
             type: "image_url",
-            image_url: {
-              url: imageUrl
-            }
+            image_url: { url: imageUrl }
           });
         } else {
-          // FOR NON-VISION MODELS - Just note the image exists
           textParts.push(`[User attached an image. You can view it at: ${imageUrl}]`);
         }
       }
     }
-    
-    // Process link matches in text
+
     const combinedText = textParts.join("\n");
     const linkMatches = combinedText.match(/\[Attached (link|file): ([^\]]+)\]\(([^)]+)\)/g) || [];
     let processedText = combinedText;
-    
+
     for (const match of linkMatches) {
       const urlMatch = match.match(/\(([^)]+)\)/);
       if (urlMatch) {
@@ -194,10 +200,8 @@ async function processAttachmentsForModel(
         }
       }
     }
-    
-    // Build final message
+
     if (hasVision && imageParts.length > 0) {
-      // Vision model gets both text and images
       processed.push({
         role: msg.role,
         content: [
@@ -207,19 +211,44 @@ async function processAttachmentsForModel(
       });
       console.log(`[Process] Created vision message with ${imageParts.length} image(s)`);
     } else {
-      // Non-vision model gets only text
       processed.push({
         role: msg.role,
         content: processedText || (imageParts.length > 0 ? "User attached an image." : "")
       });
     }
   }
-  
+
   return processed;
 }
 
+function convertMessageWithAttachments(msg: any): any {
+  if (!msg.attachments || msg.attachments.length === 0) {
+    return msg;
+  }
+
+  const content: any[] = [];
+
+  if (msg.content && typeof msg.content === 'string' && msg.content.trim()) {
+    content.push({ type: 'text', text: msg.content });
+  }
+
+  for (const att of msg.attachments) {
+    if (att.type === 'image') {
+      content.push({
+        type: 'image_url',
+        image_url: { url: att.url }
+      });
+    }
+  }
+
+  return {
+    ...msg,
+    content: content.length > 0 ? content : msg.content
+  };
+}
+
 // ============================================================
-// MEDIA DETECTION
+// MEDIA DETECTION & GENERATION
 // ============================================================
 function isVideoRequest(prompt: string): boolean {
   return /(video|animation|clip|film|movie|motion|footage|reel|short|timelapse|animate|cinematic|slow.?mo)/i.test(prompt);
@@ -235,9 +264,6 @@ function resolveMediaType(prompt: string): "video" | "image" | "chat" {
   return "chat";
 }
 
-// ============================================================
-// MEDIA GENERATION
-// ============================================================
 async function generateImage(prompt: string): Promise<string> {
   const timeoutMs = 45000;
   let lastError = "";
@@ -248,12 +274,7 @@ async function generateImage(prompt: string): Promise<string> {
       const res = await fetch(IMAGE_VIDEO_WORKER_URL, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          task: "image",
-          prompt,
-          model,
-          type: "image"
-        }),
+        body: JSON.stringify({ task: "image", prompt, model, type: "image" }),
         signal: controller.signal,
       });
       clearTimeout(timeoutId);
@@ -278,10 +299,7 @@ async function generateVideo(prompt: string, imageUrl?: string): Promise<string>
     const pollinationsUrl = `https://video.pollinations.ai/prompt/${encodedPrompt}?model=fast-svd&nologo=true`;
     const controller = new AbortController();
     const timeoutId = setTimeout(() => controller.abort(), 120000);
-    const res = await fetch(pollinationsUrl, {
-      method: "GET",
-      signal: controller.signal,
-    });
+    const res = await fetch(pollinationsUrl, { method: "GET", signal: controller.signal });
     clearTimeout(timeoutId);
     if (res.ok) {
       const blob = await res.blob();
@@ -296,14 +314,341 @@ async function generateVideo(prompt: string, imageUrl?: string): Promise<string>
 }
 
 async function generateMedia(task: "image" | "video", prompt: string, image?: string): Promise<string> {
-  if (task === "video") {
-    return generateVideo(prompt, image);
-  }
+  if (task === "video") return generateVideo(prompt, image);
   return generateImage(prompt);
 }
 
 // ============================================================
-// MCP TOOLS
+// PROVIDER CALLS - WITH NEW FALLBACKS
+// ============================================================
+
+// 1. GROQ - Primary provider (fastest, free tier available)
+async function callGroq(
+  messages: any[],
+  model: string,
+  hasImage: boolean
+): Promise<{ stream: ReadableStream; provider: string; model: string }> {
+  const groqModel = hasImage 
+    ? "meta-llama/llama-4-scout-17b-16e-instruct" 
+    : (GROQ_CHAT_MODELS[model] ?? "llama-3.3-70b-versatile");
+  const hasVision = isVisionModel(groqModel);
+
+  console.log(`[Groq] Using model: ${groqModel}, hasVision: ${hasVision}, hasImage: ${hasImage}`);
+
+  const processedMessages = await processAttachmentsForModel(messages, groqModel, hasVision);
+
+  for (let attempt = 0; attempt < GROQ_KEYS.length; attempt++) {
+    const key = GROQ_KEYS[(currentGroqKeyIndex + attempt) % GROQ_KEYS.length];
+    if (!key) continue;
+
+    try {
+      const requestBody: any = {
+        model: groqModel,
+        messages: [
+          { role: "system", content: `You are uncgpt, a helpful AI assistant. You can SEE and DESCRIBE images. When users share images, analyze them carefully and describe what you see in detail including objects, text, colors, people, and any notable elements. Be conversational and natural.` },
+          ...processedMessages,
+        ],
+        stream: true,
+        temperature: 0.7,
+        max_tokens: 4096,
+      };
+
+      const res = await fetch("https://api.groq.com/openai/v1/chat/completions", {
+        method: "POST",
+        headers: { "Content-Type": "application/json", Authorization: `Bearer ${key}` },
+        body: JSON.stringify(requestBody),
+      });
+
+      if (res.status === 401) {
+        console.error(`[Groq] Key ${attempt + 1} returned 401 - invalid/expired`);
+        continue; // Try next key
+      }
+
+      if (res.ok) {
+        currentGroqKeyIndex = (currentGroqKeyIndex + 1) % GROQ_KEYS.length;
+        return { stream: res.body!, provider: "Groq", model: groqModel };
+      }
+
+      const errText = await res.text().catch(() => "");
+      console.error(`[Groq] Key ${attempt + 1} failed: ${res.status} ${errText.slice(0, 100)}`);
+    } catch (err: any) {
+      console.error(`[Groq] Key ${attempt + 1} network error:`, err.message);
+    }
+  }
+
+  throw new Error("All Groq keys failed (401 unauthorized - keys are expired/invalid)");
+}
+
+// 2. OPENROUTER - Free tier fallback (no key needed for :free models)
+async function callOpenRouter(
+  messages: any[],
+  hasImage: boolean
+): Promise<{ stream: ReadableStream; provider: string; model: string }> {
+  // Free vision models on OpenRouter (no API key required, just rate limited)
+  const visionModels = [
+    "meta-llama/llama-4-scout-17b-16e-instruct:free",
+    "meta-llama/llama-3.2-11b-vision-instruct:free",
+    "google/gemma-3-4b-it:free",
+  ];
+  const textModels = [
+    "meta-llama/llama-3.1-8b-instruct:free",
+    "mistralai/mistral-7b-instruct:free",
+  ];
+
+  const modelsToTry = hasImage ? visionModels : textModels;
+
+  for (const modelId of modelsToTry) {
+    try {
+      const headers: any = { "Content-Type": "application/json" };
+      if (OPENROUTER_KEY) {
+        headers["Authorization"] = `Bearer ${OPENROUTER_KEY}`;
+        headers["HTTP-Referer"] = "https://uncgpt.app";
+        headers["X-Title"] = "UncGPT";
+      }
+
+      const processedMessages = hasImage 
+        ? await processAttachmentsForModel(messages, modelId, true)
+        : messages;
+
+      const controller = new AbortController();
+      const timeoutId = setTimeout(() => controller.abort(), 30000);
+
+      const res = await fetch(OPENROUTER_URL, {
+        method: "POST",
+        headers,
+        body: JSON.stringify({
+          model: modelId,
+          messages: processedMessages,
+          stream: true,
+          temperature: 0.7,
+          max_tokens: 4096,
+        }),
+        signal: controller.signal,
+      });
+      clearTimeout(timeoutId);
+
+      if (res.ok) {
+        console.log(`[OpenRouter] Success with model: ${modelId}`);
+        return { stream: res.body!, provider: "OpenRouter (Free)", model: modelId };
+      }
+
+      const err = await res.text().catch(() => "");
+      console.error(`[OpenRouter] ${modelId} failed: ${res.status} ${err.slice(0, 100)}`);
+    } catch (err: any) {
+      console.error(`[OpenRouter] ${modelId} error:`, err.message);
+    }
+  }
+
+  throw new Error("All OpenRouter free models failed");
+}
+
+// 3. CEREBRAS - Free tier fallback (1M tokens/day)
+async function callCerebras(
+  messages: any[],
+  hasImage: boolean
+): Promise<{ stream: ReadableStream; provider: string; model: string }> {
+  if (!CEREBRAS_KEY) {
+    throw new Error("Cerebras API key not configured");
+  }
+
+  const model = hasImage 
+    ? "llama-4-scout-17b-16e-instruct"  // Vision-capable
+    : "llama-3.3-70b";
+
+  try {
+    const processedMessages = hasImage 
+      ? await processAttachmentsForModel(messages, model, true)
+      : messages;
+
+    const res = await fetch(CEREBRAS_URL, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        "Authorization": `Bearer ${CEREBRAS_KEY}`,
+      },
+      body: JSON.stringify({
+        model,
+        messages: processedMessages,
+        stream: true,
+        temperature: 0.7,
+        max_tokens: 4096,
+      }),
+    });
+
+    if (res.ok) {
+      return { stream: res.body!, provider: "Cerebras", model };
+    }
+
+    const err = await res.text().catch(() => "");
+    throw new Error(`Cerebras failed: ${res.status} ${err.slice(0, 100)}`);
+  } catch (err: any) {
+    throw err;
+  }
+}
+
+// 4. CLOUDFLARE WORKERS - Text-only fallback
+async function callChatWorkers(
+  body: any,
+  model: string,
+  hasImage: boolean
+): Promise<{ stream: ReadableStream; provider: string; model: string }> {
+  const cfModel = model.startsWith("@cf/") ? model : "@cf/anthropic/claude-3-haiku";
+
+  for (let i = 0; i < CHAT_WORKER_URLS.length; i++) {
+    const index = (currentChatIndex + i) % CHAT_WORKER_URLS.length;
+    const url = CHAT_WORKER_URLS[index];
+    try {
+      const controller = new AbortController();
+      const timeoutId = setTimeout(() => controller.abort(), 18000);
+
+      // For text-only, simplify messages. For vision, preserve images.
+      const messagesToSend = hasImage 
+        ? (body.messages || []).map((m: any) => ({
+            role: m.role,
+            content: Array.isArray(m.content) 
+              ? m.content.map((c: any) => {
+                  if (c.type === "text") return { type: "text", text: c.text };
+                  if (c.type === "image_url") return { type: "image_url", image_url: { url: c.image_url.url } };
+                  return c;
+                })
+              : m.content
+          }))
+        : (body.messages || []).map((m: any) => ({
+            role: m.role,
+            content: Array.isArray(m.content)
+              ? m.content.find((c: any) => c.type === "text")?.text || ""
+              : m.content
+          }));
+
+      const res = await fetch(url, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          ...body,
+          model: cfModel,
+          messages: messagesToSend,
+          ...(hasImage && { vision: true })
+        }),
+        signal: controller.signal,
+      });
+      clearTimeout(timeoutId);
+
+      if (res.ok) {
+        currentChatIndex = (index + 1) % CHAT_WORKER_URLS.length;
+        return { stream: res.body!, provider: "Cloudflare", model: cfModel };
+      }
+    } catch (err: any) {}
+  }
+  throw new Error("All Cloudflare chat workers failed");
+}
+
+// 5. PUTER - Claude fallback
+async function callPuter(
+  messages: any[],
+  model: string
+): Promise<{ stream: ReadableStream; provider: string; model: string }> {
+  const puterModel = PUTER_CLAUDE_MODELS[model] ?? "claude-sonnet-4-5";
+  if (!PUTER_AUTH_TOKEN) {
+    throw new Error("No Puter auth token configured");
+  }
+  try {
+    const res = await fetch(PUTER_API_URL, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        Authorization: `Bearer ${PUTER_AUTH_TOKEN}`,
+      },
+      body: JSON.stringify({
+        model: puterModel,
+        messages: [
+          { role: "system", content: "You are a helpful AI assistant. Be conversational and natural." },
+          ...messages,
+        ],
+        stream: true,
+      }),
+    });
+    if (!res.ok) {
+      const errText = await res.text().catch(() => "");
+      throw new Error(`Puter failed (${res.status}): ${errText.slice(0, 200)}`);
+    }
+    return { stream: res.body!, provider: "Puter (Claude)", model: puterModel };
+  } catch (err: any) {
+    throw err;
+  }
+}
+
+// ============================================================
+// FALLBACK CHAIN - VISION-AWARE
+// ============================================================
+async function fallbackChat(
+  messages: any[],
+  hasImage: boolean
+): Promise<{ stream: ReadableStream; provider: string; model: string }> {
+  const errors: string[] = [];
+
+  // If we have images, try vision-capable providers in order
+  if (hasImage) {
+    // 1. Try Groq with vision model
+    try {
+      return await callGroq(messages, "meta-llama/llama-4-scout-17b-16e-instruct", true);
+    } catch (err: any) {
+      errors.push(`Groq: ${err.message}`);
+      console.error("[Fallback] Groq vision failed:", err.message);
+    }
+
+    // 2. Try OpenRouter free vision models (no API key needed)
+    try {
+      return await callOpenRouter(messages, true);
+    } catch (err: any) {
+      errors.push(`OpenRouter: ${err.message}`);
+      console.error("[Fallback] OpenRouter vision failed:", err.message);
+    }
+
+    // 3. Try Cerebras if key is configured
+    if (CEREBRAS_KEY) {
+      try {
+        return await callCerebras(messages, true);
+      } catch (err: any) {
+        errors.push(`Cerebras: ${err.message}`);
+        console.error("[Fallback] Cerebras vision failed:", err.message);
+      }
+    }
+
+    // 4. Try Cloudflare workers (may or may not support vision)
+    try {
+      return await callChatWorkers({ task: "chat", messages }, "@cf/anthropic/claude-3-haiku", true);
+    } catch (err: any) {
+      errors.push(`Cloudflare: ${err.message}`);
+      console.error("[Fallback] Cloudflare vision failed:", err.message);
+    }
+
+    throw new Error(`Critical Failure: No vision-capable providers available.\n\nDetails:\n${errors.join("\n")}\n\nTo fix this:\n1. Get a new free Groq API key at console.groq.com (Llama 4 Scout is FREE)\n2. Or add an OpenRouter key for free vision models\n3. Or add a Cerebras key for free vision (1M tokens/day)`);
+  }
+
+  // No images - standard fallback chain
+  try {
+    return await callGroq(messages, "llama-3.3-70b-versatile", false);
+  } catch (err: any) {
+    errors.push(`Groq: ${err.message}`);
+  }
+
+  try {
+    return await callOpenRouter(messages, false);
+  } catch (err: any) {
+    errors.push(`OpenRouter: ${err.message}`);
+  }
+
+  try {
+    return await callChatWorkers({ task: "chat", messages }, "@cf/anthropic/claude-3-haiku", false);
+  } catch (err: any) {
+    errors.push(`Cloudflare: ${err.message}`);
+  }
+
+  throw new Error(`Critical Failure: All providers failed.\n\n${errors.join("\n")}`);
+}
+
+// ============================================================
+// MCP TOOLS (unchanged)
 // ============================================================
 async function fetchMcpTools(connectors: any[], baseUrl: string): Promise<any[]> {
   if (!connectors?.length) return [];
@@ -320,12 +665,7 @@ async function fetchMcpTools(connectors: any[], baseUrl: string): Promise<any[]>
               "Content-Type": "application/json",
               Accept: "application/json, text/event-stream",
             },
-            body: JSON.stringify({
-              action,
-              connectorId: c.id,
-              method,
-              params,
-            }),
+            body: JSON.stringify({ action, connectorId: c.id, method, params }),
           });
           if (!res.ok) throw new Error(`HTTP ${res.status}`);
           const ct = res.headers.get("content-type") || "";
@@ -375,9 +715,6 @@ async function fetchMcpTools(connectors: any[], baseUrl: string): Promise<any[]>
   return tools;
 }
 
-// ============================================================
-// BUILT-IN TOOLS
-// ============================================================
 const BUILTIN_TOOLS: any[] = [];
 
 async function executeBuiltInTool(toolName: string, args: any): Promise<string> {
@@ -443,9 +780,6 @@ async function runToolLoop(
   return working;
 }
 
-// ============================================================
-// OAUTH TOOLS
-// ============================================================
 function buildOAuthTools(req: NextRequest, baseUrl: string) {
   const cookieHeader = req.headers.get("cookie") || "";
   const providers = ["github", "linear", "slack", "notion", "google_drive", "vercel"];
@@ -617,137 +951,6 @@ async function executeMcpTool(tool: any, args: any, baseUrl: string): Promise<st
 }
 
 // ============================================================
-// PROVIDER CALLS
-// ============================================================
-async function callGroq(
-  messages: any[],
-  model: string,
-  hasImage: boolean
-): Promise<{ stream: ReadableStream; provider: string; model: string }> {
-  // IMPORTANT: Use vision model if there's an image
-  const groqModel = hasImage ? "meta-llama/llama-4-scout-17b-16e-instruct" : (GROQ_CHAT_MODELS[model] ?? "llama-3.3-70b-versatile");
-  const hasVision = isVisionModel(groqModel);
-  
-  console.log(`[Groq] Using model: ${groqModel}, hasVision: ${hasVision}, hasImage: ${hasImage}`);
-  
-  const processedMessages = await processAttachmentsForModel(messages, groqModel, hasVision);
-
-  for (let attempt = 0; attempt < GROQ_KEYS.length; attempt++) {
-    const key = GROQ_KEYS[(currentGroqKeyIndex + attempt) % GROQ_KEYS.length];
-    try {
-      const requestBody: any = {
-        model: groqModel,
-        messages: [
-          { role: "system", content: `You are uncgpt, a helpful AI assistant. You can SEE and DESCRIBE images. When users share images, analyze them carefully and describe what you see in detail including objects, text, colors, people, and any notable elements. Be conversational and natural.` },
-          ...processedMessages,
-        ],
-        stream: true,
-        temperature: 0.7,
-        max_tokens: 4096,
-      };
-
-      const res = await fetch("https://api.groq.com/openai/v1/chat/completions", {
-        method: "POST",
-        headers: { "Content-Type": "application/json", Authorization: `Bearer ${key}` },
-        body: JSON.stringify(requestBody),
-      });
-
-      if (res.ok) {
-        currentGroqKeyIndex = (currentGroqKeyIndex + 1) % GROQ_KEYS.length;
-        return { stream: res.body!, provider: "Groq", model: groqModel };
-      }
-    } catch (err: any) {}
-  }
-  throw new Error("All Groq keys failed");
-}
-
-async function callPuter(
-  messages: any[],
-  model: string
-): Promise<{ stream: ReadableStream; provider: string; model: string }> {
-  const puterModel = PUTER_CLAUDE_MODELS[model] ?? "claude-sonnet-4-5";
-  if (!PUTER_AUTH_TOKEN) {
-    throw new Error("No Puter auth token configured");
-  }
-  try {
-    const res = await fetch(PUTER_API_URL, {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-        Authorization: `Bearer ${PUTER_AUTH_TOKEN}`,
-      },
-      body: JSON.stringify({
-        model: puterModel,
-        messages: [
-          { role: "system", content: "You are a helpful AI assistant. Be conversational and natural." },
-          ...messages,
-        ],
-        stream: true,
-      }),
-    });
-    if (!res.ok) {
-      const errText = await res.text().catch(() => "");
-      throw new Error(`Puter failed (${res.status}): ${errText.slice(0, 200)}`);
-    }
-    return { stream: res.body!, provider: "Puter (Claude)", model: puterModel };
-  } catch (err: any) {
-    throw err;
-  }
-}
-
-async function callChatWorkers(
-  body: any,
-  model: string
-): Promise<{ stream: ReadableStream; provider: string; model: string }> {
-  const cfModel = model.startsWith("@cf/") ? model : "@cf/anthropic/claude-3-haiku";
-  for (let i = 0; i < CHAT_WORKER_URLS.length; i++) {
-    const index = (currentChatIndex + i) % CHAT_WORKER_URLS.length;
-    const url = CHAT_WORKER_URLS[index];
-    try {
-      const controller = new AbortController();
-      const timeoutId = setTimeout(() => controller.abort(), 18000);
-      const simplifiedMessages = (body.messages || []).map((m: any) => ({
-        role: m.role,
-        content: Array.isArray(m.content)
-          ? m.content.find((c: any) => c.type === "text")?.text || ""
-          : m.content
-      }));
-      const res = await fetch(url, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          ...body,
-          model: cfModel,
-          messages: simplifiedMessages
-        }),
-        signal: controller.signal,
-      });
-      clearTimeout(timeoutId);
-      if (res.ok) {
-        currentChatIndex = (index + 1) % CHAT_WORKER_URLS.length;
-        return { stream: res.body!, provider: "Cloudflare", model: cfModel };
-      }
-    } catch (err: any) {}
-  }
-  throw new Error("All Cloudflare chat workers failed");
-}
-
-async function fallbackChat(
-  messages: any[],
-  hasImage: boolean
-): Promise<{ stream: ReadableStream; provider: string; model: string }> {
-  try {
-    return await callGroq(messages, "llama-3.3-70b-versatile", hasImage);
-  } catch {
-    try {
-      return await callChatWorkers({ task: "chat", messages }, "@cf/anthropic/claude-3-haiku");
-    } catch {
-      throw new Error("Critical Failure: All providers and fallbacks failed.");
-    }
-  }
-}
-
-// ============================================================
 // STREAM RESPONSE
 // ============================================================
 function createStreamResponse(
@@ -764,9 +967,7 @@ function createStreamResponse(
       controller.enqueue(encoder.encode(`data: ${JSON.stringify({ provider, model })}\n\n`));
 
       for (const step of toolSteps) {
-        controller.enqueue(
-          encoder.encode(`data: ${JSON.stringify({ tool_step: step })}\n\n`)
-        );
+        controller.enqueue(encoder.encode(`data: ${JSON.stringify({ tool_step: step })}\n\n`));
       }
 
       const reader = stream.getReader();
@@ -864,12 +1065,25 @@ export async function POST(req: NextRequest) {
     let hasImage = false;
     let imageUrl = "";
 
-    if (Array.isArray(lastMsg?.content)) {
-      const imgPart = lastMsg.content.find((c: any) => c.type === "image_url");
-      if (imgPart && !imgPart.image_url.url.startsWith("blob:")) {
-        hasImage = true;
-        imageUrl = imgPart.image_url.url;
-        console.log(`[Main] Valid image detected: ${imageUrl.substring(0, 80)}...`);
+    // Check ALL messages for images
+    for (const msg of messages) {
+      if (Array.isArray(msg?.content)) {
+        const imgPart = msg.content.find((c: any) => c.type === "image_url");
+        if (imgPart && !imgPart.image_url.url.startsWith("blob:")) {
+          hasImage = true;
+          imageUrl = imgPart.image_url.url;
+          console.log(`[Main] Valid image in content array: ${imageUrl.substring(0, 80)}...`);
+          break;
+        }
+      }
+      if (msg?.attachments) {
+        const imgAtt = msg.attachments.find((a: any) => a.type === 'image');
+        if (imgAtt && !imgAtt.url.startsWith("blob:")) {
+          hasImage = true;
+          imageUrl = imgAtt.url;
+          console.log(`[Main] Valid image in attachments: ${imageUrl.substring(0, 80)}...`);
+          break;
+        }
       }
     }
 
@@ -903,10 +1117,11 @@ export async function POST(req: NextRequest) {
     // ==================== CHAT ====================
     const targetModel = finalModel !== "auto" ? finalModel : (hasImage ? "meta-llama/llama-4-scout-17b-16e-instruct" : "llama-3.3-70b-versatile");
     const hasVisionCapability = isVisionModel(targetModel) || hasImage;
-    
+
     console.log(`[Main] Target model: ${targetModel}, hasVision: ${hasVisionCapability}, hasImage: ${hasImage}`);
-    
-    const apiMessages = await processAttachmentsForModel(messages, targetModel, hasVisionCapability);
+
+    const messagesWithVisionFormat = messages.map(convertMessageWithAttachments);
+    const apiMessages = await processAttachmentsForModel(messagesWithVisionFormat, targetModel, hasVisionCapability);
 
     const systemParts: string[] = [
       `You are uncgpt - a helpful AI assistant. You can SEE and ANALYZE images. When users share images, describe what you see in detail including objects, text, colors, people, and any notable elements. Be conversational and natural.\n\nFor greetings and general questions: just talk naturally.\nFor action requests (code, GitHub, etc): use tools if available.`,
@@ -940,8 +1155,10 @@ export async function POST(req: NextRequest) {
     try {
       if (finalProvider === "groq" || GROQ_CHAT_MODELS[finalModel]) {
         result = await callGroq(messagesWithSystem, finalModel, hasImage);
+      } else if (finalProvider === "openrouter") {
+        result = await callOpenRouter(messagesWithSystem, hasImage);
       } else if (finalProvider === "cloudflare" || finalModel.startsWith("@cf/")) {
-        result = await callChatWorkers({ task: "chat", messages: messagesWithSystem }, finalModel);
+        result = await callChatWorkers({ task: "chat", messages: messagesWithSystem }, finalModel, hasImage);
       } else {
         result = await fallbackChat(messagesWithSystem, hasImage);
       }
