@@ -100,22 +100,34 @@ function textToFileAttachment(text: string, filename?: string): Attachment {
   };
 }
 
-// Fallback copy method
-function fallbackCopyText(text: string): boolean {
+// WORKING COPY FUNCTION - NO Clipboard API
+function copyToClipboard(text: string): boolean {
   try {
+    // Create a temporary textarea element
     const textArea = document.createElement('textarea');
     textArea.value = text;
+    
+    // Make it invisible but attached to DOM
     textArea.style.position = 'fixed';
-    textArea.style.top = '-9999px';
-    textArea.style.left = '-9999px';
+    textArea.style.top = '-999999px';
+    textArea.style.left = '-999999px';
     textArea.style.opacity = '0';
+    textArea.style.pointerEvents = 'none';
+    
     document.body.appendChild(textArea);
+    
+    // Select and copy
     textArea.select();
     textArea.setSelectionRange(0, text.length);
+    
     const success = document.execCommand('copy');
+    
+    // Clean up
     document.body.removeChild(textArea);
+    
     return success;
   } catch (err) {
+    console.error('Copy failed:', err);
     return false;
   }
 }
@@ -353,36 +365,43 @@ function NetworkErrorBanner({ error, onRetry }: { error: string; onRetry?: () =>
   );
 }
 
-// ============= MESSAGE ACTIONS WITH FIXED COPY =============
+// ============= MESSAGE ACTIONS WITH WORKING COPY =============
 function MessageActions({ message, isAssistant, onCopy, onRegenerate, onEdit, onDislike }: { message: Message; isAssistant: boolean; onCopy: () => void; onRegenerate?: () => void; onEdit?: () => void; onDislike?: () => void }) {
   const [copied, setCopied] = useState(false);
   const [feedback, setFeedback] = useState<'like' | 'dislike' | null>(null);
 
   useEffect(() => { if (isAssistant) { getFeedbackFromSupabase(message.id).then(setFeedback); } }, [message.id, isAssistant]);
 
-  const handleCopy = useCallback(async () => {
-    try {
-      if (navigator.clipboard && window.isSecureContext) {
-        await navigator.clipboard.writeText(message.content);
-      } else {
-        if (!fallbackCopyText(message.content)) throw new Error('Copy failed');
-      }
+  // FIXED: Using ONLY execCommand fallback, NO Clipboard API
+  const handleCopy = useCallback(() => {
+    const success = copyToClipboard(message.content);
+    if (success) {
       onCopy();
       setCopied(true);
       setTimeout(() => setCopied(false), 2000);
-    } catch (err) {
-      console.error('Copy failed:', err);
-      const textArea = document.createElement('textarea');
-      textArea.value = message.content;
-      textArea.style.position = 'fixed';
-      textArea.style.left = '-999999px';
-      document.body.appendChild(textArea);
-      textArea.select();
-      document.execCommand('copy');
-      document.body.removeChild(textArea);
-      onCopy();
-      setCopied(true);
-      setTimeout(() => setCopied(false), 2000);
+    } else {
+      // Last resort: show text selection for manual copy
+      const tempDiv = document.createElement('div');
+      tempDiv.textContent = message.content;
+      tempDiv.style.position = 'fixed';
+      tempDiv.style.top = '0';
+      tempDiv.style.left = '0';
+      tempDiv.style.width = '100%';
+      tempDiv.style.height = '100%';
+      tempDiv.style.backgroundColor = 'rgba(0,0,0,0.9)';
+      tempDiv.style.color = 'white';
+      tempDiv.style.padding = '20px';
+      tempDiv.style.zIndex = '99999';
+      tempDiv.style.overflow = 'auto';
+      tempDiv.style.whiteSpace = 'pre-wrap';
+      document.body.appendChild(tempDiv);
+      const range = document.createRange();
+      range.selectNodeContents(tempDiv);
+      const selection = window.getSelection();
+      selection?.removeAllRanges();
+      selection?.addRange(range);
+      alert('Press Ctrl+C to copy, then click anywhere to close');
+      tempDiv.onclick = () => document.body.removeChild(tempDiv);
     }
   }, [onCopy, message.content]);
 
@@ -473,7 +492,11 @@ export function ChatMessages({ messages, isStreaming, isThinking, onRegenerate, 
           const fileAtt = textToFileAttachment(msg.content);
           // Show toast notification
           setTimeout(() => setToast(`Converted ${(bytes.length / 1024).toFixed(1)} KB message to "${fileAtt.name}"`), 0);
-          return { ...msg, attachments: [fileAtt], content: `📎 **Large message converted to file**\n\nYour message (${(bytes.length / 1024).toFixed(1)} KB) has been automatically converted to an attached file for better readability.` };
+          return { 
+            ...msg, 
+            attachments: [fileAtt], 
+            content: `📎 **Large message converted to file**\n\nYour message (${(bytes.length / 1024).toFixed(1)} KB) has been automatically converted to an attached file for better readability.\n\n**File:** ${fileAtt.name}\n**Size:** ${(bytes.length / 1024).toFixed(1)} KB\n**Language:** ${fileAtt.language}\n\nClick the file attachment above to view the full content.` 
+          };
         }
       }
       return msg;
@@ -502,7 +525,14 @@ export function ChatMessages({ messages, isStreaming, isThinking, onRegenerate, 
                       {message.image && (<motion.div initial={{ opacity: 0, scale: 0.9 }} animate={{ opacity: 1, scale: 1 }} className="mt-3 rounded-lg overflow-hidden max-w-sm">{message.image.startsWith('data:') ? <img src={message.image} alt="Generated image" className="w-full h-auto object-cover rounded-lg bg-muted" /> : <NextImage src={message.image} alt="Generated image" width={400} height={300} className="w-full h-auto object-cover rounded-lg" loading="lazy" unoptimized={message.image.includes('blob:')} />}</motion.div>)}
                       {message.video && (<motion.div initial={{ opacity: 0, scale: 0.9 }} animate={{ opacity: 1, scale: 1 }} className="mt-3 rounded-lg overflow-hidden max-w-sm"><video src={message.video} controls className="w-full h-auto rounded-lg bg-muted" /></motion.div>)}
                     </div>
-                    <MessageActions message={message} isAssistant={isAssistant} onCopy={() => navigator.clipboard.writeText(message.content).catch(() => { const ta = document.createElement('textarea'); ta.value = message.content; document.body.appendChild(ta); ta.select(); document.execCommand('copy'); document.body.removeChild(ta); })} onRegenerate={isLast && isAssistant ? () => onRegenerate?.(message.id) : undefined} onEdit={!isAssistant ? () => onEditMessage?.(message.id, message.content) : undefined} onDislike={isAssistant ? () => setFeedbackMessage(message) : undefined} />
+                    <MessageActions 
+                      message={message} 
+                      isAssistant={isAssistant} 
+                      onCopy={() => {}} 
+                      onRegenerate={isLast && isAssistant ? () => onRegenerate?.(message.id) : undefined} 
+                      onEdit={!isAssistant ? () => onEditMessage?.(message.id, message.content) : undefined} 
+                      onDislike={isAssistant ? () => setFeedbackMessage(message) : undefined} 
+                    />
                   </div>
                   {!isAssistant && (<div className="w-8 h-8 rounded-full flex items-center justify-center flex-shrink-0 overflow-hidden bg-zinc-800 text-zinc-100"><User className="w-4 h-4" /></div>)}
                 </div>
