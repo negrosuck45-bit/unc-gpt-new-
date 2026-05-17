@@ -74,6 +74,36 @@ function useIsDarkMode() {
   return isDark;
 }
 
+// Helper function to detect language from content
+function detectLanguage(content: string): string {
+  // Simple language detection based on common patterns
+  if (content.includes('function') || content.includes('const') || content.includes('let') || content.includes('=>')) {
+    if (content.includes('import React') || content.includes('useState')) return 'tsx';
+    if (content.includes('<html') || content.includes('<div')) return 'html';
+    return 'javascript';
+  }
+  if (content.includes('def ') || content.includes('import ') && content.includes('from ')) return 'python';
+  if (content.includes('SELECT') || content.includes('INSERT INTO')) return 'sql';
+  if (content.includes('curl ') || content.includes('wget ')) return 'bash';
+  if (content.includes('{') && content.includes('}') && content.includes(':')) return 'json';
+  return 'text';
+}
+
+// Convert long text to file attachment
+function textToFileAttachment(text: string, filename?: string): Attachment {
+  const bytes = new TextEncoder().encode(text);
+  const base64 = toBase64(text);
+  const dataUrl = `data:text/plain;base64,${base64}`;
+  
+  return {
+    name: filename || `pasted-message-${Date.now()}.txt`,
+    url: dataUrl,
+    type: 'file',
+    size: bytes.length,
+    language: detectLanguage(text),
+  };
+}
+
 export interface ChatMessagesProps {
   messages: Message[];
   isStreaming: boolean;
@@ -181,7 +211,9 @@ function AttachmentPreview({
       ) : (
         <FileText className="h-4 w-4 flex-shrink-0 text-muted-foreground" />
       )}
-      <span className="text-sm text-muted-foreground truncate">{attachment.name}</span>
+      <span className="text-sm text-muted-foreground truncate">
+        {attachment.name} {attachment.size && `(${(attachment.size / 1024).toFixed(1)} KB)`}
+      </span>
       <button
         onClick={() => onView(attachment)}
         className="ml-auto p-1 rounded-md hover:bg-accent transition-colors"
@@ -596,11 +628,16 @@ function MessageActions({
     }
   }, [message.id, isAssistant]);
 
-  const handleCopy = useCallback(() => {
-    onCopy();
-    setCopied(true);
-    setTimeout(() => setCopied(false), 2000);
-  }, [onCopy]);
+  const handleCopy = useCallback(async () => {
+    try {
+      await navigator.clipboard.writeText(message.content);
+      onCopy();
+      setCopied(true);
+      setTimeout(() => setCopied(false), 2000);
+    } catch (err) {
+      console.error('Failed to copy:', err);
+    }
+  }, [onCopy, message.content]);
 
   const handleLike = useCallback(async () => {
     await saveFeedbackToSupabase(message.id, 'like', message.content);
@@ -898,11 +935,33 @@ export function ChatMessages({
     }
   }, [isThinking]);
 
+  // Process messages to convert long text to file attachments
+  const processedMessages = useMemo(() => {
+    return messages.map(message => {
+      // Only process user messages that have content but no attachments
+      if (message.role === 'user' && message.content && (!message.attachments || message.attachments.length === 0)) {
+        const contentBytes = new TextEncoder().encode(message.content);
+        
+        // If content is over 1000 bytes, convert to file attachment
+        if (contentBytes.length > 1000) {
+          const fileAttachment = textToFileAttachment(message.content);
+          
+          return {
+            ...message,
+            content: `📎 **Long message converted to file**\n\nYour message was ${(contentBytes.length / 1024).toFixed(1)} KB, which exceeds the 1000 byte limit. It has been automatically converted to a file attachment.\n\n**Filename:** ${fileAttachment.name}\n**Size:** ${(fileAttachment.size! / 1024).toFixed(1)} KB`,
+            attachments: [fileAttachment],
+          };
+        }
+      }
+      return message;
+    });
+  }, [messages]);
+
   return (
     <>
       <div className="flex-1 overflow-y-auto scroll-smooth" style={{ WebkitOverflowScrolling: 'touch', willChange: 'scroll-position' } as React.CSSProperties}>
         <div className="max-w-3xl xl:max-w-4xl mx-auto px-3 sm:px-4 md:px-6 py-3 space-y-4">
-          {messages.map((message, index) => {
+          {processedMessages.map((message, index) => {
             const isAssistant = message.role === 'assistant';
             const isLast = index === messages.length - 1;
 
