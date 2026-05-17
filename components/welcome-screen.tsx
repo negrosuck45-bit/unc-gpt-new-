@@ -17,14 +17,6 @@ export function WelcomeScreen({ onSelectPrompt, project }: WelcomeScreenProps) {
       {/* Centered content */}
       <div className="flex flex-col items-center text-center max-w-2xl w-full -mt-20">
         {/* Logo / Avatar */}
-            <Image
-              src="/uncgpt.png"
-              alt="UNC GPT"
-              width={80}
-              height={80}
-              className="object-cover"
-              priority
-            />
           </div>
 
 
