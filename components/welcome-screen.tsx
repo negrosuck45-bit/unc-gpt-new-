@@ -1,7 +1,7 @@
 "use client";
 
 import { useChatStore } from "@/lib/chat-store";
-import { Sparkles } from "lucide-react";
+import Image from "next/image";
 import { motion } from "framer-motion";
 
 interface WelcomeScreenProps {
@@ -23,8 +23,15 @@ export function WelcomeScreen({ onSelectPrompt, project }: WelcomeScreenProps) {
           transition={{ duration: 0.5 }}
           className="mb-6"
         >
-          <div className="w-16 h-16 rounded-full bg-gradient-to-br from-orange-400 to-red-600 flex items-center justify-center shadow-lg shadow-orange-500/20">
-            <Sparkles className="w-8 h-8 text-white" />
+          <div className="w-20 h-20 rounded-full bg-gradient-to-br from-orange-400 to-red-600 flex items-center justify-center shadow-lg shadow-orange-500/20 overflow-hidden">
+            <Image
+              src="/uncgpt.png"
+              alt="UNC GPT"
+              width={80}
+              height={80}
+              className="object-cover"
+              priority
+            />
           </div>
         </motion.div>
 
@@ -55,7 +62,7 @@ export function WelcomeScreen({ onSelectPrompt, project }: WelcomeScreenProps) {
           transition={{ delay: 0.3, duration: 0.5 }}
           className="grid grid-cols-1 sm:grid-cols-2 gap-3 w-full max-w-xl"
         >
- 
+          {/* Add your prompt buttons here */}
         </motion.div>
       </div>
     </div>
