@@ -45,7 +45,7 @@ export function WelcomeScreen({ onSelectPrompt, project }: WelcomeScreenProps) {
           transition={{ delay: 0.2, duration: 0.5 }}
           className="text-zinc-400 text-sm sm:text-base mb-10"
         >
-          Chat, write, generate and edit images, all in one clean workspace.
+          Chat, write and generate, all in one clean workspace.
         </motion.p>
 
         {/* Example Prompts - centered grid */}
