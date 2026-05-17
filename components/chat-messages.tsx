@@ -142,21 +142,15 @@ function ToastNotification({ message, onClose }: { message: string; onClose: () 
 
   return (
     <motion.div
-      initial={{ opacity: 0, y: -50, scale: 0.9 }}
-      animate={{ opacity: 1, y: 0, scale: 1 }}
-      exit={{ opacity: 0, y: -50, scale: 0.9 }}
+      initial={{ opacity: 0, y: -20 }}
+      animate={{ opacity: 1, y: 0 }}
+      exit={{ opacity: 0, y: -20 }}
       className="fixed top-4 left-1/2 -translate-x-1/2 z-[100]"
     >
-      <div className="bg-zinc-900/95 backdrop-blur-md border border-zinc-700 rounded-xl shadow-2xl p-4 flex items-center gap-3 min-w-[380px] max-w-lg">
-        <div className="w-8 h-8 rounded-full bg-blue-500/20 flex items-center justify-center flex-shrink-0">
-          <FileText className="h-4 w-4 text-blue-400" />
-        </div>
-        <div className="flex-1">
-          <p className="text-sm font-medium text-white">Message Converted to File</p>
-          <p className="text-xs text-zinc-400">{message}</p>
-        </div>
-        <button onClick={onClose} className="p-1.5 rounded-lg hover:bg-white/10 transition-colors flex-shrink-0">
-          <X className="h-3.5 w-3.5 text-zinc-500" />
+      <div className="bg-zinc-800/90 backdrop-blur-sm border border-zinc-700/50 rounded-lg shadow-xl px-4 py-3 flex items-center gap-2 max-w-md">
+        <p className="text-sm text-zinc-200">{message}</p>
+        <button onClick={onClose} className="ml-2 p-1 rounded hover:bg-white/10 transition-colors">
+          <X className="h-3 w-3 text-zinc-500" />
         </button>
       </div>
     </motion.div>
@@ -499,7 +493,7 @@ export function ChatMessages({ messages, isStreaming, isThinking, onRegenerate, 
             shownToastsRef.current.add(msg.id);
             // Use setTimeout to avoid calling setState during render
             setTimeout(() => {
-              setToast(`Pasted message exceeded 4000 bytes (${(bytes.length / 1024).toFixed(1)} KB). Converting it to a file...`);
+              setToast(`Content exceeds 4000 bytes and has been converted to a txt attachment.`);
             }, 0);
           }
 
