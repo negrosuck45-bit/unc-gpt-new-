@@ -50,6 +50,9 @@ import {
 import NextImage from 'next/image' // Renamed to avoid conflict
 import { createClient } from '@supabase/supabase-js'
 
+// ============= CONSTANTS =============
+const MAX_MESSAGE_BYTES = 4000;
+
 // Initialize Supabase client
 const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL
 const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY
@@ -71,6 +74,7 @@ const familyIcons: Record<string, string> = {
   llama: "/llama.png",
 }
 
+// ============= HELPER FUNCTIONS =============
 function toBase64(str: string): string {
   const encoder = new TextEncoder()
   const bytes = encoder.encode(str)
@@ -84,6 +88,32 @@ function fromBase64(base64: string): string {
   const bytes = new Uint8Array(binary.length)
   for (let i = 0; i < binary.length; i++) bytes[i] = binary.charCodeAt(i)
   return new TextDecoder().decode(bytes)
+}
+
+function detectLanguage(content: string): string {
+  if (content.includes('function') || content.includes('const') || content.includes('let') || content.includes('=>')) {
+    if (content.includes('import React') || content.includes('useState')) return 'tsx';
+    if (content.includes('<html') || content.includes('<div')) return 'html';
+    return 'javascript';
+  }
+  if (content.includes('def ') || (content.includes('import ') && content.includes('from '))) return 'python';
+  if (content.includes('SELECT') || content.includes('INSERT INTO')) return 'sql';
+  if (content.includes('curl ') || content.includes('wget ')) return 'bash';
+  if (content.includes('{') && content.includes('}') && content.includes(':')) return 'json';
+  return 'text';
+}
+
+function textToFileAttachment(text: string, filename?: string): Attachment {
+  const bytes = new TextEncoder().encode(text);
+  const base64 = toBase64(text);
+  const dataUrl = `data:text/plain;base64,${base64}`;
+  return {
+    name: filename || `pasted-message-${Date.now()}.txt`,
+    url: dataUrl,
+    type: 'file',
+    size: bytes.length,
+    language: detectLanguage(text),
+  };
 }
 
 async function compressImage(file: File): Promise<File> {
@@ -194,6 +224,36 @@ function useIsDarkMode() {
   return dark
 }
 
+// ============= TOAST NOTIFICATION - TOP CENTER =============
+function ToastNotification({ message, onClose }: { message: string; onClose: () => void }) {
+  useEffect(() => {
+    const timer = setTimeout(onClose, 4000);
+    return () => clearTimeout(timer);
+  }, [onClose]);
+
+  return (
+    <motion.div
+      initial={{ opacity: 0, y: -50, scale: 0.9 }}
+      animate={{ opacity: 1, y: 0, scale: 1 }}
+      exit={{ opacity: 0, y: -50, scale: 0.9 }}
+      className="fixed top-4 left-1/2 -translate-x-1/2 z-[100]"
+    >
+      <div className="bg-zinc-900/95 backdrop-blur-md border border-zinc-700 rounded-xl shadow-2xl p-4 flex items-center gap-3 min-w-[380px] max-w-lg">
+        <div className="w-8 h-8 rounded-full bg-blue-500/20 flex items-center justify-center flex-shrink-0">
+          <FileText className="h-4 w-4 text-blue-400" />
+        </div>
+        <div className="flex-1">
+          <p className="text-sm font-medium text-white">Message Converted to File</p>
+          <p className="text-xs text-zinc-400">{message}</p>
+        </div>
+        <button onClick={onClose} className="p-1.5 rounded-lg hover:bg-white/10 transition-colors flex-shrink-0">
+          <X className="h-3.5 w-3.5 text-zinc-500" />
+        </button>
+      </div>
+    </motion.div>
+  );
+}
+
 interface ChatInputProps {
   onSend: (message: string, attachments?: Attachment[]) => void
   onStop: () => void
@@ -222,6 +282,7 @@ export function ChatInput({
   const [iconErrors, setIconErrors] = useState<Set<string>>(new Set())
   const [viewingAttachment, setViewingAttachment] = useState<Attachment | null>(null)
   const [uploadStatus, setUploadStatus] = useState<Map<string, { status: 'uploading' | 'completed' | 'error', progress?: number, url?: string }>>(new Map())
+  const [toast, setToast] = useState<string | null>(null)
 
   const textareaRef = useRef<HTMLTextAreaElement>(null)
   const fileInputRef = useRef<HTMLInputElement>(null)
@@ -263,7 +324,7 @@ export function ChatInput({
   const uploadImage = useCallback(async (file: File, attachmentId: string) => {
     // Set uploading status
     setUploadStatus(prev => new Map(prev).set(attachmentId, { status: 'uploading', progress: 0 }))
-    
+
     try {
       // Update progress - compressing
       setUploadStatus(prev => {
@@ -271,25 +332,25 @@ export function ChatInput({
         newMap.set(attachmentId, { status: 'uploading', progress: 20 })
         return newMap
       })
-      
+
       // Compress image
       const compressed = await compressImage(file)
-      
+
       setUploadStatus(prev => {
         const newMap = new Map(prev)
         newMap.set(attachmentId, { status: 'uploading', progress: 50 })
         return newMap
       })
-      
+
       // Upload to Supabase
       const publicUrl = await uploadToSupabase(compressed, file.name)
-      
+
       setUploadStatus(prev => {
         const newMap = new Map(prev)
         newMap.set(attachmentId, { status: 'completed', progress: 100, url: publicUrl })
         return newMap
       })
-      
+
       // Update attachment with permanent URL
       setAttachments((prev) => 
         prev.map((a) => 
@@ -298,9 +359,9 @@ export function ChatInput({
             : a
         )
       )
-      
+
       console.log('Image upload completed:', publicUrl)
-      
+
     } catch (error) {
       console.error('Upload failed:', error)
       setUploadStatus(prev => {
@@ -320,20 +381,22 @@ export function ChatInput({
     }
   }, [])
 
+  // FIXED: Handle paste with 4000 byte limit check
   const handlePasteEvent = async (e: React.ClipboardEvent<HTMLTextAreaElement>) => {
     const items = Array.from(e.clipboardData.items)
     const images = items.filter((it) => it.kind === 'file' && it.type.startsWith('image/'))
-    
+
+    // Handle image paste first (existing behavior)
     if (images.length > 0) {
       e.preventDefault()
       setIsUploading(true)
-      
+
       for (const item of images) {
         const file = item.getAsFile()
         if (!file) continue
         const id = crypto.randomUUID()
         const localUrl = URL.createObjectURL(file)
-        
+
         setAttachments((prev) => [...prev, { 
           id, 
           type: 'image', 
@@ -342,17 +405,33 @@ export function ChatInput({
           size: file.size, 
           mimeType: file.type,
         }])
-        
+
         await uploadImage(file, id)
         URL.revokeObjectURL(localUrl)
       }
-      
+
       setIsUploading(false)
       return
     }
-    
+
+    // Handle text paste - check if exceeds 4000 bytes
     const text = e.clipboardData.getData('text/plain')
     if (text) {
+      const bytes = new TextEncoder().encode(text)
+
+      if (bytes.length > MAX_MESSAGE_BYTES) {
+        // Prevent normal paste and convert to file attachment
+        e.preventDefault()
+        e.stopPropagation()
+
+        const fileAtt = textToFileAttachment(text)
+        setAttachments((prev) => [...prev, fileAtt])
+        setToast(`Pasted message exceeded 4000 bytes (${(bytes.length / 1024).toFixed(1)} KB). Converting it to a file...`)
+
+        return
+      }
+
+      // Normal paste for short text
       setInput(prev => prev + text)
     }
   }
@@ -374,12 +453,12 @@ export function ChatInput({
   const handleSubmit = useCallback(() => {
     // Check if any images are still uploading
     const hasUploading = Array.from(uploadStatus.values()).some(status => status.status === 'uploading')
-    
+
     if (hasUploading) {
       alert('Please wait for images to finish uploading before sending.')
       return
     }
-    
+
     if ((input.trim() || attachments.length > 0) && !isStreaming && !disabled) {
       // Filter out attachments that have upload errors
       const validAttachments = attachments.filter(a => !a.uploadError)
@@ -431,15 +510,15 @@ export function ChatInput({
   const handleFileSelect = async (e: React.ChangeEvent<HTMLInputElement>, type: 'file' | 'image') => {
     const files = Array.from(e.target.files || [])
     e.target.value = ''
-    
+
     if (type === 'image') {
       setIsUploading(true)
     }
-    
+
     for (const file of files) {
       const id = crypto.randomUUID()
       const localUrl = type === 'image' ? URL.createObjectURL(file) : ''
-      
+
       setAttachments((prev) => [...prev, {
         id,
         type,
@@ -448,17 +527,17 @@ export function ChatInput({
         size: file.size,
         mimeType: file.type,
       }])
-      
+
       if (type === 'image') {
         await uploadImage(file, id)
         URL.revokeObjectURL(localUrl)
       }
     }
-    
+
     if (type === 'image') {
       setIsUploading(false)
     }
-    
+
     setAttachMenuOpen(false)
   }
 
@@ -488,12 +567,22 @@ export function ChatInput({
 
   const imageAttachments = attachments.filter((a) => a.type === 'image')
   const otherAttachments = attachments.filter((a) => a.type !== 'image')
-  
+
   // Check if any images are still uploading
   const hasUploadingImages = Array.from(uploadStatus.values()).some(status => status.status === 'uploading')
 
   return (
     <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} className="bg-background">
+      {/* Toast Notification */}
+      <AnimatePresence>
+        {toast && (
+          <ToastNotification 
+            message={toast} 
+            onClose={() => setToast(null)} 
+          />
+        )}
+      </AnimatePresence>
+
       <div className="max-w-3xl mx-auto w-full px-0 pb-1">
         <AnimatePresence>
           {attachments.length > 0 && (
@@ -505,24 +594,24 @@ export function ChatInput({
                     const isUploading = status?.status === 'uploading'
                     const hasError = status?.status === 'error'
                     const progress = status?.progress || 0
-                    
+
                     return (
                       <div key={att.id} className="relative group w-20 h-20 rounded-lg overflow-hidden border border-border">
                         <img src={att.url} alt={att.name} className="w-full h-full object-cover" />
-                        
+
                         {isUploading && (
                           <div className="absolute inset-0 bg-black/50 flex flex-col items-center justify-center">
                             <Loader2 className="h-5 w-5 text-white animate-spin mb-1" />
                             <span className="text-[10px] text-white">{progress}%</span>
                           </div>
                         )}
-                        
+
                         {hasError && !isUploading && (
                           <div className="absolute inset-0 bg-red-500/80 flex items-center justify-center">
                             <X className="h-6 w-6 text-white" />
                           </div>
                         )}
-                        
+
                         <button 
                           onClick={() => removeAttachment(att.id)} 
                           className="absolute top-1 right-1 w-5 h-5 rounded-full bg-destructive flex items-center justify-center opacity-100 md:opacity-0 md:group-hover:opacity-100 transition-opacity"
@@ -534,11 +623,11 @@ export function ChatInput({
                   })}
                 </div>
               )}
-              
+
               {otherAttachments.map((att) => (
                 <div key={att.id} className="flex items-center gap-2 p-2 bg-muted rounded-lg group">
-                  <FileText className="h-4 w-4 flex-shrink-0" />
-                  <span className="truncate flex-1 text-sm">{att.name}</span>
+                  <FileText className="h-4 w-4 flex-shrink-0 text-blue-400" />
+                  <span className="truncate flex-1 text-sm">{att.name} {att.size ? `(${(att.size / 1024).toFixed(1)} KB)` : ''}</span>
                   <button onClick={() => setViewingAttachment(att)} className="p-1 hover:bg-accent rounded">
                     <Eye className="h-3.5 w-3.5" />
                   </button>

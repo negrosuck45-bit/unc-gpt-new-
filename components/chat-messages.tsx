@@ -110,7 +110,7 @@ function copyToClipboard(text: string): boolean {
       navigator.clipboard.writeText(text);
       return true;
     }
-    
+
     const textArea = document.createElement('textarea');
     textArea.value = text;
     textArea.style.position = 'fixed';
@@ -118,14 +118,14 @@ function copyToClipboard(text: string): boolean {
     textArea.style.left = '-999999px';
     textArea.style.opacity = '0';
     textArea.style.pointerEvents = 'none';
-    
+
     document.body.appendChild(textArea);
     textArea.select();
     textArea.setSelectionRange(0, text.length);
-    
+
     const success = document.execCommand('copy');
     document.body.removeChild(textArea);
-    
+
     return success;
   } catch (err) {
     console.error('Copy failed:', err);
@@ -379,12 +379,12 @@ function MessageActions({ message, isAssistant, onCopy, onRegenerate, onEdit, on
   const handleCopy = useCallback(() => {
     if (hasCopiedRef.current) return;
     hasCopiedRef.current = true;
-    
+
     const success = copyToClipboard(message.content);
     if (success) {
       onCopy();
       setCopied(true);
-      
+
       copyTimeoutRef.current = setTimeout(() => {
         setCopied(false);
         hasCopiedRef.current = false;
@@ -473,12 +473,12 @@ function getModelFamilyFromModel(model: string | undefined): ModelFamily {
 export function ChatMessages({ messages, isStreaming, isThinking, onRegenerate, onEditMessage, onRetry, searchInfo, error }: ChatMessagesProps) {
   const { getCurrentChat, settings } = useChatStore();
   const currentChat = getCurrentChat();
-  const [viewingAttachment, setViewingAttachment] = useState<<Attachment | null>(null);
+  const [viewingAttachment, setViewingAttachment] = useState<Attachment | null>(null);
   const [feedbackMessage, setFeedbackMessage] = useState<Message | null>(null);
   const [toast, setToast] = useState<string | null>(null);
   const streamingFamily = useMemo(() => getModelFamilyFromModel(currentChat?.model || settings.model), [currentChat?.model, settings.model]);
-  
-  const shownToastsRef = useRef<<Set<string>>(new Set());
+
+  const shownToastsRef = useRef<Set<string>>(new Set());
 
   const handleFeedbackSubmit = useCallback(async (issueType: string, details: string) => {
     if (!feedbackMessage) return;
@@ -493,13 +493,16 @@ export function ChatMessages({ messages, isStreaming, isThinking, onRegenerate, 
         const bytes = new TextEncoder().encode(msg.content);
         if (bytes.length > MAX_MESSAGE_BYTES) {
           const fileAtt = textToFileAttachment(msg.content);
-          
+
           // Show toast only once per message
           if (!shownToastsRef.current.has(msg.id)) {
             shownToastsRef.current.add(msg.id);
-            setToast(`Pasted message exceeded 4000 bytes (${(bytes.length / 1024).toFixed(1)} KB). Converting it to a file...`);
+            // Use setTimeout to avoid calling setState during render
+            setTimeout(() => {
+              setToast(`Pasted message exceeded 4000 bytes (${(bytes.length / 1024).toFixed(1)} KB). Converting it to a file...`);
+            }, 0);
           }
-          
+
           return { 
             ...msg, 
             attachments: [fileAtt], 
@@ -536,7 +539,7 @@ export function ChatMessages({ messages, isStreaming, isThinking, onRegenerate, 
                     {message.attachments?.some(a => a.type === 'image') && (<div className="mb-2 flex flex-row flex-wrap gap-1.5 justify-end max-w-full">{message.attachments.filter(a => a.type === 'image').map((att, i) => (<AttachmentPreview key={`img-${i}`} attachment={att} onView={setViewingAttachment} compact />))}</div>)}
                     <div className={cn('rounded-2xl px-3.5 py-2 text-[13px] sm:text-sm leading-relaxed shadow-sm w-full', isAssistant ? 'bg-zinc-900/50 border border-zinc-800 text-zinc-200' : 'bg-zinc-800 text-zinc-100')}>
                       {message.content && message.content.trim().length > 0 && <MessageContent content={message.content} />}
-                      
+
                       {/* Show file attachments - NO "converted to file" info card */}
                       {message.attachments?.some(a => a.type !== 'image') && (
                         <div className="space-y-2">
@@ -545,7 +548,7 @@ export function ChatMessages({ messages, isStreaming, isThinking, onRegenerate, 
                           ))}
                         </div>
                       )}
-                      
+
                       {message.image && (<motion.div initial={{ opacity: 0, scale: 0.9 }} animate={{ opacity: 1, scale: 1 }} className="mt-3 rounded-lg overflow-hidden max-w-sm">{message.image.startsWith('data:') ? <img src={message.image} alt="Generated image" className="w-full h-auto object-cover rounded-lg bg-muted" /> : <NextImage src={message.image} alt="Generated image" width={400} height={300} className="w-full h-auto object-cover rounded-lg" loading="lazy" unoptimized={message.image.includes('blob:')} />}</motion.div>)}
                       {message.video && (<motion.div initial={{ opacity: 0, scale: 0.9 }} animate={{ opacity: 1, scale: 1 }} className="mt-3 rounded-lg overflow-hidden max-w-sm"><video src={message.video} controls className="w-full h-auto rounded-lg bg-muted" /></motion.div>)}
                     </div>
@@ -580,24 +583,24 @@ export function usePasteHandler(
   onConvertToFile: (attachment: Attachment) => void,
   onShowToast: (message: string) => void
 ) {
-  const handlePaste = useCallback((event: React.ClipboardEvent<<HTMLTextAreaElement>) => {
+  const handlePaste = useCallback((event: React.ClipboardEvent<HTMLTextAreaElement>) => {
     const pastedText = event.clipboardData.getData('text');
-    
+
     if (!pastedText) return false;
-    
+
     const bytes = new TextEncoder().encode(pastedText);
-    
+
     if (bytes.length > MAX_MESSAGE_BYTES) {
       event.preventDefault();
       event.stopPropagation();
-      
+
       const fileAtt = textToFileAttachment(pastedText);
       onConvertToFile(fileAtt);
       onShowToast(`Pasted message exceeded 4000 bytes (${(bytes.length / 1024).toFixed(1)} KB). Converting it to a file...`);
-      
+
       return true;
     }
-    
+
     return false;
   }, [onConvertToFile, onShowToast]);
 
