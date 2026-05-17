@@ -41,53 +41,36 @@ const GROQ_CHAT_MODELS: Record<string, string> = {
   "mixtral-8x7b-32768": "mixtral-8x7b-32768",
 };
 
-const PUTER_CLAUDE_MODELS: Record<string, string> = {
-  "claude-opus-4.7": "claude-opus-4.7",
-  "claude-opus-4-7": "claude-opus-4.7",
-  "claude-sonnet-4.6": "claude-sonnet-4.6",
-  "claude-sonnet-4-6": "claude-sonnet-4.6",
-  "claude-sonnet-4": "claude-sonnet-4",
-  "claude-opus-4.6": "claude-opus-4.6",
-  "claude-opus-4-6": "claude-opus-4.6",
-  "claude-haiku-4.5": "claude-haiku-4.5",
-  "claude-haiku-4-5": "claude-haiku-4.5",
-  "claude-sonnet-4.5": "claude-sonnet-4.5",
-  "claude-sonnet-4-5": "claude-sonnet-4.5",
-  "claude-opus-4-5": "claude-opus-4.5",
-  "claude-3-7-sonnet": "claude-3-7-sonnet",
-  "claude-opus-4.6-fast": "claude-opus-4.6-fast",
-};
-
-// GROQ KEYS - These are expired/invalid (returning 401)
-// User needs to get new ones from console.groq.com
+// GROQ KEYS - Replace these with your NEW valid keys from console.groq.com
+// Format: gsk_xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx
 const GROQ_KEYS: string[] = [
+  // PASTE YOUR NEW KEYS HERE - one per line, in quotes
+  // Example: "gsk_abc123...",
   "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",
   "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",
-  "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",
+  "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",
 ];
 
-// OPENROUTER - Free tier available, no API key needed for some models
+// OPENROUTER - Get free key at openrouter.ai/settings/keys (optional but recommended)
 const OPENROUTER_URL = "https://openrouter.ai/api/v1/chat/completions";
-const OPENROUTER_KEY = ""; // Optional - some models work without key (rate limited)
+const OPENROUTER_KEY = ""; // <-- PASTE OPENROUTER KEY HERE (starts with sk-or-v1-...)
 
-// CEREBRAS - Free tier with 1M tokens/day
+// CEREBRAS - Get free key at console.cerebras.ai (1M tokens/day)
 const CEREBRAS_URL = "https://api.cerebras.ai/v1/chat/completions";
 const CEREBRAS_KEY = "csk-tt4rvyyfwr5ytrm9vn33nhv5myc6p3thynkcv2j9cdtce62d";
 
-const PUTER_API_URL = "https://api.puter.com/puterai/openai/v1/chat/completions";
-const PUTER_AUTH_TOKEN = "";
-
 let currentGroqKeyIndex = 0;
 let currentChatIndex = 0;
+const deadGroqKeys = new Set<number>(); // Track permanently dead keys
 
 // ============================================================
 // VISION MODELS - Updated for 2026
 // ============================================================
 const VISION_MODELS = [
-  "meta-llama/llama-4-scout-17b-16e-instruct",  // Primary Groq vision model (FREE TIER)
-  "meta-llama/llama-4-maverick-17b-128e-instruct", // Better vision, still free
-  "llama3.1-8b",  // DEPRECATED April 2025 - do not use
-  "llama-3.2-90b-vision-preview",  // DEPRECATED April 2025 - do not use
+  "meta-llama/llama-4-scout-17b-16e-instruct",
+  "meta-llama/llama-4-maverick-17b-128e-instruct",
+  "llama-3.2-90b-vision-preview",
+  "llama-3.2-11b-vision-preview",
   "@cf/moonshot/kimi-k2.6",
   "@cf/moonshot/kimi-k2.5",
   "claude-3-opus",
@@ -139,6 +122,22 @@ function decodeFileContent(dataUrl: string): string {
   } catch {
     return "[Could not decode file]";
   }
+}
+
+// CRITICAL FIX: Strip unsupported fields from messages before sending to APIs
+function sanitizeMessagesForAPI(messages: any[]): any[] {
+  return messages.map(msg => {
+    // Only keep role and content - strip attachments, metadata, etc.
+    const sanitized: any = {
+      role: msg.role,
+      content: msg.content
+    };
+    // Preserve tool-related fields if present
+    if (msg.tool_calls) sanitized.tool_calls = msg.tool_calls;
+    if (msg.tool_call_id) sanitized.tool_call_id = msg.tool_call_id;
+    if (msg.name) sanitized.name = msg.name;
+    return sanitized;
+  });
 }
 
 async function processAttachmentsForModel(
@@ -328,18 +327,33 @@ async function callGroq(
   model: string,
   hasImage: boolean
 ): Promise<{ stream: ReadableStream; provider: string; model: string }> {
+  // CRITICAL FIX: Sanitize messages to strip unsupported fields
+  const cleanMessages = sanitizeMessagesForAPI(messages);
+
   const groqModel = hasImage 
     ? "meta-llama/llama-4-scout-17b-16e-instruct" 
     : (GROQ_CHAT_MODELS[model] ?? "llama-3.3-70b-versatile");
   const hasVision = isVisionModel(groqModel);
 
   console.log(`[Groq] Using model: ${groqModel}, hasVision: ${hasVision}, hasImage: ${hasImage}`);
+  console.log(`[Groq] Messages count: ${cleanMessages.length}`);
+  console.log(`[Groq] First message role: ${cleanMessages[0]?.role}`);
 
-  const processedMessages = await processAttachmentsForModel(messages, groqModel, hasVision);
+  const processedMessages = await processAttachmentsForModel(cleanMessages, groqModel, hasVision);
 
-  for (let attempt = 0; attempt < GROQ_KEYS.length; attempt++) {
-    const key = GROQ_KEYS[(currentGroqKeyIndex + attempt) % GROQ_KEYS.length];
-    if (!key) continue;
+  // Get available keys (excluding permanently dead ones)
+  const availableKeys = GROQ_KEYS.map((key, idx) => ({ key, idx })).filter(({ idx }) => !deadGroqKeys.has(idx));
+
+  if (availableKeys.length === 0) {
+    throw new Error("All Groq keys have been marked as dead. Please add new valid keys.");
+  }
+
+  for (let attempt = 0; attempt < availableKeys.length; attempt++) {
+    const { key, idx } = availableKeys[(currentGroqKeyIndex + attempt) % availableKeys.length];
+    if (!key || key.length < 20) {
+      console.error(`[Groq] Key ${idx} is malformed (length: ${key?.length || 0})`);
+      continue;
+    }
 
     try {
       const requestBody: any = {
@@ -353,6 +367,8 @@ async function callGroq(
         max_tokens: 4096,
       };
 
+      console.log(`[Groq] Attempt ${attempt + 1}/${availableKeys.length} with key index ${idx}`);
+
       const res = await fetch("https://api.groq.com/openai/v1/chat/completions", {
         method: "POST",
         headers: { "Content-Type": "application/json", Authorization: `Bearer ${key}` },
@@ -360,23 +376,48 @@ async function callGroq(
       });
 
       if (res.status === 401) {
-        console.error(`[Groq] Key ${attempt + 1} returned 401 - invalid/expired`);
+        console.error(`[Groq] Key ${idx} returned 401 - INVALID/EXPIRED. Marking as dead.`);
+        deadGroqKeys.add(idx);
         continue; // Try next key
       }
 
+      if (res.status === 429) {
+        console.error(`[Groq] Key ${idx} returned 429 - RATE LIMITED. Will retry later.`);
+        continue;
+      }
+
       if (res.ok) {
-        currentGroqKeyIndex = (currentGroqKeyIndex + 1) % GROQ_KEYS.length;
+        currentGroqKeyIndex = (currentGroqKeyIndex + 1) % availableKeys.length;
+        console.log(`[Groq] SUCCESS with key index ${idx}`);
         return { stream: res.body!, provider: "Groq", model: groqModel };
       }
 
       const errText = await res.text().catch(() => "");
-      console.error(`[Groq] Key ${attempt + 1} failed: ${res.status} ${errText.slice(0, 100)}`);
+      console.error(`[Groq] Key ${idx} failed: ${res.status} ${errText.slice(0, 200)}`);
+
+      // If model not found, try fallback model
+      if (res.status === 404 && groqModel.includes("llama-4")) {
+        console.log(`[Groq] Model ${groqModel} not found, trying llama-3.2-90b-vision-preview...`);
+        // Retry with older vision model
+        const fallbackBody = {
+          ...requestBody,
+          model: "llama-3.2-90b-vision-preview"
+        };
+        const fallbackRes = await fetch("https://api.groq.com/openai/v1/chat/completions", {
+          method: "POST",
+          headers: { "Content-Type": "application/json", Authorization: `Bearer ${key}` },
+          body: JSON.stringify(fallbackBody),
+        });
+        if (fallbackRes.ok) {
+          return { stream: fallbackRes.body!, provider: "Groq", model: "llama-3.2-90b-vision-preview" };
+        }
+      }
     } catch (err: any) {
-      console.error(`[Groq] Key ${attempt + 1} network error:`, err.message);
+      console.error(`[Groq] Key ${idx} network error:`, err.message);
     }
   }
 
-  throw new Error("All Groq keys failed (401 unauthorized - keys are expired/invalid)");
+  throw new Error("All Groq keys failed (401 unauthorized - keys are expired/invalid, or 404 model not found)");
 }
 
 // 2. OPENROUTER - Free tier fallback (no key needed for :free models)
@@ -384,6 +425,9 @@ async function callOpenRouter(
   messages: any[],
   hasImage: boolean
 ): Promise<{ stream: ReadableStream; provider: string; model: string }> {
+  // CRITICAL FIX: Sanitize messages
+  const cleanMessages = sanitizeMessagesForAPI(messages);
+
   // Free vision models on OpenRouter (no API key required, just rate limited)
   const visionModels = [
     "meta-llama/llama-4-scout-17b-16e-instruct:free",
@@ -407,8 +451,8 @@ async function callOpenRouter(
       }
 
       const processedMessages = hasImage 
-        ? await processAttachmentsForModel(messages, modelId, true)
-        : messages;
+        ? await processAttachmentsForModel(cleanMessages, modelId, true)
+        : cleanMessages;
 
       const controller = new AbortController();
       const timeoutId = setTimeout(() => controller.abort(), 30000);
@@ -451,14 +495,17 @@ async function callCerebras(
     throw new Error("Cerebras API key not configured");
   }
 
+  // CRITICAL FIX: Sanitize messages to strip attachments
+  const cleanMessages = sanitizeMessagesForAPI(messages);
+
   const model = hasImage 
     ? "llama-4-scout-17b-16e-instruct"  // Vision-capable
     : "llama-3.3-70b";
 
   try {
     const processedMessages = hasImage 
-      ? await processAttachmentsForModel(messages, model, true)
-      : messages;
+      ? await processAttachmentsForModel(cleanMessages, model, true)
+      : cleanMessages;
 
     const res = await fetch(CEREBRAS_URL, {
       method: "POST",
@@ -551,6 +598,10 @@ async function callPuter(
   if (!PUTER_AUTH_TOKEN) {
     throw new Error("No Puter auth token configured");
   }
+
+  // CRITICAL FIX: Sanitize messages
+  const cleanMessages = sanitizeMessagesForAPI(messages);
+
   try {
     const res = await fetch(PUTER_API_URL, {
       method: "POST",
@@ -562,7 +613,7 @@ async function callPuter(
         model: puterModel,
         messages: [
           { role: "system", content: "You are a helpful AI assistant. Be conversational and natural." },
-          ...messages,
+          ...cleanMessages,
         ],
         stream: true,
       }),
