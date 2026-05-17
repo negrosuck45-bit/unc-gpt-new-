@@ -456,6 +456,14 @@ export function ChatInput({
     if ((input.trim() || attachments.length > 0) && !isStreaming && !disabled) {
       // Filter out attachments that have upload errors
       const validAttachments = attachments.filter(a => !a.uploadError)
+
+      // DEBUG: Log what's being sent
+      console.log('[ChatInput] Sending message:', {
+        text: input.trim(),
+        attachments: validAttachments.map(a => ({ type: a.type, name: a.name, size: a.size, url: a.url?.substring(0, 50) + '...' })),
+        attachmentCount: validAttachments.length
+      });
+
       onSend(input.trim(), validAttachments.length > 0 ? validAttachments : undefined)
       setInput('')
       setAttachments([])

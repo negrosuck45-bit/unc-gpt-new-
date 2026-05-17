@@ -480,10 +480,10 @@ export function ChatMessages({ messages, isStreaming, isThinking, onRegenerate, 
   }, [feedbackMessage]);
 
   // FIXED: Convert messages > 4000 bytes to file. NO ugly info card in message bubble.
-  // Only shows clean file attachment + top-center toast notification.
+  // PRESERVES existing attachments (images, etc.) - appends file attachment to them.
   const processedMessages = useMemo(() => {
     return messages.map(msg => {
-      if (msg.role === 'user' && msg.content && (!msg.attachments || msg.attachments.length === 0)) {
+      if (msg.role === 'user' && msg.content) {
         const bytes = new TextEncoder().encode(msg.content);
         if (bytes.length > MAX_MESSAGE_BYTES) {
           const fileAtt = textToFileAttachment(msg.content);
@@ -497,9 +497,11 @@ export function ChatMessages({ messages, isStreaming, isThinking, onRegenerate, 
             }, 0);
           }
 
+          // PRESERVE existing attachments (images, links, etc.) and append the file
+          const existingAttachments = msg.attachments || [];
           return { 
             ...msg, 
-            attachments: [fileAtt], 
+            attachments: [...existingAttachments, fileAtt], 
             content: '' // Empty content - just show the file attachment, NO info card
           };
         }
@@ -524,6 +526,16 @@ export function ChatMessages({ messages, isStreaming, isThinking, onRegenerate, 
             const isAssistant = message.role === 'assistant';
             const isLast = index === messages.length - 1;
             const messageFamily = getModelFamilyFromModel(message.modelUsed || currentChat?.model || settings.model);
+
+            // DEBUG: Log message structure for user messages with attachments
+            if (message.role === 'user' && message.attachments && message.attachments.length > 0) {
+              console.log('[ChatMessages] User message with attachments:', {
+                id: message.id,
+                contentLength: message.content?.length || 0,
+                attachmentTypes: message.attachments.map(a => a.type),
+                attachmentCount: message.attachments.length
+              });
+            }
 
             return (
               <div key={message.id} className="group">
