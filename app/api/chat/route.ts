@@ -135,32 +135,32 @@ async function processAttachmentsForModel(
   hasVision: boolean
 ): Promise<any[]> {
   const processed = [];
-  
+
   for (const msg of messages) {
     if (!Array.isArray(msg.content)) {
       processed.push(msg);
       continue;
     }
-    
+
     const textParts: string[] = [];
     const imageParts: any[] = [];
-    
+
     for (const part of msg.content) {
       if (part.type === "text") {
         textParts.push(part.text);
       } 
       else if (part.type === "image_url") {
         const imageUrl = part.image_url.url;
-        
+
         // Skip blob URLs (local previews not uploaded yet)
         if (imageUrl.startsWith("blob:")) {
           textParts.push("[Image is still uploading - please wait for upload to complete]");
           console.log("[Process] Skipping blob URL");
           continue;
         }
-        
+
         console.log(`[Process] Found image URL for vision model ${hasVision}: ${imageUrl.substring(0, 80)}...`);
-        
+
         if (hasVision) {
           // FOR VISION MODELS - Add the image in the correct format
           imageParts.push({
@@ -175,12 +175,12 @@ async function processAttachmentsForModel(
         }
       }
     }
-    
+
     // Process link matches in text
     const combinedText = textParts.join("\n");
     const linkMatches = combinedText.match(/\[Attached (link|file): ([^\]]+)\]\(([^)]+)\)/g) || [];
     let processedText = combinedText;
-    
+
     for (const match of linkMatches) {
       const urlMatch = match.match(/\(([^)]+)\)/);
       if (urlMatch) {
@@ -194,7 +194,7 @@ async function processAttachmentsForModel(
         }
       }
     }
-    
+
     // Build final message
     if (hasVision && imageParts.length > 0) {
       // Vision model gets both text and images
@@ -214,7 +214,7 @@ async function processAttachmentsForModel(
       });
     }
   }
-  
+
   return processed;
 }
 
@@ -662,9 +662,9 @@ async function callGroq(
   // IMPORTANT: Use vision model if there's an image
   const groqModel = hasImage ? "meta-llama/llama-4-scout-17b-16e-instruct" : (GROQ_CHAT_MODELS[model] ?? "llama-3.3-70b-versatile");
   const hasVision = isVisionModel(groqModel);
-  
+
   console.log(`[Groq] Using model: ${groqModel}, hasVision: ${hasVision}, hasImage: ${hasImage}`);
-  
+
   const processedMessages = await processAttachmentsForModel(messages, groqModel, hasVision);
 
   for (let attempt = 0; attempt < GROQ_KEYS.length; attempt++) {
@@ -730,30 +730,59 @@ async function callPuter(
   }
 }
 
+// ============================================================
+// CLOUDFLARE WORKERS - FIXED TO PRESERVE IMAGES
+// ============================================================
 async function callChatWorkers(
   body: any,
-  model: string
+  model: string,
+  hasImage: boolean
 ): Promise<{ stream: ReadableStream; provider: string; model: string }> {
   const cfModel = model.startsWith("@cf/") ? model : "@cf/anthropic/claude-3-haiku";
+
   for (let i = 0; i < CHAT_WORKER_URLS.length; i++) {
     const index = (currentChatIndex + i) % CHAT_WORKER_URLS.length;
     const url = CHAT_WORKER_URLS[index];
     try {
       const controller = new AbortController();
       const timeoutId = setTimeout(() => controller.abort(), 18000);
-      const simplifiedMessages = (body.messages || []).map((m: any) => ({
-        role: m.role,
-        content: Array.isArray(m.content)
-          ? m.content.find((c: any) => c.type === "text")?.text || ""
-          : m.content
-      }));
+
+      // FIXED: Preserve image content instead of stripping it!
+      const messagesWithImages = (body.messages || []).map((m: any) => {
+        // If content is array (has images), keep it as-is for vision-capable workers
+        if (Array.isArray(m.content)) {
+          return {
+            role: m.role,
+            content: m.content.map((c: any) => {
+              if (c.type === "text") {
+                return { type: "text", text: c.text };
+              }
+              if (c.type === "image_url") {
+                // Keep image URLs - some CF workers support vision
+                return {
+                  type: "image_url",
+                  image_url: { url: c.image_url.url }
+                };
+              }
+              return c;
+            })
+          };
+        }
+        // Plain text content
+        return {
+          role: m.role,
+          content: m.content
+        };
+      });
+
       const res = await fetch(url, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           ...body,
           model: cfModel,
-          messages: simplifiedMessages
+          messages: messagesWithImages,
+          ...(hasImage && { vision: true })
         }),
         signal: controller.signal,
       });
@@ -767,15 +796,34 @@ async function callChatWorkers(
   throw new Error("All Cloudflare chat workers failed");
 }
 
+// ============================================================
+// FALLBACK CHAT - FIXED TO TRY GROQ WITH VISION FIRST
+// ============================================================
 async function fallbackChat(
   messages: any[],
   hasImage: boolean
 ): Promise<{ stream: ReadableStream; provider: string; model: string }> {
+  // If we have images, we MUST use a vision model
+  if (hasImage) {
+    try {
+      // Try Groq with vision model first
+      return await callGroq(messages, "meta-llama/llama-4-scout-17b-16e-instruct", true);
+    } catch {
+      try {
+        // Try Cloudflare with images preserved
+        return await callChatWorkers({ task: "chat", messages }, "@cf/anthropic/claude-3-haiku", true);
+      } catch {
+        throw new Error("Critical Failure: No vision-capable providers available. All API keys may be invalid.");
+      }
+    }
+  }
+
+  // No images - standard fallback
   try {
-    return await callGroq(messages, "llama-3.3-70b-versatile", hasImage);
+    return await callGroq(messages, "llama-3.3-70b-versatile", false);
   } catch {
     try {
-      return await callChatWorkers({ task: "chat", messages }, "@cf/anthropic/claude-3-haiku");
+      return await callChatWorkers({ task: "chat", messages }, "@cf/anthropic/claude-3-haiku", false);
     } catch {
       throw new Error("Critical Failure: All providers and fallbacks failed.");
     }
@@ -953,9 +1001,9 @@ export async function POST(req: NextRequest) {
     // ==================== CHAT ====================
     const targetModel = finalModel !== "auto" ? finalModel : (hasImage ? "meta-llama/llama-4-scout-17b-16e-instruct" : "llama-3.3-70b-versatile");
     const hasVisionCapability = isVisionModel(targetModel) || hasImage;
-    
+
     console.log(`[Main] Target model: ${targetModel}, hasVision: ${hasVisionCapability}, hasImage: ${hasImage}`);
-    
+
     // Convert frontend attachments to OpenAI vision format
     const messagesWithVisionFormat = messages.map(convertMessageWithAttachments);
     const apiMessages = await processAttachmentsForModel(messagesWithVisionFormat, targetModel, hasVisionCapability);
@@ -993,7 +1041,7 @@ export async function POST(req: NextRequest) {
       if (finalProvider === "groq" || GROQ_CHAT_MODELS[finalModel]) {
         result = await callGroq(messagesWithSystem, finalModel, hasImage);
       } else if (finalProvider === "cloudflare" || finalModel.startsWith("@cf/")) {
-        result = await callChatWorkers({ task: "chat", messages: messagesWithSystem }, finalModel);
+        result = await callChatWorkers({ task: "chat", messages: messagesWithSystem }, finalModel, hasImage);
       } else {
         result = await fallbackChat(messagesWithSystem, hasImage);
       }
