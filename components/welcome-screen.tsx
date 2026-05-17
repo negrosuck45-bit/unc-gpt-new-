@@ -29,14 +29,16 @@ export function WelcomeScreen({ onSelectPrompt, project }: WelcomeScreenProps) {
 
 
         {/* Heading */}
-        <motion.h1
-          initial={{ y: 20, opacity: 0 }}
-          animate={{ y: 0, opacity: 1 }}
-          transition={{ delay: 0.1, duration: 0.5 }}
-          className="text-3xl sm:text-4xl font-semibold text-white mb-3"
-        >
-          How can I help today?
-        </motion.h1>
+       
+         <Image
+              src="/uncgpt.png"
+              alt="UNC GPT"
+              width={80}
+              height={80}
+              className="object-cover"
+              priority
+            />
+        
 
         {/* Subtitle */}
         <motion.p
