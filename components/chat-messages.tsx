@@ -25,10 +25,6 @@ import {
   ChevronDown as ChevronDownIcon,
   WifiOff,
   RotateCcw,
-  Brain,
-  Zap,
-  Sparkles,
-  Loader2,
 } from 'lucide-react';
 import { MessageContent } from './message-content';
 import { ComputerUseSteps } from './computer-use-steps';
@@ -670,6 +666,85 @@ function MessageActions({
   );
 }
 
+// ---------- Terminal Code Block Component ----------
+function TerminalCodeBlock({ code, language = "bash" }: { code: string; language?: string }) {
+  const [copied, setCopied] = useState(false);
+  const isDark = useIsDarkMode();
+
+  const handleCopy = async () => {
+    await navigator.clipboard.writeText(code);
+    setCopied(true);
+    setTimeout(() => setCopied(false), 2000);
+  };
+
+  // Parse terminal commands with $ or > prompts
+  const lines = code.split('\n');
+  
+  return (
+    <div className="my-4 rounded-lg overflow-hidden border border-zinc-700/50">
+      {/* Terminal Header */}
+      <div className="bg-zinc-900 px-4 py-2 flex items-center justify-between border-b border-zinc-700/50">
+        <div className="flex items-center gap-2">
+          <div className="flex gap-1.5">
+            <div className="w-3 h-3 rounded-full bg-red-500/80"></div>
+            <div className="w-3 h-3 rounded-full bg-yellow-500/80"></div>
+            <div className="w-3 h-3 rounded-full bg-green-500/80"></div>
+          </div>
+          <span className="text-xs text-zinc-400 font-mono ml-2">
+            {language === "bash" ? "terminal" : language}
+          </span>
+        </div>
+        <Button
+          variant="ghost"
+          size="sm"
+          onClick={handleCopy}
+          className="h-7 px-2 text-zinc-400 hover:text-zinc-200 hover:bg-zinc-800"
+        >
+          {copied ? <Check className="h-3.5 w-3.5" /> : <Copy className="h-3.5 w-3.5" />}
+        </Button>
+      </div>
+      
+      {/* Terminal Content */}
+      <div className="bg-black/90 p-4 overflow-x-auto">
+        <pre className="text-sm font-mono text-green-400 whitespace-pre-wrap break-all">
+          {lines.map((line, idx) => {
+            // Check if line is a command (starts with $ or >)
+            const isCommand = line.trim().startsWith('$') || line.trim().startsWith('>');
+            const isOutput = !isCommand && line.trim().length > 0;
+            
+            if (isCommand) {
+              const prompt = line.trim()[0];
+              const command = line.trim().slice(1);
+              return (
+                <div key={idx} className="flex items-start gap-2">
+                  <span className="text-yellow-500 select-none">{prompt}</span>
+                  <span className="text-green-400">{command}</span>
+                </div>
+              );
+            } else if (isOutput) {
+              return (
+                <div key={idx} className="text-zinc-300 pl-4">
+                  {line}
+                </div>
+              );
+            } else {
+              return <div key={idx} className="h-2"></div>;
+            }
+          })}
+        </pre>
+      </div>
+      
+      {/* Terminal Status Bar */}
+      <div className="bg-zinc-900 px-4 py-1 border-t border-zinc-700/50">
+        <div className="flex items-center gap-3 text-xs text-zinc-500 font-mono">
+          <span>└─ $</span>
+          <span className="animate-pulse">▋</span>
+        </div>
+      </div>
+    </div>
+  );
+}
+
 // ---------- Grok-style Reflective Thinking Component with Progressive Dots ----------
 function ThinkingText({ text, variant = "default" }: { text: string; variant?: "default" | "glitch" | "pulse" }) {
   // Progressive dots effect (thinking → thinking. → thinking.. → thinking...)
@@ -750,40 +825,6 @@ function ThinkingText({ text, variant = "default" }: { text: string; variant?: "
   );
 }
 
-// ---------- Alternative Thinking Styles ----------
-function ThinkingIcon({ type }: { type: "brain" | "zap" | "sparkles" | "loader" }) {
-  const icons = {
-    brain: <Brain className="w-4 h-4 text-purple-400" />,
-    zap: <Zap className="w-4 h-4 text-yellow-400" />,
-    sparkles: <Sparkles className="w-4 h-4 text-blue-400" />,
-    loader: <Loader2 className="w-4 h-4 text-green-400 animate-spin" />,
-  };
-  
-  return (
-    <motion.div
-      animate={{ 
-        rotate: type === "loader" ? 360 : [0, 10, -10, 0],
-        scale: [1, 1.1, 1]
-      }}
-      transition={{ 
-        rotate: { duration: 2, repeat: Infinity, ease: "linear" },
-        scale: { duration: 1, repeat: Infinity }
-      }}
-    >
-      {icons[type]}
-    </motion.div>
-  );
-}
-
-function ThinkingWithIcon({ text, iconType }: { text: string; iconType: "brain" | "zap" | "sparkles" | "loader" }) {
-  return (
-    <div className="flex items-center gap-2">
-      <ThinkingIcon type={iconType} />
-      <ThinkingText text={text} variant="default" />
-    </div>
-  );
-}
-
 // ---------- Thinking Phases (Progressive) ----------
 const THINKING_PHRASES = [
   "Hmm, let me think",
@@ -834,9 +875,8 @@ export function ChatMessages({
   const currentChat = getCurrentChat();
   const [viewingAttachment, setViewingAttachment] = useState<Attachment | null>(null);
   const [feedbackMessage, setFeedbackMessage] = useState<Message | null>(null);
-  const [thinkingStyle, setThinkingStyle] = useState<"default" | "icon" | "progressive">("default");
+  const [thinkingStyle, setThinkingStyle] = useState<"default" | "progressive">("default");
   const [thinkingVariant, setThinkingVariant] = useState<"default" | "glitch" | "pulse">("glitch");
-  const [iconType, setIconType] = useState<"brain" | "zap" | "sparkles" | "loader">("brain");
 
   const streamingFamily = useMemo(() => getModelFamilyFromModel(currentChat?.model || settings.model), [currentChat?.model, settings.model]);
 
@@ -848,13 +888,9 @@ export function ChatMessages({
   // Randomly change thinking style for variety (optional)
   useEffect(() => {
     if (isThinking) {
-      const styles: Array<"default" | "icon" | "progressive"> = ["default", "icon", "progressive"];
+      const styles: Array<"default" | "progressive"> = ["default", "progressive"];
       const randomStyle = styles[Math.floor(Math.random() * styles.length)];
       setThinkingStyle(randomStyle);
-      
-      const icons: Array<"brain" | "zap" | "sparkles" | "loader"> = ["brain", "zap", "sparkles", "loader"];
-      const randomIcon = icons[Math.floor(Math.random() * icons.length)];
-      setIconType(randomIcon);
       
       const variants: Array<"default" | "glitch" | "pulse"> = ["default", "glitch", "pulse"];
       const randomVariant = variants[Math.floor(Math.random() * variants.length)];
@@ -965,7 +1001,7 @@ export function ChatMessages({
 
           {searchInfo && <SearchIndicator searchInfo={searchInfo} />}
 
-          {/* ENHANCED THINKING STATES */}
+          {/* ENHANCED THINKING STATES - NO ICONS */}
           {isThinking && (
             <motion.div
               initial={{ opacity: 0, y: 10 }}
@@ -976,9 +1012,7 @@ export function ChatMessages({
                 <MarsAvatar size={32} family={streamingFamily} useSimpleIcon />
               </div>
               <div className="flex items-center">
-                {thinkingStyle === "icon" ? (
-                  <ThinkingWithIcon text="thinking" iconType={iconType} />
-                ) : thinkingStyle === "progressive" ? (
+                {thinkingStyle === "progressive" ? (
                   <ProgressiveThinking />
                 ) : (
                   <ThinkingText text="thinking" variant={thinkingVariant} />
