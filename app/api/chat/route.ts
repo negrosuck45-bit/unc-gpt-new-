@@ -72,7 +72,7 @@ const OPENROUTER_KEY = ""; // Optional - some models work without key (rate limi
 
 // CEREBRAS - Free tier with 1M tokens/day
 const CEREBRAS_URL = "https://api.cerebras.ai/v1/chat/completions";
-const CEREBRAS_KEY = "";
+const CEREBRAS_KEY = "csk-9m3ww6rnkj4vfnxtc65ckmhf8v44238k8yw3ph9fcdc9r9xe";
 
 const PUTER_API_URL = "https://api.puter.com/puterai/openai/v1/chat/completions";
 const PUTER_AUTH_TOKEN = "";
