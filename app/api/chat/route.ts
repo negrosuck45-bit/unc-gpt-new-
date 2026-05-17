@@ -72,7 +72,7 @@ const OPENROUTER_KEY = ""; // Optional - some models work without key (rate limi
 
 // CEREBRAS - Free tier with 1M tokens/day
 const CEREBRAS_URL = "https://api.cerebras.ai/v1/chat/completions";
-const CEREBRAS_KEY = "csk-9m3ww6rnkj4vfnxtc65ckmhf8v44238k8yw3ph9fcdc9r9xe";
+const CEREBRAS_KEY = "csk-tt4rvyyfwr5ytrm9vn33nhv5myc6p3thynkcv2j9cdtce62d";
 
 const PUTER_API_URL = "https://api.puter.com/puterai/openai/v1/chat/completions";
 const PUTER_AUTH_TOKEN = "";
@@ -86,7 +86,7 @@ let currentChatIndex = 0;
 const VISION_MODELS = [
   "meta-llama/llama-4-scout-17b-16e-instruct",  // Primary Groq vision model (FREE TIER)
   "meta-llama/llama-4-maverick-17b-128e-instruct", // Better vision, still free
-  "llama-3.2-11b-vision-preview",  // DEPRECATED April 2025 - do not use
+  "llama3.1-8b",  // DEPRECATED April 2025 - do not use
   "llama-3.2-90b-vision-preview",  // DEPRECATED April 2025 - do not use
   "@cf/moonshot/kimi-k2.6",
   "@cf/moonshot/kimi-k2.5",
