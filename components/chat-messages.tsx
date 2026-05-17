@@ -615,8 +615,6 @@ function MessageActions({
     <div
       className={cn(
         'flex items-center gap-1 mt-1 transition-opacity',
-        // On mobile: always visible (opacity-100)
-        // On desktop (md+): hidden by default, visible on hover
         'opacity-100 md:opacity-0 md:group-hover:opacity-100',
         isAssistant ? 'ml-0' : 'mr-0 flex-row-reverse'
       )}
@@ -665,6 +663,59 @@ function MessageActions({
         </Button>
       )}
     </div>
+  );
+}
+
+// ---------- Grok-style Reflective Thinking Component ----------
+function ThinkingText({ text }: { text: string }) {
+  // Create glitchy/reflective effect on letters
+  const letters = text.split('');
+  
+  return (
+    <motion.div 
+      initial={{ opacity: 0 }}
+      animate={{ opacity: 1 }}
+      className="text-sm text-zinc-400 italic font-mono"
+    >
+      {letters.map((letter, index) => {
+        // Random glitch offset for some letters
+        const glitchX = Math.sin(index * 0.5) * 2;
+        const glitchY = Math.cos(index * 0.3) * 1;
+        
+        return (
+          <motion.span
+            key={index}
+            animate={{
+              opacity: [0.6, 1, 0.6],
+              x: [0, glitchX, 0],
+              y: [0, glitchY, 0],
+              textShadow: [
+                '0 0 0px rgba(255,255,255,0)',
+                '0 0 2px rgba(255,255,255,0.3)',
+                '0 0 0px rgba(255,255,255,0)',
+              ],
+            }}
+            transition={{
+              duration: 2,
+              delay: index * 0.03,
+              repeat: Infinity,
+              repeatDelay: Math.random() * 3 + 2,
+            }}
+            className="inline-block"
+            style={{
+              filter: `blur(${Math.sin(index) * 0.3}px)`,
+            }}
+          >
+            {letter === ' ' ? '\u00A0' : letter}
+          </motion.span>
+        );
+      })}
+      <motion.span
+        animate={{ opacity: [0, 1, 0] }}
+        transition={{ duration: 1, repeat: Infinity }}
+        className="inline-block w-0.5 h-4 bg-zinc-500 ml-0.5 align-middle"
+      />
+    </motion.div>
   );
 }
 
@@ -731,7 +782,6 @@ export function ChatMessages({
                           : 'bg-zinc-800 text-zinc-100'
                       )}
                     >
-                      {/* Claude.com / Kimi-style collapsible tool-use embed */}
                       {isAssistant && message.computerUseSteps && message.computerUseSteps.length > 0 && (
                         <ComputerUseSteps
                           steps={message.computerUseSteps as any}
@@ -795,49 +845,47 @@ export function ChatMessages({
 
           {searchInfo && <SearchIndicator searchInfo={searchInfo} />}
 
+          {/* NEW: Plain text thinking with reflective/glitchy letters - NO BUBBLE */}
           {isThinking && (
-            <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} className="flex gap-4">
+            <motion.div
+              initial={{ opacity: 0, y: 10 }}
+              animate={{ opacity: 1, y: 0 }}
+              className="flex gap-4"
+            >
               <div className="w-8 h-8 rounded-full flex items-center justify-center flex-shrink-0 overflow-hidden bg-zinc-800">
                 <MarsAvatar size={32} family={streamingFamily} useSimpleIcon />
               </div>
-              <div className="bg-zinc-900/50 border border-zinc-800 rounded-2xl px-4 py-2.5 flex items-center gap-2">
-                <motion.span animate={{ opacity: [0.5, 1, 0.5] }} transition={{ duration: 1.5, repeat: Infinity }} className="text-sm text-zinc-400 italic">Thinking</motion.span>
-                <div className="flex gap-1 ml-2">
-                  <motion.div animate={{ opacity: [0.4, 1, 0.4] }} transition={{ duration: 1.5, repeat: Infinity }} className="w-1.5 h-1.5 rounded-full bg-primary" />
-                  <motion.div animate={{ opacity: [0.4, 1, 0.4] }} transition={{ duration: 1.5, repeat: Infinity, delay: 0.2 }} className="w-1.5 h-1.5 rounded-full bg-primary" />
-                  <motion.div animate={{ opacity: [0.4, 1, 0.4] }} transition={{ duration: 1.5, repeat: Infinity, delay: 0.4 }} className="w-1.5 h-1.5 rounded-full bg-primary" />
-                </div>
+              <div className="flex items-center">
+                <ThinkingText text="thinking..." />
               </div>
             </motion.div>
           )}
 
           {isStreaming && !isThinking && messages[messages.length - 1]?.role === 'user' && (
-            <div className="flex gap-4">
+            <motion.div
+              initial={{ opacity: 0, y: 10 }}
+              animate={{ opacity: 1, y: 0 }}
+              className="flex gap-4"
+            >
               <div className="w-8 h-8 rounded-full flex items-center justify-center flex-shrink-0 overflow-hidden bg-zinc-800">
                 <MarsAvatar size={32} family={streamingFamily} useSimpleIcon />
               </div>
-              <div className="bg-zinc-900/50 border border-zinc-800 rounded-2xl px-4 py-2.5 flex items-center gap-2">
-                <div className="flex gap-1">
-                  <motion.div animate={{ opacity: [0.4, 1, 0.4] }} transition={{ duration: 1.5, repeat: Infinity }} className="w-1.5 h-1.5 rounded-full bg-primary" />
-                  <motion.div animate={{ opacity: [0.4, 1, 0.4] }} transition={{ duration: 1.5, repeat: Infinity, delay: 0.2 }} className="w-1.5 h-1.5 rounded-full bg-primary" />
-                  <motion.div animate={{ opacity: [0.4, 1, 0.4] }} transition={{ duration: 1.5, repeat: Infinity, delay: 0.4 }} className="w-1.5 h-1.5 rounded-full bg-primary" />
-                </div>
+              <div className="flex items-center">
+                <ThinkingText text="..." />
               </div>
-            </div>
+            </motion.div>
           )}
 
           <AttachmentViewerDialog attachment={viewingAttachment} onClose={() => setViewingAttachment(null)} />
         </div>
       </div>
 
-      {/* Network Error Banner */}
       <AnimatePresence>
         {error && (
           <NetworkErrorBanner error={error} onRetry={onRetry} />
         )}
       </AnimatePresence>
 
-      {/* Feedback Modal */}
       <FeedbackModal
         open={!!feedbackMessage}
         onClose={() => setFeedbackMessage(null)}
