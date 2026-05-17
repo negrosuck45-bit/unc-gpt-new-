@@ -44,6 +44,9 @@ import {
   DialogDescription,
 } from '@/components/ui/dialog';
 
+// ============= CONSTANTS =============
+const MAX_MESSAGE_BYTES = 4000;
+
 // ============= HELPER FUNCTIONS =============
 function toBase64(str: string): string {
   const encoder = new TextEncoder();
@@ -92,7 +95,7 @@ function textToFileAttachment(text: string, filename?: string): Attachment {
   const base64 = toBase64(text);
   const dataUrl = `data:text/plain;base64,${base64}`;
   return {
-    name: filename || `message-${Date.now()}.txt`,
+    name: filename || `pasted-message-${Date.now()}.txt`,
     url: dataUrl,
     type: 'file',
     size: bytes.length,
@@ -100,31 +103,29 @@ function textToFileAttachment(text: string, filename?: string): Attachment {
   };
 }
 
-// WORKING COPY FUNCTION - NO Clipboard API
+// FIXED: Single copy only - prevents double copy
 function copyToClipboard(text: string): boolean {
   try {
-    // Create a temporary textarea element
+    if (navigator.clipboard && window.isSecureContext) {
+      navigator.clipboard.writeText(text);
+      return true;
+    }
+
     const textArea = document.createElement('textarea');
     textArea.value = text;
-    
-    // Make it invisible but attached to DOM
     textArea.style.position = 'fixed';
     textArea.style.top = '-999999px';
     textArea.style.left = '-999999px';
     textArea.style.opacity = '0';
     textArea.style.pointerEvents = 'none';
-    
+
     document.body.appendChild(textArea);
-    
-    // Select and copy
     textArea.select();
     textArea.setSelectionRange(0, text.length);
-    
+
     const success = document.execCommand('copy');
-    
-    // Clean up
     document.body.removeChild(textArea);
-    
+
     return success;
   } catch (err) {
     console.error('Copy failed:', err);
@@ -132,7 +133,7 @@ function copyToClipboard(text: string): boolean {
   }
 }
 
-// ============= TOAST NOTIFICATION =============
+// ============= TOAST NOTIFICATION - TOP CENTER =============
 function ToastNotification({ message, onClose }: { message: string; onClose: () => void }) {
   useEffect(() => {
     const timer = setTimeout(onClose, 4000);
@@ -141,21 +142,15 @@ function ToastNotification({ message, onClose }: { message: string; onClose: () 
 
   return (
     <motion.div
-      initial={{ opacity: 0, y: -50, scale: 0.9 }}
-      animate={{ opacity: 1, y: 0, scale: 1 }}
-      exit={{ opacity: 0, y: -50, scale: 0.9 }}
-      className="fixed top-4 left-1/2 -translate-x-1/2 z-50"
+      initial={{ opacity: 0, y: -20 }}
+      animate={{ opacity: 1, y: 0 }}
+      exit={{ opacity: 0, y: -20 }}
+      className="fixed top-4 left-1/2 -translate-x-1/2 z-[100]"
     >
-      <div className="bg-zinc-900/95 backdrop-blur-sm border border-yellow-500/30 rounded-xl shadow-2xl p-4 flex items-center gap-3 min-w-[320px] max-w-md">
-        <div className="w-8 h-8 rounded-full bg-yellow-500/10 flex items-center justify-center flex-shrink-0">
-          <AlertCircle className="h-4 w-4 text-yellow-500" />
-        </div>
-        <div className="flex-1">
-          <p className="text-sm font-medium text-yellow-400">Message Converted to File</p>
-          <p className="text-xs text-zinc-400">{message}</p>
-        </div>
-        <button onClick={onClose} className="p-1 rounded-lg hover:bg-zinc-800 transition-colors">
-          <X className="h-3.5 w-3.5 text-zinc-500" />
+      <div className="bg-zinc-800/90 backdrop-blur-sm border border-zinc-700/50 rounded-lg shadow-xl px-4 py-3 flex items-center gap-2 max-w-md">
+        <p className="text-sm text-zinc-200">{message}</p>
+        <button onClick={onClose} className="ml-2 p-1 rounded hover:bg-white/10 transition-colors">
+          <X className="h-3 w-3 text-zinc-500" />
         </button>
       </div>
     </motion.div>
@@ -190,10 +185,10 @@ function AttachmentPreview({ attachment, onView, compact = false }: { attachment
   }
 
   return (
-    <motion.div initial={{ opacity: 0, y: 5 }} animate={{ opacity: 1, y: 0 }} className="mt-2 flex items-center gap-2 p-2 rounded-lg bg-muted/50 border border-border">
-      <FileText className="h-4 w-4 flex-shrink-0 text-muted-foreground" />
+    <motion.div initial={{ opacity: 0, y: 5 }} animate={{ opacity: 1, y: 0 }} className="mt-2 flex items-center gap-2 p-2.5 rounded-lg bg-muted/50 border border-border hover:bg-muted/70 transition-colors">
+      <FileText className="h-4 w-4 flex-shrink-0 text-blue-400" />
       <span className="text-sm text-muted-foreground truncate">{attachment.name} {attachment.size && `(${(attachment.size / 1024).toFixed(1)} KB)`}</span>
-      <button onClick={() => onView(attachment)} className="ml-auto p-1 rounded-md hover:bg-accent transition-colors" title="View content">
+      <button onClick={() => onView(attachment)} className="ml-auto p-1.5 rounded-md hover:bg-accent transition-colors" title="View content">
         <Eye className="h-4 w-4 text-muted-foreground hover:text-foreground" />
       </button>
     </motion.div>
@@ -365,52 +360,51 @@ function NetworkErrorBanner({ error, onRetry }: { error: string; onRetry?: () =>
   );
 }
 
-// ============= MESSAGE ACTIONS WITH WORKING COPY =============
+// ============= MESSAGE ACTIONS - FIXED SINGLE COPY =============
 function MessageActions({ message, isAssistant, onCopy, onRegenerate, onEdit, onDislike }: { message: Message; isAssistant: boolean; onCopy: () => void; onRegenerate?: () => void; onEdit?: () => void; onDislike?: () => void }) {
   const [copied, setCopied] = useState(false);
   const [feedback, setFeedback] = useState<'like' | 'dislike' | null>(null);
+  const hasCopiedRef = useRef(false);
+  const copyTimeoutRef = useRef<NodeJS.Timeout | null>(null);
 
   useEffect(() => { if (isAssistant) { getFeedbackFromSupabase(message.id).then(setFeedback); } }, [message.id, isAssistant]);
 
-  // FIXED: Using ONLY execCommand fallback, NO Clipboard API
+  // FIXED: Guaranteed single copy with ref guard
   const handleCopy = useCallback(() => {
+    if (hasCopiedRef.current) return;
+    hasCopiedRef.current = true;
+
     const success = copyToClipboard(message.content);
     if (success) {
       onCopy();
       setCopied(true);
-      setTimeout(() => setCopied(false), 2000);
+
+      copyTimeoutRef.current = setTimeout(() => {
+        setCopied(false);
+        hasCopiedRef.current = false;
+      }, 2000);
     } else {
-      // Last resort: show text selection for manual copy
-      const tempDiv = document.createElement('div');
-      tempDiv.textContent = message.content;
-      tempDiv.style.position = 'fixed';
-      tempDiv.style.top = '0';
-      tempDiv.style.left = '0';
-      tempDiv.style.width = '100%';
-      tempDiv.style.height = '100%';
-      tempDiv.style.backgroundColor = 'rgba(0,0,0,0.9)';
-      tempDiv.style.color = 'white';
-      tempDiv.style.padding = '20px';
-      tempDiv.style.zIndex = '99999';
-      tempDiv.style.overflow = 'auto';
-      tempDiv.style.whiteSpace = 'pre-wrap';
-      document.body.appendChild(tempDiv);
-      const range = document.createRange();
-      range.selectNodeContents(tempDiv);
-      const selection = window.getSelection();
-      selection?.removeAllRanges();
-      selection?.addRange(range);
-      alert('Press Ctrl+C to copy, then click anywhere to close');
-      tempDiv.onclick = () => document.body.removeChild(tempDiv);
+      hasCopiedRef.current = false;
     }
   }, [onCopy, message.content]);
+
+  useEffect(() => {
+    return () => {
+      if (copyTimeoutRef.current) {
+        clearTimeout(copyTimeoutRef.current);
+      }
+      hasCopiedRef.current = false;
+    };
+  }, []);
 
   const handleLike = useCallback(async () => { await saveFeedbackToSupabase(message.id, 'like', message.content); setFeedback('like'); }, [message.id, message.content]);
   const handleDislike = useCallback(() => { onDislike?.(); }, [onDislike]);
 
   return (
     <div className={cn('flex items-center gap-1 mt-1 transition-opacity', 'opacity-100 md:opacity-0 md:group-hover:opacity-100', isAssistant ? 'ml-0' : 'mr-0 flex-row-reverse')}>
-      <Button variant="ghost" size="icon" className="h-7 w-7 text-muted-foreground" onClick={handleCopy}>{copied ? <Check className="h-3.5 w-3.5" /> : <Copy className="h-3.5 w-3.5" />}</Button>
+      <Button variant="ghost" size="icon" className="h-7 w-7 text-muted-foreground" onClick={handleCopy}>
+        {copied ? <Check className="h-3.5 w-3.5" /> : <Copy className="h-3.5 w-3.5" />}
+      </Button>
       {isAssistant && (<><Button variant="ghost" size="icon" className={cn("h-7 w-7", feedback === 'like' ? "text-green-500" : "text-muted-foreground hover:text-green-500")} onClick={handleLike} title="Good response"><ThumbsUp className="h-3.5 w-3.5" /></Button><Button variant="ghost" size="icon" className={cn("h-7 w-7", feedback === 'dislike' ? "text-red-500" : "text-muted-foreground hover:text-red-500")} onClick={handleDislike} title="Bad response - provide feedback"><ThumbsDown className="h-3.5 w-3.5" /></Button></>)}
       {onRegenerate && (<Button variant="ghost" size="icon" className="h-7 w-7 text-muted-foreground" onClick={onRegenerate}><RefreshCw className="h-3.5 w-3.5" /></Button>)}
       {onEdit && (<Button variant="ghost" size="icon" className="h-7 w-7 text-muted-foreground" onClick={onEdit}><Pencil className="h-3.5 w-3.5" /></Button>)}
@@ -478,24 +472,35 @@ export function ChatMessages({ messages, isStreaming, isThinking, onRegenerate, 
   const [toast, setToast] = useState<string | null>(null);
   const streamingFamily = useMemo(() => getModelFamilyFromModel(currentChat?.model || settings.model), [currentChat?.model, settings.model]);
 
+  const shownToastsRef = useRef<Set<string>>(new Set());
+
   const handleFeedbackSubmit = useCallback(async (issueType: string, details: string) => {
     if (!feedbackMessage) return;
     await saveFeedbackToSupabase(feedbackMessage.id, 'dislike', feedbackMessage.content, details, issueType);
   }, [feedbackMessage]);
 
-  // Process messages - convert any message over 1000 bytes to file attachment
+  // FIXED: Convert messages > 4000 bytes to file. NO ugly info card in message bubble.
+  // Only shows clean file attachment + top-center toast notification.
   const processedMessages = useMemo(() => {
     return messages.map(msg => {
       if (msg.role === 'user' && msg.content && (!msg.attachments || msg.attachments.length === 0)) {
         const bytes = new TextEncoder().encode(msg.content);
-        if (bytes.length > 1000) {
+        if (bytes.length > MAX_MESSAGE_BYTES) {
           const fileAtt = textToFileAttachment(msg.content);
-          // Show toast notification
-          setTimeout(() => setToast(`Converted ${(bytes.length / 1024).toFixed(1)} KB message to "${fileAtt.name}"`), 0);
+
+          // Show toast only once per message
+          if (!shownToastsRef.current.has(msg.id)) {
+            shownToastsRef.current.add(msg.id);
+            // Use setTimeout to avoid calling setState during render
+            setTimeout(() => {
+              setToast(`Content exceeds 4000 bytes and has been converted to a txt attachment.`);
+            }, 0);
+          }
+
           return { 
             ...msg, 
             attachments: [fileAtt], 
-            content: `📎 **Large message converted to file**\n\nYour message (${(bytes.length / 1024).toFixed(1)} KB) has been automatically converted to an attached file for better readability.\n\n**File:** ${fileAtt.name}\n**Size:** ${(bytes.length / 1024).toFixed(1)} KB\n**Language:** ${fileAtt.language}\n\nClick the file attachment above to view the full content.` 
+            content: '' // Empty content - just show the file attachment, NO info card
           };
         }
       }
@@ -505,7 +510,14 @@ export function ChatMessages({ messages, isStreaming, isThinking, onRegenerate, 
 
   return (
     <>
-      <AnimatePresence>{toast && <ToastNotification message={toast} onClose={() => setToast(null)} />}</AnimatePresence>
+      <AnimatePresence>
+        {toast && (
+          <ToastNotification 
+            message={toast} 
+            onClose={() => setToast(null)} 
+          />
+        )}
+      </AnimatePresence>
       <div className="flex-1 overflow-y-auto scroll-smooth">
         <div className="max-w-3xl xl:max-w-4xl mx-auto px-3 sm:px-4 md:px-6 py-3 space-y-4">
           {processedMessages.map((message, index) => {
@@ -520,8 +532,17 @@ export function ChatMessages({ messages, isStreaming, isThinking, onRegenerate, 
                   <div className={cn('flex flex-col max-w-[92%] sm:max-w-[85%] md:max-w-[78%] lg:max-w-[72%]', isAssistant ? 'items-start' : 'items-end')}>
                     {message.attachments?.some(a => a.type === 'image') && (<div className="mb-2 flex flex-row flex-wrap gap-1.5 justify-end max-w-full">{message.attachments.filter(a => a.type === 'image').map((att, i) => (<AttachmentPreview key={`img-${i}`} attachment={att} onView={setViewingAttachment} compact />))}</div>)}
                     <div className={cn('rounded-2xl px-3.5 py-2 text-[13px] sm:text-sm leading-relaxed shadow-sm w-full', isAssistant ? 'bg-zinc-900/50 border border-zinc-800 text-zinc-200' : 'bg-zinc-800 text-zinc-100')}>
-                      <MessageContent content={message.content} />
-                      {message.attachments?.some(a => a.type !== 'image') && (<div className="mt-3 space-y-2">{message.attachments.filter(a => a.type !== 'image').map((att, i) => (<AttachmentPreview key={`file-${i}`} attachment={att} onView={setViewingAttachment} />))}</div>)}
+                      {message.content && message.content.trim().length > 0 && <MessageContent content={message.content} />}
+
+                      {/* Show file attachments - NO "converted to file" info card */}
+                      {message.attachments?.some(a => a.type !== 'image') && (
+                        <div className="space-y-2">
+                          {message.attachments.filter(a => a.type !== 'image').map((att, i) => (
+                            <AttachmentPreview key={`file-${i}`} attachment={att} onView={setViewingAttachment} />
+                          ))}
+                        </div>
+                      )}
+
                       {message.image && (<motion.div initial={{ opacity: 0, scale: 0.9 }} animate={{ opacity: 1, scale: 1 }} className="mt-3 rounded-lg overflow-hidden max-w-sm">{message.image.startsWith('data:') ? <img src={message.image} alt="Generated image" className="w-full h-auto object-cover rounded-lg bg-muted" /> : <NextImage src={message.image} alt="Generated image" width={400} height={300} className="w-full h-auto object-cover rounded-lg" loading="lazy" unoptimized={message.image.includes('blob:')} />}</motion.div>)}
                       {message.video && (<motion.div initial={{ opacity: 0, scale: 0.9 }} animate={{ opacity: 1, scale: 1 }} className="mt-3 rounded-lg overflow-hidden max-w-sm"><video src={message.video} controls className="w-full h-auto rounded-lg bg-muted" /></motion.div>)}
                     </div>
@@ -549,4 +570,33 @@ export function ChatMessages({ messages, isStreaming, isThinking, onRegenerate, 
       <FeedbackModal open={!!feedbackMessage} onClose={() => setFeedbackMessage(null)} message={feedbackMessage} onSubmit={handleFeedbackSubmit} />
     </>
   );
+}
+
+// ============= PASTE HANDLER HOOK (use in your ChatInput component) =============
+export function usePasteHandler(
+  onConvertToFile: (attachment: Attachment) => void,
+  onShowToast: (message: string) => void
+) {
+  const handlePaste = useCallback((event: React.ClipboardEvent<HTMLTextAreaElement>) => {
+    const pastedText = event.clipboardData.getData('text');
+
+    if (!pastedText) return false;
+
+    const bytes = new TextEncoder().encode(pastedText);
+
+    if (bytes.length > MAX_MESSAGE_BYTES) {
+      event.preventDefault();
+      event.stopPropagation();
+
+      const fileAtt = textToFileAttachment(pastedText);
+      onConvertToFile(fileAtt);
+      onShowToast(`Pasted message exceeded 4000 bytes (${(bytes.length / 1024).toFixed(1)} KB). Converting it to a file...`);
+
+      return true;
+    }
+
+    return false;
+  }, [onConvertToFile, onShowToast]);
+
+  return { handlePaste };
 }
