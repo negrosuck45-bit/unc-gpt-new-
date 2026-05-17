@@ -219,6 +219,41 @@ async function processAttachmentsForModel(
 }
 
 // ============================================================
+// CONVERT FRONTEND ATTACHMENTS TO OPENAI VISION FORMAT
+// ============================================================
+function convertMessageWithAttachments(msg: any): any {
+  // If no attachments or content is already an array, return as-is
+  if (!msg.attachments || msg.attachments.length === 0) {
+    return msg;
+  }
+
+  // Build content array: text first, then images/files
+  const content: any[] = [];
+
+  // Add text content
+  if (msg.content && typeof msg.content === 'string' && msg.content.trim()) {
+    content.push({ type: 'text', text: msg.content });
+  }
+
+  // Add image attachments
+  for (const att of msg.attachments) {
+    if (att.type === 'image') {
+      content.push({
+        type: 'image_url',
+        image_url: {
+          url: att.url
+        }
+      });
+    }
+  }
+
+  return {
+    ...msg,
+    content: content.length > 0 ? content : msg.content
+  };
+}
+
+// ============================================================
 // MEDIA DETECTION
 // ============================================================
 function isVideoRequest(prompt: string): boolean {
@@ -864,12 +899,27 @@ export async function POST(req: NextRequest) {
     let hasImage = false;
     let imageUrl = "";
 
-    if (Array.isArray(lastMsg?.content)) {
-      const imgPart = lastMsg.content.find((c: any) => c.type === "image_url");
-      if (imgPart && !imgPart.image_url.url.startsWith("blob:")) {
-        hasImage = true;
-        imageUrl = imgPart.image_url.url;
-        console.log(`[Main] Valid image detected: ${imageUrl.substring(0, 80)}...`);
+    // Check ALL messages for images (not just the last one)
+    for (const msg of messages) {
+      // Check content array format
+      if (Array.isArray(msg?.content)) {
+        const imgPart = msg.content.find((c: any) => c.type === "image_url");
+        if (imgPart && !imgPart.image_url.url.startsWith("blob:")) {
+          hasImage = true;
+          imageUrl = imgPart.image_url.url;
+          console.log(`[Main] Valid image detected in content array: ${imageUrl.substring(0, 80)}...`);
+          break;
+        }
+      }
+      // Check attachments format (frontend sends this)
+      if (msg?.attachments) {
+        const imgAtt = msg.attachments.find((a: any) => a.type === 'image');
+        if (imgAtt && !imgAtt.url.startsWith("blob:")) {
+          hasImage = true;
+          imageUrl = imgAtt.url;
+          console.log(`[Main] Valid image detected in attachments: ${imageUrl.substring(0, 80)}...`);
+          break;
+        }
       }
     }
 
@@ -906,7 +956,9 @@ export async function POST(req: NextRequest) {
     
     console.log(`[Main] Target model: ${targetModel}, hasVision: ${hasVisionCapability}, hasImage: ${hasImage}`);
     
-    const apiMessages = await processAttachmentsForModel(messages, targetModel, hasVisionCapability);
+    // Convert frontend attachments to OpenAI vision format
+    const messagesWithVisionFormat = messages.map(convertMessageWithAttachments);
+    const apiMessages = await processAttachmentsForModel(messagesWithVisionFormat, targetModel, hasVisionCapability);
 
     const systemParts: string[] = [
       `You are uncgpt - a helpful AI assistant. You can SEE and ANALYZE images. When users share images, describe what you see in detail including objects, text, colors, people, and any notable elements. Be conversational and natural.\n\nFor greetings and general questions: just talk naturally.\nFor action requests (code, GitHub, etc): use tools if available.`,
