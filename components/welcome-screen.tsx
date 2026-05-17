@@ -58,6 +58,5 @@ export function WelcomeScreen({ onSelectPrompt, project }: WelcomeScreenProps) {
           {/* Add your prompt buttons here */}
         </motion.div>
       </div>
-    </div>
   );
 }
