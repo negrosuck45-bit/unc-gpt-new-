@@ -47,7 +47,7 @@ import {
   DropdownMenuSeparator,
   DropdownMenuLabel,
 } from '@/components/ui/dropdown-menu'
-import Image from 'next/image'
+import NextImage from 'next/image' // Renamed to avoid conflict
 import { createClient } from '@supabase/supabase-js'
 
 // Initialize Supabase client
@@ -90,7 +90,8 @@ async function compressImage(file: File): Promise<File> {
   return new Promise((resolve, reject) => {
     const reader = new FileReader()
     reader.onload = (e) => {
-      const img = new Image()
+      // Use native Image constructor (not Next.js Image)
+      const img = new window.Image()
       img.onload = () => {
         const canvas = document.createElement('canvas')
         let w = img.width, h = img.height
@@ -119,10 +120,10 @@ async function compressImage(file: File): Promise<File> {
           }
         }, 'image/jpeg', 0.7)
       }
-      img.onerror = reject
+      img.onerror = () => reject(new Error('Failed to load image'))
       img.src = e.target?.result as string
     }
-    reader.onerror = reject
+    reader.onerror = () => reject(new Error('Failed to read file'))
     reader.readAsDataURL(file)
   })
 }
@@ -140,6 +141,8 @@ async function uploadToSupabase(file: File, fileName: string): Promise<string> {
   const uniqueFileName = `${timestamp}_${randomStr}_${safeFileName}.${fileExt}`
   const filePath = `chat-images/${uniqueFileName}`
 
+  console.log('Uploading to Supabase:', filePath)
+
   const { data, error } = await supabase.storage
     .from('chat-attachments')
     .upload(filePath, file, {
@@ -148,23 +151,33 @@ async function uploadToSupabase(file: File, fileName: string): Promise<string> {
       contentType: file.type,
     })
 
-  if (error) throw error
+  if (error) {
+    console.error('Upload error:', error)
+    throw error
+  }
 
   const { data: { publicUrl } } = supabase.storage
     .from('chat-attachments')
     .getPublicUrl(filePath)
 
+  console.log('Upload success:', publicUrl)
+
   // Store metadata in database
-  await supabase.from('attachments').insert({
-    id: uniqueFileName,
-    url: publicUrl,
-    file_path: filePath,
-    created_at: new Date().toISOString(),
-    expires_at: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString(),
-    file_name: file.name,
-    file_size: file.size,
-    mime_type: file.type,
-  }).catch(console.error)
+  try {
+    await supabase.from('attachments').insert({
+      id: uniqueFileName,
+      url: publicUrl,
+      file_path: filePath,
+      created_at: new Date().toISOString(),
+      expires_at: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString(),
+      file_name: file.name,
+      file_size: file.size,
+      mime_type: file.type,
+    })
+  } catch (dbError) {
+    console.error('Failed to save metadata:', dbError)
+    // Don't throw - the image is still uploaded
+  }
 
   return publicUrl
 }
@@ -242,7 +255,7 @@ export function ChatInput({
     if (family === 'auto') return <Sparkles className="h-4 w-4 text-purple-500 shrink-0" />
     const src = familyIcons[family]
     if (src && !iconErrors.has(family)) {
-      return <Image src={src} alt={family} width={16} height={16} className="h-4 w-4 shrink-0" onError={() => setIconErrors((prev) => new Set([...prev, family]))} />
+      return <NextImage src={src} alt={family} width={16} height={16} className="h-4 w-4 shrink-0" onError={() => setIconErrors((prev) => new Set([...prev, family]))} />
     }
     return <span className="h-4 w-4 text-xs font-bold flex items-center justify-center text-muted-foreground">{family[0].toUpperCase()}</span>
   }
@@ -252,18 +265,19 @@ export function ChatInput({
     setUploadStatus(prev => new Map(prev).set(attachmentId, { status: 'uploading', progress: 0 }))
     
     try {
-      // Compress image
+      // Update progress - compressing
       setUploadStatus(prev => {
         const newMap = new Map(prev)
-        newMap.set(attachmentId, { status: 'uploading', progress: 30 })
+        newMap.set(attachmentId, { status: 'uploading', progress: 20 })
         return newMap
       })
       
+      // Compress image
       const compressed = await compressImage(file)
       
       setUploadStatus(prev => {
         const newMap = new Map(prev)
-        newMap.set(attachmentId, { status: 'uploading', progress: 60 })
+        newMap.set(attachmentId, { status: 'uploading', progress: 50 })
         return newMap
       })
       
@@ -284,6 +298,8 @@ export function ChatInput({
             : a
         )
       )
+      
+      console.log('Image upload completed:', publicUrl)
       
     } catch (error) {
       console.error('Upload failed:', error)
