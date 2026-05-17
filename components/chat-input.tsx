@@ -24,7 +24,6 @@ import {
 import { motion, AnimatePresence } from 'framer-motion'
 import { cn } from '@/lib/utils'
 import { Attachment, useChatStore, MODELS, type ModelInfo } from '@/lib/chat-store'
-import { uploadFile } from '@/lib/upload'
 import { Light as SyntaxHighlighter } from 'react-syntax-highlighter'
 import { oneDark } from 'react-syntax-highlighter/dist/esm/styles/prism'
 import { oneLight } from 'react-syntax-highlighter/dist/esm/styles/prism'
@@ -49,14 +48,16 @@ import {
   DropdownMenuLabel,
 } from '@/components/ui/dropdown-menu'
 import Image from 'next/image'
-
-// ====================== SUPABASE SETUP ======================
 import { createClient } from '@supabase/supabase-js'
 
 // Initialize Supabase client
-const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL!
-const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
-const supabase = createClient(supabaseUrl, supabaseAnonKey)
+const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL
+const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY
+
+let supabase: any = null
+if (supabaseUrl && supabaseAnonKey) {
+  supabase = createClient(supabaseUrl, supabaseAnonKey)
+}
 
 // ====================== FAMILY ICONS ======================
 const familyIcons: Record<string, string> = {
@@ -70,7 +71,6 @@ const familyIcons: Record<string, string> = {
   llama: "/llama.png",
 }
 
-// ---------- Helpers ----------
 function toBase64(str: string): string {
   const encoder = new TextEncoder()
   const bytes = encoder.encode(str)
@@ -86,8 +86,8 @@ function fromBase64(base64: string): string {
   return new TextDecoder().decode(bytes)
 }
 
-async function compressImage(file: File): Promise<Blob> {
-  return new Promise((resolve) => {
+async function compressImage(file: File): Promise<File> {
+  return new Promise((resolve, reject) => {
     const reader = new FileReader()
     reader.onload = (e) => {
       const img = new Image()
@@ -110,18 +110,34 @@ async function compressImage(file: File): Promise<Blob> {
         canvas.height = h
         const ctx = canvas.getContext('2d')
         ctx?.drawImage(img, 0, 0, w, h)
-        canvas.toBlob((blob) => resolve(blob || file), 'image/jpeg', 0.7)
+        canvas.toBlob((blob) => {
+          if (blob) {
+            const compressedFile = new File([blob], file.name, { type: 'image/jpeg' })
+            resolve(compressedFile)
+          } else {
+            resolve(file)
+          }
+        }, 'image/jpeg', 0.7)
       }
+      img.onerror = reject
       img.src = e.target?.result as string
     }
+    reader.onerror = reject
     reader.readAsDataURL(file)
   })
 }
 
 // Upload image to Supabase Storage
 async function uploadToSupabase(file: File, fileName: string): Promise<string> {
-  const fileExt = file.name.split('.').pop()
-  const uniqueFileName = `${Date.now()}_${Math.random().toString(36).substring(2)}_${fileName.replace(/[^a-zA-Z0-9]/g, '_')}.${fileExt || 'jpg'}`
+  if (!supabase) {
+    throw new Error('Supabase not configured')
+  }
+
+  const fileExt = file.name.split('.').pop() || 'jpg'
+  const timestamp = Date.now()
+  const randomStr = Math.random().toString(36).substring(2, 8)
+  const safeFileName = fileName.replace(/[^a-zA-Z0-9]/g, '_').slice(0, 50)
+  const uniqueFileName = `${timestamp}_${randomStr}_${safeFileName}.${fileExt}`
   const filePath = `chat-images/${uniqueFileName}`
 
   const { data, error } = await supabase.storage
@@ -134,53 +150,23 @@ async function uploadToSupabase(file: File, fileName: string): Promise<string> {
 
   if (error) throw error
 
-  // Get public URL
   const { data: { publicUrl } } = supabase.storage
     .from('chat-attachments')
     .getPublicUrl(filePath)
 
-  // Store metadata in database for cleanup
+  // Store metadata in database
   await supabase.from('attachments').insert({
     id: uniqueFileName,
     url: publicUrl,
     file_path: filePath,
     created_at: new Date().toISOString(),
-    expires_at: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString(), // 7 days expiry
+    expires_at: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString(),
     file_name: file.name,
     file_size: file.size,
     mime_type: file.type,
   }).catch(console.error)
 
   return publicUrl
-}
-
-// Cleanup expired attachments (run periodically)
-async function cleanupExpiredAttachments() {
-  try {
-    const { data: expired } = await supabase
-      .from('attachments')
-      .select('file_path')
-      .lt('expires_at', new Date().toISOString())
-
-    if (expired && expired.length > 0) {
-      // Delete from storage
-      for (const item of expired) {
-        await supabase.storage.from('chat-attachments').remove([item.file_path])
-      }
-      // Delete from database
-      await supabase
-        .from('attachments')
-        .delete()
-        .lt('expires_at', new Date().toISOString())
-    }
-  } catch (error) {
-    console.error('Cleanup error:', error)
-  }
-}
-
-// Run cleanup every hour
-if (typeof window !== 'undefined') {
-  setInterval(cleanupExpiredAttachments, 60 * 60 * 1000)
 }
 
 function useIsDarkMode() {
@@ -205,21 +191,6 @@ interface ChatInputProps {
   onVoiceMessageSent?: () => void
 }
 
-// ====================== MCP PROVIDERS ======================
-const MCP_PROVIDERS = [
-  {
-    name: 'github', label: 'GitHub',
-    description: 'Access repositories, issues, and pull requests',
-    badge: undefined,
-    icon: (
-      <svg viewBox="0 0 24 24" fill="currentColor" className="h-8 w-8">
-        <path d="M12 0C5.37 0 0 5.37 0 12c0 5.31 3.435 9.795 8.205 11.385.6.105.825-.255.825-.57 0-.285-.015-1.23-.015-2.235-3.015.555-3.795-.735-4.035-1.41-.135-.345-.72-1.41-1.23-1.695-.42-.225-1.02-.78-.015-.795.945-.015 1.62.87 1.845 1.23 1.08 1.815 2.805 1.305 3.495.99.105-.78.42-1.305.765-1.605-2.67-.3-5.46-1.335-5.46-5.925 0-1.305.465-2.385 1.23-3.225-.12-.3-.54-1.53.12-3.18 0 0 1.005-.315 3.3 1.23.96-.27 1.98-.405 3-.405s2.04.135 3 .405c2.295-1.56 3.3-1.23 3.3-1.23.66 1.65.24 2.88.12 3.18.765.84 1.23 1.905 1.23 3.225 0 4.605-2.805 5.625-5.475 5.925.435.375.81 1.095.81 2.22 0 1.605-.015 2.895-.015 3.3 0 .315.225.69.825.57A12.02 12.02 0 0 0 24 12c0-6.63-5.37-12-12-12z"/>
-      </svg>
-    ),
-  },
-  // ... rest of MCP_PROVIDERS
-]
-
 export function ChatInput({
   onSend,
   onStop,
@@ -237,9 +208,7 @@ export function ChatInput({
   const [attachMenuOpen, setAttachMenuOpen] = useState(false)
   const [iconErrors, setIconErrors] = useState<Set<string>>(new Set())
   const [viewingAttachment, setViewingAttachment] = useState<Attachment | null>(null)
-  const [connectorDirOpen, setConnectorDirOpen] = useState(false)
-  const [uploadingImages, setUploadingImages] = useState<Set<string>>(new Set())
-  const [uploadProgress, setUploadProgress] = useState<Map<string, number>>(new Map())
+  const [uploadStatus, setUploadStatus] = useState<Map<string, { status: 'uploading' | 'completed' | 'error', progress?: number, url?: string }>>(new Map())
 
   const textareaRef = useRef<HTMLTextAreaElement>(null)
   const fileInputRef = useRef<HTMLInputElement>(null)
@@ -278,31 +247,32 @@ export function ChatInput({
     return <span className="h-4 w-4 text-xs font-bold flex items-center justify-center text-muted-foreground">{family[0].toUpperCase()}</span>
   }
 
-  // Upload image to Supabase with progress
-  const uploadImageToSupabase = useCallback(async (file: File, attachmentId: string) => {
+  const uploadImage = useCallback(async (file: File, attachmentId: string) => {
+    // Set uploading status
+    setUploadStatus(prev => new Map(prev).set(attachmentId, { status: 'uploading', progress: 0 }))
+    
     try {
-      setUploadingImages(prev => new Set([...prev, attachmentId]))
-      setIsUploading(true)
-      
-      // Simulate progress
-      const progressInterval = setInterval(() => {
-        setUploadProgress(prev => {
-          const newMap = new Map(prev)
-          const current = newMap.get(attachmentId) || 0
-          if (current < 90) {
-            newMap.set(attachmentId, current + 10)
-          }
-          return newMap
-        })
-      }, 200)
+      // Compress image
+      setUploadStatus(prev => {
+        const newMap = new Map(prev)
+        newMap.set(attachmentId, { status: 'uploading', progress: 30 })
+        return newMap
+      })
       
       const compressed = await compressImage(file)
+      
+      setUploadStatus(prev => {
+        const newMap = new Map(prev)
+        newMap.set(attachmentId, { status: 'uploading', progress: 60 })
+        return newMap
+      })
+      
+      // Upload to Supabase
       const publicUrl = await uploadToSupabase(compressed, file.name)
       
-      clearInterval(progressInterval)
-      setUploadProgress(prev => {
+      setUploadStatus(prev => {
         const newMap = new Map(prev)
-        newMap.set(attachmentId, 100)
+        newMap.set(attachmentId, { status: 'completed', progress: 100, url: publicUrl })
         return newMap
       })
       
@@ -310,37 +280,29 @@ export function ChatInput({
       setAttachments((prev) => 
         prev.map((a) => 
           a.id === attachmentId 
-            ? { ...a, url: publicUrl, uploaded: true, permanentUrl: publicUrl }
+            ? { ...a, url: publicUrl, permanentUrl: publicUrl, uploaded: true }
             : a
         )
       )
       
-      setTimeout(() => {
-        setUploadProgress(prev => {
-          const newMap = new Map(prev)
-          newMap.delete(attachmentId)
-          return newMap
-        })
-      }, 1000)
-      
     } catch (error) {
       console.error('Upload failed:', error)
+      setUploadStatus(prev => {
+        const newMap = new Map(prev)
+        newMap.set(attachmentId, { status: 'error', progress: 0 })
+        return newMap
+      })
       setAttachments((prev) => 
         prev.map((a) => 
           a.id === attachmentId 
-            ? { ...a, uploadError: true }
+            ? { ...a, uploadError: true, errorMessage: error instanceof Error ? error.message : 'Upload failed' }
             : a
         )
       )
     } finally {
-      setUploadingImages(prev => {
-        const newSet = new Set(prev)
-        newSet.delete(attachmentId)
-        return newSet
-      })
-      if (uploadingImages.size === 1) setIsUploading(false)
+      setIsUploading(false)
     }
-  }, [uploadingImages.size])
+  }, [])
 
   const handlePasteEvent = async (e: React.ClipboardEvent<HTMLTextAreaElement>) => {
     const items = Array.from(e.clipboardData.items)
@@ -348,11 +310,14 @@ export function ChatInput({
     
     if (images.length > 0) {
       e.preventDefault()
+      setIsUploading(true)
+      
       for (const item of images) {
         const file = item.getAsFile()
         if (!file) continue
         const id = crypto.randomUUID()
         const localUrl = URL.createObjectURL(file)
+        
         setAttachments((prev) => [...prev, { 
           id, 
           type: 'image', 
@@ -360,11 +325,13 @@ export function ChatInput({
           url: localUrl,
           size: file.size, 
           mimeType: file.type,
-          uploading: true
         }])
-        await uploadImageToSupabase(file, id)
+        
+        await uploadImage(file, id)
         URL.revokeObjectURL(localUrl)
       }
+      
+      setIsUploading(false)
       return
     }
     
@@ -384,20 +351,28 @@ export function ChatInput({
   useEffect(() => {
     if (initialValue) {
       setInput(initialValue)
+      onClearInitialValue?.()
     }
-  }, [initialValue])
+  }, [initialValue, onClearInitialValue])
 
   const handleSubmit = useCallback(() => {
+    // Check if any images are still uploading
+    const hasUploading = Array.from(uploadStatus.values()).some(status => status.status === 'uploading')
+    
+    if (hasUploading) {
+      alert('Please wait for images to finish uploading before sending.')
+      return
+    }
+    
     if ((input.trim() || attachments.length > 0) && !isStreaming && !disabled) {
-      // Filter out attachments that are still uploading or have errors
+      // Filter out attachments that have upload errors
       const validAttachments = attachments.filter(a => !a.uploadError)
       onSend(input.trim(), validAttachments.length > 0 ? validAttachments : undefined)
       setInput('')
       setAttachments([])
-      setUploadingImages(new Set())
-      setUploadProgress(new Map())
+      setUploadStatus(new Map())
     }
-  }, [input, attachments, isStreaming, disabled, onSend])
+  }, [input, attachments, uploadStatus, isStreaming, disabled, onSend])
 
   useEffect(() => {
     if (typeof window === 'undefined') return
@@ -441,6 +416,10 @@ export function ChatInput({
     const files = Array.from(e.target.files || [])
     e.target.value = ''
     
+    if (type === 'image') {
+      setIsUploading(true)
+    }
+    
     for (const file of files) {
       const id = crypto.randomUUID()
       const localUrl = type === 'image' ? URL.createObjectURL(file) : ''
@@ -452,14 +431,18 @@ export function ChatInput({
         url: localUrl,
         size: file.size,
         mimeType: file.type,
-        uploading: type === 'image'
       }])
       
       if (type === 'image') {
-        await uploadImageToSupabase(file, id)
+        await uploadImage(file, id)
         URL.revokeObjectURL(localUrl)
       }
     }
+    
+    if (type === 'image') {
+      setIsUploading(false)
+    }
+    
     setAttachMenuOpen(false)
   }
 
@@ -479,12 +462,7 @@ export function ChatInput({
 
   const removeAttachment = (id: string) => {
     setAttachments((prev) => prev.filter((a) => a.id !== id))
-    setUploadingImages(prev => {
-      const newSet = new Set(prev)
-      newSet.delete(id)
-      return newSet
-    })
-    setUploadProgress(prev => {
+    setUploadStatus(prev => {
       const newMap = new Map(prev)
       newMap.delete(id)
       return newMap
@@ -494,6 +472,9 @@ export function ChatInput({
 
   const imageAttachments = attachments.filter((a) => a.type === 'image')
   const otherAttachments = attachments.filter((a) => a.type !== 'image')
+  
+  // Check if any images are still uploading
+  const hasUploadingImages = Array.from(uploadStatus.values()).some(status => status.status === 'uploading')
 
   return (
     <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} className="bg-background">
@@ -504,9 +485,10 @@ export function ChatInput({
               {imageAttachments.length > 0 && (
                 <div className="flex flex-wrap gap-2">
                   {imageAttachments.map((att) => {
-                    const isUploading = uploadingImages.has(att.id)
-                    const progress = uploadProgress.get(att.id) || 0
-                    const hasError = att.uploadError
+                    const status = uploadStatus.get(att.id)
+                    const isUploading = status?.status === 'uploading'
+                    const hasError = status?.status === 'error'
+                    const progress = status?.progress || 0
                     
                     return (
                       <div key={att.id} className="relative group w-20 h-20 rounded-lg overflow-hidden border border-border">
@@ -521,7 +503,7 @@ export function ChatInput({
                         
                         {hasError && !isUploading && (
                           <div className="absolute inset-0 bg-red-500/80 flex items-center justify-center">
-                            <span className="text-[10px] text-white text-center">Upload failed</span>
+                            <X className="h-6 w-6 text-white" />
                           </div>
                         )}
                         
@@ -587,17 +569,6 @@ export function ChatInput({
                     </button>
                   </PopoverContent>
                 </Popover>
-
-                <Button
-                  variant="ghost"
-                  size="sm"
-                  className="h-8 gap-1.5 text-xs text-muted-foreground hover:text-foreground px-2"
-                  onClick={() => setConnectorDirOpen(true)}
-                  disabled={isStreaming || disabled}
-                >
-                  <Puzzle className="h-3.5 w-3.5" />
-                  <span className="hidden sm:inline">Add connectors</span>
-                </Button>
               </div>
 
               <div className="flex items-center gap-1">
@@ -639,8 +610,13 @@ export function ChatInput({
                   </Button>
                 ) : (
                   (input.trim() || attachments.length > 0) ? (
-                    <Button onClick={handleSubmit} disabled={isStreaming || disabled || isUploading} size="icon" className="h-9 w-9 rounded-full bg-primary hover:bg-primary/90">
-                      <ArrowUp className="h-4 w-4" />
+                    <Button 
+                      onClick={handleSubmit} 
+                      disabled={isStreaming || disabled || hasUploadingImages} 
+                      size="icon" 
+                      className="h-9 w-9 rounded-full bg-primary hover:bg-primary/90"
+                    >
+                      {hasUploadingImages ? <Loader2 className="h-4 w-4 animate-spin" /> : <ArrowUp className="h-4 w-4" />}
                     </Button>
                   ) : (
                     <Button onClick={toggleVoiceInput} size="icon" variant={isRecording ? "destructive" : "ghost"} className="h-8 w-8 rounded-full">
@@ -652,6 +628,12 @@ export function ChatInput({
             </div>
           </div>
         </div>
+
+        {hasUploadingImages && (
+          <div className="px-3 mt-2">
+            <p className="text-xs text-muted-foreground">Uploading images... Please wait before sending.</p>
+          </div>
+        )}
 
         <AnimatePresence>
           {showLinkInput && (
@@ -665,6 +647,24 @@ export function ChatInput({
 
         <input ref={fileInputRef} type="file" multiple className="hidden" onChange={(e) => handleFileSelect(e, 'file')} />
         <input ref={imageInputRef} type="file" accept="image/*" multiple className="hidden" onChange={(e) => handleFileSelect(e, 'image')} />
+
+        <Dialog open={!!viewingAttachment} onOpenChange={(open) => !open && setViewingAttachment(null)}>
+          <DialogContent className="max-w-4xl max-h-[85vh] flex flex-col">
+            <DialogHeader>
+              <DialogTitle>{viewingAttachment?.name}</DialogTitle>
+              <DialogDescription className="text-xs">{viewingAttachment?.size ? `${(viewingAttachment.size / 1024).toFixed(1)} KB` : ''}</DialogDescription>
+            </DialogHeader>
+            <div className="flex-1 overflow-auto mt-4 rounded-lg border border-border">
+              {viewingAttachment?.language ? (
+                <SyntaxHighlighter language={viewingAttachment.language} style={isDark ? oneDark : oneLight} showLineNumbers customStyle={{ margin: 0, borderRadius: '0.5rem', fontSize: '0.875rem' }}>
+                  {fromBase64(viewingAttachment.url.split(',')[1])}
+                </SyntaxHighlighter>
+              ) : (
+                <pre className="p-4 text-sm whitespace-pre-wrap">{viewingAttachment?.url}</pre>
+              )}
+            </div>
+          </DialogContent>
+        </Dialog>
       </div>
     </motion.div>
   )
