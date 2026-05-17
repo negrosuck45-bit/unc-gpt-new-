@@ -41,23 +41,6 @@ const GROQ_CHAT_MODELS: Record<string, string> = {
   "mixtral-8x7b-32768": "mixtral-8x7b-32768",
 };
 
-const PUTER_CLAUDE_MODELS: Record<string, string> = {
-  "claude-opus-4.7": "claude-opus-4.7",
-  "claude-opus-4-7": "claude-opus-4.7",
-  "claude-sonnet-4.6": "claude-sonnet-4.6",
-  "claude-sonnet-4-6": "claude-sonnet-4.6",
-  "claude-sonnet-4": "claude-sonnet-4",
-  "claude-opus-4.6": "claude-opus-4.6",
-  "claude-opus-4-6": "claude-opus-4.6",
-  "claude-haiku-4.5": "claude-haiku-4.5",
-  "claude-haiku-4-5": "claude-haiku-4.5",
-  "claude-sonnet-4.5": "claude-sonnet-4.5",
-  "claude-sonnet-4-5": "claude-sonnet-4.5",
-  "claude-opus-4-5": "claude-opus-4.5",
-  "claude-3-7-sonnet": "claude-3-7-sonnet",
-  "claude-opus-4.6-fast": "claude-opus-4.6-fast",
-};
-
 // GROQ KEYS - Replace these with your NEW valid keys from console.groq.com
 // Format: gsk_xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx
 const GROQ_KEYS: string[] = [
@@ -75,10 +58,6 @@ const OPENROUTER_KEY = ""; // <-- PASTE OPENROUTER KEY HERE (starts with sk-or-v
 // CEREBRAS - Get free key at console.cerebras.ai (1M tokens/day)
 const CEREBRAS_URL = "https://api.cerebras.ai/v1/chat/completions";
 const CEREBRAS_KEY = "csk-tt4rvyyfwr5ytrm9vn33nhv5myc6p3thynkcv2j9cdtce62d";
-
-// PUTER - Optional Claude fallback
-const PUTER_API_URL = "https://api.puter.com/puterai/openai/v1/chat/completions";
-const PUTER_AUTH_TOKEN = "";
 
 let currentGroqKeyIndex = 0;
 let currentChatIndex = 0;
