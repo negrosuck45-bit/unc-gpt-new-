@@ -85,7 +85,7 @@ export function ChatInterface({ onSwitchToImagine, onOpenSidebar, isSidebarOpen 
     if (!content?.trim() && (!attachments || attachments.length === 0)) return;
 
     const chatId = currentChatId || createNewChat("text", null, settings.model, settings.provider);
-    
+
     addMessage(chatId, {
       role: "user",
       content: content.trim(),
@@ -262,6 +262,8 @@ export function ChatInterface({ onSwitchToImagine, onOpenSidebar, isSidebarOpen 
 
   if (!mounted) return null;
 
+  const hasMessages = currentChat && currentChat.messages.length > 0;
+
   return (
     <div className="flex flex-col h-full bg-background relative overflow-hidden">
       <ChatHeader
@@ -272,30 +274,39 @@ export function ChatInterface({ onSwitchToImagine, onOpenSidebar, isSidebarOpen 
         isSidebarOpen={isSidebarOpen}
       />
 
-      <div className="flex-1 flex flex-col min-h-0 overflow-hidden">
-        <div className="flex-1 overflow-y-auto scroll-smooth" style={{ WebkitOverflowScrolling: "touch" } as React.CSSProperties}>
-          {!currentChat || currentChat.messages.length === 0 ? (
-            <WelcomeScreen onSelectPrompt={(p) => handleSend(p)} project={currentProject} />
-          ) : (
-            <ChatMessages
-              messages={currentChat.messages}
-              isStreaming={isCurrentChatStreaming}
-              isThinking={isThinking}
-              onRegenerate={handleRegenerate}
-            />
-          )}
-        </div>
-      </div>
-
-      <div className="chat-input-footer w-full flex-shrink-0">
-        <div className="px-3 pt-3 pb-2 max-w-4xl mx-auto w-full">
-          <ChatInput
-            onSend={handleSend}
-            onStop={() => abortControllerRef.current?.abort()}
+      {/* Main content area */}
+      <div className="flex-1 flex flex-col min-h-0 overflow-hidden relative">
+        {/* Messages scroll area */}
+        <div 
+          className={`overflow-y-auto scroll-smooth ${!hasMessages ? 'hidden' : 'flex-1'}`}
+          style={{ WebkitOverflowScrolling: "touch" } as React.CSSProperties}
+        >
+          <ChatMessages
+            messages={currentChat?.messages || []}
             isStreaming={isCurrentChatStreaming}
-            disabled={isCurrentChatStreaming}
-            key={currentChatId || 'new-chat'}
+            isThinking={isThinking}
+            onRegenerate={handleRegenerate}
           />
+        </div>
+
+        {/* Welcome screen - centered in the viewport */}
+        {!hasMessages && (
+          <div className="flex-1 flex items-center justify-center overflow-y-auto">
+            <WelcomeScreen onSelectPrompt={(p) => handleSend(p)} project={currentProject} />
+          </div>
+        )}
+
+        {/* Chat Input - centered at bottom, like ChatGPT/Claude */}
+        <div className="w-full flex-shrink-0 bg-gradient-to-t from-background via-background to-transparent pb-4 pt-2">
+          <div className="max-w-3xl mx-auto w-full px-4">
+            <ChatInput
+              onSend={handleSend}
+              onStop={() => abortControllerRef.current?.abort()}
+              isStreaming={isCurrentChatStreaming}
+              disabled={isCurrentChatStreaming}
+              key={currentChatId || 'new-chat'}
+            />
+          </div>
         </div>
       </div>
     </div>
