@@ -1,0 +1,13 @@
+{
+  "buildCommand": "npm run build",
+  "outputDirectory": ".next",
+  "installCommand": "npm install",
+  "framework": "nextjs",
+  "functions": {
+    "app/api/chat/route.ts": { "maxDuration": 60 },
+    "app/api/computer-use/route.ts": { "maxDuration": 60 },
+    "app/api/chat-with-tools/route.ts": { "maxDuration": 60 },
+    "app/api/website-builder/route.ts": { "maxDuration": 60 },
+    "app/api/mcp/**/route.ts": { "maxDuration": 30 }
+  }
+}
