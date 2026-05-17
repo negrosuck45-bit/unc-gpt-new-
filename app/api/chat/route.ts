@@ -70,16 +70,19 @@ let currentGroqKeyIndex = 0;
 let currentChatIndex = 0;
 
 // ============================================================
-// VISION MODELS
+// VISION MODELS (Expanded)
 // ============================================================
 const VISION_MODELS = [
   "meta-llama/llama-4-scout-17b-16e-instruct",
   "llama-3.2-11b-vision-preview",
+  "llama-3.2-90b-vision-preview",
   "@cf/moonshot/kimi-k2.6",
   "@cf/moonshot/kimi-k2.5",
   "claude-3-opus",
   "claude-3-sonnet",
   "claude-3-haiku",
+  "gpt-4-vision-preview",
+  "gpt-4o",
 ];
 
 function isVisionModel(model: string): boolean {
@@ -87,13 +90,14 @@ function isVisionModel(model: string): boolean {
 }
 
 // ============================================================
-// ATTACHMENT PROCESSING
+// ENHANCED ATTACHMENT PROCESSING WITH IMAGE SUPPORT
 // ============================================================
 async function fetchLinkContent(url: string): Promise<string> {
   try {
     if (url.startsWith("blob:")) {
-      return `[Error: Cannot access local browser blob URL: ${url}]`;
+      return `[Note: Local blob URL - image data not accessible on server]`;
     }
+    
     const controller = new AbortController();
     const timeoutId = setTimeout(() => controller.abort(), 10000);
     const res = await fetch(url, {
@@ -103,16 +107,27 @@ async function fetchLinkContent(url: string): Promise<string> {
       },
     });
     clearTimeout(timeoutId);
+    
     if (!res.ok) return `[Failed to fetch URL: ${res.status}]`;
-    const text = await res.text();
-    const stripped = text
-      .replace(/<script[^>]*>[\s\S]*?<\/script>/gi, "")
-      .replace(/<style[^>]*>[\s\S]*?<\/style>/gi, "")
-      .replace(/<[^>]+>/g, " ")
-      .replace(/\s+/g, " ")
-      .trim()
-      .slice(0, 8000);
-    return `[Content from ${url}]:\n${stripped}`;
+    
+    const contentType = res.headers.get("content-type") || "";
+    
+    if (contentType.startsWith("image/")) {
+      // For images, return a note that the image is available for vision models
+      return `[Image available at ${url} - This image can be analyzed by vision-capable models]`;
+    } else if (contentType.includes("text/")) {
+      const text = await res.text();
+      const stripped = text
+        .replace(/<script[^>]*>[\s\S]*?<\/script>/gi, "")
+        .replace(/<style[^>]*>[\s\S]*?<\/style>/gi, "")
+        .replace(/<[^>]+>/g, " ")
+        .replace(/\s+/g, " ")
+        .trim()
+        .slice(0, 8000);
+      return `[Content from ${url}]:\n${stripped}`;
+    } else {
+      return `[File from ${url} - Type: ${contentType}]`;
+    }
   } catch (err: any) {
     return `[Failed to fetch URL: ${err.message}]`;
   }
@@ -128,11 +143,17 @@ function decodeFileContent(dataUrl: string): string {
   }
 }
 
+// Enhanced image description for non-vision models
 async function describeImage(imageUrl: string): Promise<string> {
   try {
+    // Skip blob URLs
     if (imageUrl.startsWith("blob:")) {
-      return "[Image processing error: Image is a local preview and was not uploaded to storage.]";
+      return "[Image is a local preview. Please ensure images are uploaded to permanent storage for AI analysis.]";
     }
+    
+    // For Supabase URLs or any public image URL
+    console.log(`[Vision] Analyzing image: ${imageUrl.substring(0, 100)}...`);
+    
     const key = GROQ_KEYS[currentGroqKeyIndex % GROQ_KEYS.length];
     const res = await fetch("https://api.groq.com/openai/v1/chat/completions", {
       method: "POST",
@@ -143,18 +164,26 @@ async function describeImage(imageUrl: string): Promise<string> {
           {
             role: "user",
             content: [
-              { type: "text", text: "Describe this image in detail. Include all visible text, objects, colors, and layout." },
+              { type: "text", text: "Describe this image in detail. Include all visible text, objects, colors, layout, and any notable details." },
               { type: "image_url", image_url: { url: imageUrl } }
             ]
           }
         ],
-        max_tokens: 500,
+        max_tokens: 1000,
       }),
     });
-    if (!res.ok) return "[Could not analyze image]";
+    
+    if (!res.ok) {
+      console.error(`[Vision] API error: ${res.status}`);
+      return "[Could not analyze image - API error]";
+    }
+    
     const data = await res.json();
-    return data.choices?.[0]?.message?.content || "[Image analysis failed]";
-  } catch {
+    const description = data.choices?.[0]?.message?.content || "[No description generated]";
+    console.log(`[Vision] Analysis complete: ${description.substring(0, 100)}...`);
+    return description;
+  } catch (error) {
+    console.error("[Vision] Error:", error);
     return "[Image analysis failed]";
   }
 }
@@ -165,58 +194,76 @@ async function processAttachmentsForModel(
   hasVision: boolean
 ): Promise<any[]> {
   const processed = [];
+  
   for (const msg of messages) {
     if (!Array.isArray(msg.content)) {
       processed.push(msg);
       continue;
     }
+    
     const textParts: string[] = [];
     const imageParts: any[] = [];
+    
     for (const part of msg.content) {
       if (part.type === "text") {
         textParts.push(part.text);
       } else if (part.type === "image_url") {
+        const imageUrl = part.image_url.url;
+        
+        // Skip blob URLs (shouldn't happen if upload completed)
+        if (imageUrl.startsWith("blob:")) {
+          textParts.push("[Image pending upload - please wait for upload to complete]");
+          continue;
+        }
+        
         if (hasVision) {
-          imageParts.push(part);
+          // Vision model can see images directly
+          console.log(`[Process] Adding image for vision model: ${imageUrl.substring(0, 100)}`);
+          imageParts.push({
+            type: "image_url",
+            image_url: { url: imageUrl }
+          });
         } else {
-          const description = await describeImage(part.image_url.url);
-          textParts.push(`[Image attached - AI Description]: ${description}`);
+          // Non-vision model gets description
+          console.log(`[Process] Describing image for non-vision model`);
+          const description = await describeImage(imageUrl);
+          textParts.push(`[Image Analysis]: ${description}`);
         }
       }
     }
-    const linkMatches = textParts[0]?.match(/\[Attached (link|file): ([^\]]+)\]\(([^)]+)\)/g) || [];
-    for (const match of linkMatches) {
-      const urlMatch = match.match(/\(([^)]+)\)/);
-      if (urlMatch) {
-        const url = urlMatch[1];
-        if (url.startsWith("http")) {
-          if (url.startsWith("blob:")) {
-            textParts.push(`\n\n[Local preview URL cannot be processed by server: ${url}]`);
-            continue;
-          }
-          const content = await fetchLinkContent(url);
-          textParts.push(`\n\n${content}`);
-        } else if (url.startsWith("data:")) {
-          const content = decodeFileContent(url);
-          textParts.push(`\n\n[File Content]:\n${content}`);
+    
+    // Process any URL links in text
+    const fullText = textParts.join("\n");
+    const urlRegex = /(https?:\/\/[^\s]+)/g;
+    let processedText = fullText;
+    const urls = fullText.match(urlRegex) || [];
+    
+    for (const url of urls) {
+      if (!url.startsWith("blob:") && (url.includes("supabase") || url.includes("storage"))) {
+        // This is likely an image URL from Supabase
+        if (!hasVision) {
+          const description = await describeImage(url);
+          processedText = processedText.replace(url, `[Image at ${url}]: ${description}`);
         }
       }
     }
+    
     if (hasVision && imageParts.length > 0) {
       processed.push({
         role: msg.role,
         content: [
-          { type: "text", text: textParts.join("\n") },
+          { type: "text", text: processedText },
           ...imageParts
         ]
       });
     } else {
       processed.push({
         role: msg.role,
-        content: textParts.join("\n")
+        content: processedText
       });
     }
   }
+  
   return processed;
 }
 
@@ -305,7 +352,7 @@ async function generateMedia(task: "image" | "video", prompt: string, image?: st
 }
 
 // ============================================================
-// MCP TOOLS
+// MCP TOOLS (keeping existing implementation)
 // ============================================================
 async function fetchMcpTools(connectors: any[], baseUrl: string): Promise<any[]> {
   if (!connectors?.length) return [];
@@ -446,7 +493,7 @@ async function runToolLoop(
 }
 
 // ============================================================
-// OAUTH TOOLS
+// OAUTH TOOLS (keeping existing implementation)
 // ============================================================
 function buildOAuthTools(req: NextRequest, baseUrl: string) {
   const cookieHeader = req.headers.get("cookie") || "";
@@ -634,13 +681,15 @@ async function callGroq(
       const requestBody: any = {
         model: groqModel,
         messages: [
-          { role: "system", content: `You are uncgpt, a helpful AI assistant. Be conversational, natural, and friendly. For greetings, questions, opinions, explanations, creative writing, and general chat — just respond naturally with text. ONLY use tools when the user explicitly asks you to perform an action like: run code, create a GitHub repo, send a Slack message, search the web, execute a terminal command, or manipulate files. If someone says "hi", "hello", "how are you", or asks a general question — just talk to them like a person. Don't use tools for casual conversation.you can see images files links attahced too.` },
+          { role: "system", content: `You are uncgpt, a helpful AI assistant. You can SEE IMAGES that users attach. When users share images, analyze them carefully and describe what you see. You can also read files and access links. Be conversational, natural, and friendly.` },
           ...messages,
         ],
         stream: true,
         temperature: 0.7,
         max_tokens: 4096,
       };
+
+      console.log(`[Groq] Calling with model: ${groqModel}, hasImage: ${hasImage}`);
 
       const res = await fetch("https://api.groq.com/openai/v1/chat/completions", {
         method: "POST",
@@ -652,7 +701,9 @@ async function callGroq(
         currentGroqKeyIndex = (currentGroqKeyIndex + 1) % GROQ_KEYS.length;
         return { stream: res.body!, provider: "Groq", model: groqModel };
       }
-    } catch (err: any) {}
+    } catch (err: any) {
+      console.error(`[Groq] Attempt ${attempt} failed:`, err.message);
+    }
   }
   throw new Error("All Groq keys failed");
 }
@@ -675,7 +726,7 @@ async function callPuter(
       body: JSON.stringify({
         model: puterModel,
         messages: [
-          { role: "system", content: "You are a helpful AI assistant. Be conversational and natural." },
+          { role: "system", content: "You are a helpful AI assistant that can see images and read files." },
           ...messages,
         ],
         stream: true,
@@ -865,6 +916,7 @@ export async function POST(req: NextRequest) {
       if (imgPart) {
         hasImage = true;
         imageUrl = imgPart.image_url.url;
+        console.log(`[Main] Image detected: ${imageUrl.substring(0, 100)}...`);
       }
     }
 
@@ -898,10 +950,13 @@ export async function POST(req: NextRequest) {
     // ==================== CHAT ====================
     const targetModel = finalModel !== "auto" ? finalModel : (hasImage ? "meta-llama/llama-4-scout-17b-16e-instruct" : "llama-3.3-70b-versatile");
     const hasVisionCapability = isVisionModel(targetModel) || hasImage;
+    
+    console.log(`[Main] Target model: ${targetModel}, Has vision: ${hasVisionCapability}, Has image: ${hasImage}`);
+    
     const apiMessages = await processAttachmentsForModel(messages, targetModel, hasVisionCapability);
 
     const systemParts: string[] = [
-      `You are uncgpt - a helpful AI assistant. Be conversational and natural.\n\nFor greetings and general questions: just talk naturally.\nFor action requests (code, GitHub, etc): use tools if available.`,
+      `You are uncgpt - a helpful AI assistant. You can SEE and ANALYZE images that users share with you. When a user shares an image, describe what you see in detail including objects, text, colors, people, and any notable elements. Be conversational and natural.\n\nFor greetings and general questions: just talk naturally.\nFor action requests (code, GitHub, etc): use tools if available.`,
     ];
     if (projectInstructions) systemParts.push(`\n\nProject Instructions:\n${projectInstructions}`);
     if (projectMemory) systemParts.push(`\n\n[MEMORY]:\n${projectMemory}`);
@@ -938,12 +993,14 @@ export async function POST(req: NextRequest) {
         result = await fallbackChat(messagesWithSystem, hasImage);
       }
     } catch (primaryErr: any) {
+      console.error("[Main] Primary provider failed, using fallback:", primaryErr.message);
       result = await fallbackChat(messagesWithSystem, hasImage);
     }
 
     console.log(`[UNCGPT] Model: ${result.model} | Provider: ${result.provider}`);
     return createStreamResponse(result.stream, result.provider, result.model, toolSteps);
   } catch (err: any) {
+    console.error("[Main] Fatal error:", err);
     return Response.json({ error: err.message || "Internal server error" }, { status: 500 });
   }
 }
