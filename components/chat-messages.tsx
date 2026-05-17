@@ -25,6 +25,10 @@ import {
   ChevronDown as ChevronDownIcon,
   WifiOff,
   RotateCcw,
+  Brain,
+  Zap,
+  Sparkles,
+  Loader2,
 } from 'lucide-react';
 import { MessageContent } from './message-content';
 import { ComputerUseSteps } from './computer-use-steps';
@@ -666,19 +670,46 @@ function MessageActions({
   );
 }
 
-// ---------- Grok-style Reflective Thinking Component ----------
-function ThinkingText({ text }: { text: string }) {
-  // Create glitchy/reflective effect on letters
-  const letters = text.split('');
+// ---------- Grok-style Reflective Thinking Component with Progressive Dots ----------
+function ThinkingText({ text, variant = "default" }: { text: string; variant?: "default" | "glitch" | "pulse" }) {
+  // Progressive dots effect (thinking → thinking. → thinking.. → thinking...)
+  const [dotCount, setDotCount] = useState(0);
   
+  useEffect(() => {
+    if (text === "thinking") {
+      const interval = setInterval(() => {
+        setDotCount((prev) => (prev + 1) % 4);
+      }, 500);
+      return () => clearInterval(interval);
+    }
+  }, [text]);
+  
+  const displayText = text === "thinking" 
+    ? `thinking${'.'.repeat(dotCount)}`
+    : text;
+  
+  const letters = displayText.split('');
+  
+  if (variant === "pulse") {
+    return (
+      <motion.div 
+        animate={{ opacity: [0.5, 1, 0.5] }}
+        transition={{ duration: 1.5, repeat: Infinity }}
+        className="text-sm text-zinc-400 font-mono"
+      >
+        {displayText}
+      </motion.div>
+    );
+  }
+  
+  // Glitchy/reflective effect (default)
   return (
     <motion.div 
       initial={{ opacity: 0 }}
       animate={{ opacity: 1 }}
-      className="text-sm text-zinc-400 italic font-mono"
+      className="text-sm text-zinc-400 italic font-mono tracking-wide"
     >
       {letters.map((letter, index) => {
-        // Random glitch offset for some letters
         const glitchX = Math.sin(index * 0.5) * 2;
         const glitchY = Math.cos(index * 0.3) * 1;
         
@@ -719,6 +750,75 @@ function ThinkingText({ text }: { text: string }) {
   );
 }
 
+// ---------- Alternative Thinking Styles ----------
+function ThinkingIcon({ type }: { type: "brain" | "zap" | "sparkles" | "loader" }) {
+  const icons = {
+    brain: <Brain className="w-4 h-4 text-purple-400" />,
+    zap: <Zap className="w-4 h-4 text-yellow-400" />,
+    sparkles: <Sparkles className="w-4 h-4 text-blue-400" />,
+    loader: <Loader2 className="w-4 h-4 text-green-400 animate-spin" />,
+  };
+  
+  return (
+    <motion.div
+      animate={{ 
+        rotate: type === "loader" ? 360 : [0, 10, -10, 0],
+        scale: [1, 1.1, 1]
+      }}
+      transition={{ 
+        rotate: { duration: 2, repeat: Infinity, ease: "linear" },
+        scale: { duration: 1, repeat: Infinity }
+      }}
+    >
+      {icons[type]}
+    </motion.div>
+  );
+}
+
+function ThinkingWithIcon({ text, iconType }: { text: string; iconType: "brain" | "zap" | "sparkles" | "loader" }) {
+  return (
+    <div className="flex items-center gap-2">
+      <ThinkingIcon type={iconType} />
+      <ThinkingText text={text} variant="default" />
+    </div>
+  );
+}
+
+// ---------- Thinking Phases (Progressive) ----------
+const THINKING_PHRASES = [
+  "Hmm, let me think",
+  "Processing your request",
+  "Analyzing the question",
+  "Searching memory",
+  "Formulating response",
+  "Almost there",
+  "Wrapping up",
+];
+
+function ProgressiveThinking() {
+  const [phraseIndex, setPhraseIndex] = useState(0);
+  const [dotCount, setDotCount] = useState(0);
+  
+  useEffect(() => {
+    const phraseInterval = setInterval(() => {
+      setPhraseIndex((prev) => (prev + 1) % THINKING_PHRASES.length);
+    }, 2000);
+    
+    const dotInterval = setInterval(() => {
+      setDotCount((prev) => (prev + 1) % 4);
+    }, 400);
+    
+    return () => {
+      clearInterval(phraseInterval);
+      clearInterval(dotInterval);
+    };
+  }, []);
+  
+  const displayText = `${THINKING_PHRASES[phraseIndex]}${'.'.repeat(dotCount)}`;
+  
+  return <ThinkingText text={displayText} variant="glitch" />;
+}
+
 // ---------- Main Component ----------
 export function ChatMessages({
   messages,
@@ -734,6 +834,9 @@ export function ChatMessages({
   const currentChat = getCurrentChat();
   const [viewingAttachment, setViewingAttachment] = useState<Attachment | null>(null);
   const [feedbackMessage, setFeedbackMessage] = useState<Message | null>(null);
+  const [thinkingStyle, setThinkingStyle] = useState<"default" | "icon" | "progressive">("default");
+  const [thinkingVariant, setThinkingVariant] = useState<"default" | "glitch" | "pulse">("glitch");
+  const [iconType, setIconType] = useState<"brain" | "zap" | "sparkles" | "loader">("brain");
 
   const streamingFamily = useMemo(() => getModelFamilyFromModel(currentChat?.model || settings.model), [currentChat?.model, settings.model]);
 
@@ -741,6 +844,23 @@ export function ChatMessages({
     if (!feedbackMessage) return;
     await saveFeedbackToSupabase(feedbackMessage.id, 'dislike', feedbackMessage.content, details, issueType);
   }, [feedbackMessage]);
+
+  // Randomly change thinking style for variety (optional)
+  useEffect(() => {
+    if (isThinking) {
+      const styles: Array<"default" | "icon" | "progressive"> = ["default", "icon", "progressive"];
+      const randomStyle = styles[Math.floor(Math.random() * styles.length)];
+      setThinkingStyle(randomStyle);
+      
+      const icons: Array<"brain" | "zap" | "sparkles" | "loader"> = ["brain", "zap", "sparkles", "loader"];
+      const randomIcon = icons[Math.floor(Math.random() * icons.length)];
+      setIconType(randomIcon);
+      
+      const variants: Array<"default" | "glitch" | "pulse"> = ["default", "glitch", "pulse"];
+      const randomVariant = variants[Math.floor(Math.random() * variants.length)];
+      setThinkingVariant(randomVariant);
+    }
+  }, [isThinking]);
 
   return (
     <>
@@ -845,7 +965,7 @@ export function ChatMessages({
 
           {searchInfo && <SearchIndicator searchInfo={searchInfo} />}
 
-          {/* NEW: Plain text thinking with reflective/glitchy letters - NO BUBBLE */}
+          {/* ENHANCED THINKING STATES */}
           {isThinking && (
             <motion.div
               initial={{ opacity: 0, y: 10 }}
@@ -856,7 +976,13 @@ export function ChatMessages({
                 <MarsAvatar size={32} family={streamingFamily} useSimpleIcon />
               </div>
               <div className="flex items-center">
-                <ThinkingText text="thinking..." />
+                {thinkingStyle === "icon" ? (
+                  <ThinkingWithIcon text="thinking" iconType={iconType} />
+                ) : thinkingStyle === "progressive" ? (
+                  <ProgressiveThinking />
+                ) : (
+                  <ThinkingText text="thinking" variant={thinkingVariant} />
+                )}
               </div>
             </motion.div>
           )}
@@ -871,7 +997,7 @@ export function ChatMessages({
                 <MarsAvatar size={32} family={streamingFamily} useSimpleIcon />
               </div>
               <div className="flex items-center">
-                <ThinkingText text="..." />
+                <ThinkingText text="..." variant="pulse" />
               </div>
             </motion.div>
           )}
