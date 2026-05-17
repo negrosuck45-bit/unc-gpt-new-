@@ -85,9 +85,7 @@ let currentChatIndex = 0;
 // ============================================================
 const VISION_MODELS = [
   "meta-llama/llama-4-scout-17b-16e-instruct",  // Primary Groq vision model (FREE TIER)
-  "meta-llama/llama-4-maverick-17b-128e-instruct", // Better vision, still free
-  "llama-3.2-11b-vision-preview",  // DEPRECATED April 2025 - do not use
-  "llama-3.2-90b-vision-preview",  // DEPRECATED April 2025 - do not use
+  "meta-llama/llama-4-maverick-17b-128e-instruct", // Better vision, still free // DEPRECATED April 2025 - do not use
   "@cf/moonshot/kimi-k2.6",
   "@cf/moonshot/kimi-k2.5",
   "claude-3-opus",
