@@ -294,7 +294,7 @@ export function ChatInterface({ onSwitchToImagine, onOpenSidebar, isSidebarOpen 
                   <p className="text-zinc-400 text-sm leading-tight">Lightning-fast answers powered by advanced AI.</p>
                 </div>
 
-                <div className="group bg-zinc-900/60 backdrop-blur-xl border border-white/10 hover:border-white/20 rounded-3xl p-5 transition-all duration-300 hover:scale-[1.02] h-full">
+                <div className="group bg-zinc-900/60 backdrop-blur-xl border border-white/07 hover:border-white/20 rounded-3xl p-5 transition-all duration-300 hover:scale-[1.02] h-full">
                   <h4 className="font-semibold text-base mb-1.5 text-white">Vision Ready</h4>
                   <p className="text-zinc-400 text-sm leading-tight">Analyze images, screenshots, and diagrams.</p>
                 </div>
