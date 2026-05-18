@@ -51,24 +51,24 @@ const GROQ_KEYS: string[] = [
 ];
 
 // ============================================================
-// SEARXNG - FREE META-SEARCH (NO API KEY, NO CREDIT CARD)
+// WEB SEARCH APIs - REAL, RELIABLE, FREE TIERS
 // ============================================================
 
-// Public SearXNG instances - rotates if one is down
-// Get more at: https://searx.space
+// 1. SERPAPI - 100 searches/month FREE (Google Search results)
+// Your key:
+const SERPAPI_KEY = "669b7c2e5a8b2686c3fe887f8cafdd0c89d1a841957b10a6a6b2d501b8fabb75";
+
+// 2. BING WEB SEARCH - 1,000 queries/month FREE (Microsoft)
+// Get free key at: https://azure.microsoft.com/en-us/services/cognitive-services/bing-web-search-api/
+// No credit card needed, just Microsoft account
+const BING_API_KEY = ""; // <-- PASTE BING KEY HERE
+
+// 3. SEARXNG - Public instances (free but unreliable, used as last resort)
 const SEARXNG_INSTANCES = [
   "https://search.sapti.me",
   "https://search.bus-hit.me",
   "https://searx.be",
-  "https://searx.tiekoetter.com",
-  "https://searx.prvcy.eu",
-  "https://searxng.nicfab.eu",
-  "https://searx.divided-by-zero.eu",
-  "https://search.rhscz.eu",
 ];
-
-// If you self-host, put your URL here and it'll use that instead
-const SELF_HOSTED_SEARXNG = ""; // e.g. "https://your-app.railway.app"
 
 // OPENROUTER
 const OPENROUTER_URL = "https://openrouter.ai/api/v1/chat/completions";
@@ -124,19 +124,143 @@ function shouldSearchWeb(text: string): boolean {
 }
 
 // ============================================================
-// SEARXNG SEARCH FUNCTION
+// REAL WEB SEARCH FUNCTIONS
 // ============================================================
 
 /**
- * Search using SearXNG - completely free, no API key
- * Aggregates Google, Bing, DuckDuckGo, Yahoo, etc.
+ * SERPAPI - Google Search results (100 free/month)
+ * Most reliable, real-time Google data
+ */
+async function searchSerpAPI(query: string): Promise<string> {
+  if (!SERPAPI_KEY) return "";
+  try {
+    const params = new URLSearchParams({
+      engine: "google",
+      q: query,
+      api_key: SERPAPI_KEY,
+      num: "8",
+      hl: "en",
+      gl: "us",
+      tbs: "qdr:d", // past day - most recent results
+    });
+
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => controller.abort(), 10000);
+
+    const res = await fetch(`https://serpapi.com/search?${params}`, {
+      method: "GET",
+      headers: { "Accept": "application/json" },
+      signal: controller.signal,
+    });
+
+    clearTimeout(timeoutId);
+
+    if (!res.ok) {
+      console.log(`[SerpAPI] Failed: ${res.status}`);
+      return "";
+    }
+
+    const data = await res.json();
+    const results = data.organic_results || [];
+    const answerBox = data.answer_box || {};
+    const knowledgeGraph = data.knowledge_graph || {};
+
+    if (!results.length && !answerBox.answer && !knowledgeGraph.description) {
+      console.log("[SerpAPI] No results");
+      return "";
+    }
+
+    let output = `**Web Search Results for "${query}":**\n\n`;
+
+    // Include answer box if present (featured snippet)
+    if (answerBox.answer || answerBox.snippet) {
+      output += `**Quick Answer:** ${answerBox.answer || answerBox.snippet}\n\n`;
+    }
+
+    // Include knowledge graph if present
+    if (knowledgeGraph.description) {
+      output += `**Info:** ${knowledgeGraph.description}\n`;
+      if (knowledgeGraph.source?.link) {
+        output += `Source: ${knowledgeGraph.source.link}\n\n`;
+      }
+    }
+
+    results.slice(0, 6).forEach((r: any, i: number) => {
+      const title = r.title || "No title";
+      const snippet = r.snippet || r.description || "";
+      const url = r.link || r.url || "";
+      output += `[${i + 1}] **${title}**\n${snippet.slice(0, 350)}\nURL: ${url}\n\n`;
+    });
+
+    console.log(`[SerpAPI] ✓ Success - ${results.length} results`);
+    return output;
+
+  } catch (err: any) {
+    console.error("[SerpAPI] Error:", err.message);
+    return "";
+  }
+}
+
+/**
+ * BING WEB SEARCH - Microsoft (1,000 free/month)
+ * Real Bing search results, no credit card needed
+ */
+async function searchBing(query: string): Promise<string> {
+  if (!BING_API_KEY) return "";
+  try {
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => controller.abort(), 10000);
+
+    const res = await fetch(
+      `https://api.bing.microsoft.com/v7.0/search?q=${encodeURIComponent(query)}&count=8&freshness=Day&mkt=en-US`,
+      {
+        method: "GET",
+        headers: {
+          "Ocp-Apim-Subscription-Key": BING_API_KEY,
+          "Accept": "application/json",
+        },
+        signal: controller.signal,
+      }
+    );
+
+    clearTimeout(timeoutId);
+
+    if (!res.ok) {
+      console.log(`[Bing] Failed: ${res.status}`);
+      return "";
+    }
+
+    const data = await res.json();
+    const results = data.webPages?.value || [];
+
+    if (!results.length) {
+      console.log("[Bing] No results");
+      return "";
+    }
+
+    let output = `**Web Search Results for "${query}":**\n\n`;
+
+    results.slice(0, 6).forEach((r: any, i: number) => {
+      const title = r.name || "No title";
+      const snippet = r.snippet || "";
+      const url = r.url || "";
+      output += `[${i + 1}] **${title}**\n${snippet.slice(0, 350)}\nURL: ${url}\n\n`;
+    });
+
+    console.log(`[Bing] ✓ Success - ${results.length} results`);
+    return output;
+
+  } catch (err: any) {
+    console.error("[Bing] Error:", err.message);
+    return "";
+  }
+}
+
+/**
+ * SEARXNG - Last resort, free but unreliable
  */
 async function searchSearXNG(query: string): Promise<string> {
-  const instances = SELF_HOSTED_SEARXNG
-    ? [SELF_HOSTED_SEARXNG, ...SEARXNG_INSTANCES]
-    : SEARXNG_INSTANCES;
-
-  for (const instance of instances) {
+  for (const instance of SEARXNG_INSTANCES) {
     try {
       const params = new URLSearchParams({
         q: query,
@@ -147,7 +271,7 @@ async function searchSearXNG(query: string): Promise<string> {
       });
 
       const controller = new AbortController();
-      const timeoutId = setTimeout(() => controller.abort(), 8000);
+      const timeoutId = setTimeout(() => controller.abort(), 6000);
 
       const res = await fetch(`${instance}/search?${params}`, {
         method: "GET",
@@ -160,52 +284,58 @@ async function searchSearXNG(query: string): Promise<string> {
 
       clearTimeout(timeoutId);
 
-      if (!res.ok) {
-        console.log(`[SearXNG] ${instance} returned ${res.status}, trying next...`);
-        continue;
-      }
+      if (!res.ok) continue;
 
       const data = await res.json();
       const results = data.results || [];
 
-      if (!results.length) {
-        console.log(`[SearXNG] ${instance} returned no results, trying next...`);
-        continue;
-      }
+      if (!results.length) continue;
 
       let output = `**Web Search Results for "${query}":**\n\n`;
-
-      results.slice(0, 8).forEach((r: any, i: number) => {
+      results.slice(0, 5).forEach((r: any, i: number) => {
         const title = r.title || "No title";
         const snippet = r.content || r.abstract || r.snippet || "";
         const url = r.url || r.link || "";
-
-        output += `[${i + 1}] **${title}**\n${snippet.slice(0, 400)}\nURL: ${url}\n\n`;
+        output += `[${i + 1}] **${title}**\n${snippet.slice(0, 300)}\nURL: ${url}\n\n`;
       });
 
-      console.log(`[SearXNG] Success with ${instance} - ${results.length} results`);
+      console.log(`[SearXNG] ✓ Success with ${instance}`);
       return output;
 
-    } catch (err: any) {
-      console.log(`[SearXNG] ${instance} failed: ${err.message}`);
+    } catch {
       continue;
     }
   }
-
-  console.error("[SearXNG] All instances failed");
   return "";
 }
 
-// Unified silent search
+// Unified silent search - SerpAPI → Bing → SearXNG
 async function silentWebSearch(userQuery: string): Promise<string> {
   console.log(`[SilentSearch] Searching for: "${userQuery.substring(0, 80)}..."`);
-  const result = await searchSearXNG(userQuery);
+
+  // 1. Try SerpAPI first (Google results, most reliable)
+  let result = await searchSerpAPI(userQuery);
   if (result) {
-    console.log(`[SilentSearch] Got ${result.length} chars of search context`);
-  } else {
-    console.log("[SilentSearch] No search results available");
+    console.log(`[SilentSearch] ✓ Used SerpAPI (Google)`);
+    return result;
   }
-  return result;
+
+  // 2. Try Bing Web Search
+  result = await searchBing(userQuery);
+  if (result) {
+    console.log(`[SilentSearch] ✓ Used Bing`);
+    return result;
+  }
+
+  // 3. Last resort: SearXNG
+  result = await searchSearXNG(userQuery);
+  if (result) {
+    console.log(`[SilentSearch] ✓ Used SearXNG`);
+    return result;
+  }
+
+  console.log("[SilentSearch] ✗ All search sources failed");
+  return "";
 }
 
 // ============================================================
@@ -228,9 +358,9 @@ async function fetchLinkContent(url: string): Promise<string> {
     if (!res.ok) return `[Failed to fetch URL: ${res.status}]`;
     const text = await res.text();
     const stripped = text
-      .replace(/<script[^>]*>[\s\S]*?<\/script>/gi, "")
-      .replace(/<style[^>]*>[\s\S]*?<\/style>/gi, "")
-      .replace(/<[^>]+>/g, " ")
+      .replace(/<<script[^>]*>[\s\S]*?<\/script>/gi, "")
+      .replace(/<<style[^>]*>[\s\S]*?<\/style>/gi, "")
+      .replace(/<<[^>]+>/g, " ")
       .replace(/\s+/g, " ")
       .trim()
       .slice(0, 8000);
