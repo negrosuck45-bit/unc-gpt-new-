@@ -276,7 +276,7 @@ export function ChatInterface({ onSwitchToImagine, onOpenSidebar, isSidebarOpen 
 
       {/* 
         LAYOUT LOGIC:
-        - NO messages: WelcomeScreen + Input centered together in middle
+        - NO messages: Logo at top, Input centered below it
         - HAS messages: Messages scroll at top, Input fixed at bottom
       */}
       {hasMessages ? (
@@ -310,13 +310,15 @@ export function ChatInterface({ onSwitchToImagine, onOpenSidebar, isSidebarOpen 
         </div>
       ) : (
         // === EMPTY CHAT MODE ===
-        <div className="flex-1 flex flex-col items-center justify-center min-h-0 overflow-hidden">
-          {/* Welcome + Input centered together */}
-          <div className="flex flex-col items-center justify-center w-full max-w-3xl mx-auto px-4">
+        <div className="flex-1 flex flex-col min-h-0 overflow-hidden">
+          {/* Logo at top, pushed down from header */}
+          <div className="flex-shrink-0 pt-24 sm:pt-32 md:pt-40">
             <WelcomeScreen onSelectPrompt={(p) => handleSend(p)} project={currentProject} />
+          </div>
 
-            {/* Input centered below welcome */}
-            <div className="w-full mt-8">
+          {/* Input below logo, not at very bottom */}
+          <div className="flex-shrink-0 mt-8 pb-8">
+            <div className="max-w-3xl mx-auto w-full px-4">
               <ChatInput
                 onSend={handleSend}
                 onStop={() => abortControllerRef.current?.abort()}
@@ -326,6 +328,9 @@ export function ChatInterface({ onSwitchToImagine, onOpenSidebar, isSidebarOpen 
               />
             </div>
           </div>
+
+          {/* Spacer to push input up from bottom */}
+          <div className="flex-1" />
         </div>
       )}
     </div>
