@@ -39,6 +39,9 @@ const GROQ_CHAT_MODELS: Record<string, string> = {
   "meta-llama/llama-4-maverick-17b-128e-instruct": "meta-llama/llama-4-maverick-17b-128e-instruct",
   "deepseek-r1-distill-llama-70b": "deepseek-r1-distill-llama-70b",
   "mixtral-8x7b-32768": "mixtral-8x7b-32768",
+  // Compound models with built-in web search
+  "compound-beta": "compound-beta",
+  "compound-mini": "compound-mini",
 };
 
 // GROQ KEYS - Replace these with your NEW valid keys from console.groq.com
@@ -50,6 +53,11 @@ const GROQ_KEYS: string[] = [
   "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",
   "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",
 ];
+
+// WEB SEARCH CONFIGURATION
+// Option 1: Groq Compound Models (built-in, no extra key needed)
+// Option 2: Tavily API (get free key at tavily.com - 1,000 req/month)
+const TAVILY_API_KEY = ""; // <-- PASTE TAVILY KEY HERE (tvly-...)
 
 // OPENROUTER - Get free key at openrouter.ai/settings/keys (optional but recommended)
 const OPENROUTER_URL = "https://openrouter.ai/api/v1/chat/completions";
@@ -83,6 +91,159 @@ function isVisionModel(model: string): boolean {
 }
 
 // ============================================================
+// WEB SEARCH FUNCTIONS
+// ============================================================
+
+/**
+ * Search the web using Tavily API (external search)
+ * Returns search results with content snippets and sources
+ */
+async function searchWebTavily(query: string, maxResults: number = 5): Promise<{ results: any[]; answer?: string }> {
+  if (!TAVILY_API_KEY) {
+    throw new Error("Tavily API key not configured");
+  }
+
+  try {
+    const res = await fetch("https://api.tavily.com/search", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        "Authorization": `Bearer ${TAVILY_API_KEY}`,
+      },
+      body: JSON.stringify({
+        query,
+        search_depth: "advanced",
+        max_results: maxResults,
+        include_answer: true,
+        include_raw_content: false,
+        include_images: false,
+      }),
+    });
+
+    if (!res.ok) {
+      const err = await res.text();
+      throw new Error(`Tavily search failed: ${res.status} ${err}`);
+    }
+
+    const data = await res.json();
+    return {
+      results: data.results || [],
+      answer: data.answer,
+    };
+  } catch (err: any) {
+    throw new Error(`Web search error: ${err.message}`);
+  }
+}
+
+/**
+ * Search the web using Groq Compound Model (built-in search)
+ * This uses Groq's compound-beta or compound-mini models which have
+ * native web search capabilities with automatic citations
+ */
+async function searchWebGroq(query: string): Promise<{ content: string; sources: any[] }> {
+  // Get available keys
+  const availableKeys = GROQ_KEYS.map((key, idx) => ({ key, idx })).filter(({ idx }) => !deadGroqKeys.has(idx));
+  if (availableKeys.length === 0) {
+    throw new Error("No valid Groq keys available for web search");
+  }
+
+  for (let attempt = 0; attempt < availableKeys.length; attempt++) {
+    const { key, idx } = availableKeys[(currentGroqKeyIndex + attempt) % availableKeys.length];
+    if (!key || key.length < 20) continue;
+
+    try {
+      const res = await fetch("https://api.groq.com/openai/v1/chat/completions", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          "Authorization": `Bearer ${key}`,
+        },
+        body: JSON.stringify({
+          model: "compound-beta", // or "compound-mini" for faster/cheaper
+          messages: [
+            {
+              role: "user",
+              content: `Search the web for: ${query}\n\nProvide a comprehensive answer with sources.`
+            }
+          ],
+          stream: false,
+          temperature: 0.7,
+          max_tokens: 4096,
+        }),
+      });
+
+      if (res.status === 401) {
+        deadGroqKeys.add(idx);
+        continue;
+      }
+      if (res.status === 429) continue;
+
+      if (res.ok) {
+        currentGroqKeyIndex = (currentGroqKeyIndex + 1) % availableKeys.length;
+        const data = await res.json();
+        const content = data.choices?.[0]?.message?.content || "";
+        
+        // Extract citations/sources from Groq compound response
+        // Groq compound models include [^index^] citations in their responses
+        const sources: any[] = [];
+        const citationMatches = content.match(/\[\^(\d+)\^\]/g) || [];
+        
+        return { content, sources };
+      }
+
+      const errText = await res.text().catch(() => "");
+      console.error(`[Groq Search] Key ${idx} failed: ${res.status} ${errText.slice(0, 200)}`);
+    } catch (err: any) {
+      console.error(`[Groq Search] Key ${idx} network error:`, err.message);
+    }
+  }
+
+  throw new Error("All Groq keys failed for web search");
+}
+
+/**
+ * Main web search function - tries Groq compound first, falls back to Tavily
+ */
+async function searchWeb(query: string): Promise<{ content: string; sources: any[]; provider: string }> {
+  const errors: string[] = [];
+
+  // Try Groq compound model first (built-in search, no extra key needed)
+  try {
+    const result = await searchWebGroq(query);
+    return { ...result, provider: "Groq Compound (Web Search)" };
+  } catch (err: any) {
+    errors.push(`Groq: ${err.message}`);
+    console.log("[WebSearch] Groq compound failed, trying Tavily...");
+  }
+
+  // Fallback to Tavily if configured
+  if (TAVILY_API_KEY) {
+    try {
+      const result = await searchWebTavily(query, 5);
+      let content = result.answer || "";
+      
+      // Format results into a readable response
+      if (result.results.length > 0) {
+        content += "\n\n**Sources:**\n";
+        result.results.forEach((r: any, i: number) => {
+          content += `\n${i + 1}. [${r.title}](${r.url})\n   ${r.content?.slice(0, 200)}...`;
+        });
+      }
+
+      return {
+        content,
+        sources: result.results.map((r: any) => ({ title: r.title, url: r.url })),
+        provider: "Tavily API",
+      };
+    } catch (err: any) {
+      errors.push(`Tavily: ${err.message}`);
+    }
+  }
+
+  throw new Error(`Web search failed. Errors:\n${errors.join("\n")}`);
+}
+
+// ============================================================
 // ATTACHMENT PROCESSING
 // ============================================================
 async function fetchLinkContent(url: string): Promise<string> {
@@ -102,9 +263,9 @@ async function fetchLinkContent(url: string): Promise<string> {
     if (!res.ok) return `[Failed to fetch URL: ${res.status}]`;
     const text = await res.text();
     const stripped = text
-      .replace(/<script[^>]*>[\s\S]*?<\/script>/gi, "")
-      .replace(/<style[^>]*>[\s\S]*?<\/style>/gi, "")
-      .replace(/<[^>]+>/g, " ")
+      .replace(/<<script[^>]*>[\s\S]*?<\/script>/gi, "")
+      .replace(/<<style[^>]*>[\s\S]*?<\/style>/gi, "")
+      .replace(/<<[^>]+>/g, " ")
       .replace(/\s+/g, " ")
       .trim()
       .slice(0, 8000);
@@ -1093,6 +1254,9 @@ export async function POST(req: NextRequest) {
       projectMemory,
       source,
       mcpConnectors,
+      // NEW: Web search options
+      webSearch,
+      searchQuery,
     } = body;
 
     const finalModel = preferredModel || model || "auto";
@@ -1105,6 +1269,40 @@ export async function POST(req: NextRequest) {
     const userText = Array.isArray(lastMsg?.content)
       ? lastMsg.content.find((c: any) => c.type === "text")?.text || ""
       : lastMsg?.content || "";
+
+    // ==================== WEB SEARCH ====================
+    // If webSearch is enabled or user asks to search
+    if (webSearch === true || /search (the )?web|google (this|for)|look up|find online|what's the latest/i.test(userText)) {
+      const query = searchQuery || userText.replace(/search (the )?web|google (this|for)|look up|find online/i, "").trim();
+      
+      if (query) {
+        const encoder = new TextEncoder();
+        const s = new ReadableStream({
+          async start(controller) {
+            controller.enqueue(encoder.encode(`data: ${JSON.stringify({ provider: "Web Search", model: "search" })}\n\n`));
+            controller.enqueue(encoder.encode(`data: ${JSON.stringify({ content: `🔍 Searching the web for: "${query}"...\n\n` })}\n\n`));
+
+            try {
+              const result = await searchWeb(query);
+              controller.enqueue(encoder.encode(`data: ${JSON.stringify({ content: result.content })}\n\n`));
+              
+              if (result.sources.length > 0) {
+                controller.enqueue(encoder.encode(`data: ${JSON.stringify({ content: `\n\n**Sources (${result.provider}):**\n` })}\n\n`));
+                result.sources.forEach((source: any, i: number) => {
+                  controller.enqueue(encoder.encode(`data: ${JSON.stringify({ content: `${i + 1}. [${source.title || source.url}](${source.url})\n` })}\n\n`));
+                });
+              }
+            } catch (err: any) {
+              controller.enqueue(encoder.encode(`data: ${JSON.stringify({ content: `\n\n❌ Web search failed: ${err.message}` })}\n\n`));
+            } finally {
+              controller.enqueue(encoder.encode("data: [DONE]\n\n"));
+              controller.close();
+            }
+          }
+        });
+        return new Response(s, { headers: { "Content-Type": "text/event-stream" } });
+      }
+    }
 
     let mediaType: "image" | "video" | "chat";
     if (source === "imagine") {
@@ -1175,7 +1373,7 @@ export async function POST(req: NextRequest) {
     const apiMessages = await processAttachmentsForModel(messagesWithVisionFormat, targetModel, hasVisionCapability);
 
     const systemParts: string[] = [
-      `You are uncgpt - a helpful AI assistant. You can SEE and ANALYZE images. When users share images, describe what you see in detail including objects, text, colors, people, and any notable elements. Be conversational and natural.\n\nFor greetings and general questions: just talk naturally.\nFor action requests (code, GitHub, etc): use tools if available.`,
+      `You are uncgpt - a helpful AI assistant. You can SEE and ANALYZE images. When users share images, describe what you see in detail including objects, text, colors, people, and any notable elements. Be conversational and natural.\n\nFor greetings and general questions: just talk naturally.\nFor action requests (code, GitHub, etc): use tools if available.\n\nYou have access to web search. When users ask about current events, recent news, or anything requiring up-to-date information, you can search the web. To trigger a web search, respond with [SEARCH: query].`,
     ];
     if (projectInstructions) systemParts.push(`\n\nProject Instructions:\n${projectInstructions}`);
     if (projectMemory) systemParts.push(`\n\n[MEMORY]:\n${projectMemory}`);
