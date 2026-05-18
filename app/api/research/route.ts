@@ -1,64 +1,132 @@
 import { NextRequest } from "next/server";
+import {
+  searchWeb,
+  formatSearchResultsForAI,
+  generateCitations,
+} from "@/lib/web-search-enhanced";
+
+export const runtime = "nodejs";
 
 export async function POST(req: NextRequest) {
   try {
-    const { query, depth = "quick" } = await req.json();
+    const { query, depth = "quick", includeContent = false } = await req.json();
 
-    if (!query) {
-      return Response.json({ error: "Missing query" }, { status: 400 });
+    if (!query || typeof query !== "string" || query.trim().length === 0) {
+      return Response.json(
+        { error: "Invalid query: must be a non-empty string" },
+        { status: 400 }
+      );
     }
 
-    // Search using SerpAPI or DuckDuckGo
-    const results = await searchWeb(query);
-    
-    let analysis = "";
-    if (depth === "deep") {
-      // Fetch content from top results
-      analysis = await analyzeResults(results);
-    }
+    const trimmedQuery = query.trim();
 
-    return Response.json({
+    // Perform web search with real-time data
+    const searchResults = await searchWeb(trimmedQuery, {
+      fetchContent: depth === "deep" || includeContent,
+      useCache: depth !== "live", // Don't cache for "live" requests
+    });
+
+    // Format results for AI response
+    const formattedResults = formatSearchResultsForAI(searchResults);
+    const citations = generateCitations(searchResults);
+
+    // Prepare response with all metadata
+    const response = {
       success: true,
-      query,
-      results,
-      analysis: depth === "deep" ? analysis : undefined,
-      count: results.length,
-      timestamp: new Date().toISOString(),
+      query: trimmedQuery,
+      searchDate: searchResults.searchedAt,
+      searchSources: searchResults.sources,
+      resultCount: searchResults.results.length,
+      results: searchResults.results.map((r) => ({
+        title: r.title,
+        url: r.url,
+        snippet: r.snippet,
+        source: r.source,
+        domain: r.domain,
+        retrievedDate: searchResults.searchedAt,
+        citationKey: `[${r.domain}]`,
+      })),
+      formattedForAI: formattedResults,
+      citations,
+      instructions: {
+        citation_format:
+          "When referencing these results, use the format: [1] Source Name: Key claim. URL: [source_url]. Retrieved: [date]",
+        must_include_date: true,
+        must_include_url: true,
+        must_include_source: true,
+      },
+    };
+
+    return Response.json(response, {
+      headers: {
+        "Cache-Control":
+          depth === "live" ? "no-cache, no-store" : "public, max-age=3600",
+      },
     });
   } catch (error: any) {
-    return Response.json({ error: error.message }, { status: 500 });
+    console.error("Research endpoint error:", error);
+    return Response.json(
+      {
+        success: false,
+        error: error.message || "Search failed",
+        timestamp: new Date().toISOString(),
+      },
+      { status: 500 }
+    );
   }
 }
 
-async function searchWeb(query: string): Promise<any[]> {
-  try {
-    // Using free DuckDuckGo search
-    const url = `https://duckduckgo.com/?q=${encodeURIComponent(query)}&format=json`;
-    const response = await fetch(url);
-    const data = await response.json();
+export async function GET(req: NextRequest) {
+  const query = req.nextUrl.searchParams.get("q");
 
-    return (data.Results || []).slice(0, 5).map((result: any) => ({
-      title: result.Title,
-      url: result.FirstURL,
-      snippet: result.Text,
-    }));
-  } catch (error) {
-    return [];
+  if (!query) {
+    return Response.json({
+      features: [
+        "✅ Real-time web search (live results)",
+        "✅ Free APIs (no paid keys needed)",
+        "✅ Multiple sources (Searxng, DuckDuckGo, Brave)",
+        "✅ Source attribution with dates",
+        "✅ Automatic citation formatting",
+        "✅ Content extraction from top results",
+        "✅ Caching for performance",
+        "✅ Error handling and fallbacks",
+      ],
+      endpoints: {
+        POST: {
+          description: "Execute web search",
+          params: {
+            query: "string (required) - Search query",
+            depth: "string (optional) - 'quick' (default), 'deep', or 'live'",
+            includeContent:
+              "boolean (optional) - Extract full content from results",
+          },
+          example: {
+            query: "latest AI developments 2026",
+            depth: "deep",
+            includeContent: true,
+          },
+        },
+        GET: {
+          description: "Get search by query parameter",
+          params: {
+            q: "string - Search query",
+          },
+          example: "?q=latest+news+2026",
+        },
+      },
+      version: "2.0 (Enhanced)",
+      lastUpdated: "2026-05-18",
+    });
   }
-}
 
-async function analyzeResults(results: any[]): Promise<string> {
-  // Would use Groq LLM to analyze search results
-  return results.map((r) => `${r.title}: ${r.snippet}`).join("\n\n");
-}
+  // Handle GET search
+  const searchResults = await searchWeb(query, { fetchContent: false });
 
-export async function GET() {
   return Response.json({
-    features: [
-      "Web search with DuckDuckGo",
-      "Deep research mode",
-      "Content analysis",
-      "Multi-source aggregation",
-    ],
+    success: true,
+    query,
+    results: searchResults.results,
+    sources: searchResults.sources,
+    timestamp: searchResults.searchedAt,
   });
 }
