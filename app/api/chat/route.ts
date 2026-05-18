@@ -51,19 +51,16 @@ const GROQ_KEYS: string[] = [
 ];
 
 // ============================================================
-// WEB SEARCH APIs - REAL, RELIABLE, FREE TIERS
+// WEB SEARCH APIs
 // ============================================================
 
-// 1. SERPAPI - 100 searches/month FREE (Google Search results)
-// Your key:
+// SERPAPI - 100 searches/month FREE (Google Search results)
 const SERPAPI_KEY = "669b7c2e5a8b2686c3fe887f8cafdd0c89d1a841957b10a6a6b2d501b8fabb75";
 
-// 2. BING WEB SEARCH - 1,000 queries/month FREE (Microsoft)
-// Get free key at: https://azure.microsoft.com/en-us/services/cognitive-services/bing-web-search-api/
-// No credit card needed, just Microsoft account
-const BING_API_KEY = ""; // <-- PASTE BING KEY HERE
+// BING WEB SEARCH - 1,000 queries/month FREE
+const BING_API_KEY = "";
 
-// 3. SEARXNG - Public instances (free but unreliable, used as last resort)
+// SEARXNG - Last resort
 const SEARXNG_INSTANCES = [
   "https://search.sapti.me",
   "https://search.bus-hit.me",
@@ -127,10 +124,6 @@ function shouldSearchWeb(text: string): boolean {
 // REAL WEB SEARCH FUNCTIONS
 // ============================================================
 
-/**
- * SERPAPI - Google Search results (100 free/month)
- * Most reliable, real-time Google data
- */
 async function searchSerpAPI(query: string): Promise<string> {
   if (!SERPAPI_KEY) return "";
   try {
@@ -141,7 +134,7 @@ async function searchSerpAPI(query: string): Promise<string> {
       num: "8",
       hl: "en",
       gl: "us",
-      tbs: "qdr:d", // past day - most recent results
+      tbs: "qdr:d",
     });
 
     const controller = new AbortController();
@@ -170,26 +163,27 @@ async function searchSerpAPI(query: string): Promise<string> {
       return "";
     }
 
-    let output = `**Web Search Results for "${query}":**\n\n`;
+    let output = "";
 
-    // Include answer box if present (featured snippet)
+    // Featured snippet / answer box - most important
     if (answerBox.answer || answerBox.snippet) {
-      output += `**Quick Answer:** ${answerBox.answer || answerBox.snippet}\n\n`;
+      output += `DIRECT ANSWER: ${answerBox.answer || answerBox.snippet}\n\n`;
     }
 
-    // Include knowledge graph if present
+    // Knowledge graph
     if (knowledgeGraph.description) {
-      output += `**Info:** ${knowledgeGraph.description}\n`;
+      output += `FACTS: ${knowledgeGraph.description}\n`;
       if (knowledgeGraph.source?.link) {
         output += `Source: ${knowledgeGraph.source.link}\n\n`;
       }
     }
 
-    results.slice(0, 6).forEach((r: any, i: number) => {
+    // Top results
+    results.slice(0, 5).forEach((r: any, i: number) => {
       const title = r.title || "No title";
       const snippet = r.snippet || r.description || "";
       const url = r.link || r.url || "";
-      output += `[${i + 1}] **${title}**\n${snippet.slice(0, 350)}\nURL: ${url}\n\n`;
+      output += `RESULT ${i + 1}: ${title}\n${snippet.slice(0, 300)}\nSource: ${url}\n\n`;
     });
 
     console.log(`[SerpAPI] ✓ Success - ${results.length} results`);
@@ -201,10 +195,6 @@ async function searchSerpAPI(query: string): Promise<string> {
   }
 }
 
-/**
- * BING WEB SEARCH - Microsoft (1,000 free/month)
- * Real Bing search results, no credit card needed
- */
 async function searchBing(query: string): Promise<string> {
   if (!BING_API_KEY) return "";
   try {
@@ -238,13 +228,12 @@ async function searchBing(query: string): Promise<string> {
       return "";
     }
 
-    let output = `**Web Search Results for "${query}":**\n\n`;
-
-    results.slice(0, 6).forEach((r: any, i: number) => {
+    let output = "";
+    results.slice(0, 5).forEach((r: any, i: number) => {
       const title = r.name || "No title";
       const snippet = r.snippet || "";
       const url = r.url || "";
-      output += `[${i + 1}] **${title}**\n${snippet.slice(0, 350)}\nURL: ${url}\n\n`;
+      output += `RESULT ${i + 1}: ${title}\n${snippet.slice(0, 300)}\nSource: ${url}\n\n`;
     });
 
     console.log(`[Bing] ✓ Success - ${results.length} results`);
@@ -256,9 +245,6 @@ async function searchBing(query: string): Promise<string> {
   }
 }
 
-/**
- * SEARXNG - Last resort, free but unreliable
- */
 async function searchSearXNG(query: string): Promise<string> {
   for (const instance of SEARXNG_INSTANCES) {
     try {
@@ -291,12 +277,12 @@ async function searchSearXNG(query: string): Promise<string> {
 
       if (!results.length) continue;
 
-      let output = `**Web Search Results for "${query}":**\n\n`;
+      let output = "";
       results.slice(0, 5).forEach((r: any, i: number) => {
         const title = r.title || "No title";
         const snippet = r.content || r.abstract || r.snippet || "";
         const url = r.url || r.link || "";
-        output += `[${i + 1}] **${title}**\n${snippet.slice(0, 300)}\nURL: ${url}\n\n`;
+        output += `RESULT ${i + 1}: ${title}\n${snippet.slice(0, 300)}\nSource: ${url}\n\n`;
       });
 
       console.log(`[SearXNG] ✓ Success with ${instance}`);
@@ -309,25 +295,22 @@ async function searchSearXNG(query: string): Promise<string> {
   return "";
 }
 
-// Unified silent search - SerpAPI → Bing → SearXNG
+// Unified silent search
 async function silentWebSearch(userQuery: string): Promise<string> {
   console.log(`[SilentSearch] Searching for: "${userQuery.substring(0, 80)}..."`);
 
-  // 1. Try SerpAPI first (Google results, most reliable)
   let result = await searchSerpAPI(userQuery);
   if (result) {
-    console.log(`[SilentSearch] ✓ Used SerpAPI (Google)`);
+    console.log(`[SilentSearch] ✓ Used SerpAPI`);
     return result;
   }
 
-  // 2. Try Bing Web Search
   result = await searchBing(userQuery);
   if (result) {
     console.log(`[SilentSearch] ✓ Used Bing`);
     return result;
   }
 
-  // 3. Last resort: SearXNG
   result = await searchSearXNG(userQuery);
   if (result) {
     console.log(`[SilentSearch] ✓ Used SearXNG`);
@@ -1176,21 +1159,33 @@ export async function POST(req: NextRequest) {
     const messagesWithVisionFormat = messages.map(convertMessageWithAttachments);
     const apiMessages = await processAttachmentsForModel(messagesWithVisionFormat, targetModel, hasVisionCapability);
 
-    const systemParts: string[] = [
-      `You are uncgpt - a helpful AI assistant. You can SEE and ANALYZE images. When users share images, describe what you see in detail including objects, text, colors, people, and any notable elements. Be conversational and natural.\n\nFor greetings and general questions: just talk naturally.\nFor action requests (code, GitHub, etc): use tools if available.`,
-    ];
+    // CRITICAL FIX: Instead of putting search results in system prompt,
+    // we inject them as a user message right before the actual user message.
+    // This forces the AI to treat them as actual conversation context.
+    const systemContent = `You are uncgpt - a helpful AI assistant. You can SEE and ANALYZE images. When users share images, describe what you see in detail including objects, text, colors, people, and any notable elements. Be conversational and natural.
 
-    if (searchContext) {
-      systemParts.push(`\n\n[WEB SEARCH RESULTS - USE THIS TO ANSWER THE USER'S QUESTION. DO NOT MENTION THAT YOU SEARCHED THE WEB. JUST ANSWER NATURALLY USING THIS INFORMATION:]\n\n${searchContext}`);
-    }
+CRITICAL INSTRUCTION: You have been provided with REAL-TIME WEB SEARCH RESULTS in the conversation. You MUST use these search results to answer the user's question. Do NOT say you don't have access to current information. Do NOT mention your knowledge cutoff. The search results ARE your current information. Answer based on the search results provided.`;
+
+    const systemParts: string[] = [systemContent];
 
     if (projectInstructions) systemParts.push(`\n\nProject Instructions:\n${projectInstructions}`);
     if (projectMemory) systemParts.push(`\n\n[MEMORY]:\n${projectMemory}`);
 
-    let messagesWithSystem = [
+    let messagesWithSystem: any[] = [
       { role: "system", content: systemParts.join("") },
-      ...apiMessages,
     ];
+
+    // If we have search results, inject them as an assistant message before the user's question
+    // This makes the AI think it already "knows" this info
+    if (searchContext) {
+      messagesWithSystem.push({
+        role: "assistant",
+        content: `I found the following current information from web search:\n\n${searchContext}\n\nBased on this information, I can now answer your question.`
+      });
+    }
+
+    // Add all the actual conversation messages
+    messagesWithSystem = [...messagesWithSystem, ...apiMessages];
 
     const toolSteps: Array<{ iteration: number; action: "tool_use"; tool: string; input: any; result: string }> = [];
 
