@@ -289,7 +289,7 @@ export function ChatInterface({ onSwitchToImagine, onOpenSidebar, isSidebarOpen 
           <div className="flex-shrink-0 px-4 pb-20 mt-auto">
             <div className="max-w-4xl mx-auto">
               <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
-                <div className="group bg-zinc-900/60 backdrop-blur-xl border border-white/10 hover:border-white/20 rounded-3xl p-5 transition-all duration-300 hover:scale-[1.02] h-full">
+                <div className="group bg-zinc-900/60 backdrop-blur-xl border border-white/07 hover:border-white/20 rounded-3xl p-5 transition-all duration-300 hover:scale-[1.02] h-full">
                   <h4 className="font-semibold text-base mb-1.5 text-white">Fast &amp; Smart</h4>
                   <p className="text-zinc-400 text-sm leading-tight">Lightning-fast answers powered by advanced AI.</p>
                 </div>
@@ -299,7 +299,7 @@ export function ChatInterface({ onSwitchToImagine, onOpenSidebar, isSidebarOpen 
                   <p className="text-zinc-400 text-sm leading-tight">Analyze images, screenshots, and diagrams.</p>
                 </div>
 
-                <div className="group bg-zinc-900/60 backdrop-blur-xl border border-white/10 hover:border-white/20 rounded-3xl p-5 transition-all duration-300 hover:scale-[1.02] h-full">
+                <div className="group bg-zinc-900/60 backdrop-blur-xl border border-white/07 hover:border-white/20 rounded-3xl p-5 transition-all duration-300 hover:scale-[1.02] h-full">
                   <h4 className="font-semibold text-base mb-1.5 text-white">Creative Power</h4>
                   <p className="text-zinc-400 text-sm leading-tight">Stories, ideas, code, and brainstorming.</p>
                 </div>
