@@ -50,45 +50,26 @@ const GROQ_KEYS: string[] = [
   "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",
 ];
 
-// TAVILY - Optional fallback for web search
-const TAVILY_API_KEY = "";
-
-// OPENROUTER
-const OPENROUTER_URL = "https://openrouter.ai/api/v1/chat/completions";
-const OPENROUTER_KEY = "";
-
-// CEREBRAS
-const CEREBRAS_URL = "https://api.cerebras.ai/v1/chat/completions";
-const CEREBRAS_KEY = "csk-tt4rvyyfwr5ytrm9vn33nhv5myc6p3thynkcv2j9cdtce62d";
-
-let currentGroqKeyIndex = 0;
-let currentChatIndex = 0;
-const deadGroqKeys = new Set<number>();
-
 // ============================================================
-// VISION MODELS
+// SEARXNG - FREE META-SEARCH (NO API KEY, NO CREDIT CARD)
 // ============================================================
-const VISION_MODELS = [
-  "meta-llama/llama-4-scout-17b-16e-instruct",
-  "meta-llama/llama-4-maverick-17b-128e-instruct",
-  "llama-3.2-90b-vision-preview",
-  "llama-3.2-11b-vision-preview",
-  "@cf/moonshot/kimi-k2.6",
-  "@cf/moonshot/kimi-k2.5",
-  "claude-3-opus",
-  "claude-3-sonnet",
-  "claude-3-haiku",
+
+// Public SearXNG instances - rotates if one is down
+// Get more at: https://searx.space
+const SEARXNG_INSTANCES = [
+  "https://search.sapti.me",
+  "https://search.bus-hit.me",
+  "https://searx.be",
+  "https://searx.tiekoetter.com",
+  "https://searx.prvcy.eu",
+  "https://searxng.nicfab.eu",
+  "https://searx.divided-by-zero.eu",
+  "https://search.rhscz.eu",
 ];
 
-function isVisionModel(model: string): boolean {
-  return VISION_MODELS.some(v => model.toLowerCase().includes(v.toLowerCase()));
-}
+// If you self-host, put your URL here and it'll use that instead
+const SELF_HOSTED_SEARXNG = ""; // e.g. "https://your-app.railway.app"
 
-// ============================================================
-// SILENT WEB SEARCH (BACKGROUND - USER DOESN'T SEE IT)
-// ============================================================
-
-// Keywords that trigger a silent web search
 const SEARCH_TRIGGERS = [
   /what('s| is) (the )?(latest|current|recent|new)/i,
   /(latest|current|recent|new) (news|update|version|price|score|status)/i,
@@ -100,101 +81,96 @@ const SEARCH_TRIGGERS = [
   /(net worth|how much|how many|population of)/i,
   /(search|look up|find out|google|check)/i,
   /\b(2024|2025|2026)\b.*\b(news|update|happened|event)\b/i,
+  /btc|bitcoin|eth|ethereum|solana|cardano|crypto|xrp|doge/i,
+  /nft|opensea|blur/i,
 ];
 
 function shouldSearchWeb(text: string): boolean {
   return SEARCH_TRIGGERS.some(pattern => pattern.test(text));
 }
 
-async function searchWebTavily(query: string, maxResults: number = 5): Promise<string> {
-  if (!TAVILY_API_KEY) return "";
-  try {
-    const res = await fetch("https://api.tavily.com/search", {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-        "Authorization": `Bearer ${TAVILY_API_KEY}`,
-      },
-      body: JSON.stringify({
-        query,
-        search_depth: "advanced",
-        max_results: maxResults,
-        include_answer: true,
-        include_raw_content: false,
-        include_images: false,
-      }),
-    });
-    if (!res.ok) return "";
-    const data = await res.json();
-    let result = "";
-    if (data.answer) result += `**Quick Answer:** ${data.answer}\n\n`;
-    if (data.results?.length) {
-      result += "**Sources:**\n";
-      data.results.forEach((r: any, i: number) => {
-        result += `[${i + 1}] ${r.title}: ${r.content?.slice(0, 300)}...\nURL: ${r.url}\n\n`;
-      });
-    }
-    return result;
-  } catch {
-    return "";
-  }
-}
+/**
+ * Search using SearXNG - completely free, no API key
+ * Aggregates Google, Bing, DuckDuckGo, Yahoo, etc.
+ */
+async function searchSearXNG(query: string): Promise<string> {
+  const instances = SELF_HOSTED_SEARXNG
+    ? [SELF_HOSTED_SEARXNG, ...SEARXNG_INSTANCES]
+    : SEARXNG_INSTANCES;
 
-async function searchWebGroq(query: string): Promise<string> {
-  const availableKeys = GROQ_KEYS.map((key, idx) => ({ key, idx })).filter(({ idx }) => !deadGroqKeys.has(idx));
-  if (availableKeys.length === 0) return "";
-
-  for (let attempt = 0; attempt < availableKeys.length; attempt++) {
-    const { key, idx } = availableKeys[(currentGroqKeyIndex + attempt) % availableKeys.length];
-    if (!key || key.length < 20) continue;
-
+  for (const instance of instances) {
     try {
-      const res = await fetch("https://api.groq.com/openai/v1/chat/completions", {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          "Authorization": `Bearer ${key}`,
-        },
-        body: JSON.stringify({
-          model: "compound-beta",
-          messages: [{ role: "user", content: `Search the web and provide a detailed answer with sources: ${query}` }],
-          stream: false,
-          temperature: 0.7,
-          max_tokens: 4096,
-        }),
+      // SearXNG JSON API - no auth needed
+      const params = new URLSearchParams({
+        q: query,
+        format: "json",
+        language: "en",
+        safesearch: "1",
+        categories: "general",
       });
 
-      if (res.status === 401) {
-        deadGroqKeys.add(idx);
+      const controller = new AbortController();
+      const timeoutId = setTimeout(() => controller.abort(), 8000);
+
+      const res = await fetch(`${instance}/search?${params}`, {
+        method: "GET",
+        headers: {
+          "Accept": "application/json",
+          "User-Agent": "Mozilla/5.0 (compatible; UncGPT/1.0)",
+        },
+        signal: controller.signal,
+      });
+
+      clearTimeout(timeoutId);
+
+      if (!res.ok) {
+        console.log(`[SearXNG] ${instance} returned ${res.status}, trying next...`);
         continue;
       }
-      if (res.status === 429) continue;
 
-      if (res.ok) {
-        currentGroqKeyIndex = (currentGroqKeyIndex + 1) % availableKeys.length;
-        const data = await res.json();
-        return data.choices?.[0]?.message?.content || "";
+      const data = await res.json();
+      const results = data.results || [];
+
+      if (!results.length) {
+        console.log(`[SearXNG] ${instance} returned no results, trying next...`);
+        continue;
       }
-    } catch {
-      continue;
+
+      // Format results for the AI
+      let output = `**Web Search Results for "${query}":**\n\n`;
+
+      results.slice(0, 8).forEach((r: any, i: number) => {
+        const title = r.title || "No title";
+        const snippet = r.content || r.abstract || r.snippet || "";
+        const url = r.url || r.link || "";
+        const engine = r.engine || "web";
+
+        output += `[${i + 1}] **${title}**\n${snippet.slice(0, 400)}\nURL: ${url}\n\n`;
+      });
+
+      console.log(`[SearXNG] ✓ Success with ${instance} - ${results.length} results`);
+      return output;
+
+    } catch (err: any) {
+      console.log(`[SearXNG] ${instance} failed: ${err.message}`);
+      continue; // Try next instance
     }
   }
+
+  console.error("[SearXNG] All instances failed");
   return "";
 }
 
-// Silent search - returns search context to inject into messages, no UI shown
+// Unified silent search
 async function silentWebSearch(userQuery: string): Promise<string> {
-  // Try Groq compound first
-  let result = await searchWebGroq(userQuery);
-  if (result) return result;
-
-  // Fallback to Tavily
-  if (TAVILY_API_KEY) {
-    result = await searchWebTavily(userQuery);
-    if (result) return result;
+  console.log(`[SilentSearch] Searching for: "${userQuery.substring(0, 80)}..."`);
+  const result = await searchSearXNG(userQuery);
+  if (result) {
+    console.log(`[SilentSearch] ✓ Got ${result.length} chars of search context`);
+  } else {
+    console.log("[SilentSearch] ✗ No search results available");
   }
-
-  return "";
+  return result;
 }
 
 // ============================================================
@@ -217,9 +193,9 @@ async function fetchLinkContent(url: string): Promise<string> {
     if (!res.ok) return `[Failed to fetch URL: ${res.status}]`;
     const text = await res.text();
     const stripped = text
-      .replace(/<script[^>]*>[\s\S]*?<\/script>/gi, "")
-      .replace(/<style[^>]*>[\s\S]*?<\/style>/gi, "")
-      .replace(/<[^>]+>/g, " ")
+      .replace(/<<script[^>]*>[\s\S]*?<\/script>/gi, "")
+      .replace(/<<style[^>]*>[\s\S]*?<\/style>/gi, "")
+      .replace(/<<[^>]+>/g, " ")
       .replace(/\s+/g, " ")
       .trim()
       .slice(0, 8000);
@@ -950,7 +926,6 @@ export async function POST(req: NextRequest) {
       projectMemory,
       source,
       mcpConnectors,
-      // Optional: force web search
       webSearch,
     } = body;
 
@@ -966,16 +941,12 @@ export async function POST(req: NextRequest) {
       : lastMsg?.content || "";
 
     // ==================== SILENT WEB SEARCH ====================
-    // Check if we should do a background web search
     let searchContext = "";
     const needsSearch = webSearch === true || shouldSearchWeb(userText);
 
     if (needsSearch && userText) {
       console.log(`[SilentSearch] Detected search need for: "${userText.substring(0, 80)}..."`);
       searchContext = await silentWebSearch(userText);
-      if (searchContext) {
-        console.log(`[SilentSearch] Got ${searchContext.length} chars of search context`);
-      }
     }
 
     let mediaType: "image" | "video" | "chat";
@@ -1040,12 +1011,10 @@ export async function POST(req: NextRequest) {
     const messagesWithVisionFormat = messages.map(convertMessageWithAttachments);
     const apiMessages = await processAttachmentsForModel(messagesWithVisionFormat, targetModel, hasVisionCapability);
 
-    // Build system prompt - inject search context silently if we have it
     const systemParts: string[] = [
       `You are uncgpt - a helpful AI assistant. You can SEE and ANALYZE images. When users share images, describe what you see in detail including objects, text, colors, people, and any notable elements. Be conversational and natural.\n\nFor greetings and general questions: just talk naturally.\nFor action requests (code, GitHub, etc): use tools if available.`,
     ];
 
-    // SILENTLY inject web search results into system prompt - user never sees this happening
     if (searchContext) {
       systemParts.push(`\n\n[WEB SEARCH RESULTS - USE THIS TO ANSWER THE USER'S QUESTION. DO NOT MENTION THAT YOU SEARCHED THE WEB. JUST ANSWER NATURALLY USING THIS INFORMATION:]\n\n${searchContext}`);
     }
