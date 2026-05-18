@@ -658,11 +658,11 @@ export function ChatMessages({ messages, isStreaming, isThinking, onRegenerate, 
             return (
               <div key={message.id} className="group">
                 {/* NO BUBBLES - Clean flat layout */}
-                <div className={cn('flex gap-3', isAssistant ? 'justify-start' : 'justify-end')}>
+                <div className={cn('flex gap-3 items-start', isAssistant ? 'justify-start' : 'justify-end')}>
 
                   {/* Assistant Avatar - Left side */}
                   {isAssistant && (
-                    <div className="w-7 h-7 rounded-full flex items-center justify-center flex-shrink-0 overflow-hidden mt-1">
+                    <div className="w-7 h-7 rounded-full flex items-center justify-center flex-shrink-0 overflow-hidden mt-0">
                       <MarsAvatar size={28} family={messageFamily} useSimpleIcon />
                     </div>
                   )}
@@ -731,7 +731,7 @@ export function ChatMessages({ messages, isStreaming, isThinking, onRegenerate, 
 
                   {/* User Avatar - Right side */}
                   {!isAssistant && (
-                    <div className="w-7 h-7 rounded-full flex items-center justify-center flex-shrink-0 overflow-hidden bg-zinc-700 mt-1">
+                    <div className="w-7 h-7 rounded-full flex items-center justify-center flex-shrink-0 overflow-hidden bg-zinc-700 mt-0">
                       <User className="w-3.5 h-3.5 text-zinc-300" />
                     </div>
                   )}
@@ -748,9 +748,9 @@ export function ChatMessages({ messages, isStreaming, isThinking, onRegenerate, 
             <motion.div 
               initial={{ opacity: 0, y: 10 }} 
               animate={{ opacity: 1, y: 0 }} 
-              className="flex gap-3"
+              className="flex gap-3 items-start"
             >
-              <div className="w-7 h-7 rounded-full flex items-center justify-center flex-shrink-0 overflow-hidden bg-zinc-800 mt-1">
+              <div className="w-7 h-7 rounded-full flex items-center justify-center flex-shrink-0 overflow-hidden bg-zinc-800 mt-0">
                 <MarsAvatar size={28} family={streamingFamily} useSimpleIcon />
               </div>
               <div className="flex items-center py-2">
@@ -764,9 +764,9 @@ export function ChatMessages({ messages, isStreaming, isThinking, onRegenerate, 
             <motion.div 
               initial={{ opacity: 0, y: 10 }} 
               animate={{ opacity: 1, y: 0 }} 
-              className="flex gap-3"
+              className="flex gap-3 items-start"
             >
-              <div className="w-7 h-7 rounded-full flex items-center justify-center flex-shrink-0 overflow-hidden bg-zinc-800 mt-1">
+              <div className="w-7 h-7 rounded-full flex items-center justify-center flex-shrink-0 overflow-hidden bg-zinc-800 mt-0">
                 <MarsAvatar size={28} family={streamingFamily} useSimpleIcon />
               </div>
               <div className="flex items-center py-2">
