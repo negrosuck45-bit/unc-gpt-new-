@@ -39,40 +39,34 @@ const GROQ_CHAT_MODELS: Record<string, string> = {
   "meta-llama/llama-4-maverick-17b-128e-instruct": "meta-llama/llama-4-maverick-17b-128e-instruct",
   "deepseek-r1-distill-llama-70b": "deepseek-r1-distill-llama-70b",
   "mixtral-8x7b-32768": "mixtral-8x7b-32768",
-  // Compound models with built-in web search
   "compound-beta": "compound-beta",
   "compound-mini": "compound-mini",
 };
 
-// GROQ KEYS - Replace these with your NEW valid keys from console.groq.com
-// Format: gsk_xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx
+// GROQ KEYS
 const GROQ_KEYS: string[] = [
-  // PASTE YOUR NEW KEYS HERE - one per line, in quotes
-  // Example: "gsk_abc123...",
   "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",
   "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",
   "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",
 ];
 
-// WEB SEARCH CONFIGURATION
-// Option 1: Groq Compound Models (built-in, no extra key needed)
-// Option 2: Tavily API (get free key at tavily.com - 1,000 req/month)
-const TAVILY_API_KEY = ""; // <-- PASTE TAVILY KEY HERE (tvly-...)
+// TAVILY - Optional fallback for web search
+const TAVILY_API_KEY = "";
 
-// OPENROUTER - Get free key at openrouter.ai/settings/keys (optional but recommended)
+// OPENROUTER
 const OPENROUTER_URL = "https://openrouter.ai/api/v1/chat/completions";
-const OPENROUTER_KEY = ""; // <-- PASTE OPENROUTER KEY HERE (starts with sk-or-v1-...)
+const OPENROUTER_KEY = "";
 
-// CEREBRAS - Get free key at console.cerebras.ai (1M tokens/day)
+// CEREBRAS
 const CEREBRAS_URL = "https://api.cerebras.ai/v1/chat/completions";
 const CEREBRAS_KEY = "csk-tt4rvyyfwr5ytrm9vn33nhv5myc6p3thynkcv2j9cdtce62d";
 
 let currentGroqKeyIndex = 0;
 let currentChatIndex = 0;
-const deadGroqKeys = new Set<number>(); // Track permanently dead keys
+const deadGroqKeys = new Set<number>();
 
 // ============================================================
-// VISION MODELS - Updated for 2026
+// VISION MODELS
 // ============================================================
 const VISION_MODELS = [
   "meta-llama/llama-4-scout-17b-16e-instruct",
@@ -91,18 +85,29 @@ function isVisionModel(model: string): boolean {
 }
 
 // ============================================================
-// WEB SEARCH FUNCTIONS
+// SILENT WEB SEARCH (BACKGROUND - USER DOESN'T SEE IT)
 // ============================================================
 
-/**
- * Search the web using Tavily API (external search)
- * Returns search results with content snippets and sources
- */
-async function searchWebTavily(query: string, maxResults: number = 5): Promise<{ results: any[]; answer?: string }> {
-  if (!TAVILY_API_KEY) {
-    throw new Error("Tavily API key not configured");
-  }
+// Keywords that trigger a silent web search
+const SEARCH_TRIGGERS = [
+  /what('s| is) (the )?(latest|current|recent|new)/i,
+  /(latest|current|recent|new) (news|update|version|price|score|status)/i,
+  /(today|yesterday|this week|this month|this year)/i,
+  /(weather|stock|crypto|bitcoin|ethereum|price of)/i,
+  /(who won|who lost|election|match|game|score)/i,
+  /(release date|coming out|launch|announced)/i,
+  /(died|passed away|birthday|age of)/i,
+  /(net worth|how much|how many|population of)/i,
+  /(search|look up|find out|google|check)/i,
+  /\b(2024|2025|2026)\b.*\b(news|update|happened|event)\b/i,
+];
 
+function shouldSearchWeb(text: string): boolean {
+  return SEARCH_TRIGGERS.some(pattern => pattern.test(text));
+}
+
+async function searchWebTavily(query: string, maxResults: number = 5): Promise<string> {
+  if (!TAVILY_API_KEY) return "";
   try {
     const res = await fetch("https://api.tavily.com/search", {
       method: "POST",
@@ -119,33 +124,25 @@ async function searchWebTavily(query: string, maxResults: number = 5): Promise<{
         include_images: false,
       }),
     });
-
-    if (!res.ok) {
-      const err = await res.text();
-      throw new Error(`Tavily search failed: ${res.status} ${err}`);
-    }
-
+    if (!res.ok) return "";
     const data = await res.json();
-    return {
-      results: data.results || [],
-      answer: data.answer,
-    };
-  } catch (err: any) {
-    throw new Error(`Web search error: ${err.message}`);
+    let result = "";
+    if (data.answer) result += `**Quick Answer:** ${data.answer}\n\n`;
+    if (data.results?.length) {
+      result += "**Sources:**\n";
+      data.results.forEach((r: any, i: number) => {
+        result += `[${i + 1}] ${r.title}: ${r.content?.slice(0, 300)}...\nURL: ${r.url}\n\n`;
+      });
+    }
+    return result;
+  } catch {
+    return "";
   }
 }
 
-/**
- * Search the web using Groq Compound Model (built-in search)
- * This uses Groq's compound-beta or compound-mini models which have
- * native web search capabilities with automatic citations
- */
-async function searchWebGroq(query: string): Promise<{ content: string; sources: any[] }> {
-  // Get available keys
+async function searchWebGroq(query: string): Promise<string> {
   const availableKeys = GROQ_KEYS.map((key, idx) => ({ key, idx })).filter(({ idx }) => !deadGroqKeys.has(idx));
-  if (availableKeys.length === 0) {
-    throw new Error("No valid Groq keys available for web search");
-  }
+  if (availableKeys.length === 0) return "";
 
   for (let attempt = 0; attempt < availableKeys.length; attempt++) {
     const { key, idx } = availableKeys[(currentGroqKeyIndex + attempt) % availableKeys.length];
@@ -159,13 +156,8 @@ async function searchWebGroq(query: string): Promise<{ content: string; sources:
           "Authorization": `Bearer ${key}`,
         },
         body: JSON.stringify({
-          model: "compound-beta", // or "compound-mini" for faster/cheaper
-          messages: [
-            {
-              role: "user",
-              content: `Search the web for: ${query}\n\nProvide a comprehensive answer with sources.`
-            }
-          ],
+          model: "compound-beta",
+          messages: [{ role: "user", content: `Search the web and provide a detailed answer with sources: ${query}` }],
           stream: false,
           temperature: 0.7,
           max_tokens: 4096,
@@ -181,66 +173,28 @@ async function searchWebGroq(query: string): Promise<{ content: string; sources:
       if (res.ok) {
         currentGroqKeyIndex = (currentGroqKeyIndex + 1) % availableKeys.length;
         const data = await res.json();
-        const content = data.choices?.[0]?.message?.content || "";
-        
-        // Extract citations/sources from Groq compound response
-        // Groq compound models include [^index^] citations in their responses
-        const sources: any[] = [];
-        const citationMatches = content.match(/\[\^(\d+)\^\]/g) || [];
-        
-        return { content, sources };
+        return data.choices?.[0]?.message?.content || "";
       }
-
-      const errText = await res.text().catch(() => "");
-      console.error(`[Groq Search] Key ${idx} failed: ${res.status} ${errText.slice(0, 200)}`);
-    } catch (err: any) {
-      console.error(`[Groq Search] Key ${idx} network error:`, err.message);
+    } catch {
+      continue;
     }
   }
-
-  throw new Error("All Groq keys failed for web search");
+  return "";
 }
 
-/**
- * Main web search function - tries Groq compound first, falls back to Tavily
- */
-async function searchWeb(query: string): Promise<{ content: string; sources: any[]; provider: string }> {
-  const errors: string[] = [];
+// Silent search - returns search context to inject into messages, no UI shown
+async function silentWebSearch(userQuery: string): Promise<string> {
+  // Try Groq compound first
+  let result = await searchWebGroq(userQuery);
+  if (result) return result;
 
-  // Try Groq compound model first (built-in search, no extra key needed)
-  try {
-    const result = await searchWebGroq(query);
-    return { ...result, provider: "Groq Compound (Web Search)" };
-  } catch (err: any) {
-    errors.push(`Groq: ${err.message}`);
-    console.log("[WebSearch] Groq compound failed, trying Tavily...");
-  }
-
-  // Fallback to Tavily if configured
+  // Fallback to Tavily
   if (TAVILY_API_KEY) {
-    try {
-      const result = await searchWebTavily(query, 5);
-      let content = result.answer || "";
-      
-      // Format results into a readable response
-      if (result.results.length > 0) {
-        content += "\n\n**Sources:**\n";
-        result.results.forEach((r: any, i: number) => {
-          content += `\n${i + 1}. [${r.title}](${r.url})\n   ${r.content?.slice(0, 200)}...`;
-        });
-      }
-
-      return {
-        content,
-        sources: result.results.map((r: any) => ({ title: r.title, url: r.url })),
-        provider: "Tavily API",
-      };
-    } catch (err: any) {
-      errors.push(`Tavily: ${err.message}`);
-    }
+    result = await searchWebTavily(userQuery);
+    if (result) return result;
   }
 
-  throw new Error(`Web search failed. Errors:\n${errors.join("\n")}`);
+  return "";
 }
 
 // ============================================================
@@ -263,9 +217,9 @@ async function fetchLinkContent(url: string): Promise<string> {
     if (!res.ok) return `[Failed to fetch URL: ${res.status}]`;
     const text = await res.text();
     const stripped = text
-      .replace(/<<script[^>]*>[\s\S]*?<\/script>/gi, "")
-      .replace(/<<style[^>]*>[\s\S]*?<\/style>/gi, "")
-      .replace(/<<[^>]+>/g, " ")
+      .replace(/<script[^>]*>[\s\S]*?<\/script>/gi, "")
+      .replace(/<style[^>]*>[\s\S]*?<\/style>/gi, "")
+      .replace(/<[^>]+>/g, " ")
       .replace(/\s+/g, " ")
       .trim()
       .slice(0, 8000);
@@ -285,15 +239,9 @@ function decodeFileContent(dataUrl: string): string {
   }
 }
 
-// CRITICAL FIX: Strip unsupported fields from messages before sending to APIs
 function sanitizeMessagesForAPI(messages: any[]): any[] {
   return messages.map(msg => {
-    // Only keep role and content - strip attachments, metadata, etc.
-    const sanitized: any = {
-      role: msg.role,
-      content: msg.content
-    };
-    // Preserve tool-related fields if present
+    const sanitized: any = { role: msg.role, content: msg.content };
     if (msg.tool_calls) sanitized.tool_calls = msg.tool_calls;
     if (msg.tool_call_id) sanitized.tool_call_id = msg.tool_call_id;
     if (msg.name) sanitized.name = msg.name;
@@ -307,46 +255,32 @@ async function processAttachmentsForModel(
   hasVision: boolean
 ): Promise<any[]> {
   const processed = [];
-
   for (const msg of messages) {
     if (!Array.isArray(msg.content)) {
       processed.push(msg);
       continue;
     }
-
     const textParts: string[] = [];
     const imageParts: any[] = [];
-
     for (const part of msg.content) {
       if (part.type === "text") {
         textParts.push(part.text);
-      } 
-      else if (part.type === "image_url") {
+      } else if (part.type === "image_url") {
         const imageUrl = part.image_url.url;
-
         if (imageUrl.startsWith("blob:")) {
           textParts.push("[Image is still uploading - please wait for upload to complete]");
-          console.log("[Process] Skipping blob URL");
           continue;
         }
-
-        console.log(`[Process] Found image URL for vision model ${hasVision}: ${imageUrl.substring(0, 80)}...`);
-
         if (hasVision) {
-          imageParts.push({
-            type: "image_url",
-            image_url: { url: imageUrl }
-          });
+          imageParts.push({ type: "image_url", image_url: { url: imageUrl } });
         } else {
           textParts.push(`[User attached an image. You can view it at: ${imageUrl}]`);
         }
       }
     }
-
     const combinedText = textParts.join("\n");
     const linkMatches = combinedText.match(/\[Attached (link|file): ([^\]]+)\]\(([^)]+)\)/g) || [];
     let processedText = combinedText;
-
     for (const match of linkMatches) {
       const urlMatch = match.match(/\(([^)]+)\)/);
       if (urlMatch) {
@@ -360,7 +294,6 @@ async function processAttachmentsForModel(
         }
       }
     }
-
     if (hasVision && imageParts.length > 0) {
       processed.push({
         role: msg.role,
@@ -369,7 +302,6 @@ async function processAttachmentsForModel(
           ...imageParts
         ]
       });
-      console.log(`[Process] Created vision message with ${imageParts.length} image(s)`);
     } else {
       processed.push({
         role: msg.role,
@@ -377,34 +309,21 @@ async function processAttachmentsForModel(
       });
     }
   }
-
   return processed;
 }
 
 function convertMessageWithAttachments(msg: any): any {
-  if (!msg.attachments || msg.attachments.length === 0) {
-    return msg;
-  }
-
+  if (!msg.attachments || msg.attachments.length === 0) return msg;
   const content: any[] = [];
-
   if (msg.content && typeof msg.content === 'string' && msg.content.trim()) {
     content.push({ type: 'text', text: msg.content });
   }
-
   for (const att of msg.attachments) {
     if (att.type === 'image') {
-      content.push({
-        type: 'image_url',
-        image_url: { url: att.url }
-      });
+      content.push({ type: 'image_url', image_url: { url: att.url } });
     }
   }
-
-  return {
-    ...msg,
-    content: content.length > 0 ? content : msg.content
-  };
+  return { ...msg, content: content.length > 0 ? content : msg.content };
 }
 
 // ============================================================
@@ -479,43 +398,26 @@ async function generateMedia(task: "image" | "video", prompt: string, image?: st
 }
 
 // ============================================================
-// PROVIDER CALLS - WITH NEW FALLBACKS
+// PROVIDER CALLS
 // ============================================================
 
-// 1. GROQ - Primary provider (fastest, free tier available)
 async function callGroq(
   messages: any[],
   model: string,
   hasImage: boolean
 ): Promise<{ stream: ReadableStream; provider: string; model: string }> {
-  // CRITICAL FIX: Sanitize messages to strip unsupported fields
   const cleanMessages = sanitizeMessagesForAPI(messages);
-
-  const groqModel = hasImage 
-    ? "meta-llama/llama-4-scout-17b-16e-instruct" 
+  const groqModel = hasImage
+    ? "meta-llama/llama-4-scout-17b-16e-instruct"
     : (GROQ_CHAT_MODELS[model] ?? "llama-3.3-70b-versatile");
   const hasVision = isVisionModel(groqModel);
-
-  console.log(`[Groq] Using model: ${groqModel}, hasVision: ${hasVision}, hasImage: ${hasImage}`);
-  console.log(`[Groq] Messages count: ${cleanMessages.length}`);
-  console.log(`[Groq] First message role: ${cleanMessages[0]?.role}`);
-
   const processedMessages = await processAttachmentsForModel(cleanMessages, groqModel, hasVision);
-
-  // Get available keys (excluding permanently dead ones)
   const availableKeys = GROQ_KEYS.map((key, idx) => ({ key, idx })).filter(({ idx }) => !deadGroqKeys.has(idx));
-
-  if (availableKeys.length === 0) {
-    throw new Error("All Groq keys have been marked as dead. Please add new valid keys.");
-  }
+  if (availableKeys.length === 0) throw new Error("All Groq keys dead");
 
   for (let attempt = 0; attempt < availableKeys.length; attempt++) {
     const { key, idx } = availableKeys[(currentGroqKeyIndex + attempt) % availableKeys.length];
-    if (!key || key.length < 20) {
-      console.error(`[Groq] Key ${idx} is malformed (length: ${key?.length || 0})`);
-      continue;
-    }
-
+    if (!key || key.length < 20) continue;
     try {
       const requestBody: any = {
         model: groqModel,
@@ -527,69 +429,33 @@ async function callGroq(
         temperature: 0.7,
         max_tokens: 4096,
       };
-
-      console.log(`[Groq] Attempt ${attempt + 1}/${availableKeys.length} with key index ${idx}`);
-
       const res = await fetch("https://api.groq.com/openai/v1/chat/completions", {
         method: "POST",
         headers: { "Content-Type": "application/json", Authorization: `Bearer ${key}` },
         body: JSON.stringify(requestBody),
       });
-
-      if (res.status === 401) {
-        console.error(`[Groq] Key ${idx} returned 401 - INVALID/EXPIRED. Marking as dead.`);
-        deadGroqKeys.add(idx);
-        continue; // Try next key
-      }
-
-      if (res.status === 429) {
-        console.error(`[Groq] Key ${idx} returned 429 - RATE LIMITED. Will retry later.`);
-        continue;
-      }
-
+      if (res.status === 401) { deadGroqKeys.add(idx); continue; }
+      if (res.status === 429) continue;
       if (res.ok) {
         currentGroqKeyIndex = (currentGroqKeyIndex + 1) % availableKeys.length;
-        console.log(`[Groq] SUCCESS with key index ${idx}`);
         return { stream: res.body!, provider: "Groq", model: groqModel };
       }
-
-      const errText = await res.text().catch(() => "");
-      console.error(`[Groq] Key ${idx} failed: ${res.status} ${errText.slice(0, 200)}`);
-
-      // If model not found, try fallback model
       if (res.status === 404 && groqModel.includes("llama-4")) {
-        console.log(`[Groq] Model ${groqModel} not found, trying llama-3.2-90b-vision-preview...`);
-        // Retry with older vision model
-        const fallbackBody = {
-          ...requestBody,
-          model: "llama-3.2-90b-vision-preview"
-        };
+        const fallbackBody = { ...requestBody, model: "llama-3.2-90b-vision-preview" };
         const fallbackRes = await fetch("https://api.groq.com/openai/v1/chat/completions", {
           method: "POST",
           headers: { "Content-Type": "application/json", Authorization: `Bearer ${key}` },
           body: JSON.stringify(fallbackBody),
         });
-        if (fallbackRes.ok) {
-          return { stream: fallbackRes.body!, provider: "Groq", model: "llama-3.2-90b-vision-preview" };
-        }
+        if (fallbackRes.ok) return { stream: fallbackRes.body!, provider: "Groq", model: "llama-3.2-90b-vision-preview" };
       }
-    } catch (err: any) {
-      console.error(`[Groq] Key ${idx} network error:`, err.message);
-    }
+    } catch {}
   }
-
-  throw new Error("All Groq keys failed (401 unauthorized - keys are expired/invalid, or 404 model not found)");
+  throw new Error("All Groq keys failed");
 }
 
-// 2. OPENROUTER - Free tier fallback (no key needed for :free models)
-async function callOpenRouter(
-  messages: any[],
-  hasImage: boolean
-): Promise<{ stream: ReadableStream; provider: string; model: string }> {
-  // CRITICAL FIX: Sanitize messages
+async function callOpenRouter(messages: any[], hasImage: boolean): Promise<{ stream: ReadableStream; provider: string; model: string }> {
   const cleanMessages = sanitizeMessagesForAPI(messages);
-
-  // Free vision models on OpenRouter (no API key required, just rate limited)
   const visionModels = [
     "meta-llama/llama-4-scout-17b-16e-instruct:free",
     "meta-llama/llama-3.2-11b-vision-instruct:free",
@@ -599,7 +465,6 @@ async function callOpenRouter(
     "meta-llama/llama-3.1-8b-instruct:free",
     "mistralai/mistral-7b-instruct:free",
   ];
-
   const modelsToTry = hasImage ? visionModels : textModels;
 
   for (const modelId of modelsToTry) {
@@ -610,110 +475,53 @@ async function callOpenRouter(
         headers["HTTP-Referer"] = "https://uncgpt.app";
         headers["X-Title"] = "UncGPT";
       }
-
-      const processedMessages = hasImage 
+      const processedMessages = hasImage
         ? await processAttachmentsForModel(cleanMessages, modelId, true)
         : cleanMessages;
-
       const controller = new AbortController();
       const timeoutId = setTimeout(() => controller.abort(), 30000);
-
       const res = await fetch(OPENROUTER_URL, {
         method: "POST",
         headers,
-        body: JSON.stringify({
-          model: modelId,
-          messages: processedMessages,
-          stream: true,
-          temperature: 0.7,
-          max_tokens: 4096,
-        }),
+        body: JSON.stringify({ model: modelId, messages: processedMessages, stream: true, temperature: 0.7, max_tokens: 4096 }),
         signal: controller.signal,
       });
       clearTimeout(timeoutId);
-
-      if (res.ok) {
-        console.log(`[OpenRouter] Success with model: ${modelId}`);
-        return { stream: res.body!, provider: "OpenRouter (Free)", model: modelId };
-      }
-
-      const err = await res.text().catch(() => "");
-      console.error(`[OpenRouter] ${modelId} failed: ${res.status} ${err.slice(0, 100)}`);
-    } catch (err: any) {
-      console.error(`[OpenRouter] ${modelId} error:`, err.message);
-    }
+      if (res.ok) return { stream: res.body!, provider: "OpenRouter (Free)", model: modelId };
+    } catch {}
   }
-
   throw new Error("All OpenRouter free models failed");
 }
 
-// 3. CEREBRAS - Free tier fallback (1M tokens/day)
-async function callCerebras(
-  messages: any[],
-  hasImage: boolean
-): Promise<{ stream: ReadableStream; provider: string; model: string }> {
-  if (!CEREBRAS_KEY) {
-    throw new Error("Cerebras API key not configured");
-  }
-
-  // CRITICAL FIX: Sanitize messages to strip attachments
+async function callCerebras(messages: any[], hasImage: boolean): Promise<{ stream: ReadableStream; provider: string; model: string }> {
+  if (!CEREBRAS_KEY) throw new Error("Cerebras API key not configured");
   const cleanMessages = sanitizeMessagesForAPI(messages);
-
-  const model = hasImage 
-    ? "llama-4-scout-17b-16e-instruct"  // Vision-capable
-    : "llama-3.3-70b";
-
-  try {
-    const processedMessages = hasImage 
-      ? await processAttachmentsForModel(cleanMessages, model, true)
-      : cleanMessages;
-
-    const res = await fetch(CEREBRAS_URL, {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-        "Authorization": `Bearer ${CEREBRAS_KEY}`,
-      },
-      body: JSON.stringify({
-        model,
-        messages: processedMessages,
-        stream: true,
-        temperature: 0.7,
-        max_tokens: 4096,
-      }),
-    });
-
-    if (res.ok) {
-      return { stream: res.body!, provider: "Cerebras", model };
-    }
-
-    const err = await res.text().catch(() => "");
-    throw new Error(`Cerebras failed: ${res.status} ${err.slice(0, 100)}`);
-  } catch (err: any) {
-    throw err;
-  }
+  const model = hasImage ? "llama-4-scout-17b-16e-instruct" : "llama-3.3-70b";
+  const processedMessages = hasImage
+    ? await processAttachmentsForModel(cleanMessages, model, true)
+    : cleanMessages;
+  const res = await fetch(CEREBRAS_URL, {
+    method: "POST",
+    headers: { "Content-Type": "application/json", "Authorization": `Bearer ${CEREBRAS_KEY}` },
+    body: JSON.stringify({ model, messages: processedMessages, stream: true, temperature: 0.7, max_tokens: 4096 }),
+  });
+  if (res.ok) return { stream: res.body!, provider: "Cerebras", model };
+  const err = await res.text().catch(() => "");
+  throw new Error(`Cerebras failed: ${res.status} ${err.slice(0, 100)}`);
 }
 
-// 4. CLOUDFLARE WORKERS - Text-only fallback
-async function callChatWorkers(
-  body: any,
-  model: string,
-  hasImage: boolean
-): Promise<{ stream: ReadableStream; provider: string; model: string }> {
+async function callChatWorkers(body: any, model: string, hasImage: boolean): Promise<{ stream: ReadableStream; provider: string; model: string }> {
   const cfModel = model.startsWith("@cf/") ? model : "@cf/anthropic/claude-3-haiku";
-
   for (let i = 0; i < CHAT_WORKER_URLS.length; i++) {
     const index = (currentChatIndex + i) % CHAT_WORKER_URLS.length;
     const url = CHAT_WORKER_URLS[index];
     try {
       const controller = new AbortController();
       const timeoutId = setTimeout(() => controller.abort(), 18000);
-
-      // For text-only, simplify messages. For vision, preserve images.
-      const messagesToSend = hasImage 
+      const messagesToSend = hasImage
         ? (body.messages || []).map((m: any) => ({
             role: m.role,
-            content: Array.isArray(m.content) 
+            content: Array.isArray(m.content)
               ? m.content.map((c: any) => {
                   if (c.type === "text") return { type: "text", text: c.text };
                   if (c.type === "image_url") return { type: "image_url", image_url: { url: c.image_url.url } };
@@ -727,140 +535,39 @@ async function callChatWorkers(
               ? m.content.find((c: any) => c.type === "text")?.text || ""
               : m.content
           }));
-
       const res = await fetch(url, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          ...body,
-          model: cfModel,
-          messages: messagesToSend,
-          ...(hasImage && { vision: true })
-        }),
+        body: JSON.stringify({ ...body, model: cfModel, messages: messagesToSend, ...(hasImage && { vision: true }) }),
         signal: controller.signal,
       });
       clearTimeout(timeoutId);
-
       if (res.ok) {
         currentChatIndex = (index + 1) % CHAT_WORKER_URLS.length;
         return { stream: res.body!, provider: "Cloudflare", model: cfModel };
       }
-    } catch (err: any) {}
+    } catch {}
   }
   throw new Error("All Cloudflare chat workers failed");
 }
 
-// 5. PUTER - Claude fallback
-async function callPuter(
-  messages: any[],
-  model: string
-): Promise<{ stream: ReadableStream; provider: string; model: string }> {
-  const puterModel = PUTER_CLAUDE_MODELS[model] ?? "claude-sonnet-4-5";
-  if (!PUTER_AUTH_TOKEN) {
-    throw new Error("No Puter auth token configured");
-  }
-
-  // CRITICAL FIX: Sanitize messages
-  const cleanMessages = sanitizeMessagesForAPI(messages);
-
-  try {
-    const res = await fetch(PUTER_API_URL, {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-        Authorization: `Bearer ${PUTER_AUTH_TOKEN}`,
-      },
-      body: JSON.stringify({
-        model: puterModel,
-        messages: [
-          { role: "system", content: "You are a helpful AI assistant. Be conversational and natural." },
-          ...cleanMessages,
-        ],
-        stream: true,
-      }),
-    });
-    if (!res.ok) {
-      const errText = await res.text().catch(() => "");
-      throw new Error(`Puter failed (${res.status}): ${errText.slice(0, 200)}`);
-    }
-    return { stream: res.body!, provider: "Puter (Claude)", model: puterModel };
-  } catch (err: any) {
-    throw err;
-  }
-}
-
-// ============================================================
-// FALLBACK CHAIN - VISION-AWARE
-// ============================================================
-async function fallbackChat(
-  messages: any[],
-  hasImage: boolean
-): Promise<{ stream: ReadableStream; provider: string; model: string }> {
+async function fallbackChat(messages: any[], hasImage: boolean): Promise<{ stream: ReadableStream; provider: string; model: string }> {
   const errors: string[] = [];
-
-  // If we have images, try vision-capable providers in order
   if (hasImage) {
-    // 1. Try Groq with vision model
-    try {
-      return await callGroq(messages, "meta-llama/llama-4-scout-17b-16e-instruct", true);
-    } catch (err: any) {
-      errors.push(`Groq: ${err.message}`);
-      console.error("[Fallback] Groq vision failed:", err.message);
-    }
-
-    // 2. Try OpenRouter free vision models (no API key needed)
-    try {
-      return await callOpenRouter(messages, true);
-    } catch (err: any) {
-      errors.push(`OpenRouter: ${err.message}`);
-      console.error("[Fallback] OpenRouter vision failed:", err.message);
-    }
-
-    // 3. Try Cerebras if key is configured
-    if (CEREBRAS_KEY) {
-      try {
-        return await callCerebras(messages, true);
-      } catch (err: any) {
-        errors.push(`Cerebras: ${err.message}`);
-        console.error("[Fallback] Cerebras vision failed:", err.message);
-      }
-    }
-
-    // 4. Try Cloudflare workers (may or may not support vision)
-    try {
-      return await callChatWorkers({ task: "chat", messages }, "@cf/anthropic/claude-3-haiku", true);
-    } catch (err: any) {
-      errors.push(`Cloudflare: ${err.message}`);
-      console.error("[Fallback] Cloudflare vision failed:", err.message);
-    }
-
-    throw new Error(`Critical Failure: No vision-capable providers available.\n\nDetails:\n${errors.join("\n")}\n\nTo fix this:\n1. Get a new free Groq API key at console.groq.com (Llama 4 Scout is FREE)\n2. Or add an OpenRouter key for free vision models\n3. Or add a Cerebras key for free vision (1M tokens/day)`);
+    try { return await callGroq(messages, "meta-llama/llama-4-scout-17b-16e-instruct", true); } catch (err: any) { errors.push(`Groq: ${err.message}`); }
+    try { return await callOpenRouter(messages, true); } catch (err: any) { errors.push(`OpenRouter: ${err.message}`); }
+    if (CEREBRAS_KEY) { try { return await callCerebras(messages, true); } catch (err: any) { errors.push(`Cerebras: ${err.message}`); } }
+    try { return await callChatWorkers({ task: "chat", messages }, "@cf/anthropic/claude-3-haiku", true); } catch (err: any) { errors.push(`Cloudflare: ${err.message}`); }
+    throw new Error(`No vision providers: ${errors.join(", ")}`);
   }
-
-  // No images - standard fallback chain
-  try {
-    return await callGroq(messages, "llama-3.3-70b-versatile", false);
-  } catch (err: any) {
-    errors.push(`Groq: ${err.message}`);
-  }
-
-  try {
-    return await callOpenRouter(messages, false);
-  } catch (err: any) {
-    errors.push(`OpenRouter: ${err.message}`);
-  }
-
-  try {
-    return await callChatWorkers({ task: "chat", messages }, "@cf/anthropic/claude-3-haiku", false);
-  } catch (err: any) {
-    errors.push(`Cloudflare: ${err.message}`);
-  }
-
-  throw new Error(`Critical Failure: All providers failed.\n\n${errors.join("\n")}`);
+  try { return await callGroq(messages, "llama-3.3-70b-versatile", false); } catch (err: any) { errors.push(`Groq: ${err.message}`); }
+  try { return await callOpenRouter(messages, false); } catch (err: any) { errors.push(`OpenRouter: ${err.message}`); }
+  try { return await callChatWorkers({ task: "chat", messages }, "@cf/anthropic/claude-3-haiku", false); } catch (err: any) { errors.push(`Cloudflare: ${err.message}`); }
+  throw new Error(`All providers failed: ${errors.join(", ")}`);
 }
 
 // ============================================================
-// MCP TOOLS (unchanged)
+// MCP TOOLS
 // ============================================================
 async function fetchMcpTools(connectors: any[], baseUrl: string): Promise<any[]> {
   if (!connectors?.length) return [];
@@ -873,10 +580,7 @@ async function fetchMcpTools(connectors: any[], baseUrl: string): Promise<any[]>
         const callMcpEndpoint = async (action: string, method?: string, params?: any) => {
           const res = await fetch(`${baseUrl}/api/mcp`, {
             method: "POST",
-            headers: {
-              "Content-Type": "application/json",
-              Accept: "application/json, text/event-stream",
-            },
+            headers: { "Content-Type": "application/json", Accept: "application/json, text/event-stream" },
             body: JSON.stringify({ action, connectorId: c.id, method, params }),
           });
           if (!res.ok) throw new Error(`HTTP ${res.status}`);
@@ -893,10 +597,7 @@ async function fetchMcpTools(connectors: any[], baseUrl: string): Promise<any[]>
               buf = lines.pop() || "";
               for (const line of lines) {
                 if (!line.startsWith("data:")) continue;
-                try {
-                  const p = JSON.parse(line.slice(5).trim());
-                  return p.result;
-                } catch {}
+                try { const p = JSON.parse(line.slice(5).trim()); return p.result; } catch {}
               }
             }
             throw new Error("SSE ended");
@@ -977,11 +678,9 @@ async function runToolLoop(
       const oauth = oauthTools.find((o: any) => o.function.name === tc.function.name);
       const mcp = mcpTools.find((m: any) => m.function.name === tc.function.name);
       if (oauth) {
-        try { result = await oauth._exec(args); }
-        catch (e: any) { result = `Tool error: ${e.message}`; }
+        try { result = await oauth._exec(args); } catch (e: any) { result = `Tool error: ${e.message}`; }
       } else if (mcp) {
-        try { result = await executeMcpTool(mcp, args, baseUrl); }
-        catch (e: any) { result = `Tool error: ${e.message}`; }
+        try { result = await executeMcpTool(mcp, args, baseUrl); } catch (e: any) { result = `Tool error: ${e.message}`; }
       } else {
         result = await executeBuiltInTool(tc.function.name, args);
       }
@@ -1145,10 +844,7 @@ async function executeMcpTool(tool: any, args: any, baseUrl: string): Promise<st
       buf = lines.pop() || "";
       for (const line of lines) {
         if (!line.startsWith("data:")) continue;
-        try {
-          const p = JSON.parse(line.slice(5).trim());
-          result = p.result;
-        } catch {}
+        try { const p = JSON.parse(line.slice(5).trim()); result = p.result; } catch {}
       }
     }
   } else {
@@ -1254,9 +950,8 @@ export async function POST(req: NextRequest) {
       projectMemory,
       source,
       mcpConnectors,
-      // NEW: Web search options
+      // Optional: force web search
       webSearch,
-      searchQuery,
     } = body;
 
     const finalModel = preferredModel || model || "auto";
@@ -1270,37 +965,16 @@ export async function POST(req: NextRequest) {
       ? lastMsg.content.find((c: any) => c.type === "text")?.text || ""
       : lastMsg?.content || "";
 
-    // ==================== WEB SEARCH ====================
-    // If webSearch is enabled or user asks to search
-    if (webSearch === true || /search (the )?web|google (this|for)|look up|find online|what's the latest/i.test(userText)) {
-      const query = searchQuery || userText.replace(/search (the )?web|google (this|for)|look up|find online/i, "").trim();
-      
-      if (query) {
-        const encoder = new TextEncoder();
-        const s = new ReadableStream({
-          async start(controller) {
-            controller.enqueue(encoder.encode(`data: ${JSON.stringify({ provider: "Web Search", model: "search" })}\n\n`));
-            controller.enqueue(encoder.encode(`data: ${JSON.stringify({ content: `🔍 Searching the web for: "${query}"...\n\n` })}\n\n`));
+    // ==================== SILENT WEB SEARCH ====================
+    // Check if we should do a background web search
+    let searchContext = "";
+    const needsSearch = webSearch === true || shouldSearchWeb(userText);
 
-            try {
-              const result = await searchWeb(query);
-              controller.enqueue(encoder.encode(`data: ${JSON.stringify({ content: result.content })}\n\n`));
-              
-              if (result.sources.length > 0) {
-                controller.enqueue(encoder.encode(`data: ${JSON.stringify({ content: `\n\n**Sources (${result.provider}):**\n` })}\n\n`));
-                result.sources.forEach((source: any, i: number) => {
-                  controller.enqueue(encoder.encode(`data: ${JSON.stringify({ content: `${i + 1}. [${source.title || source.url}](${source.url})\n` })}\n\n`));
-                });
-              }
-            } catch (err: any) {
-              controller.enqueue(encoder.encode(`data: ${JSON.stringify({ content: `\n\n❌ Web search failed: ${err.message}` })}\n\n`));
-            } finally {
-              controller.enqueue(encoder.encode("data: [DONE]\n\n"));
-              controller.close();
-            }
-          }
-        });
-        return new Response(s, { headers: { "Content-Type": "text/event-stream" } });
+    if (needsSearch && userText) {
+      console.log(`[SilentSearch] Detected search need for: "${userText.substring(0, 80)}..."`);
+      searchContext = await silentWebSearch(userText);
+      if (searchContext) {
+        console.log(`[SilentSearch] Got ${searchContext.length} chars of search context`);
       }
     }
 
@@ -1314,14 +988,12 @@ export async function POST(req: NextRequest) {
     let hasImage = false;
     let imageUrl = "";
 
-    // Check ALL messages for images
     for (const msg of messages) {
       if (Array.isArray(msg?.content)) {
         const imgPart = msg.content.find((c: any) => c.type === "image_url");
         if (imgPart && !imgPart.image_url.url.startsWith("blob:")) {
           hasImage = true;
           imageUrl = imgPart.image_url.url;
-          console.log(`[Main] Valid image in content array: ${imageUrl.substring(0, 80)}...`);
           break;
         }
       }
@@ -1330,7 +1002,6 @@ export async function POST(req: NextRequest) {
         if (imgAtt && !imgAtt.url.startsWith("blob:")) {
           hasImage = true;
           imageUrl = imgAtt.url;
-          console.log(`[Main] Valid image in attachments: ${imageUrl.substring(0, 80)}...`);
           break;
         }
       }
@@ -1341,7 +1012,6 @@ export async function POST(req: NextRequest) {
       const encoder = new TextEncoder();
       const providerName = mediaType === "video" ? "Pollinations AI" : "Cloudflare Workers AI";
       const modelName = mediaType === "video" ? "stable-video-diffusion" : "@cf/black-forest-labs/flux-2-dev";
-      console.log(`[UNCGPT] Generating ${mediaType} | Provider: ${providerName} | Model: ${modelName}`);
 
       const s = new ReadableStream({
         async start(controller) {
@@ -1367,14 +1037,19 @@ export async function POST(req: NextRequest) {
     const targetModel = finalModel !== "auto" ? finalModel : (hasImage ? "meta-llama/llama-4-scout-17b-16e-instruct" : "llama-3.3-70b-versatile");
     const hasVisionCapability = isVisionModel(targetModel) || hasImage;
 
-    console.log(`[Main] Target model: ${targetModel}, hasVision: ${hasVisionCapability}, hasImage: ${hasImage}`);
-
     const messagesWithVisionFormat = messages.map(convertMessageWithAttachments);
     const apiMessages = await processAttachmentsForModel(messagesWithVisionFormat, targetModel, hasVisionCapability);
 
+    // Build system prompt - inject search context silently if we have it
     const systemParts: string[] = [
-      `You are uncgpt - a helpful AI assistant. You can SEE and ANALYZE images. When users share images, describe what you see in detail including objects, text, colors, people, and any notable elements. Be conversational and natural.\n\nFor greetings and general questions: just talk naturally.\nFor action requests (code, GitHub, etc): use tools if available.\n\nYou have access to web search. When users ask about current events, recent news, or anything requiring up-to-date information, you can search the web. To trigger a web search, respond with [SEARCH: query].`,
+      `You are uncgpt - a helpful AI assistant. You can SEE and ANALYZE images. When users share images, describe what you see in detail including objects, text, colors, people, and any notable elements. Be conversational and natural.\n\nFor greetings and general questions: just talk naturally.\nFor action requests (code, GitHub, etc): use tools if available.`,
     ];
+
+    // SILENTLY inject web search results into system prompt - user never sees this happening
+    if (searchContext) {
+      systemParts.push(`\n\n[WEB SEARCH RESULTS - USE THIS TO ANSWER THE USER'S QUESTION. DO NOT MENTION THAT YOU SEARCHED THE WEB. JUST ANSWER NATURALLY USING THIS INFORMATION:]\n\n${searchContext}`);
+    }
+
     if (projectInstructions) systemParts.push(`\n\nProject Instructions:\n${projectInstructions}`);
     if (projectMemory) systemParts.push(`\n\n[MEMORY]:\n${projectMemory}`);
 
@@ -1391,7 +1066,6 @@ export async function POST(req: NextRequest) {
       if (Array.isArray(mcpConnectors) && mcpConnectors.length > 0) {
         mcpTools = await fetchMcpTools(mcpConnectors, baseUrl);
       }
-
       if (oauthBundle.tools.length > 0 || mcpTools.length > 0) {
         messagesWithSystem = await runToolLoop(messagesWithSystem, oauthBundle.tools, mcpTools, baseUrl, (s) => toolSteps.push(s));
       }
