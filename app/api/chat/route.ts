@@ -51,6 +51,12 @@ const GROQ_KEYS: string[] = [
 ];
 
 // ============================================================
+// TERMINAL EXECUTION CONFIGURATION
+// ============================================================
+const TERMINAL_API_URL = "https://ttyd-latest-bue7.onrender.com/execute";
+const TERMINAL_API_KEY = "";
+
+// ============================================================
 // WEB SEARCH CONFIGURATION
 // ============================================================
 
@@ -350,9 +356,9 @@ async function fetchLinkContent(url: string): Promise<string> {
     if (!res.ok) return `[Failed to fetch URL: ${res.status}]`;
     const text = await res.text();
     const stripped = text
-      .replace(/<<script[^>]*>[\s\S]*?<\/script>/gi, "")
-      .replace(/<<style[^>]*>[\s\S]*?<\/style>/gi, "")
-      .replace(/<<[^>]+>/g, " ")
+      .replace(/<script[^>]*>[\s\S]*?<\/script>/gi, "")
+      .replace(/<style[^>]*>[\s\S]*?<\/style>/gi, "")
+      .replace(/<[^>]+>/g, " ")
       .replace(/\s+/g, " ")
       .trim()
       .slice(0, 8000);
@@ -528,6 +534,50 @@ async function generateVideo(prompt: string, imageUrl?: string): Promise<string>
 async function generateMedia(task: "image" | "video", prompt: string, image?: string): Promise<string> {
   if (task === "video") return generateVideo(prompt, image);
   return generateImage(prompt);
+}
+
+// ============================================================
+// TERMINAL EXECUTION
+// ============================================================
+async function runTerminalCommand(command: string, timeout?: number): Promise<string> {
+  if (!TERMINAL_API_KEY) {
+    return JSON.stringify({
+      error: "Terminal API key not configured. Please set TERMINAL_API_KEY.",
+    });
+  }
+
+  try {
+    const controller = new AbortController();
+    const timeoutMs = timeout || 30000;
+    const timeoutId = setTimeout(() => controller.abort(), timeoutMs);
+
+    const res = await fetch(TERMINAL_API_URL, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        "Authorization": `Bearer ${TERMINAL_API_KEY}`,
+      },
+      body: JSON.stringify({ command }),
+      signal: controller.signal,
+    });
+
+    clearTimeout(timeoutId);
+
+    if (!res.ok) {
+      const errorText = await res.text().catch(() => "Unknown error");
+      return JSON.stringify({
+        error: `Terminal API returned ${res.status}: ${errorText.slice(0, 500)}`,
+      });
+    }
+
+    const data = await res.json();
+    return JSON.stringify(data);
+  } catch (err: any) {
+    if (err.name === "AbortError") {
+      return JSON.stringify({ error: `Command timed out after ${timeout || 30000}ms` });
+    }
+    return JSON.stringify({ error: `Terminal execution failed: ${err.message}` });
+  }
 }
 
 // ============================================================
@@ -761,9 +811,34 @@ async function fetchMcpTools(connectors: any[], baseUrl: string): Promise<any[]>
   return tools;
 }
 
-const BUILTIN_TOOLS: any[] = [];
+const BUILTIN_TOOLS: any[] = [
+  {
+    type: "function",
+    function: {
+      name: "run_terminal_command",
+      description: "Execute a shell command in a real terminal and return the output. Use this to run commands like ls, cat, git, npm, python, node, etc. The command runs in a sandboxed environment.",
+      parameters: {
+        type: "object",
+        properties: {
+          command: {
+            type: "string",
+            description: "The shell command to execute (e.g., 'ls -la', 'git status', 'python script.py')",
+          },
+          timeout: {
+            type: "number",
+            description: "Optional timeout in milliseconds (default: 30000, max: 120000)",
+          },
+        },
+        required: ["command"],
+      },
+    },
+  },
+];
 
 async function executeBuiltInTool(toolName: string, args: any): Promise<string> {
+  if (toolName === "run_terminal_command") {
+    return await runTerminalCommand(args.command, args.timeout);
+  }
   return `Tool ${toolName} not implemented yet`;
 }
 
@@ -1204,7 +1279,7 @@ DO NOT say "I don't have real-time access" or "my knowledge cutoff is" or "I can
       if (Array.isArray(mcpConnectors) && mcpConnectors.length > 0) {
         mcpTools = await fetchMcpTools(mcpConnectors, baseUrl);
       }
-      if (oauthBundle.tools.length > 0 || mcpTools.length > 0) {
+      if (oauthBundle.tools.length > 0 || mcpTools.length > 0 || BUILTIN_TOOLS.length > 0) {
         messagesWithSystem = await runToolLoop(messagesWithSystem, oauthBundle.tools, mcpTools, baseUrl, (s) => toolSteps.push(s));
       }
     } catch (e: any) {
