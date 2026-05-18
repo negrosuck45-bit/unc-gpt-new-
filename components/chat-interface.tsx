@@ -5,7 +5,6 @@ import { truncateMemory } from "@/lib/memory-parsers";
 import { ChatMessages } from "@/components/chat-messages";
 import { ChatInput } from "@/components/chat-input";
 import { WelcomeScreen } from "@/components/welcome-screen";
-import { ChatHeader } from "@/components/chat-header";
 
 interface ChatInterfaceProps {
   onSwitchToImagine?: () => void;
