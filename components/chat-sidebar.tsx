@@ -326,11 +326,6 @@ export function ChatSidebar({
                 label="Projects"
                 onClick={() => setProjectsOpen(true)}
               />
-              <NavItem
-                icon={<Box className="h-4 w-4" />}
-                label="Connectors"
-                onClick={() => setSettingsPageOpen(true)}
-              />
             </div>
 
             {/* Search input */}
