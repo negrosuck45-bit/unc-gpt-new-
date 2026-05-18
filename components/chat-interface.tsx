@@ -285,80 +285,24 @@ export function ChatInterface({ onSwitchToImagine, onOpenSidebar, isSidebarOpen 
             </div>
           </div>
 
-          {/* Glass Feature Blocks with Decorative Curves */}
+          {/* Glass Feature Blocks - Smaller Height, Wider, Lower Position */}
           <div className="flex-shrink-0 px-4 pb-20 mt-auto">
             <div className="max-w-4xl mx-auto">
               <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
-
-                {/* Card 1 - Fast & Smart */}
-                <div className="relative group">
-                  {/* Decorative Curve SVG */}
-                  <svg 
-                    className="absolute -top-6 left-4 w-24 h-10 pointer-events-none z-10 opacity-80 group-hover:opacity-100 transition-opacity"
-                    viewBox="0 0 100 40" 
-                    fill="none" 
-                    xmlns="http://www.w3.org/2000/svg"
-                  >
-                    <path 
-                      d="M2 35 C2 35, 5 5, 30 8 C55 11, 60 25, 85 15 C95 10, 98 8, 98 8" 
-                      stroke="#ef4444" 
-                      strokeWidth="2.5" 
-                      strokeLinecap="round"
-                      fill="none"
-                    />
-                  </svg>
-                  <div className="bg-zinc-900/60 backdrop-blur-xl border border-white/10 hover:border-white/20 rounded-3xl p-5 transition-all duration-300 hover:scale-[1.02] h-full">
-                    <h4 className="font-semibold text-base mb-1.5 text-white">Fast &amp; Smart</h4>
-                    <p className="text-zinc-400 text-sm leading-tight">Lightning-fast answers powered by advanced AI.</p>
-                  </div>
+                <div className="group bg-zinc-900/60 backdrop-blur-xl border border-white/10 hover:border-white/20 rounded-3xl p-5 transition-all duration-300 hover:scale-[1.02] h-full">
+                  <h4 className="font-semibold text-base mb-1.5 text-white">Fast &amp; Smart</h4>
+                  <p className="text-zinc-400 text-sm leading-tight">Lightning-fast answers powered by advanced AI.</p>
                 </div>
 
-                {/* Card 2 - Vision Ready */}
-                <div className="relative group">
-                  {/* Decorative Curve SVG */}
-                  <svg 
-                    className="absolute -top-6 left-4 w-24 h-10 pointer-events-none z-10 opacity-80 group-hover:opacity-100 transition-opacity"
-                    viewBox="0 0 100 40" 
-                    fill="none" 
-                    xmlns="http://www.w3.org/2000/svg"
-                  >
-                    <path 
-                      d="M2 35 C2 35, 8 10, 25 12 C45 14, 50 28, 70 20 C80 15, 85 12, 90 10" 
-                      stroke="#ef4444" 
-                      strokeWidth="2.5" 
-                      strokeLinecap="round"
-                      fill="none"
-                    />
-                  </svg>
-                  <div className="bg-zinc-900/60 backdrop-blur-xl border border-white/10 hover:border-white/20 rounded-3xl p-5 transition-all duration-300 hover:scale-[1.02] h-full">
-                    <h4 className="font-semibold text-base mb-1.5 text-white">Vision Ready</h4>
-                    <p className="text-zinc-400 text-sm leading-tight">Analyze images, screenshots, and diagrams.</p>
-                  </div>
+                <div className="group bg-zinc-900/60 backdrop-blur-xl border border-white/10 hover:border-white/20 rounded-3xl p-5 transition-all duration-300 hover:scale-[1.02] h-full">
+                  <h4 className="font-semibold text-base mb-1.5 text-white">Vision Ready</h4>
+                  <p className="text-zinc-400 text-sm leading-tight">Analyze images, screenshots, and diagrams.</p>
                 </div>
 
-                {/* Card 3 - Creative Power */}
-                <div className="relative group">
-                  {/* Decorative Curve SVG */}
-                  <svg 
-                    className="absolute -top-6 left-4 w-24 h-10 pointer-events-none z-10 opacity-80 group-hover:opacity-100 transition-opacity"
-                    viewBox="0 0 100 40" 
-                    fill="none" 
-                    xmlns="http://www.w3.org/2000/svg"
-                  >
-                    <path 
-                      d="M2 30 C2 30, 5 8, 20 10 C40 12, 45 25, 65 18 C75 13, 80 10, 88 8" 
-                      stroke="#ef4444" 
-                      strokeWidth="2.5" 
-                      strokeLinecap="round"
-                      fill="none"
-                    />
-                  </svg>
-                  <div className="bg-zinc-900/60 backdrop-blur-xl border border-white/10 hover:border-white/20 rounded-3xl p-5 transition-all duration-300 hover:scale-[1.02] h-full">
-                    <h4 className="font-semibold text-base mb-1.5 text-white">Creative Power</h4>
-                    <p className="text-zinc-400 text-sm leading-tight">Stories, ideas, code, and brainstorming.</p>
-                  </div>
+                <div className="group bg-zinc-900/60 backdrop-blur-xl border border-white/10 hover:border-white/20 rounded-3xl p-5 transition-all duration-300 hover:scale-[1.02] h-full">
+                  <h4 className="font-semibold text-base mb-1.5 text-white">Creative Power</h4>
+                  <p className="text-zinc-400 text-sm leading-tight">Stories, ideas, code, and brainstorming.</p>
                 </div>
-
               </div>
             </div>
           </div>
