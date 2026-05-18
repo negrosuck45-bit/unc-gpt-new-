@@ -51,20 +51,23 @@ const GROQ_KEYS: string[] = [
 ];
 
 // ============================================================
-// WEB SEARCH APIs
+// WEB SEARCH CONFIGURATION
 // ============================================================
 
 // SERPAPI - 100 searches/month FREE (Google Search results)
 const SERPAPI_KEY = "669b7c2e5a8b2686c3fe887f8cafdd0c89d1a841957b10a6a6b2d501b8fabb75";
 
 // BING WEB SEARCH - 1,000 queries/month FREE
+// Get key at: https://azure.microsoft.com/en-us/services/cognitive-services/bing-web-search-api/
 const BING_API_KEY = "";
 
-// SEARXNG - Last resort
+// SEARXNG - Public instances (free, no signup)
 const SEARXNG_INSTANCES = [
   "https://search.sapti.me",
   "https://search.bus-hit.me",
   "https://searx.be",
+  "https://searx.tiekoetter.com",
+  "https://searx.prvcy.eu",
 ];
 
 // OPENROUTER
@@ -121,9 +124,12 @@ function shouldSearchWeb(text: string): boolean {
 }
 
 // ============================================================
-// REAL WEB SEARCH FUNCTIONS
+// WEB SEARCH FUNCTIONS
 // ============================================================
 
+/**
+ * SERPAPI - Google Search results (100 free/month)
+ */
 async function searchSerpAPI(query: string): Promise<string> {
   if (!SERPAPI_KEY) return "";
   try {
@@ -165,12 +171,10 @@ async function searchSerpAPI(query: string): Promise<string> {
 
     let output = "";
 
-    // Featured snippet / answer box - most important
     if (answerBox.answer || answerBox.snippet) {
       output += `DIRECT ANSWER: ${answerBox.answer || answerBox.snippet}\n\n`;
     }
 
-    // Knowledge graph
     if (knowledgeGraph.description) {
       output += `FACTS: ${knowledgeGraph.description}\n`;
       if (knowledgeGraph.source?.link) {
@@ -178,7 +182,6 @@ async function searchSerpAPI(query: string): Promise<string> {
       }
     }
 
-    // Top results
     results.slice(0, 5).forEach((r: any, i: number) => {
       const title = r.title || "No title";
       const snippet = r.snippet || r.description || "";
@@ -186,7 +189,7 @@ async function searchSerpAPI(query: string): Promise<string> {
       output += `RESULT ${i + 1}: ${title}\n${snippet.slice(0, 300)}\nSource: ${url}\n\n`;
     });
 
-    console.log(`[SerpAPI] ✓ Success - ${results.length} results`);
+    console.log(`[SerpAPI] Success - ${results.length} results`);
     return output;
 
   } catch (err: any) {
@@ -195,6 +198,9 @@ async function searchSerpAPI(query: string): Promise<string> {
   }
 }
 
+/**
+ * BING WEB SEARCH - Microsoft (1,000 free/month)
+ */
 async function searchBing(query: string): Promise<string> {
   if (!BING_API_KEY) return "";
   try {
@@ -236,7 +242,7 @@ async function searchBing(query: string): Promise<string> {
       output += `RESULT ${i + 1}: ${title}\n${snippet.slice(0, 300)}\nSource: ${url}\n\n`;
     });
 
-    console.log(`[Bing] ✓ Success - ${results.length} results`);
+    console.log(`[Bing] Success - ${results.length} results`);
     return output;
 
   } catch (err: any) {
@@ -245,6 +251,9 @@ async function searchBing(query: string): Promise<string> {
   }
 }
 
+/**
+ * SEARXNG - Free meta-search (no API key)
+ */
 async function searchSearXNG(query: string): Promise<string> {
   for (const instance of SEARXNG_INSTANCES) {
     try {
@@ -285,7 +294,7 @@ async function searchSearXNG(query: string): Promise<string> {
         output += `RESULT ${i + 1}: ${title}\n${snippet.slice(0, 300)}\nSource: ${url}\n\n`;
       });
 
-      console.log(`[SearXNG] ✓ Success with ${instance}`);
+      console.log(`[SearXNG] Success with ${instance}`);
       return output;
 
     } catch {
@@ -295,29 +304,29 @@ async function searchSearXNG(query: string): Promise<string> {
   return "";
 }
 
-// Unified silent search
+// Unified silent search - tries all sources in order
 async function silentWebSearch(userQuery: string): Promise<string> {
   console.log(`[SilentSearch] Searching for: "${userQuery.substring(0, 80)}..."`);
 
   let result = await searchSerpAPI(userQuery);
   if (result) {
-    console.log(`[SilentSearch] ✓ Used SerpAPI`);
+    console.log(`[SilentSearch] Used SerpAPI`);
     return result;
   }
 
   result = await searchBing(userQuery);
   if (result) {
-    console.log(`[SilentSearch] ✓ Used Bing`);
+    console.log(`[SilentSearch] Used Bing`);
     return result;
   }
 
   result = await searchSearXNG(userQuery);
   if (result) {
-    console.log(`[SilentSearch] ✓ Used SearXNG`);
+    console.log(`[SilentSearch] Used SearXNG`);
     return result;
   }
 
-  console.log("[SilentSearch] ✗ All search sources failed");
+  console.log("[SilentSearch] All search sources failed");
   return "";
 }
 
@@ -1159,12 +1168,12 @@ export async function POST(req: NextRequest) {
     const messagesWithVisionFormat = messages.map(convertMessageWithAttachments);
     const apiMessages = await processAttachmentsForModel(messagesWithVisionFormat, targetModel, hasVisionCapability);
 
-    // CRITICAL FIX: Instead of putting search results in system prompt,
-    // we inject them as a user message right before the actual user message.
-    // This forces the AI to treat them as actual conversation context.
+    // Build system prompt with search-aware instructions
     const systemContent = `You are uncgpt - a helpful AI assistant. You can SEE and ANALYZE images. When users share images, describe what you see in detail including objects, text, colors, people, and any notable elements. Be conversational and natural.
 
-CRITICAL INSTRUCTION: You have been provided with REAL-TIME WEB SEARCH RESULTS in the conversation. You MUST use these search results to answer the user's question. Do NOT say you don't have access to current information. Do NOT mention your knowledge cutoff. The search results ARE your current information. Answer based on the search results provided.`;
+CRITICAL INSTRUCTION: You have been provided with REAL-TIME WEB SEARCH RESULTS in the conversation history (marked as "Here is the current information I found from web search"). These results contain CURRENT, UP-TO-DATE information from the web. You MUST use these search results to answer the user's question. 
+
+DO NOT say "I don't have real-time access" or "my knowledge cutoff is" or "I cannot provide current information." The search results ARE your current information. Answer directly using the search results provided. Do not mention that you searched the web. Just answer naturally with the current facts.`;
 
     const systemParts: string[] = [systemContent];
 
@@ -1175,16 +1184,16 @@ CRITICAL INSTRUCTION: You have been provided with REAL-TIME WEB SEARCH RESULTS i
       { role: "system", content: systemParts.join("") },
     ];
 
-    // If we have search results, inject them as an assistant message before the user's question
-    // This makes the AI think it already "knows" this info
+    // CRITICAL: Inject search results as assistant message BEFORE user messages
+    // This makes the AI treat it as factual knowledge it already possesses
     if (searchContext) {
       messagesWithSystem.push({
         role: "assistant",
-        content: `I found the following current information from web search:\n\n${searchContext}\n\nBased on this information, I can now answer your question.`
+        content: `Here is the current information I found from web search:\n\n${searchContext}\n\nI will now answer your question based on this up-to-date information.`
       });
     }
 
-    // Add all the actual conversation messages
+    // Add all actual conversation messages
     messagesWithSystem = [...messagesWithSystem, ...apiMessages];
 
     const toolSteps: Array<{ iteration: number; action: "tool_use"; tool: string; input: any; result: string }> = [];
