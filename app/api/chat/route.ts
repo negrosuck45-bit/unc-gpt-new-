@@ -70,6 +70,40 @@ const SEARXNG_INSTANCES = [
 // If you self-host, put your URL here and it'll use that instead
 const SELF_HOSTED_SEARXNG = ""; // e.g. "https://your-app.railway.app"
 
+// OPENROUTER
+const OPENROUTER_URL = "https://openrouter.ai/api/v1/chat/completions";
+const OPENROUTER_KEY = "";
+
+// CEREBRAS
+const CEREBRAS_URL = "https://api.cerebras.ai/v1/chat/completions";
+const CEREBRAS_KEY = "csk-tt4rvyyfwr5ytrm9vn33nhv5myc6p3thynkcv2j9cdtce62d";
+
+let currentGroqKeyIndex = 0;
+let currentChatIndex = 0;
+const deadGroqKeys = new Set<number>();
+
+// ============================================================
+// VISION MODELS
+// ============================================================
+const VISION_MODELS = [
+  "meta-llama/llama-4-scout-17b-16e-instruct",
+  "meta-llama/llama-4-maverick-17b-128e-instruct",
+  "llama-3.2-90b-vision-preview",
+  "llama-3.2-11b-vision-preview",
+  "@cf/moonshot/kimi-k2.6",
+  "@cf/moonshot/kimi-k2.5",
+  "claude-3-opus",
+  "claude-3-sonnet",
+  "claude-3-haiku",
+];
+
+function isVisionModel(model: string): boolean {
+  return VISION_MODELS.some(v => model.toLowerCase().includes(v.toLowerCase()));
+}
+
+// ============================================================
+// WEB SEARCH TRIGGERS
+// ============================================================
 const SEARCH_TRIGGERS = [
   /what('s| is) (the )?(latest|current|recent|new)/i,
   /(latest|current|recent|new) (news|update|version|price|score|status)/i,
@@ -89,6 +123,10 @@ function shouldSearchWeb(text: string): boolean {
   return SEARCH_TRIGGERS.some(pattern => pattern.test(text));
 }
 
+// ============================================================
+// SEARXNG SEARCH FUNCTION
+// ============================================================
+
 /**
  * Search using SearXNG - completely free, no API key
  * Aggregates Google, Bing, DuckDuckGo, Yahoo, etc.
@@ -100,7 +138,6 @@ async function searchSearXNG(query: string): Promise<string> {
 
   for (const instance of instances) {
     try {
-      // SearXNG JSON API - no auth needed
       const params = new URLSearchParams({
         q: query,
         format: "json",
@@ -136,24 +173,22 @@ async function searchSearXNG(query: string): Promise<string> {
         continue;
       }
 
-      // Format results for the AI
       let output = `**Web Search Results for "${query}":**\n\n`;
 
       results.slice(0, 8).forEach((r: any, i: number) => {
         const title = r.title || "No title";
         const snippet = r.content || r.abstract || r.snippet || "";
         const url = r.url || r.link || "";
-        const engine = r.engine || "web";
 
         output += `[${i + 1}] **${title}**\n${snippet.slice(0, 400)}\nURL: ${url}\n\n`;
       });
 
-      console.log(`[SearXNG] ✓ Success with ${instance} - ${results.length} results`);
+      console.log(`[SearXNG] Success with ${instance} - ${results.length} results`);
       return output;
 
     } catch (err: any) {
       console.log(`[SearXNG] ${instance} failed: ${err.message}`);
-      continue; // Try next instance
+      continue;
     }
   }
 
@@ -166,9 +201,9 @@ async function silentWebSearch(userQuery: string): Promise<string> {
   console.log(`[SilentSearch] Searching for: "${userQuery.substring(0, 80)}..."`);
   const result = await searchSearXNG(userQuery);
   if (result) {
-    console.log(`[SilentSearch] ✓ Got ${result.length} chars of search context`);
+    console.log(`[SilentSearch] Got ${result.length} chars of search context`);
   } else {
-    console.log("[SilentSearch] ✗ No search results available");
+    console.log("[SilentSearch] No search results available");
   }
   return result;
 }
@@ -193,9 +228,9 @@ async function fetchLinkContent(url: string): Promise<string> {
     if (!res.ok) return `[Failed to fetch URL: ${res.status}]`;
     const text = await res.text();
     const stripped = text
-      .replace(/<<script[^>]*>[\s\S]*?<\/script>/gi, "")
-      .replace(/<<style[^>]*>[\s\S]*?<\/style>/gi, "")
-      .replace(/<<[^>]+>/g, " ")
+      .replace(/<script[^>]*>[\s\S]*?<\/script>/gi, "")
+      .replace(/<style[^>]*>[\s\S]*?<\/style>/gi, "")
+      .replace(/<[^>]+>/g, " ")
       .replace(/\s+/g, " ")
       .trim()
       .slice(0, 8000);
