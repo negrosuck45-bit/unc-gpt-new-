@@ -37,7 +37,6 @@ export function ChatInterface({ onSwitchToImagine, onOpenSidebar, isSidebarOpen 
     getProject,
   } = useChatStore();
 
-  // Get streaming state for the current chat only
   const isCurrentChatStreaming = currentChatId ? getIsStreamingForChat(currentChatId) : false;
 
   useEffect(() => {
@@ -47,24 +46,18 @@ export function ChatInterface({ onSwitchToImagine, onOpenSidebar, isSidebarOpen 
   const currentChat = getCurrentChat();
   const currentProject = getProject(currentChat?.projectId);
 
-  // ====================== REGENERATE ======================
   const handleRegenerate = useCallback(async (messageId: string) => {
     if (!currentChat || isCurrentChatStreaming) return;
-
     const chatId = currentChat.id;
     const messages = [...currentChat.messages];
     const assistantIndex = messages.findIndex((m) => m.id === messageId);
-
     if (assistantIndex === -1 || messages[assistantIndex].role !== "assistant") return;
-
     const userIndex = assistantIndex - 1;
     if (userIndex < 0 || messages[userIndex].role !== "user") return;
-
     deleteMessage(chatId, messageId);
     setIsStreaming(true, chatId);
     setIsThinking(true);
     abortControllerRef.current = new AbortController();
-
     try {
       const messagesToSend = messages.slice(0, assistantIndex);
       await processAIResponse(chatId, messagesToSend);
@@ -80,29 +73,22 @@ export function ChatInterface({ onSwitchToImagine, onOpenSidebar, isSidebarOpen 
     }
   }, [currentChat, isCurrentChatStreaming, addMessage, deleteMessage, setIsStreaming]);
 
-  // ====================== SEND MESSAGE ======================
   const handleSend = useCallback(async (content: string, attachments?: Attachment[]) => {
     if (!content?.trim() && (!attachments || attachments.length === 0)) return;
-
     const chatId = currentChatId || createNewChat("text", null, settings.model, settings.provider);
-
     addMessage(chatId, {
       role: "user",
       content: content.trim(),
       attachments: attachments || [],
     });
-
     const freshChat = useChatStore.getState().chats.find((c) => c.id === chatId);
-
     if (freshChat && freshChat.messages.length <= 1) {
       const title = content.slice(0, 40) + (content.length > 40 ? "..." : "");
       updateChatTitle(chatId, title);
     }
-
     setIsStreaming(true, chatId);
     setIsThinking(true);
     abortControllerRef.current = new AbortController();
-
     try {
       const messagesToSend = freshChat?.messages || [];
       await processAIResponse(chatId, messagesToSend);
@@ -118,21 +104,16 @@ export function ChatInterface({ onSwitchToImagine, onOpenSidebar, isSidebarOpen 
     }
   }, [currentChatId, createNewChat, addMessage, updateChatTitle, setIsStreaming, settings]);
 
-  // ====================== CORE AI RESPONSE HANDLER ======================
   const processAIResponse = async (chatId: string, messages: any[]) => {
     const currentChat = useChatStore.getState().chats.find(c => c.id === chatId);
     const selectedModel = currentChat?.model;
     const selectedProvider = currentChat?.provider;
-
     if (!selectedModel || !selectedProvider) {
       addMessage(chatId, { role: "assistant", content: "Error: Model not properly selected" });
       return;
     }
-
     setActiveModelInfo({ provider: selectedProvider, model: selectedModel });
-
     const project = getProject(currentChat?.projectId ?? null);
-
     const formattedMessages = messages.map((m: any) => {
       if (m.role === "user" && m.attachments && m.attachments.length > 0) {
         const contentParts: any[] = [{ type: "text", text: m.content || "" }];
@@ -147,25 +128,20 @@ export function ChatInterface({ onSwitchToImagine, onOpenSidebar, isSidebarOpen 
       }
       return m;
     });
-
     const payload: any = {
       messages: formattedMessages,
       preferredModel: selectedModel,
       preferredProvider: selectedProvider,
     };
-
     if (selectedProvider === "anthropic" && settings.anthropicApiKey) {
       payload.anthropicApiKey = settings.anthropicApiKey;
     }
-
     if (project) {
       if (project.instructions) payload.projectInstructions = project.instructions;
       if (project.memory) {
         payload.projectMemory = truncateMemory(project.memory, 6000);
       }
     }
-
-    // MCP connectors (kept but can be removed later if not needed)
     try {
       const stored = localStorage.getItem("mcp-connectors");
       if (stored) {
@@ -174,14 +150,12 @@ export function ChatInterface({ onSwitchToImagine, onOpenSidebar, isSidebarOpen 
         if (enabled.length > 0) payload.mcpConnectors = enabled;
       }
     } catch {}
-
     const response = await fetch("/api/chat", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify(payload),
       signal: abortControllerRef.current?.signal,
     });
-
     if (!response.ok) {
       let msg = `API error: ${response.status}`;
       try {
@@ -191,34 +165,26 @@ export function ChatInterface({ onSwitchToImagine, onOpenSidebar, isSidebarOpen 
       addMessage(chatId, { role: "assistant", content: `❌ ${msg}` });
       return;
     }
-
     const reader = response.body!.getReader();
     const decoder = new TextDecoder();
     let sseBuffer = "";
     let fullContent = "";
     let assistantMsgId: string | null = null;
     let hasStartedStreaming = false;
-
     while (true) {
       const { done, value } = await reader.read();
       if (done) break;
-
       sseBuffer += decoder.decode(value, { stream: true });
-
       let boundary: number;
       while ((boundary = sseBuffer.indexOf("\n\n")) !== -1) {
         const event = sseBuffer.slice(0, boundary);
         sseBuffer = sseBuffer.slice(boundary + 2);
-
         for (const line of event.split("\n")) {
           if (!line.startsWith("data: ")) continue;
-
           const dataStr = line.slice(6).trim();
           if (dataStr === "" || dataStr === "[DONE]") continue;
-
           try {
             const parsed = JSON.parse(dataStr);
-
             if (parsed.content) {
               if (!hasStartedStreaming) {
                 hasStartedStreaming = true;
@@ -252,16 +218,13 @@ export function ChatInterface({ onSwitchToImagine, onOpenSidebar, isSidebarOpen 
               setActiveModelInfo({ provider: parsed.provider, model: parsed.model });
               if (!hasStartedStreaming) setIsThinking(false);
             }
-          } catch (e) {
-            // ignore parse errors
-          }
+          } catch (e) {}
         }
       }
     }
   };
 
   if (!mounted) return null;
-
   const hasMessages = currentChat && currentChat.messages.length > 0;
 
   return (
@@ -273,16 +236,8 @@ export function ChatInterface({ onSwitchToImagine, onOpenSidebar, isSidebarOpen 
         onOpenSidebar={onOpenSidebar}
         isSidebarOpen={isSidebarOpen}
       />
-
-      {/* 
-        LAYOUT LOGIC:
-        - NO messages: Logo at top, Input centered below it
-        - HAS messages: Messages scroll at top, Input fixed at bottom
-      */}
       {hasMessages ? (
-        // === ACTIVE CHAT MODE ===
         <div className="flex-1 flex flex-col min-h-0 overflow-hidden relative">
-          {/* Messages scroll area */}
           <div 
             className="flex-1 overflow-y-auto scroll-smooth"
             style={{ WebkitOverflowScrolling: "touch" } as React.CSSProperties}
@@ -294,8 +249,6 @@ export function ChatInterface({ onSwitchToImagine, onOpenSidebar, isSidebarOpen 
               onRegenerate={handleRegenerate}
             />
           </div>
-
-          {/* Input at bottom */}
           <div className="w-full flex-shrink-0 bg-gradient-to-t from-background via-background to-transparent pb-4 pt-2">
             <div className="max-w-3xl mx-auto w-full px-4">
               <ChatInput
@@ -309,15 +262,12 @@ export function ChatInterface({ onSwitchToImagine, onOpenSidebar, isSidebarOpen 
           </div>
         </div>
       ) : (
-        // === EMPTY CHAT MODE ===
         <div className="flex-1 flex flex-col min-h-0 overflow-hidden">
-          {/* Logo at top, pushed down from header */}
-          <div className="flex-shrink-0 pt-24 sm:pt-32 md:pt-40">
+          {/* Logo moved UP - less padding from top */}
+          <div className="flex-shrink-0 pt-12 sm:pt-16 md:pt-20">
             <WelcomeScreen onSelectPrompt={(p) => handleSend(p)} project={currentProject} />
           </div>
-
-          {/* Input below logo, not at very bottom */}
-          <div className="flex-shrink-0 mt-8 pb-8">
+          <div className="flex-shrink-0 mt-6 pb-8">
             <div className="max-w-3xl mx-auto w-full px-4">
               <ChatInput
                 onSend={handleSend}
@@ -328,8 +278,6 @@ export function ChatInterface({ onSwitchToImagine, onOpenSidebar, isSidebarOpen 
               />
             </div>
           </div>
-
-          {/* Spacer to push input up from bottom */}
           <div className="flex-1" />
         </div>
       )}
