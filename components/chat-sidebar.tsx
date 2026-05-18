@@ -22,7 +22,6 @@ import {
   MoreHorizontal,
   Code,
   Palette,
-  Box,
 } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { motion, AnimatePresence } from "framer-motion"
@@ -231,9 +230,6 @@ export function ChatSidebar({
         <RailButton title="Imagine" onClick={() => onModeChange("imagine")}>
           <Sparkles className="h-5 w-5" />
         </RailButton>
-        <RailButton title="Connectors" onClick={() => setSettingsPageOpen(true)}>
-          <Box className="h-5 w-5" />
-        </RailButton>
 
         <div className="flex-1" />
 
@@ -252,7 +248,7 @@ export function ChatSidebar({
 
         <SettingsDialog open={settingsOpen} onOpenChange={setSettingsOpen} />
         {settingsPageOpen && (
-          <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm overflow-y-auto">
+          <div className="fixed inset-0 z-50 flex items-center justify-center bg-zinc-900/50 backdrop-blur-sm overflow-y-auto">
             <div className="w-full max-w-2xl my-8">
               <SettingsPage onClose={() => setSettingsPageOpen(false)} />
             </div>
@@ -484,7 +480,7 @@ export function ChatSidebar({
 
       <SettingsDialog open={settingsOpen} onOpenChange={setSettingsOpen} />
       {settingsPageOpen && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm overflow-y-auto">
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-zinc-900/50 backdrop-blur-sm overflow-y-auto">
           <div className="w-full max-w-2xl my-8">
             <SettingsPage onClose={() => setSettingsPageOpen(false)} />
           </div>
@@ -502,7 +498,7 @@ export function ChatSidebar({
       />
       <ImageEditDialog open={imageEditOpen} onOpenChange={setImageEditOpen} />
       {historyOpen && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm">
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-zinc-900/50 backdrop-blur-sm">
           <div className="w-full max-w-lg h-[600px] shadow-2xl">
             <ChatHistoryPanel
               onClose={() => setHistoryOpen(false)}
