@@ -274,41 +274,60 @@ export function ChatInterface({ onSwitchToImagine, onOpenSidebar, isSidebarOpen 
         isSidebarOpen={isSidebarOpen}
       />
 
-      {/* Main content area */}
-      <div className="flex-1 flex flex-col min-h-0 overflow-hidden relative">
-        {/* Messages scroll area */}
-        <div 
-          className={`overflow-y-auto scroll-smooth ${!hasMessages ? 'hidden' : 'flex-1'}`}
-          style={{ WebkitOverflowScrolling: "touch" } as React.CSSProperties}
-        >
-          <ChatMessages
-            messages={currentChat?.messages || []}
-            isStreaming={isCurrentChatStreaming}
-            isThinking={isThinking}
-            onRegenerate={handleRegenerate}
-          />
-        </div>
-
-        {/* Welcome screen - centered in the viewport */}
-        {!hasMessages && (
-          <div className="flex-1 flex items-center justify-center overflow-y-auto">
-            <WelcomeScreen onSelectPrompt={(p) => handleSend(p)} project={currentProject} />
-          </div>
-        )}
-
-        {/* Chat Input - centered at bottom, like ChatGPT/Claude */}
-        <div className="w-full flex-shrink-0 bg-gradient-to-t from-background via-background to-transparent pb-4 pt-2">
-          <div className="max-w-3xl mx-auto w-full px-4">
-            <ChatInput
-              onSend={handleSend}
-              onStop={() => abortControllerRef.current?.abort()}
+      {/* 
+        LAYOUT LOGIC:
+        - NO messages: WelcomeScreen + Input centered together in middle
+        - HAS messages: Messages scroll at top, Input fixed at bottom
+      */}
+      {hasMessages ? (
+        // === ACTIVE CHAT MODE ===
+        <div className="flex-1 flex flex-col min-h-0 overflow-hidden relative">
+          {/* Messages scroll area */}
+          <div 
+            className="flex-1 overflow-y-auto scroll-smooth"
+            style={{ WebkitOverflowScrolling: "touch" } as React.CSSProperties}
+          >
+            <ChatMessages
+              messages={currentChat?.messages || []}
               isStreaming={isCurrentChatStreaming}
-              disabled={isCurrentChatStreaming}
-              key={currentChatId || 'new-chat'}
+              isThinking={isThinking}
+              onRegenerate={handleRegenerate}
             />
           </div>
+
+          {/* Input at bottom */}
+          <div className="w-full flex-shrink-0 bg-gradient-to-t from-background via-background to-transparent pb-4 pt-2">
+            <div className="max-w-3xl mx-auto w-full px-4">
+              <ChatInput
+                onSend={handleSend}
+                onStop={() => abortControllerRef.current?.abort()}
+                isStreaming={isCurrentChatStreaming}
+                disabled={isCurrentChatStreaming}
+                key={currentChatId || 'new-chat'}
+              />
+            </div>
+          </div>
         </div>
-      </div>
+      ) : (
+        // === EMPTY CHAT MODE ===
+        <div className="flex-1 flex flex-col items-center justify-center min-h-0 overflow-hidden">
+          {/* Welcome + Input centered together */}
+          <div className="flex flex-col items-center justify-center w-full max-w-3xl mx-auto px-4">
+            <WelcomeScreen onSelectPrompt={(p) => handleSend(p)} project={currentProject} />
+
+            {/* Input centered below welcome */}
+            <div className="w-full mt-8">
+              <ChatInput
+                onSend={handleSend}
+                onStop={() => abortControllerRef.current?.abort()}
+                isStreaming={isCurrentChatStreaming}
+                disabled={isCurrentChatStreaming}
+                key={currentChatId || 'new-chat'}
+              />
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
