@@ -12,7 +12,7 @@ function generateId() {
 // TERMINAL CONFIG - UPDATE AFTER RENDER DEPLOYS
 // ============================================================
 const TERMINAL_API_URL = "https://ai-terminal-api-xxx.onrender.com/execute"; // CHANGE THIS TO YOUR RENDER URL
-const TERMINAL_API_KEY = "uncgpt-terminal-key-2026"; // SAME AS RENDER ENV VAR
+const TERMINAL_API_KEY = "your-secret-key-123"; // SAME AS RENDER ENV VAR
 
 async function runTerminalCommand(command: string, cwd: string = "/home/node"): Promise<string> {
   try {
