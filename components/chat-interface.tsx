@@ -5,7 +5,6 @@ import { truncateMemory } from "@/lib/memory-parsers";
 import { ChatMessages } from "@/components/chat-messages";
 import { ChatInput } from "@/components/chat-input";
 import { WelcomeScreen } from "@/components/welcome-screen";
-import { ChatHeader } from "@/components/chat-header";
 
 interface ChatInterfaceProps {
   onSwitchToImagine?: () => void;
@@ -15,11 +14,9 @@ interface ChatInterfaceProps {
 
 export function ChatInterface({ onSwitchToImagine, onOpenSidebar, isSidebarOpen }: ChatInterfaceProps) {
   const [mounted, setMounted] = useState(false);
-  const [activeModelInfo, setActiveModelInfo] = useState<{ provider: string; model: string } | null>(null);
   const [isThinking, setIsThinking] = useState(false);
 
   const abortControllerRef = useRef<AbortController | null>(null);
-  const pendingAssistantIdRef = useRef<string | null>(null);
 
   const {
     currentChatId,
@@ -28,8 +25,6 @@ export function ChatInterface({ onSwitchToImagine, onOpenSidebar, isSidebarOpen 
     updateMessage,
     deleteMessage,
     updateChatTitle,
-    isStreaming,
-    streamingChatId,
     setIsStreaming,
     getIsStreamingForChat,
     getCurrentChat,
@@ -37,7 +32,6 @@ export function ChatInterface({ onSwitchToImagine, onOpenSidebar, isSidebarOpen 
     getProject,
   } = useChatStore();
 
-  // Get streaming state for the current chat only
   const isCurrentChatStreaming = currentChatId ? getIsStreamingForChat(currentChatId) : false;
 
   useEffect(() => {
@@ -47,16 +41,12 @@ export function ChatInterface({ onSwitchToImagine, onOpenSidebar, isSidebarOpen 
   const currentChat = getCurrentChat();
   const currentProject = getProject(currentChat?.projectId);
 
-  // ====================== REGENERATE ======================
   const handleRegenerate = useCallback(async (messageId: string) => {
     if (!currentChat || isCurrentChatStreaming) return;
-
     const chatId = currentChat.id;
     const messages = [...currentChat.messages];
     const assistantIndex = messages.findIndex((m) => m.id === messageId);
-
     if (assistantIndex === -1 || messages[assistantIndex].role !== "assistant") return;
-
     const userIndex = assistantIndex - 1;
     if (userIndex < 0 || messages[userIndex].role !== "user") return;
 
@@ -76,11 +66,9 @@ export function ChatInterface({ onSwitchToImagine, onOpenSidebar, isSidebarOpen 
       setIsStreaming(false);
       setIsThinking(false);
       abortControllerRef.current = null;
-      pendingAssistantIdRef.current = null;
     }
   }, [currentChat, isCurrentChatStreaming, addMessage, deleteMessage, setIsStreaming]);
 
-  // ====================== SEND MESSAGE ======================
   const handleSend = useCallback(async (content: string, attachments?: Attachment[]) => {
     if (!content?.trim() && (!attachments || attachments.length === 0)) return;
 
@@ -93,7 +81,6 @@ export function ChatInterface({ onSwitchToImagine, onOpenSidebar, isSidebarOpen 
     });
 
     const freshChat = useChatStore.getState().chats.find((c) => c.id === chatId);
-
     if (freshChat && freshChat.messages.length <= 1) {
       const title = content.slice(0, 40) + (content.length > 40 ? "..." : "");
       updateChatTitle(chatId, title);
@@ -114,11 +101,9 @@ export function ChatInterface({ onSwitchToImagine, onOpenSidebar, isSidebarOpen 
       setIsStreaming(false);
       setIsThinking(false);
       abortControllerRef.current = null;
-      pendingAssistantIdRef.current = null;
     }
   }, [currentChatId, createNewChat, addMessage, updateChatTitle, setIsStreaming, settings]);
 
-  // ====================== CORE AI RESPONSE HANDLER ======================
   const processAIResponse = async (chatId: string, messages: any[]) => {
     const currentChat = useChatStore.getState().chats.find(c => c.id === chatId);
     const selectedModel = currentChat?.model;
@@ -128,8 +113,6 @@ export function ChatInterface({ onSwitchToImagine, onOpenSidebar, isSidebarOpen 
       addMessage(chatId, { role: "assistant", content: "Error: Model not properly selected" });
       return;
     }
-
-    setActiveModelInfo({ provider: selectedProvider, model: selectedModel });
 
     const project = getProject(currentChat?.projectId ?? null);
 
@@ -165,7 +148,6 @@ export function ChatInterface({ onSwitchToImagine, onOpenSidebar, isSidebarOpen 
       }
     }
 
-    // MCP connectors (kept but can be removed later if not needed)
     try {
       const stored = localStorage.getItem("mcp-connectors");
       if (stored) {
@@ -212,7 +194,6 @@ export function ChatInterface({ onSwitchToImagine, onOpenSidebar, isSidebarOpen 
 
         for (const line of event.split("\n")) {
           if (!line.startsWith("data: ")) continue;
-
           const dataStr = line.slice(6).trim();
           if (dataStr === "" || dataStr === "[DONE]") continue;
 
@@ -227,9 +208,7 @@ export function ChatInterface({ onSwitchToImagine, onOpenSidebar, isSidebarOpen 
                 fullContent = parsed.content;
               } else {
                 fullContent += parsed.content;
-                if (assistantMsgId) {
-                  updateMessage(chatId, assistantMsgId, fullContent);
-                }
+                if (assistantMsgId) updateMessage(chatId, assistantMsgId, fullContent);
               }
             } 
             else if (parsed.image) {
@@ -247,14 +226,8 @@ export function ChatInterface({ onSwitchToImagine, onOpenSidebar, isSidebarOpen 
                 assistantMsgId = addMessage(chatId, { role: "assistant", content: fullContent });
               }
               if (assistantMsgId) updateMessage(chatId, assistantMsgId, fullContent, undefined, parsed.video);
-            } 
-            else if (parsed.provider && parsed.model) {
-              setActiveModelInfo({ provider: parsed.provider, model: parsed.model });
-              if (!hasStartedStreaming) setIsThinking(false);
             }
-          } catch (e) {
-            // ignore parse errors
-          }
+          } catch (e) {}
         }
       }
     }
@@ -266,49 +239,75 @@ export function ChatInterface({ onSwitchToImagine, onOpenSidebar, isSidebarOpen 
 
   return (
     <div className="flex flex-col h-full bg-background relative overflow-hidden">
-      <ChatHeader
-        project={currentProject}
-        chat={currentChat}
-        activeModelInfo={activeModelInfo}
-        onOpenSidebar={onOpenSidebar}
-        isSidebarOpen={isSidebarOpen}
-      />
-
-      {/* Main content area */}
-      <div className="flex-1 flex flex-col min-h-0 overflow-hidden relative">
-        {/* Messages scroll area */}
-        <div 
-          className={`overflow-y-auto scroll-smooth ${!hasMessages ? 'hidden' : 'flex-1'}`}
-          style={{ WebkitOverflowScrolling: "touch" } as React.CSSProperties}
-        >
-          <ChatMessages
-            messages={currentChat?.messages || []}
-            isStreaming={isCurrentChatStreaming}
-            isThinking={isThinking}
-            onRegenerate={handleRegenerate}
-          />
-        </div>
-
-        {/* Welcome screen - centered in the viewport */}
-        {!hasMessages && (
-          <div className="flex-1 flex items-center justify-center overflow-y-auto">
-            <WelcomeScreen onSelectPrompt={(p) => handleSend(p)} project={currentProject} />
-          </div>
-        )}
-
-        {/* Chat Input - centered at bottom, like ChatGPT/Claude */}
-        <div className="w-full flex-shrink-0 bg-gradient-to-t from-background via-background to-transparent pb-4 pt-2">
-          <div className="max-w-3xl mx-auto w-full px-4">
-            <ChatInput
-              onSend={handleSend}
-              onStop={() => abortControllerRef.current?.abort()}
+      {hasMessages ? (
+        <div className="flex-1 flex flex-col min-h-0 overflow-hidden relative">
+          <div 
+            className="flex-1 overflow-y-auto scroll-smooth"
+            style={{ WebkitOverflowScrolling: "touch" } as React.CSSProperties}
+          >
+            <ChatMessages
+              messages={currentChat?.messages || []}
               isStreaming={isCurrentChatStreaming}
-              disabled={isCurrentChatStreaming}
-              key={currentChatId || 'new-chat'}
+              isThinking={isThinking}
+              onRegenerate={handleRegenerate}
             />
           </div>
+
+          <div className="w-full flex-shrink-0 bg-gradient-to-t from-background via-background to-transparent pb-4 pt-2">
+            <div className="max-w-3xl mx-auto w-full px-4">
+              <ChatInput
+                onSend={handleSend}
+                onStop={() => abortControllerRef.current?.abort()}
+                isStreaming={isCurrentChatStreaming}
+                disabled={isCurrentChatStreaming}
+                key={currentChatId || 'new-chat'}
+              />
+            </div>
+          </div>
         </div>
-      </div>
+      ) : (
+        <div className="flex-1 flex flex-col min-h-0 overflow-hidden">
+          {/* Welcome Title */}
+          <div className="flex-shrink-0 pt-20 sm:pt-24 md:pt-28 lg:pt-32">
+            <WelcomeScreen onSelectPrompt={(p) => handleSend(p)} project={currentProject} />
+          </div>
+
+          {/* Chat Input */}
+          <div className="flex-shrink-0 mt-8 pb-8">
+            <div className="max-w-3xl mx-auto w-full px-4">
+              <ChatInput
+                onSend={handleSend}
+                onStop={() => abortControllerRef.current?.abort()}
+                isStreaming={isCurrentChatStreaming}
+                disabled={isCurrentChatStreaming}
+                key={currentChatId || 'new-chat'}
+              />
+            </div>
+          </div>
+
+          {/* Glass Feature Blocks - Smaller Height, Wider, Lower Position */}
+          <div className="flex-shrink-0 px-4 pb-20 mt-auto">
+            <div className="max-w-4xl mx-auto">
+              <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+                <div className="group bg-zinc-900/60 backdrop-blur-xl border border-white/07 hover:border-white/20 rounded-3xl p-5 transition-all duration-300 hover:scale-[1.02] h-full">
+                  <h4 className="font-semibold text-base mb-1.5 text-white">Fast &amp; Smart</h4>
+                  <p className="text-zinc-400 text-sm leading-tight">Lightning-fast answers powered by advanced AI.</p>
+                </div>
+
+                <div className="group bg-zinc-900/60 backdrop-blur-xl border border-white/07 hover:border-white/20 rounded-3xl p-5 transition-all duration-300 hover:scale-[1.02] h-full">
+                  <h4 className="font-semibold text-base mb-1.5 text-white">Vision Ready</h4>
+                  <p className="text-zinc-400 text-sm leading-tight">Analyze images, screenshots, and diagrams.</p>
+                </div>
+
+                <div className="group bg-zinc-900/60 backdrop-blur-xl border border-white/07 hover:border-white/20 rounded-3xl p-5 transition-all duration-300 hover:scale-[1.02] h-full">
+                  <h4 className="font-semibold text-base mb-1.5 text-white">Creative Power</h4>
+                  <p className="text-zinc-400 text-sm leading-tight">Stories, ideas, code, and brainstorming.</p>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

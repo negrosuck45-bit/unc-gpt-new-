@@ -1,8 +1,7 @@
 "use client";
 
-import { useChatStore } from "@/lib/chat-store";
-import Image from "next/image";
 import { motion } from "framer-motion";
+import Image from "next/image";
 
 interface WelcomeScreenProps {
   onSelectPrompt: (prompt: string) => void;
@@ -10,46 +9,23 @@ interface WelcomeScreenProps {
 }
 
 export function WelcomeScreen({ onSelectPrompt, project }: WelcomeScreenProps) {
-  const { settings } = useChatStore();
-
   return (
-    <div className="flex flex-col items-center justify-center h-full px-4">
-      {/* Centered content */}
-      <div className="flex flex-col items-center text-center max-w-2xl w-full -mt-20">
-        {/* Logo / Avatar */}
-          </div>
-
-
-        {/* Heading */}
-       
-         <Image
-              src="/uncgptt.png"
-              alt="UNC GPT"
-              width={600}              height={480}
-              className="object-cover"
-              priority
-            />
-        
-
-        {/* Subtitle */}
-        <motion.p
-          initial={{ y: 20, opacity: 0 }}
-          animate={{ y: 0, opacity: 1 }}
-          transition={{ delay: 0.2, duration: 0.5 }}
-          className="text-zinc-400 text-sm sm:text-base mb-10"
-        >
-          Chat, write and generate, all in one clean workspace.
-        </motion.p>
-
-        {/* Example Prompts - centered grid */}
-        <motion.div
-          initial={{ y: 20, opacity: 0 }}
-          animate={{ y: 0, opacity: 1 }}
-          transition={{ delay: 0.3, duration: 0.5 }}
-          className="grid grid-cols-1 sm:grid-cols-2 gap-3 w-full max-w-xl"
-        >
-          {/* Add your prompt buttons here */}
-        </motion.div>
-      </div>
+    <div className="flex flex-col items-center justify-center px-4">
+      {/* Logo only - no subtitle, no prompts */}
+      <motion.div
+        initial={{ opacity: 0, y: 20 }}
+        animate={{ opacity: 1, y: 0 }}
+        transition={{ duration: 0.6, ease: "easeOut" }}
+      >
+        <Image
+          src="/uncgptt.png"
+          alt="UNC GPT"
+          width={600}
+          height={480}
+          className="object-cover"
+          priority
+        />
+      </motion.div>
+    </div>
   );
 }

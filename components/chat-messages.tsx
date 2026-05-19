@@ -417,21 +417,138 @@ function MessageActions({ message, isAssistant, onCopy, onRegenerate, onEdit, on
   );
 }
 
-// ============= THINKING COMPONENTS =============
-function ThinkingText({ text, variant = "default" }: { text: string; variant?: "default" | "glitch" | "pulse" }) {
+// ============= GLOWING THINKING TEXT (like grok.com) =============
+function GlowingThinkingText({ text = "thinking" }: { text?: string }) {
   const [dotCount, setDotCount] = useState(0);
-  useEffect(() => { if (text === "thinking") { const interval = setInterval(() => { setDotCount((prev) => (prev + 1) % 4); }, 500); return () => clearInterval(interval); } }, [text]);
-  const displayText = text === "thinking" ? `thinking${'.'.repeat(dotCount)}` : text;
-  if (variant === "pulse") return (<motion.div animate={{ opacity: [0.5, 1, 0.5] }} transition={{ duration: 1.5, repeat: Infinity }} className="text-sm text-zinc-400 font-mono">{displayText}</motion.div>);
-  return (<motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="text-sm text-zinc-400 italic font-mono tracking-wide">{displayText}<motion.span animate={{ opacity: [0, 1, 0] }} transition={{ duration: 1, repeat: Infinity }} className="inline-block w-0.5 h-4 bg-zinc-500 ml-0.5 align-middle" /></motion.div>);
+
+  useEffect(() => {
+    const interval = setInterval(() => {
+      setDotCount((prev) => (prev + 1) % 4);
+    }, 500);
+    return () => clearInterval(interval);
+  }, []);
+
+  const displayText = `${text}${'.'.repeat(dotCount)}`;
+  const letters = displayText.split('');
+
+  return (
+    <div className="flex items-center gap-1">
+      <div className="flex">
+        {letters.map((letter, i) => (
+          <motion.span
+            key={i}
+            initial={{ opacity: 0.3 }}
+            animate={{ 
+              opacity: [0.3, 1, 0.3],
+              textShadow: [
+                '0 0 0px rgba(255,255,255,0)',
+                '0 0 10px rgba(255,255,255,0.8)',
+                '0 0 0px rgba(255,255,255,0)'
+              ]
+            }}
+            transition={{ 
+              duration: 1.2, 
+              repeat: Infinity, 
+              delay: i * 0.08,
+              ease: "easeInOut"
+            }}
+            className="text-sm text-zinc-300 font-mono tracking-wider"
+            style={{
+              textShadow: '0 0 20px rgba(255,255,255,0.3)',
+            }}
+          >
+            {letter === ' ' ? '\u00A0' : letter}
+          </motion.span>
+        ))}
+      </div>
+      {/* Pulsing cursor */}
+      <motion.div
+        animate={{ 
+          opacity: [0, 1, 0],
+          boxShadow: [
+            '0 0 0px rgba(255,255,255,0)',
+            '0 0 8px rgba(255,255,255,0.6)',
+            '0 0 0px rgba(255,255,255,0)'
+          ]
+        }}
+        transition={{ duration: 1, repeat: Infinity }}
+        className="w-0.5 h-4 bg-zinc-400 ml-0.5 rounded-full"
+      />
+    </div>
+  );
 }
 
-const THINKING_PHRASES = ["Hmm, let me think", "Processing your request", "Analyzing the question", "Searching memory", "Formulating response", "Almost there", "Wrapping up"];
+// ============= THINKING PHRASES =============
+const THINKING_PHRASES = [
+  "Hmm, let me think",
+  "Processing your request", 
+  "Analyzing the question",
+  "Searching memory",
+  "Formulating response",
+  "Almost there",
+  "Wrapping up"
+];
+
 function ProgressiveThinking() {
   const [phraseIndex, setPhraseIndex] = useState(0);
   const [dotCount, setDotCount] = useState(0);
-  useEffect(() => { const phraseInterval = setInterval(() => { setPhraseIndex((prev) => (prev + 1) % THINKING_PHRASES.length); }, 2000); const dotInterval = setInterval(() => { setDotCount((prev) => (prev + 1) % 4); }, 400); return () => { clearInterval(phraseInterval); clearInterval(dotInterval); }; }, []);
-  return <ThinkingText text={`${THINKING_PHRASES[phraseIndex]}${'.'.repeat(dotCount)}`} variant="glitch" />;
+
+  useEffect(() => {
+    const phraseInterval = setInterval(() => {
+      setPhraseIndex((prev) => (prev + 1) % THINKING_PHRASES.length);
+    }, 2000);
+    const dotInterval = setInterval(() => {
+      setDotCount((prev) => (prev + 1) % 4);
+    }, 400);
+    return () => {
+      clearInterval(phraseInterval);
+      clearInterval(dotInterval);
+    };
+  }, []);
+
+  const text = `${THINKING_PHRASES[phraseIndex]}${'.'.repeat(dotCount)}`;
+  const letters = text.split('');
+
+  return (
+    <div className="flex items-center gap-1">
+      <div className="flex">
+        {letters.map((letter, i) => (
+          <motion.span
+            key={i}
+            animate={{ 
+              opacity: [0.3, 1, 0.3],
+              textShadow: [
+                '0 0 0px rgba(147, 197, 253, 0)',
+                '0 0 12px rgba(147, 197, 253, 0.9)',
+                '0 0 0px rgba(147, 197, 253, 0)'
+              ]
+            }}
+            transition={{ 
+              duration: 1.5, 
+              repeat: Infinity, 
+              delay: i * 0.06,
+              ease: "easeInOut"
+            }}
+            className="text-sm text-blue-300 font-mono tracking-wide"
+          >
+            {letter === ' ' ? '\u00A0' : letter}
+          </motion.span>
+        ))}
+      </div>
+      <motion.div
+        animate={{ 
+          opacity: [0, 1, 0],
+          boxShadow: [
+            '0 0 0px rgba(147, 197, 253, 0)',
+            '0 0 10px rgba(147, 197, 253, 0.8)',
+            '0 0 0px rgba(147, 197, 253, 0)'
+          ]
+        }}
+        transition={{ duration: 1.2, repeat: Infinity }}
+        className="w-0.5 h-4 bg-blue-400 ml-1 rounded-full"
+      />
+    </div>
+  );
 }
 
 // ============= EXPORT INTERFACES =============
@@ -522,7 +639,7 @@ export function ChatMessages({ messages, isStreaming, isThinking, onRegenerate, 
         )}
       </AnimatePresence>
       <div className="flex-1 overflow-y-auto scroll-smooth">
-        <div className="max-w-3xl xl:max-w-4xl mx-auto px-3 sm:px-4 md:px-6 py-3 space-y-4">
+        <div className="max-w-3xl xl:max-w-4xl mx-auto px-3 sm:px-4 md:px-6 py-3 space-y-6">
           {processedMessages.map((message, index) => {
             const isAssistant = message.role === 'assistant';
             const isLast = index === messages.length - 1;
@@ -540,24 +657,68 @@ export function ChatMessages({ messages, isStreaming, isThinking, onRegenerate, 
 
             return (
               <div key={message.id} className="group">
-                <div className={cn('flex gap-4', isAssistant ? 'justify-start' : 'justify-end')}>
-                  {isAssistant && (<div className="w-8 h-8 rounded-full flex items-center justify-center flex-shrink-0 overflow-hidden"><MarsAvatar size={32} family={messageFamily} useSimpleIcon /></div>)}
-                  <div className={cn('flex flex-col max-w-[92%] sm:max-w-[85%] md:max-w-[78%] lg:max-w-[72%]', isAssistant ? 'items-start' : 'items-end')}>
-                    {message.attachments?.some(a => a.type === 'image') && (<div className="mb-2 flex flex-row flex-wrap gap-1.5 justify-end max-w-full">{message.attachments.filter(a => a.type === 'image').map((att, i) => (<AttachmentPreview key={`img-${i}`} attachment={att} onView={setViewingAttachment} compact />))}</div>)}
-                    <div className={cn('rounded-2xl px-3.5 py-2 text-[13px] sm:text-sm leading-relaxed shadow-sm w-full', isAssistant ? 'bg-zinc-900/50 border border-zinc-800 text-zinc-200' : 'bg-zinc-800 text-zinc-100')}>
-                      {message.content && message.content.trim().length > 0 && <MessageContent content={message.content} />}
+                {/* NO BUBBLES - Clean flat layout */}
+                <div className={cn('flex gap-3 items-start', isAssistant ? 'justify-start' : 'justify-end')}>
 
-                      {message.attachments?.some(a => a.type !== 'image') && (
-                        <div className="space-y-2">
-                          {message.attachments.filter(a => a.type !== 'image').map((att, i) => (
-                            <AttachmentPreview key={`file-${i}`} attachment={att} onView={setViewingAttachment} />
-                          ))}
-                        </div>
-                      )}
-
-                      {message.image && (<motion.div initial={{ opacity: 0, scale: 0.9 }} animate={{ opacity: 1, scale: 1 }} className="mt-3 rounded-lg overflow-hidden max-w-sm">{message.image.startsWith('data:') ? <img src={message.image} alt="Generated image" className="w-full h-auto object-cover rounded-lg bg-muted" /> : <NextImage src={message.image} alt="Generated image" width={400} height={300} className="w-full h-auto object-cover rounded-lg" loading="lazy" unoptimized={message.image.includes('blob:')} />}</motion.div>)}
-                      {message.video && (<motion.div initial={{ opacity: 0, scale: 0.9 }} animate={{ opacity: 1, scale: 1 }} className="mt-3 rounded-lg overflow-hidden max-w-sm"><video src={message.video} controls className="w-full h-auto rounded-lg bg-muted" /></motion.div>)}
+                  {/* Assistant Avatar - Left side */}
+                  {isAssistant && (
+                    <div className="w-7 h-7 rounded-full flex items-center justify-center flex-shrink-0 overflow-hidden mt-0">
+                      <MarsAvatar size={28} family={messageFamily} useSimpleIcon />
                     </div>
+                  )}
+
+                  {/* Message Content - No bubble styling */}
+                  <div className={cn(
+                    'flex flex-col max-w-[92%] sm:max-w-[85%] md:max-w-[78%] lg:max-w-[72%]',
+                    isAssistant ? 'items-start' : 'items-end'
+                  )}>
+
+                    {/* Image attachments (compact) */}
+                    {message.attachments?.some(a => a.type === 'image') && (
+                      <div className="mb-2 flex flex-row flex-wrap gap-1.5 justify-end max-w-full">
+                        {message.attachments.filter(a => a.type === 'image').map((att, i) => (
+                          <AttachmentPreview key={`img-${i}`} attachment={att} onView={setViewingAttachment} compact />
+                        ))}
+                      </div>
+                    )}
+
+                    {/* Text content - NO bubble, just plain text */}
+                    {message.content && message.content.trim().length > 0 && (
+                      <div className={cn(
+                        'text-[13px] sm:text-sm leading-relaxed',
+                        isAssistant ? 'text-zinc-200' : 'text-zinc-100'
+                      )}>
+                        <MessageContent content={message.content} />
+                      </div>
+                    )}
+
+                    {/* File attachments */}
+                    {message.attachments?.some(a => a.type !== 'image') && (
+                      <div className="space-y-2 mt-2">
+                        {message.attachments.filter(a => a.type !== 'image').map((att, i) => (
+                          <AttachmentPreview key={`file-${i}`} attachment={att} onView={setViewingAttachment} />
+                        ))}
+                      </div>
+                    )}
+
+                    {/* Generated media */}
+                    {message.image && (
+                      <motion.div initial={{ opacity: 0, scale: 0.9 }} animate={{ opacity: 1, scale: 1 }} className="mt-3 rounded-lg overflow-hidden max-w-sm">
+                        {message.image.startsWith('data:') ? (
+                          <img src={message.image} alt="Generated image" className="w-full h-auto object-cover rounded-lg bg-muted" />
+                        ) : (
+                          <NextImage src={message.image} alt="Generated image" width={400} height={300} className="w-full h-auto object-cover rounded-lg" loading="lazy" unoptimized={message.image.includes('blob:')} />
+                        )}
+                      </motion.div>
+                    )}
+
+                    {message.video && (
+                      <motion.div initial={{ opacity: 0, scale: 0.9 }} animate={{ opacity: 1, scale: 1 }} className="mt-3 rounded-lg overflow-hidden max-w-sm">
+                        <video src={message.video} controls className="w-full h-auto rounded-lg bg-muted" />
+                      </motion.div>
+                    )}
+
+                    {/* Message Actions */}
                     <MessageActions 
                       message={message} 
                       isAssistant={isAssistant} 
@@ -567,19 +728,69 @@ export function ChatMessages({ messages, isStreaming, isThinking, onRegenerate, 
                       onDislike={isAssistant ? () => setFeedbackMessage(message) : undefined} 
                     />
                   </div>
-                  {!isAssistant && (<div className="w-8 h-8 rounded-full flex items-center justify-center flex-shrink-0 overflow-hidden bg-zinc-800 text-zinc-100"><User className="w-4 h-4" /></div>)}
+
+                  {/* User Avatar - Right side */}
+                  {!isAssistant && (
+                    <div className="w-7 h-7 rounded-full flex items-center justify-center flex-shrink-0 overflow-hidden bg-zinc-700 mt-0">
+                      <User className="w-3.5 h-3.5 text-zinc-300" />
+                    </div>
+                  )}
                 </div>
               </div>
             );
           })}
+
+          {/* Search indicator */}
           {searchInfo && <SearchIndicator searchInfo={searchInfo} />}
-          {isThinking && (<motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} className="flex gap-4"><div className="w-8 h-8 rounded-full flex items-center justify-center flex-shrink-0 overflow-hidden bg-zinc-800"><MarsAvatar size={32} family={streamingFamily} useSimpleIcon /></div><div className="flex items-center"><ProgressiveThinking /></div></motion.div>)}
-          {isStreaming && !isThinking && messages[messages.length - 1]?.role === 'user' && (<motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} className="flex gap-4"><div className="w-8 h-8 rounded-full flex items-center justify-center flex-shrink-0 overflow-hidden bg-zinc-800"><MarsAvatar size={32} family={streamingFamily} useSimpleIcon /></div><div className="flex items-center"><ThinkingText text="..." variant="pulse" /></div></motion.div>)}
+
+          {/* Thinking state with GLOWING text */}
+          {isThinking && (
+            <motion.div 
+              initial={{ opacity: 0, y: 10 }} 
+              animate={{ opacity: 1, y: 0 }} 
+              className="flex gap-3 items-start"
+            >
+              <div className="w-7 h-7 rounded-full flex items-center justify-center flex-shrink-0 overflow-hidden bg-zinc-800 mt-0">
+                <MarsAvatar size={28} family={streamingFamily} useSimpleIcon />
+              </div>
+              <div className="flex items-center py-2">
+                <GlowingThinkingText text="thinking" />
+              </div>
+            </motion.div>
+          )}
+
+          {/* Streaming indicator */}
+          {isStreaming && !isThinking && messages[messages.length - 1]?.role === 'user' && (
+            <motion.div 
+              initial={{ opacity: 0, y: 10 }} 
+              animate={{ opacity: 1, y: 0 }} 
+              className="flex gap-3 items-start"
+            >
+              <div className="w-7 h-7 rounded-full flex items-center justify-center flex-shrink-0 overflow-hidden bg-zinc-800 mt-0">
+                <MarsAvatar size={28} family={streamingFamily} useSimpleIcon />
+              </div>
+              <div className="flex items-center py-2">
+                <GlowingThinkingText text="..." />
+              </div>
+            </motion.div>
+          )}
+
           <AttachmentViewerDialog attachment={viewingAttachment} onClose={() => setViewingAttachment(null)} />
         </div>
       </div>
-      <AnimatePresence>{error && <NetworkErrorBanner error={error} onRetry={onRetry} />}</AnimatePresence>
-      <FeedbackModal open={!!feedbackMessage} onClose={() => setFeedbackMessage(null)} message={feedbackMessage} onSubmit={handleFeedbackSubmit} />
+
+      {/* Error banner */}
+      <AnimatePresence>
+        {error && <NetworkErrorBanner error={error} onRetry={onRetry} />}
+      </AnimatePresence>
+
+      {/* Feedback modal */}
+      <FeedbackModal 
+        open={!!feedbackMessage} 
+        onClose={() => setFeedbackMessage(null)} 
+        message={feedbackMessage} 
+        onSubmit={handleFeedbackSubmit} 
+      />
     </>
   );
 }
