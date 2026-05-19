@@ -11,7 +11,7 @@ function generateId() {
 // ============================================================
 // TERMINAL CONFIG - UPDATE AFTER RENDER DEPLOYS
 // ============================================================
-const TERMINAL_API_URL = "https://ai-terminal-api-xxx.onrender.com/execute"; // CHANGE THIS TO YOUR RENDER URL
+const TERMINAL_API_URL = "https://ai-terminal-api.onrender.com/execute"; // CHANGE THIS TO YOUR RENDER URL
 const TERMINAL_API_KEY = "your-secret-key-123"; // SAME AS RENDER ENV VAR
 
 async function runTerminalCommand(command: string, cwd: string = "/home/node"): Promise<string> {
@@ -159,7 +159,7 @@ function isVisionModel(model: string): boolean {
 }
 
 // ============================================================
-// WEB SEARCH CONFIGURATION
+// WEB SEARCH
 // ============================================================
 const SEARCH_TRIGGERS = [
   /what('s| is) (the )?(latest|current|recent|new)/i,
@@ -180,9 +180,6 @@ function shouldSearchWeb(text: string): boolean {
   return SEARCH_TRIGGERS.some(pattern => pattern.test(text));
 }
 
-// ============================================================
-// WEB SEARCH FUNCTIONS
-// ============================================================
 async function searchSerpAPI(query: string): Promise<string> {
   if (!SERPAPI_KEY) return "";
   try {
@@ -556,6 +553,24 @@ async function generateMedia(
 // ============================================================
 // PROVIDER CALLS WITH TOOLS SUPPORT
 // ============================================================
+
+// SYSTEM PROMPT WITH STRONG TOOL INSTRUCTIONS
+const TERMINAL_SYSTEM_PROMPT = `You are uncgpt, a helpful AI assistant with access to a real Linux terminal tool called "run_terminal_command".
+
+CRITICAL INSTRUCTIONS:
+1. When the user asks you to run ANY command, install packages, create files, deploy, or do anything requiring terminal access, you MUST use the run_terminal_command tool.
+2. Do NOT just describe what to do. Actually execute the command using the tool.
+3. After running the command, report the actual output back to the user.
+4. Examples of when to use the tool:
+   - "install express" -> run_terminal_command: npm install express
+   - "create a file" -> run_terminal_command: echo "content" > file.txt
+   - "check node version" -> run_terminal_command: node --version
+   - "deploy to vercel" -> run_terminal_command: vercel --yes
+   - "git clone" -> run_terminal_command: git clone <url>
+   - "run python script" -> run_terminal_command: python script.py
+
+You have the tool available. USE IT.`;
+
 async function callGroq(
   messages: any[],
   model: string,
@@ -587,11 +602,7 @@ async function callGroq(
       const requestBody: any = {
         model: groqModel,
         messages: [
-          {
-            role: "system",
-            content:
-              "You are uncgpt, a helpful AI assistant with access to a real Linux terminal. When the user asks you to execute commands, install packages, create files, deploy, or do anything that requires terminal access, you MUST use the run_terminal_command tool. The terminal output is shown to the user in a nice terminal UI. Be concise and report the actual output back.",
-          },
+          { role: "system", content: TERMINAL_SYSTEM_PROMPT },
           ...processedMessages,
         ],
         stream: true,
@@ -679,7 +690,10 @@ async function callOpenRouter(
 
       const body: any = {
         model: modelId,
-        messages: processedMessages,
+        messages: [
+          { role: "system", content: TERMINAL_SYSTEM_PROMPT },
+          ...processedMessages,
+        ],
         stream: true,
         temperature: 0.7,
         max_tokens: 4096,
@@ -719,7 +733,10 @@ async function callCerebras(
 
   const body: any = {
     model,
-    messages: processedMessages,
+    messages: [
+      { role: "system", content: TERMINAL_SYSTEM_PROMPT },
+      ...processedMessages,
+    ],
     stream: true,
     temperature: 0.7,
     max_tokens: 4096,
@@ -834,6 +851,13 @@ async function fallbackChat(
       return await callOpenRouter(messages, true, tools);
     } catch (err: any) {
       errors.push(`OpenRouter: ${err.message}`);
+    }
+    if (CEREBRAS_KEY) {
+      try {
+        return await callCerebras(messages, true, tools);
+      } catch (err: any) {
+        errors.push(`Cerebras: ${err.message}`);
+      }
     }
     throw new Error(`No vision providers: ${errors.join(", ")}`);
   }
@@ -1486,22 +1510,8 @@ export async function POST(req: NextRequest) {
       hasVisionCapability
     );
 
-    // Build system prompt with tool instructions
-    const systemContent = `You are uncgpt - a helpful AI assistant with access to real Linux terminal execution.
-
-YOU HAVE A TERMINAL TOOL AVAILABLE - use it when the user asks you to:
-- Run commands (install npm packages, git operations, python scripts)
-- Create or edit files
-- Deploy applications (vercel, etc.)
-- Check system status
-- Anything requiring terminal execution
-
-IMPORTANT: Do not just give instructions. Use the run_terminal_command tool to ACTUALLY execute commands.
-When a user asks you to do something like "install express", you must use the tool to run: npm install express
-Then report back the output to the user.
-
-Be helpful, conversational, and execute commands proactively when needed.`;
-
+    // Build system prompt
+    const systemContent = TERMINAL_SYSTEM_PROMPT;
     const systemParts: string[] = [systemContent];
     if (projectInstructions) {
       systemParts.push(`\n\nProject Instructions:\n${projectInstructions}`);
