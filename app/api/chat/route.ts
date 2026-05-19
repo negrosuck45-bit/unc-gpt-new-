@@ -23,14 +23,26 @@ async function runTerminalCommand(command: string, cwd: string = "/home/node"): 
         "Authorization": `Bearer ${TERMINAL_API_KEY}`,
       },
       body: JSON.stringify({ command, cwd }),
+      signal: AbortSignal.timeout(45000),
     });
 
     if (!res.ok) {
-      return `Terminal HTTP ${res.status}: ${await res.text().catch(() => "Unknown error")}`;
+      const errText = await res.text().catch(() => "Unknown error");
+      return `Terminal HTTP ${res.status}: ${errText}`;
     }
 
     const data = await res.json();
-    return data.output || data.error || "Command executed with no output";
+    const output = data.output || "";
+    const error = data.error || null;
+
+    // Format as markdown terminal block for the UI to parse
+    let result = `\`\`\`terminal\n$ ${command}\n${output}`;
+    if (error) {
+      result += `\n[ERROR]: ${error}`;
+    }
+    result += `\n\`\`\``;
+
+    return result;
   } catch (err: any) {
     return `Terminal execution failed: ${err.message}`;
   }
@@ -44,7 +56,7 @@ const BUILTIN_TOOLS: any[] = [
     type: "function",
     function: {
       name: "run_terminal_command",
-      description: "Execute any command in a real Linux terminal. Use for: creating files, installing packages (npm install, apt-get), running servers, git operations, python scripts, deploying with vercel, etc. This ACTUALLY runs the command and returns real output.",
+      description: "Execute any command in a real Linux/Ubuntu terminal. Use for: creating files, installing packages (npm install, apt-get, git, vercel, python), running servers, git operations, file operations, deploying with vercel, etc. This ACTUALLY runs the command and returns real output formatted as a terminal block.",
       parameters: {
         type: "object",
         properties: {
@@ -147,7 +159,7 @@ function isVisionModel(model: string): boolean {
 }
 
 // ============================================================
-// WEB SEARCH
+// WEB SEARCH CONFIGURATION
 // ============================================================
 const SEARCH_TRIGGERS = [
   /what('s| is) (the )?(latest|current|recent|new)/i,
@@ -168,6 +180,9 @@ function shouldSearchWeb(text: string): boolean {
   return SEARCH_TRIGGERS.some(pattern => pattern.test(text));
 }
 
+// ============================================================
+// WEB SEARCH FUNCTIONS
+// ============================================================
 async function searchSerpAPI(query: string): Promise<string> {
   if (!SERPAPI_KEY) return "";
   try {
@@ -575,7 +590,7 @@ async function callGroq(
           {
             role: "system",
             content:
-              "You are uncgpt, a helpful AI assistant with access to a real Linux terminal. When the user asks you to execute commands, install packages, create files, deploy, or do anything that requires terminal access, you MUST use the run_terminal_command tool. Do not just give instructions - actually execute the commands using the tool and report the output back to the user.",
+              "You are uncgpt, a helpful AI assistant with access to a real Linux terminal. When the user asks you to execute commands, install packages, create files, deploy, or do anything that requires terminal access, you MUST use the run_terminal_command tool. The terminal output is shown to the user in a nice terminal UI. Be concise and report the actual output back.",
           },
           ...processedMessages,
         ],
@@ -819,13 +834,6 @@ async function fallbackChat(
       return await callOpenRouter(messages, true, tools);
     } catch (err: any) {
       errors.push(`OpenRouter: ${err.message}`);
-    }
-    if (CEREBRAS_KEY) {
-      try {
-        return await callCerebras(messages, true, tools);
-      } catch (err: any) {
-        errors.push(`Cerebras: ${err.message}`);
-      }
     }
     throw new Error(`No vision providers: ${errors.join(", ")}`);
   }
