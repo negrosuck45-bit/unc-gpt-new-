@@ -447,7 +447,7 @@ function EditMessageModal({ open, onClose, message, onSave }: { open: boolean; o
   );
 }
 
-// ============= MESSAGE ACTIONS - SMOOTH HOVER REVEAL + WORKING EDIT =============
+// ============= MESSAGE ACTIONS - HOVER REVEAL WITH FRAMER MOTION =============
 function MessageActions({ message, isAssistant, onCopy, onRegenerate, onEdit, onDislike }: { message: Message; isAssistant: boolean; onCopy: () => void; onRegenerate?: () => void; onEdit?: () => void; onDislike?: () => void }) {
   const [copied, setCopied] = useState(false);
   const [feedback, setFeedback] = useState<'like' | 'dislike' | null>(null);
@@ -456,7 +456,6 @@ function MessageActions({ message, isAssistant, onCopy, onRegenerate, onEdit, on
 
   useEffect(() => { if (isAssistant) { getFeedbackFromSupabase(message.id).then(setFeedback); } }, [message.id, isAssistant]);
 
-  // FIXED: Guaranteed single copy with ref guard + async clipboard
   const handleCopy = useCallback(async () => {
     if (hasCopiedRef.current) return;
     hasCopiedRef.current = true;
@@ -488,20 +487,11 @@ function MessageActions({ message, isAssistant, onCopy, onRegenerate, onEdit, on
   const handleDislike = useCallback(() => { onDislike?.(); }, [onDislike]);
 
   return (
-    <motion.div 
-      initial={{ opacity: 0, y: 4 }}
-      animate={{ opacity: 1, y: 0 }}
-      transition={{ duration: 0.2, ease: "easeOut" }}
-      className={cn(
-        'flex items-center gap-0.5 mt-1.5',
-        isAssistant ? 'ml-0' : 'mr-0 flex-row-reverse'
-      )}
-    >
+    <div className={cn('flex items-center gap-0.5 mt-1.5', isAssistant ? 'ml-0' : 'mr-0 flex-row-reverse')}>
       <Button variant="ghost" size="icon" className="h-7 w-7 text-muted-foreground hover:text-foreground transition-colors" onClick={handleCopy} title="Copy">
         {copied ? <Check className="h-3.5 w-3.5 text-green-400" /> : <Copy className="h-3.5 w-3.5" />}
       </Button>
 
-      {/* Edit button - only for user messages */}
       {!isAssistant && onEdit && (
         <Button variant="ghost" size="icon" className="h-7 w-7 text-muted-foreground hover:text-foreground transition-colors" onClick={onEdit} title="Edit message">
           <Pencil className="h-3.5 w-3.5" />
@@ -536,7 +526,7 @@ function MessageActions({ message, isAssistant, onCopy, onRegenerate, onEdit, on
           <RefreshCw className="h-3.5 w-3.5" />
         </Button>
       )}
-    </motion.div>
+    </div>
   );
 }
 
@@ -584,7 +574,6 @@ function GlowingThinkingText({ text = "thinking" }: { text?: string }) {
           </motion.span>
         ))}
       </div>
-      {/* Pulsing cursor */}
       <motion.div
         animate={{ 
           opacity: [0, 1, 0],
@@ -716,7 +705,6 @@ export function ChatMessages({ messages, isStreaming, isThinking, onRegenerate, 
   const [feedbackMessage, setFeedbackMessage] = useState<Message | null>(null);
   const [editingMessage, setEditingMessage] = useState<Message | null>(null);
   const [toast, setToast] = useState<string | null>(null);
-  const [activeMessageId, setActiveMessageId] = useState<string | null>(null);
   const streamingFamily = useMemo(() => getModelFamilyFromModel(currentChat?.model || settings.model), [currentChat?.model, settings.model]);
 
   const shownToastsRef = useRef<Set<string>>(new Set());
@@ -776,7 +764,6 @@ export function ChatMessages({ messages, isStreaming, isThinking, onRegenerate, 
             const isAssistant = message.role === 'assistant';
             const isLast = index === messages.length - 1;
             const messageFamily = getModelFamilyFromModel(message.modelUsed || currentChat?.model || settings.model);
-            const isActive = activeMessageId === message.id;
 
             // DEBUG: Log message structure for user messages with attachments
             if (message.role === 'user' && message.attachments && message.attachments.length > 0) {
@@ -789,26 +776,34 @@ export function ChatMessages({ messages, isStreaming, isThinking, onRegenerate, 
             }
 
             return (
-              <div 
+              <motion.div 
                 key={message.id} 
                 className="group min-w-0"
-                onClick={() => setActiveMessageId(isActive ? null : message.id)}
+                initial="initial"
+                whileHover="hover"
               >
-                {/* NO BUBBLES - Clean flat layout */}
-                <div className={cn('flex gap-3 items-start min-w-0', isAssistant ? 'justify-start' : 'justify-end')}>
+                {/* Message row - flex with proper alignment */}
+                <div className={cn(
+                  'flex gap-3 items-start min-w-0',
+                  isAssistant ? 'flex-row' : 'flex-row-reverse'
+                )}>
 
-                  {/* Assistant Avatar - Left side */}
-                  {isAssistant && (
-                    <div className="w-7 h-7 rounded-full flex items-center justify-center flex-shrink-0 overflow-hidden mt-0">
+                  {/* Avatar */}
+                  <div className="w-7 h-7 rounded-full flex items-center justify-center flex-shrink-0 overflow-hidden mt-0">
+                    {isAssistant ? (
                       <MarsAvatar size={28} family={messageFamily} useSimpleIcon />
-                    </div>
-                  )}
+                    ) : (
+                      <div className="w-full h-full bg-zinc-700 flex items-center justify-center">
+                        <User className="w-3.5 h-3.5 text-zinc-300" />
+                      </div>
+                    )}
+                  </div>
 
-                  {/* Message Content - No bubble styling */}
+                  {/* Message Content */}
                   <div className={cn(
-                    'flex flex-col max-w-[92%] sm:max-w-[85%] md:max-w-[78%] lg:max-w-[72%] min-w-0 w-full',
+                    'flex flex-col min-w-0',
                     isAssistant ? 'items-start' : 'items-end'
-                  )}>
+                  )} style={{ maxWidth: 'min(92%, 720px)' }}>
 
                     {/* Image attachments (compact) */}
                     {message.attachments?.some(a => a.type === 'image') && (
@@ -819,10 +814,10 @@ export function ChatMessages({ messages, isStreaming, isThinking, onRegenerate, 
                       </div>
                     )}
 
-                    {/* Text content - NO bubble, just plain text */}
+                    {/* Text content */}
                     {message.content && message.content.trim().length > 0 && (
                       <div className={cn(
-                        'text-[13px] sm:text-sm leading-relaxed w-full min-w-0',
+                        'text-[13px] sm:text-sm leading-relaxed w-full',
                         isAssistant ? 'text-zinc-200' : 'text-zinc-100'
                       )}>
                         <MessageContent content={message.content} />
@@ -831,7 +826,7 @@ export function ChatMessages({ messages, isStreaming, isThinking, onRegenerate, 
 
                     {/* File attachments */}
                     {message.attachments?.some(a => a.type !== 'image') && (
-                      <div className="space-y-2 mt-2 w-full min-w-0">
+                      <div className="space-y-2 mt-2 w-full">
                         {message.attachments.filter(a => a.type !== 'image').map((att, i) => (
                           <AttachmentPreview key={`file-${i}`} attachment={att} onView={setViewingAttachment} />
                         ))}
@@ -855,36 +850,27 @@ export function ChatMessages({ messages, isStreaming, isThinking, onRegenerate, 
                       </motion.div>
                     )}
 
-                    {/* Message Actions - SMOOTH REVEAL on click/hover */}
-                    <AnimatePresence>
-                      {(isActive || isLast) && (
-                        <motion.div
-                          initial={{ opacity: 0, y: 6, scale: 0.95 }}
-                          animate={{ opacity: 1, y: 0, scale: 1 }}
-                          exit={{ opacity: 0, y: 6, scale: 0.95 }}
-                          transition={{ duration: 0.2, ease: "easeOut" }}
-                        >
-                          <MessageActions 
-                            message={message} 
-                            isAssistant={isAssistant} 
-                            onCopy={() => {}} 
-                            onRegenerate={isLast && isAssistant ? () => onRegenerate?.(message.id) : undefined} 
-                            onEdit={!isAssistant ? () => setEditingMessage(message) : undefined} 
-                            onDislike={isAssistant ? () => setFeedbackMessage(message) : undefined} 
-                          />
-                        </motion.div>
-                      )}
-                    </AnimatePresence>
+                    {/* Message Actions - HOVER REVEAL with framer-motion variants */}
+                    <motion.div
+                      variants={{
+                        initial: { opacity: 0, y: 4, scale: 0.95 },
+                        hover: { opacity: 1, y: 0, scale: 1 }
+                      }}
+                      transition={{ duration: 0.2, ease: "easeOut" }}
+                      className="mt-1"
+                    >
+                      <MessageActions 
+                        message={message} 
+                        isAssistant={isAssistant} 
+                        onCopy={() => {}} 
+                        onRegenerate={isLast && isAssistant ? () => onRegenerate?.(message.id) : undefined} 
+                        onEdit={!isAssistant ? () => setEditingMessage(message) : undefined} 
+                        onDislike={isAssistant ? () => setFeedbackMessage(message) : undefined} 
+                      />
+                    </motion.div>
                   </div>
-
-                  {/* User Avatar - Right side */}
-                  {!isAssistant && (
-                    <div className="w-7 h-7 rounded-full flex items-center justify-center flex-shrink-0 overflow-hidden bg-zinc-700 mt-0">
-                      <User className="w-3.5 h-3.5 text-zinc-300" />
-                    </div>
-                  )}
                 </div>
-              </div>
+              </motion.div>
             );
           })}
 
