@@ -107,18 +107,18 @@ function getExtension(language: string): string {
 
 function tokenize(code: string): Token[][] {
   const lines = code.split('\n')
-  
+
   return lines.map(line => {
     const tokens: Token[] = []
     let remaining = line
-    
+
     while (remaining.length > 0) {
       // Comments
       if (remaining.startsWith('//') || remaining.startsWith('#')) {
         tokens.push({ type: 'comment', content: remaining })
         break
       }
-      
+
       // Multi-line comment start
       if (remaining.startsWith('/*')) {
         const endIndex = remaining.indexOf('*/', 2)
@@ -128,7 +128,7 @@ function tokenize(code: string): Token[][] {
           continue
         }
       }
-      
+
       // Strings (double quotes)
       const doubleQuoteMatch = remaining.match(/^"(?:[^"\\]|\\.)*"/)
       if (doubleQuoteMatch) {
@@ -136,7 +136,7 @@ function tokenize(code: string): Token[][] {
         remaining = remaining.slice(doubleQuoteMatch[0].length)
         continue
       }
-      
+
       // Strings (single quotes)
       const singleQuoteMatch = remaining.match(/^'(?:[^'\\]|\\.)*'/)
       if (singleQuoteMatch) {
@@ -144,7 +144,7 @@ function tokenize(code: string): Token[][] {
         remaining = remaining.slice(singleQuoteMatch[0].length)
         continue
       }
-      
+
       // Template literals
       const templateMatch = remaining.match(/^`(?:[^`\\]|\\.)*`/)
       if (templateMatch) {
@@ -152,7 +152,7 @@ function tokenize(code: string): Token[][] {
         remaining = remaining.slice(templateMatch[0].length)
         continue
       }
-      
+
       // Numbers
       const numberMatch = remaining.match(/^-?\d+\.?\d*(?:e[+-]?\d+)?/i)
       if (numberMatch) {
@@ -160,7 +160,7 @@ function tokenize(code: string): Token[][] {
         remaining = remaining.slice(numberMatch[0].length)
         continue
       }
-      
+
       // Function calls
       const funcMatch = remaining.match(/^([a-zA-Z_$][a-zA-Z0-9_$]*)\s*(?=\()/)
       if (funcMatch) {
@@ -168,7 +168,7 @@ function tokenize(code: string): Token[][] {
         remaining = remaining.slice(funcMatch[1].length)
         continue
       }
-      
+
       // Keywords and identifiers
       const wordMatch = remaining.match(/^[a-zA-Z_$][a-zA-Z0-9_$]*/)
       if (wordMatch) {
@@ -181,7 +181,7 @@ function tokenize(code: string): Token[][] {
         remaining = remaining.slice(word.length)
         continue
       }
-      
+
       // Operators
       const operatorMatch = remaining.match(/^(?:===|!==|==|!=|<=|>=|&&|\|\||=>|\+\+|--|[+\-*/%=<>!&|^~?:])/)
       if (operatorMatch) {
@@ -189,7 +189,7 @@ function tokenize(code: string): Token[][] {
         remaining = remaining.slice(operatorMatch[0].length)
         continue
       }
-      
+
       // Punctuation
       const punctMatch = remaining.match(/^[{}[\]();,.]/)
       if (punctMatch) {
@@ -197,12 +197,12 @@ function tokenize(code: string): Token[][] {
         remaining = remaining.slice(1)
         continue
       }
-      
+
       // Whitespace and other characters
       tokens.push({ type: 'plain', content: remaining[0] })
       remaining = remaining.slice(1)
     }
-    
+
     return tokens
   })
 }
@@ -242,10 +242,10 @@ export function CodeBlock({ code, language = 'text' }: CodeBlockProps) {
     <div className="my-3 rounded-xl overflow-hidden bg-[#0a0a0a] border border-border">
       {/* Header */}
       <div className="flex items-center justify-between px-4 py-2 bg-[#141414] border-b border-border">
-        <div className="flex items-center gap-2">
+        <div className="flex items-center gap-2 min-w-0">
           <button
             onClick={() => setCollapsed(!collapsed)}
-            className="p-1 hover:bg-accent rounded transition-colors"
+            className="p-1 hover:bg-accent rounded transition-colors flex-shrink-0"
           >
             {collapsed ? (
               <ChevronRight className="w-4 h-4 text-muted-foreground" />
@@ -253,16 +253,16 @@ export function CodeBlock({ code, language = 'text' }: CodeBlockProps) {
               <ChevronDown className="w-4 h-4 text-muted-foreground" />
             )}
           </button>
-          <span className="text-xs font-medium text-muted-foreground uppercase tracking-wide">
+          <span className="text-xs font-medium text-muted-foreground uppercase tracking-wide truncate">
             {language}
           </span>
-          <span className="text-xs text-muted-foreground/60">
+          <span className="text-xs text-muted-foreground/60 flex-shrink-0">
             {lineCount} {lineCount === 1 ? 'line' : 'lines'}
           </span>
         </div>
 
         {/* Action buttons */}
-        <div className="flex items-center gap-1">
+        <div className="flex items-center gap-1 flex-shrink-0 ml-2">
           {/* Download button */}
           <button
             onClick={downloadFile}
@@ -283,7 +283,7 @@ export function CodeBlock({ code, language = 'text' }: CodeBlockProps) {
                   className="flex items-center gap-1.5"
                 >
                   <Check className="w-3.5 h-3.5" />
-                  <span>Saved</span>
+                  <span className="hidden sm:inline">Saved</span>
                 </motion.div>
               ) : (
                 <motion.div
@@ -294,7 +294,7 @@ export function CodeBlock({ code, language = 'text' }: CodeBlockProps) {
                   className="flex items-center gap-1.5"
                 >
                   <Download className="w-3.5 h-3.5" />
-                  <span>Download</span>
+                  <span className="hidden sm:inline">Download</span>
                 </motion.div>
               )}
             </AnimatePresence>
@@ -320,7 +320,7 @@ export function CodeBlock({ code, language = 'text' }: CodeBlockProps) {
                   className="flex items-center gap-1.5"
                 >
                   <Check className="w-3.5 h-3.5" />
-                  <span>Copied</span>
+                  <span className="hidden sm:inline">Copied</span>
                 </motion.div>
               ) : (
                 <motion.div
@@ -331,7 +331,7 @@ export function CodeBlock({ code, language = 'text' }: CodeBlockProps) {
                   className="flex items-center gap-1.5"
                 >
                   <Copy className="w-3.5 h-3.5" />
-                  <span>Copy</span>
+                  <span className="hidden sm:inline">Copy</span>
                 </motion.div>
               )}
             </AnimatePresence>
@@ -339,7 +339,7 @@ export function CodeBlock({ code, language = 'text' }: CodeBlockProps) {
         </div>
       </div>
 
-      {/* Code Content */}
+      {/* Code Content - MOBILE SCROLL FIX */}
       <AnimatePresence>
         {!collapsed && (
           <motion.div
@@ -349,14 +349,26 @@ export function CodeBlock({ code, language = 'text' }: CodeBlockProps) {
             transition={{ duration: 0.2 }}
             className="overflow-hidden"
           >
-            <div className="overflow-x-auto">
-              <pre className="p-4 text-[13px] leading-6 font-mono">
+            {/* THIS IS THE KEY FIX: overflow-x-auto with touch scrolling */}
+            <div 
+              className="overflow-x-auto max-w-full"
+              style={{ WebkitOverflowScrolling: 'touch' }}
+            >
+              <pre 
+                className="p-4 text-[13px] leading-6 font-mono"
+                style={{
+                  minWidth: '100%',
+                  width: 'max-content',
+                  whiteSpace: 'pre',
+                  wordWrap: 'normal',
+                }}
+              >
                 {tokenizedLines.map((lineTokens, lineIndex) => (
                   <div key={lineIndex} className="flex">
-                    <span className="select-none text-gray-600 pr-4 text-right min-w-[2.5rem]">
+                    <span className="select-none text-gray-600 pr-4 text-right min-w-[2.5rem] flex-shrink-0">
                       {lineIndex + 1}
                     </span>
-                    <code>
+                    <code className="flex-1">
                       {lineTokens.length === 0 ? (
                         <span>&nbsp;</span>
                       ) : (
