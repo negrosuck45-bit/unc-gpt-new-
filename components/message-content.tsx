@@ -252,6 +252,7 @@ export function MessageContent({ content }: MessageContentProps) {
               command={part.command || ''}
               output={part.output}
               error={part.error}
+              interactive={true}
             />
           );
         }
