@@ -784,12 +784,15 @@ export function ChatMessages({ messages, isStreaming, isThinking, onRegenerate, 
               >
                 {/* Message row - flex with proper alignment */}
                 <div className={cn(
-                  'flex gap-3 items-start min-w-0',
+                  'flex items-start min-w-0',
                   isAssistant ? 'flex-row' : 'flex-row-reverse'
                 )}>
 
                   {/* Avatar */}
-                  <div className="w-7 h-7 rounded-full flex items-center justify-center flex-shrink-0 overflow-hidden mt-0">
+                  <div className={cn(
+                    'w-7 h-7 rounded-full flex items-center justify-center flex-shrink-0 overflow-hidden mt-0',
+                    isAssistant ? 'mr-3' : 'ml-3'
+                  )}>
                     {isAssistant ? (
                       <MarsAvatar size={28} family={messageFamily} useSimpleIcon />
                     ) : (
