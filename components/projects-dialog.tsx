@@ -133,179 +133,148 @@ export function ProjectsDialog({
 
           <div className="grid grid-cols-[220px_1fr] border-t border-border h-[480px]">
             {/* Sidebar */}
-            <div className="border-r border-border bg-gradient-to-b from-muted/20 to-muted/40 flex flex-col">
+            <div className="border-r border-border bg-muted/30 flex flex-col">
               <div className="p-3 border-b border-border space-y-2">
                 <Button
-                  variant="default"
+                  variant="secondary"
                   size="sm"
-                  className="w-full justify-start bg-blue-600 hover:bg-blue-700"
+                  className="w-full justify-start"
                   onClick={startNew}
                 >
                   <Plus className="h-4 w-4 mr-2" />
-                  New Project
+                  New project
                 </Button>
                 {currentProjectId && (
                   <Button
-                    variant="outline"
+                    variant="ghost"
                     size="sm"
                     className="w-full justify-start text-muted-foreground"
                     onClick={handleClearContext}
                   >
                     <X className="h-4 w-4 mr-2" />
-                    Clear Context
+                    Use no project
                   </Button>
                 )}
               </div>
-              <div className="flex-1 overflow-y-auto p-2 space-y-1">
-                {activeProjects.length === 0 ? (
-                  <div className="p-4 text-center">
-                    <FolderOpen className="h-8 w-8 mx-auto opacity-30 mb-2" />
-                    <p className="text-xs text-muted-foreground text-balance">
-                      Create a project to add custom instructions and persistent memory
-                    </p>
-                  </div>
-                ) : (
-                  activeProjects.map((p) => (
-                    <button
-                      key={p.id}
-                      onClick={() => openProject(p)}
-                      className={cn(
-                        "group w-full text-left px-3 py-2.5 rounded-lg text-sm flex items-center gap-2 transition-all duration-150",
-                        selected?.id === p.id
-                          ? "bg-blue-500/20 text-blue-600 font-medium border border-blue-400/50"
-                          : "hover:bg-accent/50 text-foreground",
-                      )}
-                    >
-                      <FolderOpen className="h-4 w-4 shrink-0 opacity-70" />
-                      <span className="truncate flex-1 text-sm">{p.name}</span>
-                      {currentProjectId === p.id && (
-                        <span className="text-[10px] font-semibold bg-green-500/20 text-green-700 px-1.5 py-0.5 rounded">
-                          active
-                        </span>
-                      )}
-                    </button>
-                  ))
+              <div className="flex-1 overflow-y-auto p-2 space-y-0.5">
+                {activeProjects.length === 0 && (
+                  <p className="text-xs text-muted-foreground p-3 text-balance">
+                    No projects yet. Create one to give your chats custom instructions
+                    and persistent memory.
+                  </p>
                 )}
+                {activeProjects.map((p) => (
+                  <button
+                    key={p.id}
+                    onClick={() => openProject(p)}
+                    className={cn(
+                      "group w-full text-left px-3 py-2 rounded-md text-sm flex items-center gap-2 transition-colors",
+                      selected?.id === p.id
+                        ? "bg-accent text-accent-foreground"
+                        : "hover:bg-accent/50",
+                    )}
+                  >
+                    <FolderOpen className="h-4 w-4 shrink-0 opacity-70" />
+                    <span className="truncate flex-1">{p.name}</span>
+                    {currentProjectId === p.id && (
+                      <span className="text-[10px] text-muted-foreground">active</span>
+                    )}
+                  </button>
+                ))}
               </div>
             </div>
 
             {/* Editor */}
-            <div className="flex flex-col overflow-hidden bg-muted/20">
+            <div className="flex flex-col overflow-hidden">
               {showEditor ? (
                 <>
-                  <div className="flex-1 overflow-y-auto p-6 space-y-5">
-                    {/* Header */}
-                    <div className="space-y-1">
-                      <h3 className="font-semibold text-lg">
-                        {isCreating ? "Create New Project" : `Edit "${name}"`}
-                      </h3>
-                      <p className="text-xs text-muted-foreground">
-                        {isCreating ? "Set up a new project with custom instructions and memory" : "Update project details"}
-                      </p>
+                  <div className="flex-1 overflow-y-auto p-6 space-y-4">
+                    <div className="space-y-2">
+                      <Label htmlFor="project-name">Name</Label>
+                      <Input
+                        id="project-name"
+                        value={name}
+                        onChange={(e) => setName(e.target.value)}
+                        placeholder="e.g. Research assistant"
+                      />
                     </div>
 
-                    {/* Form Fields */}
-                    <div className="space-y-4 pt-2">
-                      <div className="space-y-2">
-                        <Label htmlFor="project-name" className="font-medium">Project Name *</Label>
-                        <Input
-                          id="project-name"
-                          value={name}
-                          onChange={(e) => setName(e.target.value)}
-                          placeholder="e.g. Code Reviewer, Research Assistant"
-                          className="bg-background"
-                        />
-                      </div>
+                    <div className="space-y-2">
+                      <Label htmlFor="project-description">Description</Label>
+                      <Input
+                        id="project-description"
+                        value={description}
+                        onChange={(e) => setDescription(e.target.value)}
+                        placeholder="Optional short summary"
+                      />
+                    </div>
 
-                      <div className="space-y-2">
-                        <Label htmlFor="project-description" className="font-medium">Description</Label>
-                        <Input
-                          id="project-description"
-                          value={description}
-                          onChange={(e) => setDescription(e.target.value)}
-                          placeholder="What is this project for?"
-                          className="bg-background"
-                        />
-                      </div>
+                    <div className="space-y-2">
+                      <Label htmlFor="project-instructions">Custom instructions</Label>
+                      <Textarea
+                        id="project-instructions"
+                        value={instructions}
+                        onChange={(e) => setInstructions(e.target.value)}
+                        placeholder="Tell the assistant how to behave in this project. These instructions are prepended to every chat attached to this project."
+                        rows={4}
+                      />
+                    </div>
 
-                      <div className="space-y-2">
-                        <Label htmlFor="project-instructions" className="font-medium">Instructions</Label>
-                        <Textarea
-                          id="project-instructions"
-                          value={instructions}
-                          onChange={(e) => setInstructions(e.target.value)}
-                          placeholder="Tell the AI how to behave. Examples: 'Be concise', 'Explain in simple terms', etc."
-                          rows={3}
-                          className="bg-background resize-none"
-                        />
-                        <p className="text-xs text-muted-foreground">{instructions.length} characters</p>
+                    <div className="space-y-2">
+                      <div className="flex items-center justify-between">
+                        <Label htmlFor="project-memory">Memory</Label>
+                        <Button
+                          type="button"
+                          variant="ghost"
+                          size="sm"
+                          className="h-7 text-xs"
+                          onClick={() => setMemoryImportOpen(true)}
+                        >
+                          <Upload className="h-3.5 w-3.5 mr-1.5" />
+                          Import from ChatGPT / Claude
+                        </Button>
                       </div>
-
-                      <div className="space-y-2">
-                        <div className="flex items-center justify-between gap-2">
-                          <Label htmlFor="project-memory" className="font-medium">Memory & Context</Label>
-                          <Button
-                            type="button"
-                            variant="outline"
-                            size="sm"
-                            className="text-xs h-7"
-                            onClick={() => setMemoryImportOpen(true)}
-                          >
-                            <Upload className="h-3 w-3 mr-1.5" />
-                            Import
-                          </Button>
-                        </div>
-                        <Textarea
-                          id="project-memory"
-                          value={memory}
-                          onChange={(e) => setMemory(e.target.value)}
-                          placeholder="Add notes, facts, backgrounds, or context that should always be available..."
-                          rows={4}
-                          className="bg-background resize-none"
-                        />
-                        <p className="text-xs text-muted-foreground">{memory.length.toLocaleString()} characters</p>
-                      </div>
+                      <Textarea
+                        id="project-memory"
+                        value={memory}
+                        onChange={(e) => setMemory(e.target.value)}
+                        placeholder="Notes, facts, previous conversations, or pasted text. This is included as context in every message."
+                        rows={8}
+                      />
+                      <p className="text-xs text-muted-foreground">
+                        {memory.length.toLocaleString()} characters.
+                        Long memories are automatically truncated to fit in context.
+                      </p>
                     </div>
                   </div>
 
-                  <DialogFooter className="border-t border-border px-6 py-3 gap-2">
+                  <DialogFooter className="border-t border-border px-6 py-3">
                     {selected && (
                       <Button
                         variant="ghost"
-                        className="text-destructive hover:text-destructive hover:bg-destructive/10 mr-auto"
+                        className="text-destructive hover:text-destructive mr-auto"
                         onClick={() => handleDelete(selected.id)}
                       >
                         <Trash2 className="h-4 w-4 mr-2" />
                         Delete
                       </Button>
                     )}
-                    <Button variant="outline" onClick={() => {
-                      setSelected(null);
-                      setIsCreating(false);
-                    }}>
-                      Cancel
-                    </Button>
                     {selected && (
-                      <Button variant="secondary" onClick={() => handleApply(selected.id)} className="gap-2">
-                        Use in Chat
+                      <Button variant="secondary" onClick={() => handleApply(selected.id)}>
+                        Use in current chat
                       </Button>
                     )}
-                    <Button onClick={handleSave} disabled={!name.trim()} className="gap-2">
-                      <Save className="h-4 w-4" />
-                      {selected ? "Save" : "Create"}
+                    <Button onClick={handleSave} disabled={!name.trim()}>
+                      <Save className="h-4 w-4 mr-2" />
+                      {selected ? "Save changes" : "Create project"}
                     </Button>
                   </DialogFooter>
                 </>
               ) : (
-                <div className="flex-1 flex items-center justify-center p-12 text-center">
-                  <div className="space-y-3">
-                    <FolderOpen className="h-12 w-12 mx-auto opacity-30" />
-                    <div>
-                      <p className="text-sm font-medium text-foreground">Select or create a project</p>
-                      <p className="text-xs text-muted-foreground mt-1 max-w-xs">
-                        Projects let you save custom instructions and persistent memory for your chats
-                      </p>
-                    </div>
+                <div className="flex-1 flex items-center justify-center p-10 text-center text-sm text-muted-foreground">
+                  <div>
+                    Select a project to edit, or create a new one to give your chats
+                    persistent context.
                   </div>
                 </div>
               )}

@@ -80,95 +80,76 @@ export function SettingsDialog({ open, onOpenChange }: SettingsDialogProps) {
   return (
     <>
       <Dialog open={open} onOpenChange={onOpenChange}>
-        <DialogContent className="max-w-md">
+        <DialogContent className="max-w-lg">
           <DialogHeader>
-            <DialogTitle className="flex items-center gap-2">
-              <Plug className="h-5 w-5" />
-              Settings
-            </DialogTitle>
-            <DialogDescription>Manage your chat preferences and model selection.</DialogDescription>
+            <DialogTitle>Settings</DialogTitle>
+            <DialogDescription>Configure your preferences.</DialogDescription>
           </DialogHeader>
 
-          <div className="space-y-6 py-4">
-            {/* Model Selection */}
-            <div className="space-y-3">
-              <div className="flex items-center justify-between">
-                <Label className="text-sm font-semibold flex items-center gap-2">
-                  AI Model
-                  {isLocked && (
-                    <div className="flex items-center gap-1 bg-yellow-500/10 px-2 py-0.5 rounded">
-                      <Lock className="h-3 w-3 text-yellow-700" />
-                      <span className="text-xs text-yellow-700">Locked</span>
-                    </div>
-                  )}
-                </Label>
-              </div>
+          <div className="space-y-5">
+            <div className="space-y-2">
+              <Label className="flex items-center gap-2">
+                Model
+                {isLocked && <Lock className="h-3 w-3 opacity-50" />}
+              </Label>
               <TooltipProvider>
-                <Tooltip delayDuration={200}>
+                <Tooltip delayDuration={0}>
                   <TooltipTrigger asChild>
-                    <Select value={model} onValueChange={(v) => setModel(v)} disabled={isLocked}>
-                      <SelectTrigger disabled={isLocked} className={isLocked ? "opacity-60 cursor-not-allowed" : ""}>
-                        <SelectValue />
-                      </SelectTrigger>
-                      <SelectContent className="max-h-64">
-                        {MODELS.map((m) => (
-                          <SelectItem key={m.value} value={m.value}>
-                            <div className="flex items-center gap-2">
-                              <span>{m.label}</span>
-                              {m.free && (
-                                <span className="text-[10px] bg-green-500/20 text-green-700 px-1.5 rounded">
-                                  Free
-                                </span>
-                              )}
-                            </div>
-                          </SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
+                    <div className="w-full">
+                      <Select value={model} onValueChange={(v) => setModel(v)} disabled={isLocked}>
+                        <SelectTrigger disabled={isLocked} className={isLocked ? "opacity-70" : ""}>
+                          <SelectValue />
+                        </SelectTrigger>
+                        <SelectContent>
+                          {MODELS.map((m) => (
+                            <SelectItem key={m.value} value={m.value}>
+                              <div className="flex items-center gap-2">
+                                <span>{m.label}</span>
+                                {m.contextWindow && (
+                                  <span className="text-[10px] opacity-50 bg-muted px-1 rounded">
+                                    {m.contextWindow}
+                                  </span>
+                                )}
+                              </div>
+                            </SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                    </div>
                   </TooltipTrigger>
                   {isLocked && (
-                    <TooltipContent side="right" className="max-w-xs">
-                      <p className="text-xs">This chat is using a locked model. Start a new chat to change it.</p>
+                    <TooltipContent side="bottom">
+                      <p className="text-xs">Model is locked for this chat. Create a new chat to use another model.</p>
                     </TooltipContent>
                   )}
                 </Tooltip>
               </TooltipProvider>
-              {!isLocked && (
-                <p className="text-xs text-muted-foreground">
-                  Change the model for new chats
-                </p>
-              )}
             </div>
 
-            {/* Danger Zone */}
-            <div className="border-t pt-6">
-              <div className="space-y-3">
-                <Label className="text-sm font-semibold text-red-600">Danger Zone</Label>
-                <Button
-                  variant="destructive"
-                  size="sm"
-                  onClick={handleClearChats}
-                  className="w-full"
-                >
-                  <Trash2 className="h-4 w-4 mr-2" />
-                  Delete All Chats
-                </Button>
-                <p className="text-xs text-muted-foreground">
-                  Permanently delete all chats. Projects and settings are preserved.
-                </p>
-              </div>
+            <div className="space-y-3 border-t pt-4">
+              <Label className="text-sm font-semibold">Danger Zone</Label>
+              <Button
+                variant="destructive"
+                size="sm"
+                onClick={handleClearChats}
+                className="w-full"
+              >
+                <Trash2 className="h-4 w-4 mr-2" />
+                Delete All Chats
+              </Button>
+              <p className="text-xs text-muted-foreground">
+                This will delete all local chats. Projects and settings will remain.
+              </p>
             </div>
           </div>
 
-          <DialogFooter className="gap-2 pt-4 border-t">
+          <DialogFooter>
             <Button variant="outline" onClick={() => onOpenChange(false)}>
-              Close
+              Cancel
             </Button>
-            {!isLocked && (
-              <Button onClick={handleSave}>
-                Save Settings
-              </Button>
-            )}
+            <Button onClick={handleSave}>
+              {isLocked ? "Close" : "Save Settings"}
+            </Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>

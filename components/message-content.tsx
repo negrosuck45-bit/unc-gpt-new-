@@ -2,7 +2,7 @@
 import { useMemo, useState, useCallback } from 'react';
 import { CodeBlock } from './code-block';
 import { TerminalBlock } from './terminal-block';
-import { Download, ExternalLink, Loader2, Terminal } from 'lucide-react';
+import { Download, ExternalLink, Loader2 } from 'lucide-react';
 import { toast } from 'sonner';
 
 interface MessageContentProps {
@@ -37,39 +37,12 @@ function formatText(text: string | undefined | null): string {
   return formatted;
 }
 
-// Parse terminal blocks from AI output (both markdown and function styles)
+// Parse terminal blocks from AI output
 function parseTerminalBlocks(text: string): { text: string; terminals: Array<{ command: string; output: string; error: string | null }> } {
   const terminals: Array<{ command: string; output: string; error: string | null }> = [];
-  
-  let cleanedText = text;
-
-  // Match function-style terminal calls: <function(run_terminal_command){...}</function>
-  // Pattern: match opening brace, then any content (lazy), then closing brace
-  const functionRegex = /<function\(run_terminal_command\)(\{[\s\S]*?\})<\/function>/g;
-  let funcMatch;
-
-  while ((funcMatch = functionRegex.exec(text)) !== null) {
-    try {
-      const fullMatch = funcMatch[0];
-      const jsonStr = funcMatch[1];
-      const parsed = JSON.parse(jsonStr);
-      const command = parsed.command || '';
-
-      if (command) {
-        terminals.push({ 
-          command, 
-          output: '', 
-          error: null 
-        });
-        cleanedText = cleanedText.replace(fullMatch, `__TERMINAL_${terminals.length - 1}__`);
-      }
-    } catch (e) {
-      // Skip parse errors
-    }
-  }
-
-  // Match markdown-style terminal blocks: ```terminal\n$ command\noutput\n```
   const terminalRegex = /```terminal\n\$?\s?([^\n]+)\n([\s\S]*?)```/g;
+
+  let cleanedText = text;
   let match;
 
   while ((match = terminalRegex.exec(text)) !== null) {
@@ -93,27 +66,12 @@ function parseTerminalBlocks(text: string): { text: string; terminals: Array<{ c
   return { text: cleanedText, terminals };
 }
 
-// Helper to unescape HTML entities safely (handles &lt; &gt; etc)
-function unescapeHtml(html: string): string {
-  const entityMap: { [key: string]: string } = {
-    '&amp;': '&',
-    '&lt;': '<',
-    '&gt;': '>',
-    '&quot;': '"',
-    '&#39;': "'",
-  };
-  
-  return html.replace(/&amp;|&lt;|&gt;|&quot;|&#39;/g, (match) => entityMap[match] || match);
-}
-
 function parseContent(content: string | undefined | null): ContentPart[] {
   if (typeof content !== 'string' || !content.trim()) {
     return [{ type: 'text', content: '' }];
   }
 
-  // Unescape HTML entities before parsing to handle function tags
-  const unescapedContent = unescapeHtml(content);
-  const { text: cleanedContent, terminals } = parseTerminalBlocks(unescapedContent);
+  const { text: cleanedContent, terminals } = parseTerminalBlocks(content);
 
   const parts: ContentPart[] = [];
   const regex = /```(\w+)?\n([\s\S]*?)```|!\[([^\]]*)\]\((https?:\/\/[^\)]+)\)|__TERMINAL_(\d+)__/g;
@@ -289,75 +247,20 @@ export function MessageContent({ content }: MessageContentProps) {
 
         if (part.type === 'terminal') {
           return (
-            <div key={`terminal-${index}`} className="my-3 rounded-xl border border-zinc-800 overflow-hidden bg-zinc-950/50 backdrop-blur-sm">
-              <TerminalBlock
-                command={part.command || ''}
-                output={part.output}
-                error={part.error}
-                interactive={true}
-              />
-            </div>
+            <TerminalBlock
+              key={`terminal-${index}`}
+              command={part.command || ''}
+              output={part.output}
+              error={part.error}
+            />
           );
         }
 
-        // Handle text that may contain function markup - extract and display as styled block
-        // Match function tags more flexibly
-        const functionMatch = part.content.match(/<function[^>]*run_terminal_command[^>]*>([^<]*)<\/function>/);
-        
-        if (functionMatch) {
-          const content = functionMatch[1];
-          // Try to parse as JSON
-          try {
-            const parsed = JSON.parse(content);
-            const command = parsed.command || '';
-            
-            if (command) {
-              return (
-                <div key={`terminal-output-${index}`} className="my-3 rounded-lg border border-zinc-800 overflow-hidden bg-zinc-950/50">
-                  <div className="px-3 py-2 bg-zinc-900/80 border-b border-zinc-800 flex items-center gap-2">
-                    <Terminal className="h-3.5 w-3.5 text-green-400" />
-                    <span className="text-xs font-medium text-zinc-400">Terminal Output</span>
-                  </div>
-                  <div className="px-3 py-2 bg-zinc-950 overflow-hidden">
-                    <pre className="text-xs font-mono text-zinc-300 whitespace-pre-wrap break-words leading-relaxed max-h-96 overflow-y-auto">
-                      {command}
-                    </pre>
-                  </div>
-                </div>
-              );
-            }
-          } catch (e) {
-            // If JSON parse fails, just show the raw content in styled block
-            return (
-              <div key={`terminal-output-${index}`} className="my-3 rounded-lg border border-zinc-800 overflow-hidden bg-zinc-950/50">
-                <div className="px-3 py-2 bg-zinc-900/80 border-b border-zinc-800 flex items-center gap-2">
-                  <Terminal className="h-3.5 w-3.5 text-green-400" />
-                  <span className="text-xs font-medium text-zinc-400">Terminal Output</span>
-                </div>
-                <div className="px-3 py-2 bg-zinc-950 overflow-hidden">
-                  <pre className="text-xs font-mono text-zinc-300 whitespace-pre-wrap break-words leading-relaxed">
-                    {content}
-                  </pre>
-                </div>
-              </div>
-            );
-          }
-        }
-        
-        // Regular text - filter out any remaining function tags
-        const displayText = part.content
-          .replace(/<function[^>]*run_terminal_command[^>]*>[^<]*<\/function>/g, '')
-          .trim();
-        
-        if (!displayText) {
-          return null;
-        }
-        
         return (
           <p
             key={`text-${index}`}
             className="text-sm leading-relaxed whitespace-pre-wrap"
-            dangerouslySetInnerHTML={{ __html: formatText(displayText) }}
+            dangerouslySetInnerHTML={{ __html: formatText(part.content) }}
           />
         );
       })}
