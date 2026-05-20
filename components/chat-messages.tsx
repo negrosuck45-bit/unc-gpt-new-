@@ -365,7 +365,89 @@ function NetworkErrorBanner({ error, onRetry }: { error: string; onRetry?: () =>
   );
 }
 
-// ============= MESSAGE ACTIONS - FIXED SINGLE COPY =============
+// ============= EDIT MODAL =============
+function EditMessageModal({ open, onClose, message, onSave }: { open: boolean; onClose: () => void; message: Message | null; onSave: (newContent: string) => void }) {
+  const [editText, setEditText] = useState('');
+  const textareaRef = useRef<HTMLTextAreaElement>(null);
+
+  useEffect(() => {
+    if (open && message) {
+      setEditText(message.content);
+      setTimeout(() => textareaRef.current?.focus(), 100);
+    }
+  }, [open, message]);
+
+  const handleSave = () => {
+    if (editText.trim() && message) {
+      onSave(editText.trim());
+    }
+    onClose();
+  };
+
+  const handleKeyDown = (e: React.KeyboardEvent) => {
+    if (e.key === 'Enter' && (e.metaKey || e.ctrlKey)) {
+      handleSave();
+    }
+    if (e.key === 'Escape') {
+      onClose();
+    }
+  };
+
+  if (!open || !message) return null;
+
+  return (
+    <AnimatePresence>
+      {open && (
+        <motion.div 
+          initial={{ opacity: 0 }} 
+          animate={{ opacity: 1 }} 
+          exit={{ opacity: 0 }} 
+          className="fixed inset-0 z-50 flex items-center justify-center p-4" 
+          onClick={onClose}
+        >
+          <div className="absolute inset-0 bg-black/60 backdrop-blur-sm" />
+          <motion.div 
+            initial={{ opacity: 0, scale: 0.95, y: 20 }} 
+            animate={{ opacity: 1, scale: 1, y: 0 }} 
+            exit={{ opacity: 0, scale: 0.95, y: 20 }} 
+            transition={{ type: 'spring', damping: 25, stiffness: 300 }} 
+            onClick={(e) => e.stopPropagation()} 
+            className="relative w-full max-w-[92vw] sm:max-w-lg bg-[#1e1e1e] border border-white/10 rounded-2xl p-4 sm:p-6 shadow-2xl"
+          >
+            <div className="flex items-center justify-between mb-4">
+              <h2 className="text-lg font-semibold text-white">Edit message</h2>
+              <button onClick={onClose} className="p-1.5 rounded-lg hover:bg-white/10 transition-colors">
+                <X className="h-4 w-4 text-white/60" />
+              </button>
+            </div>
+            <textarea
+              ref={textareaRef}
+              value={editText}
+              onChange={(e) => setEditText(e.target.value)}
+              onKeyDown={handleKeyDown}
+              rows={6}
+              className="w-full bg-[#2a2a2a] border border-white/10 rounded-xl px-4 py-3 text-sm text-white placeholder:text-white/30 resize-none focus:outline-none focus:border-white/25 transition-colors"
+              placeholder="Edit your message..."
+            />
+            <div className="flex items-center justify-between mt-4">
+              <span className="text-xs text-white/40">Cmd/Ctrl + Enter to save</span>
+              <div className="flex items-center gap-2">
+                <Button variant="outline" onClick={onClose} className="h-9 px-4 bg-transparent border-white/20 text-white hover:bg-white/10 hover:text-white rounded-xl text-sm">
+                  Cancel
+                </Button>
+                <Button onClick={handleSave} className="h-9 px-5 bg-white text-black hover:bg-white/90 rounded-xl font-medium text-sm">
+                  Save
+                </Button>
+              </div>
+            </div>
+          </motion.div>
+        </motion.div>
+      )}
+    </AnimatePresence>
+  );
+}
+
+// ============= MESSAGE ACTIONS - SMOOTH HOVER REVEAL + WORKING EDIT =============
 function MessageActions({ message, isAssistant, onCopy, onRegenerate, onEdit, onDislike }: { message: Message; isAssistant: boolean; onCopy: () => void; onRegenerate?: () => void; onEdit?: () => void; onDislike?: () => void }) {
   const [copied, setCopied] = useState(false);
   const [feedback, setFeedback] = useState<'like' | 'dislike' | null>(null);
@@ -406,14 +488,55 @@ function MessageActions({ message, isAssistant, onCopy, onRegenerate, onEdit, on
   const handleDislike = useCallback(() => { onDislike?.(); }, [onDislike]);
 
   return (
-    <div className={cn('flex items-center gap-1 mt-1 transition-opacity', 'opacity-100 md:opacity-0 md:group-hover:opacity-100', isAssistant ? 'ml-0' : 'mr-0 flex-row-reverse')}>
-      <Button variant="ghost" size="icon" className="h-7 w-7 text-muted-foreground" onClick={handleCopy}>
-        {copied ? <Check className="h-3.5 w-3.5" /> : <Copy className="h-3.5 w-3.5" />}
+    <motion.div 
+      initial={{ opacity: 0, y: 4 }}
+      animate={{ opacity: 1, y: 0 }}
+      transition={{ duration: 0.2, ease: "easeOut" }}
+      className={cn(
+        'flex items-center gap-0.5 mt-1.5',
+        isAssistant ? 'ml-0' : 'mr-0 flex-row-reverse'
+      )}
+    >
+      <Button variant="ghost" size="icon" className="h-7 w-7 text-muted-foreground hover:text-foreground transition-colors" onClick={handleCopy} title="Copy">
+        {copied ? <Check className="h-3.5 w-3.5 text-green-400" /> : <Copy className="h-3.5 w-3.5" />}
       </Button>
-      {isAssistant && (<><Button variant="ghost" size="icon" className={cn("h-7 w-7", feedback === 'like' ? "text-green-500" : "text-muted-foreground hover:text-green-500")} onClick={handleLike} title="Good response"><ThumbsUp className="h-3.5 w-3.5" /></Button><Button variant="ghost" size="icon" className={cn("h-7 w-7", feedback === 'dislike' ? "text-red-500" : "text-muted-foreground hover:text-red-500")} onClick={handleDislike} title="Bad response - provide feedback"><ThumbsDown className="h-3.5 w-3.5" /></Button></>)}
-      {onRegenerate && (<Button variant="ghost" size="icon" className="h-7 w-7 text-muted-foreground" onClick={onRegenerate}><RefreshCw className="h-3.5 w-3.5" /></Button>)}
-      {onEdit && (<Button variant="ghost" size="icon" className="h-7 w-7 text-muted-foreground" onClick={onEdit}><Pencil className="h-3.5 w-3.5" /></Button>)}
-    </div>
+
+      {/* Edit button - only for user messages */}
+      {!isAssistant && onEdit && (
+        <Button variant="ghost" size="icon" className="h-7 w-7 text-muted-foreground hover:text-foreground transition-colors" onClick={onEdit} title="Edit message">
+          <Pencil className="h-3.5 w-3.5" />
+        </Button>
+      )}
+
+      {isAssistant && (
+        <>
+          <Button 
+            variant="ghost" 
+            size="icon" 
+            className={cn("h-7 w-7 transition-colors", feedback === 'like' ? "text-green-500" : "text-muted-foreground hover:text-green-500")} 
+            onClick={handleLike} 
+            title="Good response"
+          >
+            <ThumbsUp className="h-3.5 w-3.5" />
+          </Button>
+          <Button 
+            variant="ghost" 
+            size="icon" 
+            className={cn("h-7 w-7 transition-colors", feedback === 'dislike' ? "text-red-500" : "text-muted-foreground hover:text-red-500")} 
+            onClick={handleDislike} 
+            title="Bad response - provide feedback"
+          >
+            <ThumbsDown className="h-3.5 w-3.5" />
+          </Button>
+        </>
+      )}
+
+      {onRegenerate && (
+        <Button variant="ghost" size="icon" className="h-7 w-7 text-muted-foreground hover:text-foreground transition-colors" onClick={onRegenerate} title="Regenerate">
+          <RefreshCw className="h-3.5 w-3.5" />
+        </Button>
+      )}
+    </motion.div>
   );
 }
 
@@ -543,7 +666,7 @@ function ProgressiveThinking() {
             '0 0 10px rgba(147, 197, 253, 0.8)',
             '0 0 0px rgba(147, 197, 253, 0)'
           ]
-        }}
+        }
         transition={{ duration: 1.2, repeat: Infinity }}
         className="w-0.5 h-4 bg-blue-400 ml-1 rounded-full"
       />
@@ -591,7 +714,9 @@ export function ChatMessages({ messages, isStreaming, isThinking, onRegenerate, 
   const currentChat = getCurrentChat();
   const [viewingAttachment, setViewingAttachment] = useState<Attachment | null>(null);
   const [feedbackMessage, setFeedbackMessage] = useState<Message | null>(null);
+  const [editingMessage, setEditingMessage] = useState<Message | null>(null);
   const [toast, setToast] = useState<string | null>(null);
+  const [activeMessageId, setActiveMessageId] = useState<string | null>(null);
   const streamingFamily = useMemo(() => getModelFamilyFromModel(currentChat?.model || settings.model), [currentChat?.model, settings.model]);
 
   const shownToastsRef = useRef<Set<string>>(new Set());
@@ -600,6 +725,13 @@ export function ChatMessages({ messages, isStreaming, isThinking, onRegenerate, 
     if (!feedbackMessage) return;
     await saveFeedbackToSupabase(feedbackMessage.id, 'dislike', feedbackMessage.content, details, issueType);
   }, [feedbackMessage]);
+
+  const handleEditSave = useCallback((newContent: string) => {
+    if (editingMessage && onEditMessage) {
+      onEditMessage(editingMessage.id, newContent);
+    }
+    setEditingMessage(null);
+  }, [editingMessage, onEditMessage]);
 
   // FIXED: Convert messages > 4000 bytes to file. PRESERVES existing attachments.
   const processedMessages = useMemo(() => {
@@ -644,6 +776,7 @@ export function ChatMessages({ messages, isStreaming, isThinking, onRegenerate, 
             const isAssistant = message.role === 'assistant';
             const isLast = index === messages.length - 1;
             const messageFamily = getModelFamilyFromModel(message.modelUsed || currentChat?.model || settings.model);
+            const isActive = activeMessageId === message.id;
 
             // DEBUG: Log message structure for user messages with attachments
             if (message.role === 'user' && message.attachments && message.attachments.length > 0) {
@@ -656,7 +789,11 @@ export function ChatMessages({ messages, isStreaming, isThinking, onRegenerate, 
             }
 
             return (
-              <div key={message.id} className="group min-w-0">
+              <div 
+                key={message.id} 
+                className="group min-w-0"
+                onClick={() => setActiveMessageId(isActive ? null : message.id)}
+              >
                 {/* NO BUBBLES - Clean flat layout */}
                 <div className={cn('flex gap-3 items-start min-w-0', isAssistant ? 'justify-start' : 'justify-end')}>
 
@@ -718,15 +855,26 @@ export function ChatMessages({ messages, isStreaming, isThinking, onRegenerate, 
                       </motion.div>
                     )}
 
-                    {/* Message Actions */}
-                    <MessageActions 
-                      message={message} 
-                      isAssistant={isAssistant} 
-                      onCopy={() => {}} 
-                      onRegenerate={isLast && isAssistant ? () => onRegenerate?.(message.id) : undefined} 
-                      onEdit={!isAssistant ? () => onEditMessage?.(message.id, message.content) : undefined} 
-                      onDislike={isAssistant ? () => setFeedbackMessage(message) : undefined} 
-                    />
+                    {/* Message Actions - SMOOTH REVEAL on click/hover */}
+                    <AnimatePresence>
+                      {(isActive || isLast) && (
+                        <motion.div
+                          initial={{ opacity: 0, y: 6, scale: 0.95 }}
+                          animate={{ opacity: 1, y: 0, scale: 1 }}
+                          exit={{ opacity: 0, y: 6, scale: 0.95 }}
+                          transition={{ duration: 0.2, ease: "easeOut" }}
+                        >
+                          <MessageActions 
+                            message={message} 
+                            isAssistant={isAssistant} 
+                            onCopy={() => {}} 
+                            onRegenerate={isLast && isAssistant ? () => onRegenerate?.(message.id) : undefined} 
+                            onEdit={!isAssistant ? () => setEditingMessage(message) : undefined} 
+                            onDislike={isAssistant ? () => setFeedbackMessage(message) : undefined} 
+                          />
+                        </motion.div>
+                      )}
+                    </AnimatePresence>
                   </div>
 
                   {/* User Avatar - Right side */}
@@ -790,6 +938,14 @@ export function ChatMessages({ messages, isStreaming, isThinking, onRegenerate, 
         onClose={() => setFeedbackMessage(null)} 
         message={feedbackMessage} 
         onSubmit={handleFeedbackSubmit} 
+      />
+
+      {/* Edit message modal */}
+      <EditMessageModal
+        open={!!editingMessage}
+        onClose={() => setEditingMessage(null)}
+        message={editingMessage}
+        onSave={handleEditSave}
       />
     </>
   );
