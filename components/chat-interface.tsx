@@ -248,8 +248,8 @@ export function ChatInterface({ onSwitchToImagine, onOpenSidebar, isSidebarOpen 
         isSidebarOpen={isSidebarOpen}
       />
 
-      {hasMessages ? (
-        <div className="flex-1 flex flex-col min-h-0 overflow-hidden relative">
+      <div className="flex-1 flex flex-col min-h-0 overflow-hidden relative">
+        {hasMessages ? (
           <div 
             className="flex-1 overflow-y-auto scroll-smooth"
             style={{ WebkitOverflowScrolling: "touch" } as React.CSSProperties}
@@ -261,43 +261,13 @@ export function ChatInterface({ onSwitchToImagine, onOpenSidebar, isSidebarOpen 
               onRegenerate={handleRegenerate}
             />
           </div>
-
-          <div className="w-full flex-shrink-0 bg-gradient-to-t from-background via-background to-transparent pb-4 pt-2">
-            <div className="max-w-3xl mx-auto w-full px-4">
-              <ChatInput
-                onSend={handleSend}
-                onStop={() => abortControllerRef.current?.abort()}
-                isStreaming={isCurrentChatStreaming}
-                disabled={isCurrentChatStreaming}
-                key={currentChatId || 'new-chat'}
-              />
-            </div>
-          </div>
-        </div>
-      ) : (
-        <div className="flex-1 flex flex-col min-h-0 overflow-hidden">
-          {/* Welcome Title */}
-          <div className="flex-shrink-0 pt-20 sm:pt-24 md:pt-28 lg:pt-32">
+        ) : (
+          <div className="flex-1 flex flex-col items-center justify-center min-h-0 px-4">
             <WelcomeScreen onSelectPrompt={(p) => handleSend(p)} project={currentProject} />
-          </div>
-
-          {/* Chat Input */}
-          <div className="flex-shrink-0 mt-8 pb-8">
-            <div className="max-w-3xl mx-auto w-full px-4">
-              <ChatInput
-                onSend={handleSend}
-                onStop={() => abortControllerRef.current?.abort()}
-                isStreaming={isCurrentChatStreaming}
-                disabled={isCurrentChatStreaming}
-                key={currentChatId || 'new-chat'}
-              />
-            </div>
-          </div>
-
-          {/* Glass Feature Blocks - Hidden on mobile, visible on sm+ */}
-          <div className="hidden sm:flex flex-shrink-0 px-4 pb-20 mt-auto">
-            <div className="max-w-4xl mx-auto w-full">
-              <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+            
+            {/* Glass Feature Blocks - Hidden on mobile, visible on sm+ */}
+            <div className="hidden sm:flex mt-12 w-full max-w-4xl mx-auto">
+              <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 w-full">
                 <div className="group bg-zinc-900/60 backdrop-blur-xl border border-white/07 hover:border-white/20 rounded-3xl p-5 transition-all duration-300 hover:scale-[1.02] h-full">
                   <h4 className="font-semibold text-base mb-1.5 text-white">Fast &amp; Smart</h4>
                   <p className="text-zinc-400 text-sm leading-tight">Lightning-fast answers powered by advanced AI.</p>
@@ -315,8 +285,21 @@ export function ChatInterface({ onSwitchToImagine, onOpenSidebar, isSidebarOpen 
               </div>
             </div>
           </div>
+        )}
+
+        {/* Chat Input - Pinned to bottom in all states */}
+        <div className="w-full flex-shrink-0 bg-gradient-to-t from-background via-background to-transparent pb-4 pt-2">
+          <div className="max-w-3xl mx-auto w-full px-4">
+            <ChatInput
+              onSend={handleSend}
+              onStop={() => abortControllerRef.current?.abort()}
+              isStreaming={isCurrentChatStreaming}
+              disabled={isCurrentChatStreaming}
+              key={currentChatId || 'new-chat'}
+            />
+          </div>
         </div>
-      )}
+      </div>
     </div>
   );
 }

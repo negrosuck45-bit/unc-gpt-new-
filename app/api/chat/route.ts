@@ -569,7 +569,7 @@ CRITICAL INSTRUCTIONS:
    - "git clone" -> run_terminal_command: git clone <url>
    - "run python script" -> run_terminal_command: python script.py
 
-You have the tool available. USE IT.`;
+You have the tool available. USE IT.you dont have to say do you want to use the terminal use it when its necessary and u dont have to use it`;
 
 async function callGroq(
   messages: any[],
