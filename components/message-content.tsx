@@ -37,12 +37,39 @@ function formatText(text: string | undefined | null): string {
   return formatted;
 }
 
-// Parse terminal blocks from AI output
+// Parse terminal blocks from AI output (both markdown and function styles)
 function parseTerminalBlocks(text: string): { text: string; terminals: Array<{ command: string; output: string; error: string | null }> } {
   const terminals: Array<{ command: string; output: string; error: string | null }> = [];
-  const terminalRegex = /```terminal\n\$?\s?([^\n]+)\n([\s\S]*?)```/g;
-
+  
   let cleanedText = text;
+
+  // Match function-style terminal calls: <function(run_terminal_command){...}</function>
+  // Pattern: match opening brace, then any content (lazy), then closing brace
+  const functionRegex = /<function\(run_terminal_command\)(\{[\s\S]*?\})<\/function>/g;
+  let funcMatch;
+
+  while ((funcMatch = functionRegex.exec(text)) !== null) {
+    try {
+      const fullMatch = funcMatch[0];
+      const jsonStr = funcMatch[1];
+      const parsed = JSON.parse(jsonStr);
+      const command = parsed.command || '';
+
+      if (command) {
+        terminals.push({ 
+          command, 
+          output: '', 
+          error: null 
+        });
+        cleanedText = cleanedText.replace(fullMatch, `__TERMINAL_${terminals.length - 1}__`);
+      }
+    } catch (e) {
+      // Skip on parse error
+    }
+  }
+
+  // Match markdown-style terminal blocks: ```terminal\n$ command\noutput\n```
+  const terminalRegex = /```terminal\n\$?\s?([^\n]+)\n([\s\S]*?)```/g;
   let match;
 
   while ((match = terminalRegex.exec(text)) !== null) {
@@ -66,12 +93,29 @@ function parseTerminalBlocks(text: string): { text: string; terminals: Array<{ c
   return { text: cleanedText, terminals };
 }
 
+// Helper to unescape HTML entities safely (handles &lt; &gt; etc)
+function unescapeHtml(html: string): string {
+  const entityMap: { [key: string]: string } = {
+    '&amp;': '&',
+    '&lt;': '<',
+    '&gt;': '>',
+    '&quot;': '"',
+    '&#39;': "'",
+  };
+  
+  return html.replace(/&amp;|&lt;|&gt;|&quot;|&#39;/g, (match) => entityMap[match] || match);
+}
+
 function parseContent(content: string | undefined | null): ContentPart[] {
   if (typeof content !== 'string' || !content.trim()) {
     return [{ type: 'text', content: '' }];
   }
 
-  const { text: cleanedContent, terminals } = parseTerminalBlocks(content);
+  // Unescape HTML entities before parsing to handle function tags
+  const unescapedContent = unescapeHtml(content);
+  console.log('[v0] [MessageContent] Found unescaped function tags:', unescapedContent.includes('<function'));
+  const { text: cleanedContent, terminals } = parseTerminalBlocks(unescapedContent);
+  console.log('[v0] [MessageContent] Parsed terminals:', terminals.length);
 
   const parts: ContentPart[] = [];
   const regex = /```(\w+)?\n([\s\S]*?)```|!\[([^\]]*)\]\((https?:\/\/[^\)]+)\)|__TERMINAL_(\d+)__/g;
@@ -247,21 +291,29 @@ export function MessageContent({ content }: MessageContentProps) {
 
         if (part.type === 'terminal') {
           return (
-            <TerminalBlock
-              key={`terminal-${index}`}
-              command={part.command || ''}
-              output={part.output}
-              error={part.error}
-              interactive={true}
-            />
+            <div key={`terminal-${index}`} className="my-3 rounded-xl border border-zinc-800 overflow-hidden bg-zinc-950/50 backdrop-blur-sm">
+              <TerminalBlock
+                command={part.command || ''}
+                output={part.output}
+                error={part.error}
+                interactive={true}
+              />
+            </div>
           );
         }
 
+        // Hide function terminal calls from display (they should be parsed as blocks)
+        const displayText = part.content.replace(/<function\(run_terminal_command\){[\s\S]*?}<\/function>/g, '').trim();
+        
+        if (!displayText) {
+          return null; // Don't render empty text nodes
+        }
+        
         return (
           <p
             key={`text-${index}`}
             className="text-sm leading-relaxed whitespace-pre-wrap"
-            dangerouslySetInnerHTML={{ __html: formatText(part.content) }}
+            dangerouslySetInnerHTML={{ __html: formatText(displayText) }}
           />
         );
       })}
