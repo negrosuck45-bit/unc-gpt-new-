@@ -1571,7 +1571,14 @@ export async function POST(req: NextRequest) {
     let result: { stream: ReadableStream; provider: string; model: string };
 
     try {
-      if (finalProvider === "groq" || GROQ_CHAT_MODELS[finalModel]) {
+      // Prioritize Groq for reliability when auto-selecting provider
+      if (finalProvider === "auto") {
+        // Default to Groq for auto mode - most reliable
+        const model = hasImage 
+          ? "meta-llama/llama-4-scout-17b-16e-instruct"
+          : "llama-3.3-70b-versatile";
+        result = await callGroq(messagesWithSystem, model, hasImage, BUILTIN_TOOLS);
+      } else if (finalProvider === "groq" || GROQ_CHAT_MODELS[finalModel]) {
         result = await callGroq(messagesWithSystem, finalModel, hasImage, BUILTIN_TOOLS);
       } else if (finalProvider === "openrouter") {
         result = await callOpenRouter(messagesWithSystem, hasImage, BUILTIN_TOOLS);
