@@ -6,11 +6,14 @@ export interface TerminalResult {
   error: string | null;
   isRunning: boolean;
   exitCode?: number;
+  remaining?: number;
+  resetTime?: number;
 }
 
 export function useTerminal() {
   const [result, setResult] = useState<TerminalResult | null>(null);
   const [isLoading, setIsLoading] = useState(false);
+  const [remaining, setRemaining] = useState<number | null>(null);
 
   const execute = useCallback(async (command: string) => {
     if (!command.trim()) return;
@@ -24,8 +27,6 @@ export function useTerminal() {
     });
 
     try {
-      console.log('[v0] Executing terminal command:', command);
-      
       const response = await fetch('/api/terminal', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -34,22 +35,22 @@ export function useTerminal() {
 
       const data = await response.json();
 
+      // Track remaining quota
+      if (data.remaining !== undefined) {
+        setRemaining(data.remaining);
+      }
+
       if (!response.ok) {
-        console.error('[v0] Command failed:', data);
         setResult({
           command,
           output: '',
           error: data.error || 'Failed to execute command',
           isRunning: false,
           exitCode: data.exitCode || 1,
+          remaining: data.remaining,
         });
         return;
       }
-
-      console.log('[v0] Command succeeded:', { 
-        command, 
-        outputLength: data.output?.length || 0 
-      });
 
       setResult({
         command,
@@ -57,10 +58,10 @@ export function useTerminal() {
         error: data.error || null,
         isRunning: false,
         exitCode: data.exitCode,
+        remaining: data.remaining,
       });
 
     } catch (error) {
-      console.error('[v0] Terminal execution error:', error);
       setResult({
         command,
         output: '',
@@ -73,10 +74,31 @@ export function useTerminal() {
     }
   }, []);
 
+  const stop = useCallback(async () => {
+    try {
+      await fetch('/api/terminal', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ action: 'stop' }),
+      });
+      
+      setIsLoading(false);
+      if (result) {
+        setResult({
+          ...result,
+          isRunning: false,
+          output: result.output + '\n[Terminal session stopped by user]',
+        });
+      }
+    } catch (error) {
+      console.error('[v0] Failed to stop terminal:', error);
+    }
+  }, [result]);
+
   const clear = useCallback(() => {
     setResult(null);
     setIsLoading(false);
   }, []);
 
-  return { execute, clear, result, isLoading };
+  return { execute, stop, clear, result, isLoading, remaining };
 }

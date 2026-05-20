@@ -1,13 +1,78 @@
 import { NextRequest, NextResponse } from 'next/server';
 
+// In-memory rate limiting (daily limit per IP)
+const commandCounts = new Map<string, { count: number; resetTime: number }>();
+const DAILY_LIMIT = 50; // 50 commands per day (free tier)
+
+function getRateLimitKey(request: NextRequest): string {
+  const ip = request.headers.get('x-forwarded-for') || 
+             request.headers.get('x-real-ip') || 
+             'unknown';
+  return ip.split(',')[0].trim();
+}
+
+function checkRateLimit(key: string): { allowed: boolean; remaining: number; resetTime: number } {
+  const now = Date.now();
+  const entry = commandCounts.get(key);
+  
+  if (!entry || now > entry.resetTime) {
+    // Reset daily quota
+    const resetTime = now + (24 * 60 * 60 * 1000);
+    commandCounts.set(key, { count: 1, resetTime });
+    return { allowed: true, remaining: DAILY_LIMIT - 1, resetTime };
+  }
+  
+  if (entry.count >= DAILY_LIMIT) {
+    return { allowed: false, remaining: 0, resetTime: entry.resetTime };
+  }
+  
+  entry.count++;
+  return { allowed: true, remaining: DAILY_LIMIT - entry.count, resetTime: entry.resetTime };
+}
+
 export async function POST(request: NextRequest) {
   try {
-    const { command } = await request.json();
+    const { command, action } = await request.json();
+
+    // Handle stop command
+    if (action === 'stop') {
+      return NextResponse.json({
+        status: 'stopped',
+        message: 'Terminal session stopped',
+      });
+    }
 
     if (!command || typeof command !== 'string') {
       return NextResponse.json(
         { error: 'Command is required and must be a string' },
         { status: 400 }
+      );
+    }
+
+    // Rate limiting
+    const rateLimitKey = getRateLimitKey(request);
+    const rateLimit = checkRateLimit(rateLimitKey);
+
+    if (!rateLimit.allowed) {
+      const resetDate = new Date(rateLimit.resetTime).toLocaleString();
+      return NextResponse.json(
+        { 
+          error: 'Daily command limit reached (50 commands/day)',
+          remaining: 0,
+          resetTime: rateLimit.resetTime,
+          resetDate,
+        },
+        { status: 429 }
+      );
+    }
+
+    // Reject dangerous commands
+    const dangerousPatterns = ['rm -rf', 'mkfs', ':(){:|:&', 'fork()', 'sudo', 'su -'];
+    const commandLower = command.toLowerCase();
+    if (dangerousPatterns.some(pattern => commandLower.includes(pattern))) {
+      return NextResponse.json(
+        { error: 'Command blocked for safety' },
+        { status: 403 }
       );
     }
 
@@ -42,7 +107,8 @@ export async function POST(request: NextRequest) {
       return NextResponse.json(
         { 
           error: `Render API error: ${response.status}`,
-          details: errorData 
+          details: errorData,
+          remaining: rateLimit.remaining,
         },
         { status: response.status }
       );
@@ -60,6 +126,8 @@ export async function POST(request: NextRequest) {
       output: data.output || '',
       error: data.error || null,
       exitCode: data.exitCode || 0,
+      remaining: rateLimit.remaining,
+      resetTime: rateLimit.resetTime,
     });
 
   } catch (error) {

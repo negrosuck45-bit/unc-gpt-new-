@@ -1,7 +1,7 @@
 'use client';
 
 import { useState, useCallback } from 'react';
-import { Terminal, Copy, Check, Play, ChevronDown, ChevronUp, Zap } from 'lucide-react';
+import { Terminal, Copy, Check, Play, ChevronDown, ChevronUp, Zap, X } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { useTerminal } from '@/hooks/use-terminal';
 
@@ -79,21 +79,41 @@ export function TerminalBlock({
     >
       {/* Header */}
       <div className="flex items-center justify-between px-3 py-2 bg-zinc-900/80 border-b border-zinc-800">
-        <div className="flex items-center gap-2">
+        <div className="flex items-center gap-3">
           <Terminal className="h-3.5 w-3.5 text-green-400" />
           <span className="text-xs font-medium text-zinc-400">Terminal</span>
           {isCurrentlyRunning && (
             <motion.span
               animate={{ opacity: [0.4, 1, 0.4] }}
               transition={{ duration: 1.5, repeat: Infinity }}
-              className="text-xs text-yellow-400"
+              className="text-xs text-yellow-400 font-medium"
             >
               running...
             </motion.span>
           )}
+          {result?.remaining !== undefined && (
+            <span className={`text-xs px-2 py-0.5 rounded font-mono ${
+              result.remaining > 20 ? 'bg-green-500/10 text-green-400' :
+              result.remaining > 5 ? 'bg-yellow-500/10 text-yellow-400' :
+              'bg-red-500/10 text-red-400'
+            }`}>
+              {result.remaining}/{50}
+            </span>
+          )}
         </div>
         <div className="flex items-center gap-1">
-          {interactive && (
+          {isCurrentlyRunning && interactive && (
+            <button
+              onClick={() => {
+                setCommandInput('');
+              }}
+              className="p-1.5 rounded hover:bg-red-900/40 transition-colors text-red-400"
+              title="Stop execution"
+            >
+              <X className="h-3 w-3" />
+            </button>
+          )}
+          {interactive && !isCurrentlyRunning && (
             <button
               onClick={handleExecute}
               disabled={isCurrentlyRunning}
