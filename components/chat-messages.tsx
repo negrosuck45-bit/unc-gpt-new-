@@ -638,8 +638,8 @@ export function ChatMessages({ messages, isStreaming, isThinking, onRegenerate, 
           />
         )}
       </AnimatePresence>
-      <div className="flex-1 overflow-y-auto scroll-smooth">
-        <div className="max-w-3xl xl:max-w-4xl mx-auto px-3 sm:px-4 md:px-6 py-3 space-y-6">
+      <div className="flex-1 overflow-y-auto scroll-smooth overflow-x-hidden">
+        <div className="max-w-3xl xl:max-w-4xl mx-auto px-3 sm:px-4 md:px-6 py-3 space-y-6 overflow-x-hidden">
           {processedMessages.map((message, index) => {
             const isAssistant = message.role === 'assistant';
             const isLast = index === messages.length - 1;
@@ -656,9 +656,9 @@ export function ChatMessages({ messages, isStreaming, isThinking, onRegenerate, 
             }
 
             return (
-              <div key={message.id} className="group">
+              <div key={message.id} className="group min-w-0">
                 {/* NO BUBBLES - Clean flat layout */}
-                <div className={cn('flex gap-3 items-start', isAssistant ? 'justify-start' : 'justify-end')}>
+                <div className={cn('flex gap-3 items-start min-w-0', isAssistant ? 'justify-start' : 'justify-end')}>
 
                   {/* Assistant Avatar - Left side */}
                   {isAssistant && (
@@ -669,7 +669,7 @@ export function ChatMessages({ messages, isStreaming, isThinking, onRegenerate, 
 
                   {/* Message Content - No bubble styling */}
                   <div className={cn(
-                    'flex flex-col max-w-[92%] sm:max-w-[85%] md:max-w-[78%] lg:max-w-[72%]',
+                    'flex flex-col max-w-[92%] sm:max-w-[85%] md:max-w-[78%] lg:max-w-[72%] min-w-0 w-full',
                     isAssistant ? 'items-start' : 'items-end'
                   )}>
 
@@ -685,7 +685,7 @@ export function ChatMessages({ messages, isStreaming, isThinking, onRegenerate, 
                     {/* Text content - NO bubble, just plain text */}
                     {message.content && message.content.trim().length > 0 && (
                       <div className={cn(
-                        'text-[13px] sm:text-sm leading-relaxed',
+                        'text-[13px] sm:text-sm leading-relaxed w-full min-w-0',
                         isAssistant ? 'text-zinc-200' : 'text-zinc-100'
                       )}>
                         <MessageContent content={message.content} />
@@ -694,7 +694,7 @@ export function ChatMessages({ messages, isStreaming, isThinking, onRegenerate, 
 
                     {/* File attachments */}
                     {message.attachments?.some(a => a.type !== 'image') && (
-                      <div className="space-y-2 mt-2">
+                      <div className="space-y-2 mt-2 w-full min-w-0">
                         {message.attachments.filter(a => a.type !== 'image').map((att, i) => (
                           <AttachmentPreview key={`file-${i}`} attachment={att} onView={setViewingAttachment} />
                         ))}
