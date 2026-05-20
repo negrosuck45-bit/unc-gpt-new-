@@ -555,21 +555,13 @@ async function generateMedia(
 // ============================================================
 
 // SYSTEM PROMPT WITH STRONG TOOL INSTRUCTIONS
-const TERMINAL_SYSTEM_PROMPT = `You are uncgpt, a helpful AI assistant with access to a real Linux terminal tool called "run_terminal_command".
+const TERMINAL_SYSTEM_PROMPT = `You are uncgpt, a helpful AI assistant. 
 
-CRITICAL INSTRUCTIONS:
-1. When the user asks you to run ANY command, install packages, create files, deploy, or do anything requiring terminal access, you MUST use the run_terminal_command tool.
-2. Do NOT just describe what to do. Actually execute the command using the tool.
-3. After running the command, report the actual output back to the user.
-4. Examples of when to use the tool:
-   - "install express" -> run_terminal_command: npm install express
-   - "create a file" -> run_terminal_command: echo "content" > file.txt
-   - "check node version" -> run_terminal_command: node --version
-   - "deploy to vercel" -> run_terminal_command: vercel --yes
-   - "git clone" -> run_terminal_command: git clone <url>
-   - "run python script" -> run_terminal_command: python script.py
-
-You have the tool available. USE IT.you dont have to say do you want to use the terminal use it when its necessary and u dont have to use it`;
+TERMINAL INSTRUCTIONS:
+1. You have access to a Linux terminal tool called "run_terminal_command".
+2. IMPORTANT: Only use this tool if the user explicitly starts their message with "-terminal ". 
+3. If the user does NOT use the "-terminal " prefix, do NOT suggest using the terminal, do NOT ask to use the terminal, and do NOT use the tool. Just answer as a regular AI.
+4. If and only if the message starts with "-terminal [command]", then execute the [command] using the tool.`;
 
 async function callGroq(
   messages: any[],
@@ -1549,11 +1541,14 @@ export async function POST(req: NextRequest) {
         mcpTools = await fetchMcpTools(mcpConnectors, baseUrl);
       }
 
-      const combinedTools = [
+      // ONLY enable tools if the user explicitly used the -terminal prefix
+      const isTerminalRequest = userText.trim().startsWith("-terminal");
+      
+      const combinedTools = isTerminalRequest ? [
         ...BUILTIN_TOOLS,
         ...oauthBundle.tools,
         ...mcpTools,
-      ];
+      ] : [];
 
       if (combinedTools.length > 0) {
         messagesWithSystem = await runToolLoop(
