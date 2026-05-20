@@ -55,7 +55,6 @@ export function TerminalBlock({
     const cmd = commandInput.trim() || displayCommand;
     if (!cmd) return;
     
-    console.log('[v0] Terminal: Executing command:', cmd);
     await execute(cmd);
     
     if (onExecute) {

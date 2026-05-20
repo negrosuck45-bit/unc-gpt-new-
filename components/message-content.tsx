@@ -2,7 +2,7 @@
 import { useMemo, useState, useCallback } from 'react';
 import { CodeBlock } from './code-block';
 import { TerminalBlock } from './terminal-block';
-import { Download, ExternalLink, Loader2 } from 'lucide-react';
+import { Download, ExternalLink, Loader2, Terminal } from 'lucide-react';
 import { toast } from 'sonner';
 
 interface MessageContentProps {
@@ -64,7 +64,7 @@ function parseTerminalBlocks(text: string): { text: string; terminals: Array<{ c
         cleanedText = cleanedText.replace(fullMatch, `__TERMINAL_${terminals.length - 1}__`);
       }
     } catch (e) {
-      // Skip on parse error
+      // Skip parse errors
     }
   }
 
@@ -113,9 +113,7 @@ function parseContent(content: string | undefined | null): ContentPart[] {
 
   // Unescape HTML entities before parsing to handle function tags
   const unescapedContent = unescapeHtml(content);
-  console.log('[v0] [MessageContent] Found unescaped function tags:', unescapedContent.includes('<function'));
   const { text: cleanedContent, terminals } = parseTerminalBlocks(unescapedContent);
-  console.log('[v0] [MessageContent] Parsed terminals:', terminals.length);
 
   const parts: ContentPart[] = [];
   const regex = /```(\w+)?\n([\s\S]*?)```|!\[([^\]]*)\]\((https?:\/\/[^\)]+)\)|__TERMINAL_(\d+)__/g;
@@ -302,11 +300,57 @@ export function MessageContent({ content }: MessageContentProps) {
           );
         }
 
-        // Hide function terminal calls from display (they should be parsed as blocks)
-        const displayText = part.content.replace(/<function\(run_terminal_command\){[\s\S]*?}<\/function>/g, '').trim();
+        // Handle text that may contain function markup - extract and display as styled block
+        // Match function tags more flexibly
+        const functionMatch = part.content.match(/<function[^>]*run_terminal_command[^>]*>([^<]*)<\/function>/);
+        
+        if (functionMatch) {
+          const content = functionMatch[1];
+          // Try to parse as JSON
+          try {
+            const parsed = JSON.parse(content);
+            const command = parsed.command || '';
+            
+            if (command) {
+              return (
+                <div key={`terminal-output-${index}`} className="my-3 rounded-lg border border-zinc-800 overflow-hidden bg-zinc-950/50">
+                  <div className="px-3 py-2 bg-zinc-900/80 border-b border-zinc-800 flex items-center gap-2">
+                    <Terminal className="h-3.5 w-3.5 text-green-400" />
+                    <span className="text-xs font-medium text-zinc-400">Terminal Output</span>
+                  </div>
+                  <div className="px-3 py-2 bg-zinc-950 overflow-hidden">
+                    <pre className="text-xs font-mono text-zinc-300 whitespace-pre-wrap break-words leading-relaxed max-h-96 overflow-y-auto">
+                      {command}
+                    </pre>
+                  </div>
+                </div>
+              );
+            }
+          } catch (e) {
+            // If JSON parse fails, just show the raw content in styled block
+            return (
+              <div key={`terminal-output-${index}`} className="my-3 rounded-lg border border-zinc-800 overflow-hidden bg-zinc-950/50">
+                <div className="px-3 py-2 bg-zinc-900/80 border-b border-zinc-800 flex items-center gap-2">
+                  <Terminal className="h-3.5 w-3.5 text-green-400" />
+                  <span className="text-xs font-medium text-zinc-400">Terminal Output</span>
+                </div>
+                <div className="px-3 py-2 bg-zinc-950 overflow-hidden">
+                  <pre className="text-xs font-mono text-zinc-300 whitespace-pre-wrap break-words leading-relaxed">
+                    {content}
+                  </pre>
+                </div>
+              </div>
+            );
+          }
+        }
+        
+        // Regular text - filter out any remaining function tags
+        const displayText = part.content
+          .replace(/<function[^>]*run_terminal_command[^>]*>[^<]*<\/function>/g, '')
+          .trim();
         
         if (!displayText) {
-          return null; // Don't render empty text nodes
+          return null;
         }
         
         return (
