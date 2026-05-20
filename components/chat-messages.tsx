@@ -707,6 +707,37 @@ export function ChatMessages({ messages, isStreaming, isThinking, onRegenerate, 
   const [toast, setToast] = useState<string | null>(null);
   const streamingFamily = useMemo(() => getModelFamilyFromModel(currentChat?.model || settings.model), [currentChat?.model, settings.model]);
 
+  // ===== MOBILE ICON BEHAVIOR STATE =====
+  const [activeMessageId, setActiveMessageId] = useState<string | null>(null);
+  const [isMobile, setIsMobile] = useState(false);
+  const messageRefs = useRef<Map<string, HTMLDivElement>>(new Map());
+
+  // Detect mobile
+  useEffect(() => {
+    const checkMobile = () => setIsMobile(window.innerWidth < 640);
+    checkMobile();
+    window.addEventListener('resize', checkMobile);
+    return () => window.removeEventListener('resize', checkMobile);
+  }, []);
+
+  // Click outside to deactivate on mobile
+  useEffect(() => {
+    if (!isMobile) return;
+    const handleClickOutside = (e: MouseEvent) => {
+      const target = e.target as HTMLElement;
+      if (!target.closest('[data-message-item]')) {
+        setActiveMessageId(null);
+      }
+    };
+    document.addEventListener('click', handleClickOutside);
+    return () => document.removeEventListener('click', handleClickOutside);
+  }, [isMobile]);
+
+  const handleMessageClick = useCallback((messageId: string) => {
+    if (!isMobile) return;
+    setActiveMessageId(prev => prev === messageId ? null : messageId);
+  }, [isMobile]);
+
   const shownToastsRef = useRef<Set<string>>(new Set());
 
   const handleFeedbackSubmit = useCallback(async (issueType: string, details: string) => {
@@ -764,6 +795,7 @@ export function ChatMessages({ messages, isStreaming, isThinking, onRegenerate, 
             const isAssistant = message.role === 'assistant';
             const isLast = index === messages.length - 1;
             const messageFamily = getModelFamilyFromModel(message.modelUsed || currentChat?.model || settings.model);
+            const isActive = activeMessageId === message.id;
 
             if (message.role === 'user' && message.attachments && message.attachments.length > 0) {
               console.log('[ChatMessages] User message with attachments:', {
@@ -781,11 +813,18 @@ export function ChatMessages({ messages, isStreaming, isThinking, onRegenerate, 
                 initial="initial"
                 whileHover="hover"
               >
-                <div className={cn(
-                  'flex items-start min-w-0',
-                  isAssistant ? 'flex-row' : 'flex-row-reverse'
-                )}>
-
+                <div 
+                  ref={(el) => {
+                    if (el) messageRefs.current.set(message.id, el);
+                  }}
+                  data-message-item
+                  onClick={() => handleMessageClick(message.id)}
+                  className={cn(
+                    'flex items-start min-w-0 transition-colors duration-150 rounded-xl',
+                    isMobile && 'cursor-pointer',
+                    isMobile && isActive && 'bg-white/[0.03]'
+                  )}
+                >
                   {/* Avatar */}
                   <div className={cn(
                     'w-7 h-7 rounded-full flex items-center justify-center flex-shrink-0 overflow-hidden mt-0',
@@ -851,13 +890,14 @@ export function ChatMessages({ messages, isStreaming, isThinking, onRegenerate, 
                       </motion.div>
                     )}
 
-                    {/* Message Actions - HOVER REVEAL with framer-motion variants */}
+                    {/* Message Actions - HOVER REVEAL with framer-motion variants (desktop) / TAP REVEAL (mobile) */}
                     <motion.div
                       variants={{
                         initial: { opacity: 0, y: 4, scale: 0.95 },
                         hover: { opacity: 1, y: 0, scale: 1 }
                       }}
                       transition={{ duration: 0.2, ease: "easeOut" }}
+                      animate={isMobile ? (isActive ? { opacity: 1, y: 0, scale: 1 } : { opacity: 0, y: 4, scale: 0.95 }) : undefined}
                       className="mt-1"
                     >
                       <MessageActions 
