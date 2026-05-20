@@ -263,32 +263,50 @@ export function ChatInterface({ onSwitchToImagine, onOpenSidebar, isSidebarOpen 
           </div>
         ) : (
           <div className="flex-1 flex flex-col items-center justify-center min-h-0 px-4">
-            <WelcomeScreen onSelectPrompt={(p) => handleSend(p)} project={currentProject} />
-            
-            {/* Glass Feature Blocks - Hidden on mobile, visible on sm+ */}
-            <div className="hidden sm:flex mt-12 w-full max-w-4xl mx-auto">
-              <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 w-full">
-                <div className="group bg-zinc-900/60 backdrop-blur-xl border border-white/07 hover:border-white/20 rounded-3xl p-5 transition-all duration-300 hover:scale-[1.02] h-full">
+            {/* Desktop: centered layout with input in middle */}
+            <div className="hidden sm:flex flex-col items-center justify-center w-full max-w-3xl mx-auto gap-8">
+              {/* WelcomeScreen above input */}
+              <WelcomeScreen onSelectPrompt={(p) => handleSend(p)} project={currentProject} />
+
+              {/* Chat Input - Centered in middle for desktop */}
+              <div className="w-full">
+                <ChatInput
+                  onSend={handleSend}
+                  onStop={() => abortControllerRef.current?.abort()}
+                  isStreaming={isCurrentChatStreaming}
+                  disabled={isCurrentChatStreaming}
+                  key={currentChatId || 'new-chat'}
+                />
+              </div>
+
+              {/* Three Feature Rectangles - Below input, desktop only */}
+              <div className="grid grid-cols-3 gap-4 w-full max-w-4xl">
+                <div className="group bg-zinc-900/60 backdrop-blur-xl border border-white/7 hover:border-white/20 rounded-3xl p-5 transition-all duration-300 hover:scale-[1.02] h-full">
                   <h4 className="font-semibold text-base mb-1.5 text-white">Fast &amp; Smart</h4>
                   <p className="text-zinc-400 text-sm leading-tight">Lightning-fast answers powered by advanced AI.</p>
                 </div>
 
-                <div className="group bg-zinc-900/60 backdrop-blur-xl border border-white/07 hover:border-white/20 rounded-3xl p-5 transition-all duration-300 hover:scale-[1.02] h-full">
+                <div className="group bg-zinc-900/60 backdrop-blur-xl border border-white/7 hover:border-white/20 rounded-3xl p-5 transition-all duration-300 hover:scale-[1.02] h-full">
                   <h4 className="font-semibold text-base mb-1.5 text-white">Vision Ready</h4>
                   <p className="text-zinc-400 text-sm leading-tight">Analyze images, screenshots, and diagrams.</p>
                 </div>
 
-                <div className="group bg-zinc-900/60 backdrop-blur-xl border border-white/07 hover:border-white/20 rounded-3xl p-5 transition-all duration-300 hover:scale-[1.02] h-full">
+                <div className="group bg-zinc-900/60 backdrop-blur-xl border border-white/7 hover:border-white/20 rounded-3xl p-5 transition-all duration-300 hover:scale-[1.02] h-full">
                   <h4 className="font-semibold text-base mb-1.5 text-white">Creative Power</h4>
                   <p className="text-zinc-400 text-sm leading-tight">Stories, ideas, code, and brainstorming.</p>
                 </div>
               </div>
             </div>
+
+            {/* Mobile: original layout */}
+            <div className="flex sm:hidden flex-col items-center justify-center w-full">
+              <WelcomeScreen onSelectPrompt={(p) => handleSend(p)} project={currentProject} />
+            </div>
           </div>
         )}
 
-        {/* Chat Input - Pinned to bottom in all states */}
-        <div className="w-full flex-shrink-0 bg-gradient-to-t from-background via-background to-transparent pb-4 pt-2">
+        {/* Chat Input - Pinned to bottom for mobile, hidden on desktop when no messages */}
+        <div className={`w-full flex-shrink-0 bg-gradient-to-t from-background via-background to-transparent pb-4 pt-2 ${!hasMessages ? 'sm:hidden' : ''}`}>
           <div className="max-w-3xl mx-auto w-full px-4">
             <ChatInput
               onSend={handleSend}
