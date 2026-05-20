@@ -4,8 +4,8 @@ import { useChatStore, type Attachment } from "@/lib/chat-store";
 import { truncateMemory } from "@/lib/memory-parsers";
 import { ChatMessages } from "@/components/chat-messages";
 import { ChatInput } from "@/components/chat-input";
-import { WelcomeScreen } from "@/components/welcome-screen";
 import { ChatHeader } from "@/components/chat-header";
+import { WelcomeScreen } from "@/components/welcome-screen";
 
 interface ChatInterfaceProps {
   onSwitchToImagine?: () => void;
@@ -240,6 +240,14 @@ export function ChatInterface({ onSwitchToImagine, onOpenSidebar, isSidebarOpen 
 
   return (
     <div className="flex flex-col h-full bg-background relative overflow-hidden">
+      {/* Chat Header with sidebar button (mobile only) */}
+      <ChatHeader
+        project={currentProject}
+        chat={currentChat || null}
+        onOpenSidebar={onOpenSidebar}
+        isSidebarOpen={isSidebarOpen}
+      />
+
       {hasMessages ? (
         <div className="flex-1 flex flex-col min-h-0 overflow-hidden relative">
           <div 
@@ -286,9 +294,9 @@ export function ChatInterface({ onSwitchToImagine, onOpenSidebar, isSidebarOpen 
             </div>
           </div>
 
-          {/* Glass Feature Blocks - Smaller Height, Wider, Lower Position */}
-          <div className="flex-shrink-0 px-4 pb-20 mt-auto">
-            <div className="max-w-4xl mx-auto">
+          {/* Glass Feature Blocks - Hidden on mobile, visible on sm+ */}
+          <div className="hidden sm:flex flex-shrink-0 px-4 pb-20 mt-auto">
+            <div className="max-w-4xl mx-auto w-full">
               <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
                 <div className="group bg-zinc-900/60 backdrop-blur-xl border border-white/07 hover:border-white/20 rounded-3xl p-5 transition-all duration-300 hover:scale-[1.02] h-full">
                   <h4 className="font-semibold text-base mb-1.5 text-white">Fast &amp; Smart</h4>

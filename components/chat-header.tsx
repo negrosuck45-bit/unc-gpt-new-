@@ -2,31 +2,12 @@ import { useState } from "react"
 import { useChatStore, type Chat, type Project } from "@/lib/chat-store"
 import { Button } from "@/components/ui/button"
 import {
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuItem,
-  DropdownMenuTrigger,
-} from "@/components/ui/dropdown-menu"
-import {
   Settings as SettingsIcon,
-  FolderOpen,
-  ChevronDown,
-  Wand2,
-  Check,
-  Zap,
-  Cloud,
-  Sparkles,
-  Cpu,
-  Lock,
   PanelLeft,
   PanelLeftClose,
 } from "lucide-react"
 import { SettingsDialog } from "./settings-dialog"
-import { ProjectsDialog } from "./projects-dialog"
 import { ImageEditDialog } from "./image-edit-dialog"
-
-import Image from "next/image"
-import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip"
 
 interface ChatHeaderProps {
   project: Project | null
@@ -39,12 +20,11 @@ interface ChatHeaderProps {
 export function ChatHeader({ project, chat, activeModelInfo, onOpenSidebar, isSidebarOpen }: ChatHeaderProps) {
   const { settings, updateSettings, updateChatModel } = useChatStore()
   const [settingsOpen, setSettingsOpen] = useState(false)
-  const [projectsOpen, setProjectsOpen] = useState(false)
   const [imageEditOpen, setImageEditOpen] = useState(false)
 
   return (
     <>
-      <div className="flex flex-col border-b border-border bg-background/80 backdrop-blur-sm">
+      <div className="flex flex-col bg-background/80 backdrop-blur-sm">
       <header className="flex items-center gap-2 px-3 py-2.5 min-h-[48px]">
         {/* Sidebar trigger — MOBILE ONLY */}
         {onOpenSidebar && (
@@ -64,8 +44,6 @@ export function ChatHeader({ project, chat, activeModelInfo, onOpenSidebar, isSi
           </Button>
         )}
 
-       
-
         {/* Spacer */}
         <div className="flex-1" />
 
@@ -73,7 +51,6 @@ export function ChatHeader({ project, chat, activeModelInfo, onOpenSidebar, isSi
       </div>
 
       <SettingsDialog open={settingsOpen} onOpenChange={setSettingsOpen} />
-      <ProjectsDialog open={projectsOpen} onOpenChange={setProjectsOpen} />
       <ImageEditDialog open={imageEditOpen} onOpenChange={setImageEditOpen} />
     </>
   )
