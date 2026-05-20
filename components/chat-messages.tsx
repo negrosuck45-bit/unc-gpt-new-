@@ -666,7 +666,7 @@ function ProgressiveThinking() {
             '0 0 10px rgba(147, 197, 253, 0.8)',
             '0 0 0px rgba(147, 197, 253, 0)'
           ]
-        }
+        }}
         transition={{ duration: 1.2, repeat: Infinity }}
         className="w-0.5 h-4 bg-blue-400 ml-1 rounded-full"
       />
