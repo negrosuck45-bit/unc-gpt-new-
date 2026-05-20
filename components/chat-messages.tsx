@@ -356,15 +356,6 @@ function FeedbackModal({ open, onClose, message, onSubmit }: { open: boolean; on
   );
 }
 
-// ============= NETWORK ERROR BANNER =============
-function NetworkErrorBanner({ error, onRetry }: { error: string; onRetry?: () => void }) {
-  return (
-    <motion.div initial={{ opacity: 0, y: -10 }} animate={{ opacity: 1, y: 0 }} className="mx-3 sm:mx-4 mb-3">
-      <div className="max-w-3xl mx-auto"><div className="rounded-xl border border-red-500/20 bg-red-500/5 backdrop-blur-sm p-4 flex items-center gap-3"><div className="w-9 h-9 rounded-full bg-red-500/10 flex items-center justify-center flex-shrink-0"><WifiOff className="h-4 w-4 text-red-400" /></div><div className="flex-1 min-w-0"><p className="text-sm font-medium text-red-300">A network issue occurred</p><p className="text-xs text-red-300/60 truncate">{error}</p></div>{onRetry && (<Button onClick={onRetry} size="sm" className="h-9 px-4 bg-red-500/20 text-red-300 hover:bg-red-500/30 border border-red-500/20 rounded-lg flex items-center gap-1.5 flex-shrink-0"><RotateCcw className="h-3.5 w-3.5" />Retry</Button>)}</div></div>
-    </motion.div>
-  );
-}
-
 // ============= EDIT MODAL =============
 function EditMessageModal({ open, onClose, message, onSave }: { open: boolean; onClose: () => void; message: Message | null; onSave: (newContent: string) => void }) {
   const [editText, setEditText] = useState('');
@@ -447,7 +438,16 @@ function EditMessageModal({ open, onClose, message, onSave }: { open: boolean; o
   );
 }
 
-// ============= MESSAGE ACTIONS - HOVER REVEAL WITH FRAMER MOTION =============
+// ============= NETWORK ERROR BANNER =============
+function NetworkErrorBanner({ error, onRetry }: { error: string; onRetry?: () => void }) {
+  return (
+    <motion.div initial={{ opacity: 0, y: -10 }} animate={{ opacity: 1, y: 0 }} className="mx-3 sm:mx-4 mb-3">
+      <div className="max-w-3xl mx-auto"><div className="rounded-xl border border-red-500/20 bg-red-500/5 backdrop-blur-sm p-4 flex items-center gap-3"><div className="w-9 h-9 rounded-full bg-red-500/10 flex items-center justify-center flex-shrink-0"><WifiOff className="h-4 w-4 text-red-400" /></div><div className="flex-1 min-w-0"><p className="text-sm font-medium text-red-300">A network issue occurred</p><p className="text-xs text-red-300/60 truncate">{error}</p></div>{onRetry && (<Button onClick={onRetry} size="sm" className="h-9 px-4 bg-red-500/20 text-red-300 hover:bg-red-500/30 border border-red-500/20 rounded-lg flex items-center gap-1.5 flex-shrink-0"><RotateCcw className="h-3.5 w-3.5" />Retry</Button>)}</div></div>
+    </motion.div>
+  );
+}
+
+// ============= MESSAGE ACTIONS - HOVER REVEAL + WORKING EDIT =============
 function MessageActions({ message, isAssistant, onCopy, onRegenerate, onEdit, onDislike }: { message: Message; isAssistant: boolean; onCopy: () => void; onRegenerate?: () => void; onEdit?: () => void; onDislike?: () => void }) {
   const [copied, setCopied] = useState(false);
   const [feedback, setFeedback] = useState<'like' | 'dislike' | null>(null);
@@ -765,7 +765,6 @@ export function ChatMessages({ messages, isStreaming, isThinking, onRegenerate, 
             const isLast = index === messages.length - 1;
             const messageFamily = getModelFamilyFromModel(message.modelUsed || currentChat?.model || settings.model);
 
-            // DEBUG: Log message structure for user messages with attachments
             if (message.role === 'user' && message.attachments && message.attachments.length > 0) {
               console.log('[ChatMessages] User message with attachments:', {
                 id: message.id,
@@ -782,7 +781,6 @@ export function ChatMessages({ messages, isStreaming, isThinking, onRegenerate, 
                 initial="initial"
                 whileHover="hover"
               >
-                {/* Message row - flex with proper alignment */}
                 <div className={cn(
                   'flex items-start min-w-0',
                   isAssistant ? 'flex-row' : 'flex-row-reverse'
@@ -802,7 +800,7 @@ export function ChatMessages({ messages, isStreaming, isThinking, onRegenerate, 
                     )}
                   </div>
 
-                  {/* Message Content */}
+                  {/* Message Content - w-fit for user so it shrinks to text size */}
                   <div className={cn(
                     'flex flex-col',
                     isAssistant ? 'items-start min-w-0 w-full' : 'items-end w-fit'
@@ -820,7 +818,7 @@ export function ChatMessages({ messages, isStreaming, isThinking, onRegenerate, 
                     {/* Text content */}
                     {message.content && message.content.trim().length > 0 && (
                       <div className={cn(
-                        'text-[13px] sm:text-sm leading-relaxed w-full',
+                        'text-[13px] sm:text-sm leading-relaxed',
                         isAssistant ? 'text-zinc-200' : 'text-zinc-100'
                       )}>
                         <MessageContent content={message.content} />
