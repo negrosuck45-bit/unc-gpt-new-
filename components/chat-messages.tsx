@@ -821,6 +821,7 @@ export function ChatMessages({ messages, isStreaming, isThinking, onRegenerate, 
                   onClick={() => handleMessageClick(message.id)}
                   className={cn(
                     'flex items-start min-w-0 transition-colors duration-150 rounded-xl',
+                    isAssistant ? 'flex-row' : 'flex-row-reverse',
                     isMobile && 'cursor-pointer',
                     isMobile && isActive && 'bg-white/[0.03]'
                   )}
