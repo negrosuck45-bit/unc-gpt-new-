@@ -239,7 +239,7 @@ export function CodeBlock({ code, language = 'text' }: CodeBlockProps) {
   const tokenizedLines = useMemo(() => tokenize(code), [code])
 
   return (
-    <div className="my-3 rounded-xl overflow-hidden bg-[#0a0a0a] border border-border">
+    <div className="my-3 rounded-xl overflow-hidden bg-[#0a0a0a] border border-border w-full">
       {/* Header */}
       <div className="flex items-center justify-between px-4 py-2 bg-[#141414] border-b border-border">
         <div className="flex items-center gap-2 min-w-0">
@@ -349,20 +349,12 @@ export function CodeBlock({ code, language = 'text' }: CodeBlockProps) {
             transition={{ duration: 0.2 }}
             className="overflow-hidden"
           >
-            {/* THIS IS THE KEY FIX: overflow-x-auto with touch scrolling */}
+            {/* KEY FIX: overflow-x-auto on wrapper, pre stays block-level */}
             <div 
-              className="overflow-x-auto max-w-full"
+              className="overflow-x-auto"
               style={{ WebkitOverflowScrolling: 'touch' }}
             >
-              <pre 
-                className="p-4 text-[13px] leading-6 font-mono"
-                style={{
-                  minWidth: '100%',
-                  width: 'max-content',
-                  whiteSpace: 'pre',
-                  wordWrap: 'normal',
-                }}
-              >
+              <pre className="p-4 text-[13px] leading-6 font-mono whitespace-pre">
                 {tokenizedLines.map((lineTokens, lineIndex) => (
                   <div key={lineIndex} className="flex">
                     <span className="select-none text-gray-600 pr-4 text-right min-w-[2.5rem] flex-shrink-0">
