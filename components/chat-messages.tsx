@@ -804,8 +804,8 @@ export function ChatMessages({ messages, isStreaming, isThinking, onRegenerate, 
 
                   {/* Message Content */}
                   <div className={cn(
-                    'flex flex-col min-w-0',
-                    isAssistant ? 'items-start' : 'items-end'
+                    'flex flex-col',
+                    isAssistant ? 'items-start min-w-0 w-full' : 'items-end w-fit'
                   )} style={{ maxWidth: 'min(92%, 720px)' }}>
 
                     {/* Image attachments (compact) */}
