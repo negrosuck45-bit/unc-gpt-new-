@@ -9,10 +9,10 @@ function generateId() {
 }
 
 // ============================================================
-// TERMINAL CONFIG - REAL EXECUTION
+// TERMINAL CONFIG - UPDATE AFTER RENDER DEPLOYS
 // ============================================================
-const TERMINAL_API_URL = "https://ttyd-latest-bue7.onrender.com/execute";
-const TERMINAL_API_KEY = "your-api-key";
+const TERMINAL_API_URL = "https://ai-terminal-api.onrender.com/execute"; // CHANGE THIS TO YOUR RENDER URL
+const TERMINAL_API_KEY = "your-secret-key-123"; // SAME AS RENDER ENV VAR
 
 async function runTerminalCommand(command: string, cwd: string = "/home/node"): Promise<string> {
   try {
@@ -27,14 +27,60 @@ async function runTerminalCommand(command: string, cwd: string = "/home/node"): 
     });
 
     if (!res.ok) {
-      return `Terminal HTTP ${res.status}: ${await res.text().catch(() => "Unknown error")}`;
+      const errText = await res.text().catch(() => "Unknown error");
+      return `Terminal HTTP ${res.status}: ${errText}`;
     }
 
     const data = await res.json();
-    return data.output || data.error || "Command executed with no output";
+    const output = data.output || "";
+    const error = data.error || null;
+
+    // Format as markdown terminal block for the UI to parse
+    let result = `\`\`\`terminal\n$ ${command}\n${output}`;
+    if (error) {
+      result += `\n[ERROR]: ${error}`;
+    }
+    result += `\n\`\`\``;
+
+    return result;
   } catch (err: any) {
     return `Terminal execution failed: ${err.message}`;
   }
+}
+
+// ============================================================
+// BUILTIN TOOLS
+// ============================================================
+const BUILTIN_TOOLS: any[] = [
+  {
+    type: "function",
+    function: {
+      name: "run_terminal_command",
+      description: "Execute any command in a real Linux/Ubuntu terminal. Use for: creating files, installing packages (npm install, apt-get, git, vercel, python), running servers, git operations, file operations, deploying with vercel, etc. This ACTUALLY runs the command and returns real output formatted as a terminal block.",
+      parameters: {
+        type: "object",
+        properties: {
+          command: {
+            type: "string",
+            description: "The shell command to execute (e.g., 'npm install express', 'git clone https://...', 'node server.js', 'vercel --version')",
+          },
+          cwd: {
+            type: "string",
+            description: "Working directory (default: /home/node)",
+            default: "/home/node",
+          },
+        },
+        required: ["command"],
+      },
+    },
+  },
+];
+
+async function executeBuiltInTool(toolName: string, args: any): Promise<string> {
+  if (toolName === "run_terminal_command") {
+    return await runTerminalCommand(args.command, args.cwd || "/home/node");
+  }
+  return `Tool ${toolName} not implemented`;
 }
 
 // ============================================================
@@ -113,42 +159,7 @@ function isVisionModel(model: string): boolean {
 }
 
 // ============================================================
-// BUILTIN TOOLS - TERMINAL EXECUTION
-// ============================================================
-const BUILTIN_TOOLS: any[] = [
-  {
-    type: "function",
-    function: {
-      name: "run_terminal_command",
-      description: "Execute any command in a real Linux/Ubuntu terminal. Use this for: creating files, installing packages (npm, git, vercel, python), running servers, git operations, file operations, etc. This ACTUALLY runs the command and returns the output.",
-      parameters: {
-        type: "object",
-        properties: {
-          command: {
-            type: "string",
-            description: "The shell command to execute (e.g., 'npm install express', 'git clone https://...', 'node server.js')",
-          },
-          cwd: {
-            type: "string",
-            description: "Working directory (default: /home/node)",
-            default: "/home/node",
-          },
-        },
-        required: ["command"],
-      },
-    },
-  },
-];
-
-async function executeBuiltInTool(toolName: string, args: any): Promise<string> {
-  if (toolName === "run_terminal_command") {
-    return await runTerminalCommand(args.command, args.cwd || "/home/node");
-  }
-  return `Tool ${toolName} not implemented`;
-}
-
-// ============================================================
-// WEB SEARCH CONFIGURATION
+// WEB SEARCH
 // ============================================================
 const SEARCH_TRIGGERS = [
   /what('s| is) (the )?(latest|current|recent|new)/i,
@@ -169,9 +180,6 @@ function shouldSearchWeb(text: string): boolean {
   return SEARCH_TRIGGERS.some(pattern => pattern.test(text));
 }
 
-// ============================================================
-// WEB SEARCH FUNCTIONS
-// ============================================================
 async function searchSerpAPI(query: string): Promise<string> {
   if (!SERPAPI_KEY) return "";
   try {
@@ -440,8 +448,7 @@ async function processAttachmentsForModel(
     } else {
       processed.push({
         role: msg.role,
-        content:
-          processedText || (imageParts.length > 0 ? "User attached an image." : ""),
+        content: processedText || (imageParts.length > 0 ? "User attached an image." : ""),
       });
     }
   }
@@ -544,8 +551,26 @@ async function generateMedia(
 }
 
 // ============================================================
-// PROVIDER CALLS
+// PROVIDER CALLS WITH TOOLS SUPPORT
 // ============================================================
+
+// SYSTEM PROMPT WITH STRONG TOOL INSTRUCTIONS
+const TERMINAL_SYSTEM_PROMPT = `You are uncgpt, a helpful AI assistant with access to a real Linux terminal tool called "run_terminal_command".
+
+CRITICAL INSTRUCTIONS:
+1. When the user asks you to run ANY command, install packages, create files, deploy, or do anything requiring terminal access, you MUST use the run_terminal_command tool.
+2. Do NOT just describe what to do. Actually execute the command using the tool.
+3. After running the command, report the actual output back to the user.
+4. Examples of when to use the tool:
+   - "install express" -> run_terminal_command: npm install express
+   - "create a file" -> run_terminal_command: echo "content" > file.txt
+   - "check node version" -> run_terminal_command: node --version
+   - "deploy to vercel" -> run_terminal_command: vercel --yes
+   - "git clone" -> run_terminal_command: git clone <url>
+   - "run python script" -> run_terminal_command: python script.py
+
+You have the tool available. USE IT.`;
+
 async function callGroq(
   messages: any[],
   model: string,
@@ -577,18 +602,18 @@ async function callGroq(
       const requestBody: any = {
         model: groqModel,
         messages: [
-          {
-            role: "system",
-            content:
-              "You are uncgpt, a helpful AI assistant. You have access to a real Linux terminal tool called 'run_terminal_command'. When the user asks you to execute commands, install packages, create files, deploy, or do anything that requires terminal access, YOU MUST use the run_terminal_command tool. Do not just give instructions - actually execute the commands using the tool.",
-          },
+          { role: "system", content: TERMINAL_SYSTEM_PROMPT },
           ...processedMessages,
         ],
         stream: true,
         temperature: 0.7,
         max_tokens: 4096,
-        ...(tools.length > 0 && { tools, tool_choice: "auto" }),
       };
+
+      if (tools.length > 0) {
+        requestBody.tools = tools;
+        requestBody.tool_choice = "auto";
+      }
 
       const res = await fetch("https://api.groq.com/openai/v1/chat/completions", {
         method: "POST",
@@ -607,6 +632,21 @@ async function callGroq(
       if (res.ok) {
         currentGroqKeyIndex = (currentGroqKeyIndex + 1) % availableKeys.length;
         return { stream: res.body!, provider: "Groq", model: groqModel };
+      }
+      if (res.status === 404 && groqModel.includes("llama-4")) {
+        const fallbackBody = {
+          ...requestBody,
+          model: "llama-3.2-90b-vision-preview",
+        };
+        const fallbackRes = await fetch("https://api.groq.com/openai/v1/chat/completions", {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            Authorization: `Bearer ${key}`,
+          },
+          body: JSON.stringify(fallbackBody),
+        });
+        if (fallbackRes.ok) return { stream: fallbackRes.body!, provider: "Groq", model: "llama-3.2-90b-vision-preview" };
       }
     } catch {}
   }
@@ -648,17 +688,26 @@ async function callOpenRouter(
       const controller = new AbortController();
       const timeoutId = setTimeout(() => controller.abort(), 30000);
 
+      const body: any = {
+        model: modelId,
+        messages: [
+          { role: "system", content: TERMINAL_SYSTEM_PROMPT },
+          ...processedMessages,
+        ],
+        stream: true,
+        temperature: 0.7,
+        max_tokens: 4096,
+      };
+
+      if (tools.length > 0) {
+        body.tools = tools;
+        body.tool_choice = "auto";
+      }
+
       const res = await fetch(OPENROUTER_URL, {
         method: "POST",
         headers,
-        body: JSON.stringify({
-          model: modelId,
-          messages: processedMessages,
-          stream: true,
-          temperature: 0.7,
-          max_tokens: 4096,
-          ...(tools.length > 0 && { tools, tool_choice: "auto" }),
-        }),
+        body: JSON.stringify(body),
         signal: controller.signal,
       });
 
@@ -682,20 +731,29 @@ async function callCerebras(
     ? await processAttachmentsForModel(cleanMessages, model, true)
     : cleanMessages;
 
+  const body: any = {
+    model,
+    messages: [
+      { role: "system", content: TERMINAL_SYSTEM_PROMPT },
+      ...processedMessages,
+    ],
+    stream: true,
+    temperature: 0.7,
+    max_tokens: 4096,
+  };
+
+  if (tools.length > 0) {
+    body.tools = tools;
+    body.tool_choice = "auto";
+  }
+
   const res = await fetch(CEREBRAS_URL, {
     method: "POST",
     headers: {
       "Content-Type": "application/json",
       Authorization: `Bearer ${CEREBRAS_KEY}`,
     },
-    body: JSON.stringify({
-      model,
-      messages: processedMessages,
-      stream: true,
-      temperature: 0.7,
-      max_tokens: 4096,
-      ...(tools.length > 0 && { tools, tool_choice: "auto" }),
-    }),
+    body: JSON.stringify(body),
   });
 
   if (res.ok) return { stream: res.body!, provider: "Cerebras", model };
@@ -741,16 +799,22 @@ async function callChatWorkers(
               : m.content,
           }));
 
+      const reqBody: any = {
+        ...body,
+        model: cfModel,
+        messages: messagesToSend,
+        ...(hasImage && { vision: true }),
+      };
+
+      if (tools.length > 0) {
+        reqBody.tools = tools;
+        reqBody.tool_choice = "auto";
+      }
+
       const res = await fetch(url, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          ...body,
-          model: cfModel,
-          messages: messagesToSend,
-          ...(hasImage && { vision: true }),
-          ...(tools.length > 0 && { tools, tool_choice: "auto" }),
-        }),
+        body: JSON.stringify(reqBody),
         signal: controller.signal,
       });
 
@@ -787,6 +851,13 @@ async function fallbackChat(
       return await callOpenRouter(messages, true, tools);
     } catch (err: any) {
       errors.push(`OpenRouter: ${err.message}`);
+    }
+    if (CEREBRAS_KEY) {
+      try {
+        return await callCerebras(messages, true, tools);
+      } catch (err: any) {
+        errors.push(`Cerebras: ${err.message}`);
+      }
     }
     throw new Error(`No vision providers: ${errors.join(", ")}`);
   }
@@ -1019,13 +1090,20 @@ async function runToolLoop(
       let result = "";
       const builtIn = tools.find(
         (t: any) =>
-          t.function?.name === tc.function.name && !t._connector && !t._toolName
+          t.function?.name === tc.function.name && !t._connector && !t._toolName && !t._exec
       );
       const mcp = tools.find((m: any) => m.function?.name === tc.function.name && m._connector);
+      const oauth = tools.find((o: any) => o.function?.name === tc.function.name && o._exec);
 
       if (builtIn) {
         try {
           result = await executeBuiltInTool(tc.function.name, args);
+        } catch (e: any) {
+          result = `Tool error: ${e.message}`;
+        }
+      } else if (oauth) {
+        try {
+          result = await oauth._exec(args);
         } catch (e: any) {
           result = `Tool error: ${e.message}`;
         }
@@ -1432,22 +1510,8 @@ export async function POST(req: NextRequest) {
       hasVisionCapability
     );
 
-    // Build system prompt with tool instructions
-    const systemContent = `You are uncgpt - a helpful AI assistant with access to real Linux terminal execution. 
-
-YOU HAVE A TERMINAL TOOL AVAILABLE - use it when the user asks you to:
-- Run commands (install npm packages, git operations, python scripts)
-- Create or edit files
-- Deploy applications
-- Check system status
-- Anything requiring terminal execution
-
-IMPORTANT: Do not just give instructions. Use the run_terminal_command tool to ACTUALLY execute commands. 
-When a user asks you to do something like "install express", you must use the tool to run: npm install express
-Then report back the output to the user.
-
-Be helpful, conversational, and execute commands proactively when needed.`;
-
+    // Build system prompt
+    const systemContent = TERMINAL_SYSTEM_PROMPT;
     const systemParts: string[] = [systemContent];
     if (projectInstructions) {
       systemParts.push(`\n\nProject Instructions:\n${projectInstructions}`);

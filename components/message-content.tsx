@@ -1,6 +1,7 @@
 'use client';
 import { useMemo, useState, useCallback } from 'react';
 import { CodeBlock } from './code-block';
+import { TerminalBlock } from './terminal-block';
 import { Download, ExternalLink, Loader2 } from 'lucide-react';
 import { toast } from 'sonner';
 
@@ -9,35 +10,60 @@ interface MessageContentProps {
 }
 
 interface ContentPart {
-  type: 'text' | 'code' | 'image';
+  type: 'text' | 'code' | 'image' | 'terminal';
   content: string;
   language?: string;
   alt?: string;
+  command?: string;
+  output?: string;
+  error?: string | null;
 }
 
-// Enhanced formatText function to handle markdown links and formatting
 function formatText(text: string | undefined | null): string {
   if (typeof text !== 'string' || !text.trim()) {
     return '';
   }
 
   let formatted = text
-    // Escaping some HTML characters
     .replace(/&/g, '&amp;')
     .replace(/</g, '&lt;')
     .replace(/>/g, '&gt;')
-    // Links: [text](url)
     .replace(/\[([^\]]+)\]\((https?:\/\/[^\s\)]+)\)/g, '<a href="$2" target="_blank" rel="noopener noreferrer" class="text-blue-500 hover:underline inline-flex items-center gap-1">$1 <svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-external-link"><path d="M15 3h6v6"/><path d="M10 14 21 3"/><path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"/></svg></a>')
-    // Bold: **text**
     .replace(/\*\*(.*?)\*\*/g, '<strong class="font-bold text-foreground">$1</strong>')
-    // Italic: *text*
     .replace(/\*(.*?)\*/g, '<em class="italic">$1</em>')
-    // Inline code: `code`
     .replace(/`([^`]+)`/g, '<code class="px-1.5 py-0.5 rounded bg-accent text-sm font-mono border border-border/50">$1</code>')
-    // Line breaks
     .replace(/\n/g, '<br />');
 
   return formatted;
+}
+
+// Parse terminal blocks from AI output
+function parseTerminalBlocks(text: string): { text: string; terminals: Array<{ command: string; output: string; error: string | null }> } {
+  const terminals: Array<{ command: string; output: string; error: string | null }> = [];
+  const terminalRegex = /```terminal\n\$?\s?([^\n]+)\n([\s\S]*?)```/g;
+
+  let cleanedText = text;
+  let match;
+
+  while ((match = terminalRegex.exec(text)) !== null) {
+    const fullMatch = match[0];
+    const command = match[1].trim();
+    const rawOutput = match[2].trim();
+
+    let output = rawOutput;
+    let error = null;
+
+    if (rawOutput.includes('\n[ERROR]: ')) {
+      const parts = rawOutput.split('\n[ERROR]: ');
+      output = parts[0].trim();
+      error = parts[1].trim();
+    }
+
+    terminals.push({ command, output, error });
+    cleanedText = cleanedText.replace(fullMatch, `__TERMINAL_${terminals.length - 1}__`);
+  }
+
+  return { text: cleanedText, terminals };
 }
 
 function parseContent(content: string | undefined | null): ContentPart[] {
@@ -45,48 +71,54 @@ function parseContent(content: string | undefined | null): ContentPart[] {
     return [{ type: 'text', content: '' }];
   }
 
+  const { text: cleanedContent, terminals } = parseTerminalBlocks(content);
+
   const parts: ContentPart[] = [];
-  // Match code blocks and markdown images
-  // We exclude markdown links from the main regex to handle them inside formatText
-  const regex = /```(\w+)?\n([\s\S]*?)```|!\[([^\]]*)\]\((https?:\/\/[^\)]+)\)/g;
+  const regex = /```(\w+)?\n([\s\S]*?)```|!\[([^\]]*)\]\((https?:\/\/[^\)]+)\)|__TERMINAL_(\d+)__/g;
 
   let lastIndex = 0;
   let match;
 
-  while ((match = regex.exec(content)) !== null) {
-    // Add text before this match
+  while ((match = regex.exec(cleanedContent)) !== null) {
     if (match.index > lastIndex) {
-      const text = content.slice(lastIndex, match.index).trim();
+      const text = cleanedContent.slice(lastIndex, match.index).trim();
       if (text) parts.push({ type: 'text', content: text });
     }
 
-    if (match[0].startsWith('```')) {
-      // Code block
+    if (match[0].startsWith('__TERMINAL_')) {
+      const idx = parseInt(match[5], 10);
+      const term = terminals[idx];
+      if (term) {
+        parts.push({
+          type: 'terminal',
+          command: term.command,
+          output: term.output,
+          error: term.error,
+        });
+      }
+    } else if (match[0].startsWith('```')) {
       parts.push({
         type: 'code',
         language: match[1] || 'text',
         content: match[2].trim(),
       });
     } else {
-      // Markdown image: ![alt](url)
       parts.push({
         type: 'image',
         alt: match[3] || 'Generated Image',
-        content: match[4], // URL
+        content: match[4],
       });
     }
 
     lastIndex = match.index + match[0].length;
   }
 
-  // Add remaining text
-  if (lastIndex < content.length) {
-    const text = content.slice(lastIndex).trim();
+  if (lastIndex < cleanedContent.length) {
+    const text = cleanedContent.slice(lastIndex).trim();
     if (text) parts.push({ type: 'text', content: text });
   }
 
-  // Fallback if no parts found
-  return parts.length > 0 ? parts : [{ type: 'text', content: content.trim() }];
+  return parts.length > 0 ? parts : [{ type: 'text', content: cleanedContent.trim() }];
 }
 
 function ImageWithLoader({ src, alt }: { src: string; alt: string }) {
@@ -169,13 +201,11 @@ function ImageWithLoader({ src, alt }: { src: string; alt: string }) {
 export function MessageContent({ content }: MessageContentProps) {
   const parts = useMemo(() => parseContent(content), [content]);
 
-  // Separate images from other content for layout optimization
   const images = useMemo(() => parts.filter(p => p.type === 'image'), [parts]);
   const otherParts = useMemo(() => parts.filter(p => p.type !== 'image'), [parts]);
 
   return (
     <div className="space-y-2">
-      {/* Images displayed as horizontal thumbnails above text */}
       {images.length > 0 && (
         <div className="flex flex-wrap gap-2 pb-2" style={{ willChange: 'transform' }}>
           {images.map((part, index) => (
@@ -204,7 +234,6 @@ export function MessageContent({ content }: MessageContentProps) {
         </div>
       )}
 
-      {/* Other content (text, code) */}
       {otherParts.map((part, index) => {
         if (part.type === 'code') {
           return (
@@ -216,7 +245,17 @@ export function MessageContent({ content }: MessageContentProps) {
           );
         }
 
-        // Text part
+        if (part.type === 'terminal') {
+          return (
+            <TerminalBlock
+              key={`terminal-${index}`}
+              command={part.command || ''}
+              output={part.output}
+              error={part.error}
+            />
+          );
+        }
+
         return (
           <p
             key={`text-${index}`}
