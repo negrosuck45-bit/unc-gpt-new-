@@ -35,7 +35,6 @@ async function runTerminalCommand(command: string, cwd: string = "/home/node"): 
     const output = data.output || "";
     const error = data.error || null;
 
-    // Format as markdown terminal block for the UI to parse
     let result = `\`\`\`terminal\n$ ${command}\n${output}`;
     if (error) {
       result += `\n[ERROR]: ${error}`;
@@ -49,7 +48,7 @@ async function runTerminalCommand(command: string, cwd: string = "/home/node"): 
 }
 
 // ============================================================
-// BUILTIN TOOLS
+// BUILTIN TOOLS (Terminal + Custom)
 // ============================================================
 const BUILTIN_TOOLS: any[] = [
   {
@@ -106,6 +105,7 @@ const IMAGE_MODELS = [
   "@cf/leonardo-ai/phoenix-1.0",
 ];
 
+// Groq Models
 const GROQ_CHAT_MODELS: Record<string, string> = {
   "llama-3.3-70b-versatile": "llama-3.3-70b-versatile",
   "llama-3.1-8b-instant": "llama-3.1-8b-instant",
@@ -113,8 +113,10 @@ const GROQ_CHAT_MODELS: Record<string, string> = {
   "meta-llama/llama-4-maverick-17b-128e-instruct": "meta-llama/llama-4-maverick-17b-128e-instruct",
   "deepseek-r1-distill-llama-70b": "deepseek-r1-distill-llama-70b",
   "mixtral-8x7b-32768": "mixtral-8x7b-32768",
-  "compound-beta": "compound-beta",
-  "compound-mini": "compound-mini",
+  "compound-beta": "groq/compound",
+  "compound-mini": "groq/compound-mini",
+  "openai/gpt-oss-120b": "openai/gpt-oss-120b",
+  "openai/gpt-oss-20b": "openai/gpt-oss-20b",
 };
 
 const GROQ_KEYS: string[] = [
@@ -142,16 +144,14 @@ let currentGroqKeyIndex = 0;
 let currentChatIndex = 0;
 const deadGroqKeys = new Set<number>();
 
+// ============================================================
+// VISION MODELS (Updated for 2026 - Groq supported)
+// ============================================================
 const VISION_MODELS = [
   "meta-llama/llama-4-scout-17b-16e-instruct",
   "meta-llama/llama-4-maverick-17b-128e-instruct",
   "llama-3.2-90b-vision-preview",
   "llama-3.2-11b-vision-preview",
-  "@cf/moonshot/kimi-k2.6",
-  "@cf/moonshot/kimi-k2.5",
-  "claude-3-opus",
-  "claude-3-sonnet",
-  "claude-3-haiku",
 ];
 
 function isVisionModel(model: string): boolean {
@@ -159,7 +159,40 @@ function isVisionModel(model: string): boolean {
 }
 
 // ============================================================
-// WEB SEARCH
+// COMPOUND / GPT-OSS TOOL CONFIGURATION
+// ============================================================
+
+// Compound built-in tools: web_search, visit_website, code_interpreter, browser_automation, wolfram_alpha
+// GPT-OSS built-in tools: browser_search, code_interpreter
+
+type CompoundTool = "web_search" | "visit_website" | "code_interpreter" | "browser_automation" | "wolfram_alpha";
+type GptOssTool = "browser_search" | "code_interpreter";
+
+const COMPOUND_MODELS = ["groq/compound", "groq/compound-mini", "compound-beta", "compound-mini"];
+const GPT_OSS_MODELS = ["openai/gpt-oss-120b", "openai/gpt-oss-20b"];
+
+function isCompoundModel(model: string): boolean {
+  return COMPOUND_MODELS.some(m => model.toLowerCase().includes(m.toLowerCase()));
+}
+
+function isGptOssModel(model: string): boolean {
+  return GPT_OSS_MODELS.some(m => model.toLowerCase().includes(m.toLowerCase()));
+}
+
+function getCompoundCustomTools(enabledTools: CompoundTool[] = ["web_search", "visit_website", "code_interpreter", "browser_automation"]) {
+  return {
+    tools: {
+      enabled_tools: enabledTools,
+    },
+  };
+}
+
+function getGptOssTools(enabledTools: GptOssTool[] = ["browser_search", "code_interpreter"]) {
+  return enabledTools.map(t => ({ type: t }));
+}
+
+// ============================================================
+// WEB SEARCH (Fallback when not using Compound)
 // ============================================================
 const SEARCH_TRIGGERS = [
   /what('s| is) (the )?(latest|current|recent|new)/i,
@@ -551,29 +584,44 @@ async function generateMedia(
 }
 
 // ============================================================
-// PROVIDER CALLS WITH TOOLS SUPPORT
+// SYSTEM PROMPT
 // ============================================================
+const TERMINAL_SYSTEM_PROMPT = `You are uncgpt, a helpful AI assistant with access to powerful tools.
 
-// SYSTEM PROMPT WITH STRONG TOOL INSTRUCTIONS
-const TERMINAL_SYSTEM_PROMPT = `You are uncgpt, a helpful AI assistant. 
+CAPABILITIES:
+- Terminal: Use "-terminal [command]" to execute Linux commands (file ops, npm, git, python, servers, etc.)
+- Web Search: I can search the web for real-time information automatically
+- Code Execution: I can run Python code in a secure sandbox
+- Browser: I can visit websites and browse the internet
+- Vision: I can analyze images you upload
 
 TERMINAL INSTRUCTIONS:
 1. You have access to a Linux terminal tool called "run_terminal_command".
-2. IMPORTANT: Only use this tool if the user explicitly starts their message with "-terminal ". 
+2. IMPORTANT: Only use this tool if the user explicitly starts their message with "-terminal ".
 3. If the user does NOT use the "-terminal " prefix, do NOT suggest using the terminal, do NOT ask to use the terminal, and do NOT use the tool. Just answer as a regular AI.
 4. If and only if the message starts with "-terminal [command]", then execute the [command] using the tool.`;
+
+// ============================================================
+// GROQ PROVIDER CALLS WITH COMPOUND/GPT-OSS TOOLS
+// ============================================================
 
 async function callGroq(
   messages: any[],
   model: string,
   hasImage: boolean,
-  tools: any[] = []
-): Promise<{ stream: ReadableStream; provider: string; model: string }> {
+  tools: any[] = [],
+  enableCompoundTools: boolean = false,
+  enableGptOssTools: boolean = false
+): Promise<{ stream: ReadableStream; provider: string; model: string; response?: any }> {
   const cleanMessages = sanitizeMessagesForAPI(messages);
-  const groqModel = hasImage
-    ? "meta-llama/llama-4-scout-17b-16e-instruct"
-    : GROQ_CHAT_MODELS[model] ?? "llama-3.3-70b-versatile";
-  const hasVision = isVisionModel(groqModel);
+  
+  // Vision model selection
+  let groqModel = GROQ_CHAT_MODELS[model] || model;
+  if (hasImage && !isVisionModel(groqModel) && !isCompoundModel(groqModel) && !isGptOssModel(groqModel)) {
+    groqModel = "meta-llama/llama-4-scout-17b-16e-instruct";
+  }
+  
+  const hasVision = isVisionModel(groqModel) || isCompoundModel(groqModel) || isGptOssModel(groqModel);
   const processedMessages = await processAttachmentsForModel(
     cleanMessages,
     groqModel,
@@ -602,7 +650,23 @@ async function callGroq(
         max_tokens: 4096,
       };
 
-      if (tools.length > 0) {
+      // Add Compound custom tools configuration
+      if (enableCompoundTools && isCompoundModel(groqModel)) {
+        requestBody.compound_custom = getCompoundCustomTools([
+          "web_search",
+          "visit_website", 
+          "code_interpreter",
+          "browser_automation"
+        ]);
+        // Compound models handle tools server-side, don't pass local tools
+      } 
+      // Add GPT-OSS tools configuration
+      else if (enableGptOssTools && isGptOssModel(groqModel)) {
+        requestBody.tools = getGptOssTools(["browser_search", "code_interpreter"]);
+        requestBody.tool_choice = "auto";
+      }
+      // Regular tool calling for non-compound models
+      else if (tools.length > 0 && !isCompoundModel(groqModel) && !isGptOssModel(groqModel)) {
         requestBody.tools = tools;
         requestBody.tool_choice = "auto";
       }
@@ -612,6 +676,7 @@ async function callGroq(
         headers: {
           "Content-Type": "application/json",
           Authorization: `Bearer ${key}`,
+          ...(isCompoundModel(groqModel) || isGptOssModel(groqModel) ? { "Groq-Model-Version": "latest" } : {}),
         },
         body: JSON.stringify(requestBody),
       });
@@ -625,11 +690,14 @@ async function callGroq(
         currentGroqKeyIndex = (currentGroqKeyIndex + 1) % availableKeys.length;
         return { stream: res.body!, provider: "Groq", model: groqModel };
       }
+      
+      // Fallback for Llama-4 vision if 404
       if (res.status === 404 && groqModel.includes("llama-4")) {
         const fallbackBody = {
           ...requestBody,
           model: "llama-3.2-90b-vision-preview",
         };
+        delete fallbackBody.compound_custom;
         const fallbackRes = await fetch("https://api.groq.com/openai/v1/chat/completions", {
           method: "POST",
           headers: {
@@ -1320,6 +1388,15 @@ function createStreamResponse(
                 if (!content && data.content) content = data.content;
                 if (!content && typeof data === "string") content = data;
 
+                // Handle Compound executed_tools in stream
+                if (data.choices?.[0]?.message?.executed_tools) {
+                  controller.enqueue(
+                    encoder.encode(
+                      `data: ${JSON.stringify({ executed_tools: data.choices[0].message.executed_tools })}\n\n`
+                    )
+                  );
+                }
+
                 if (content) {
                   controller.enqueue(
                     encoder.encode(
@@ -1394,7 +1471,7 @@ export async function POST(req: NextRequest) {
       ? lastMsg.content.find((c: any) => c.type === "text")?.text || ""
       : lastMsg?.content || "";
 
-    // ==================== SILENT WEB SEARCH ====================
+    // ==================== SILENT WEB SEARCH (Fallback) ====================
     let searchContext = "";
     const needsSearch =
       webSearch === true || shouldSearchWeb(userText);
@@ -1487,12 +1564,32 @@ export async function POST(req: NextRequest) {
     }
 
     // ==================== CHAT WITH TOOLS ====================
-    const targetModel =
-      finalModel !== "auto"
-        ? finalModel
-        : hasImage
-          ? "meta-llama/llama-4-scout-17b-16e-instruct"
-          : "llama-3.3-70b-versatile";
+    
+    // Determine if we should use Compound or GPT-OSS for built-in tools
+    const isTerminalRequest = userText.trim().startsWith("-terminal");
+    const isSearchQuery = shouldSearchWeb(userText);
+    const isCodeQuery = /(code|python|javascript|execute|run|script|calculate|math|compute)/i.test(userText);
+    const isBrowseQuery = /(visit|browse|open|go to|check|website|url|page)/i.test(userText);
+    
+    // Auto-select model based on query type
+    let targetModel = finalModel !== "auto" ? finalModel : "llama-3.3-70b-versatile";
+    let useCompoundTools = false;
+    let useGptOssTools = false;
+    
+    if (finalModel === "auto") {
+      if (hasImage) {
+        targetModel = "meta-llama/llama-4-scout-17b-16e-instruct";
+      } else if (isSearchQuery || isCodeQuery || isBrowseQuery) {
+        // Use Compound for web search/code/browser automation
+        targetModel = "groq/compound";
+        useCompoundTools = true;
+      }
+    } else if (isCompoundModel(finalModel)) {
+      useCompoundTools = true;
+    } else if (isGptOssModel(finalModel)) {
+      useGptOssTools = true;
+    }
+
     const hasVisionCapability = isVisionModel(targetModel) || hasImage;
 
     const messagesWithVisionFormat = messages.map(convertMessageWithAttachments);
@@ -1503,8 +1600,7 @@ export async function POST(req: NextRequest) {
     );
 
     // Build system prompt
-    const systemContent = TERMINAL_SYSTEM_PROMPT;
-    const systemParts: string[] = [systemContent];
+    const systemParts: string[] = [TERMINAL_SYSTEM_PROMPT];
     if (projectInstructions) {
       systemParts.push(`\n\nProject Instructions:\n${projectInstructions}`);
     }
@@ -1516,7 +1612,7 @@ export async function POST(req: NextRequest) {
       { role: "system", content: systemParts.join("") },
     ];
 
-    if (searchContext) {
+    if (searchContext && !useCompoundTools && !useGptOssTools) {
       messagesWithSystem.push({
         role: "assistant",
         content: `Here is the current information I found from web search:\n\n${searchContext}\n\nI will now answer your question based on this up-to-date information.`,
@@ -1541,16 +1637,14 @@ export async function POST(req: NextRequest) {
         mcpTools = await fetchMcpTools(mcpConnectors, baseUrl);
       }
 
-      // ONLY enable tools if the user explicitly used the -terminal prefix
-      const isTerminalRequest = userText.trim().startsWith("-terminal");
-      
-      const combinedTools = isTerminalRequest ? [
+      // Terminal tool is always available via local tool loop for non-compound models
+      const combinedTools = (!useCompoundTools && !useGptOssTools) ? [
         ...BUILTIN_TOOLS,
         ...oauthBundle.tools,
         ...mcpTools,
       ] : [];
 
-      if (combinedTools.length > 0) {
+      if (combinedTools.length > 0 && !useCompoundTools && !useGptOssTools) {
         messagesWithSystem = await runToolLoop(
           messagesWithSystem,
           combinedTools,
@@ -1566,15 +1660,31 @@ export async function POST(req: NextRequest) {
     let result: { stream: ReadableStream; provider: string; model: string };
 
     try {
-      // Prioritize Groq for reliability when auto-selecting provider
       if (finalProvider === "auto") {
-        // Default to Groq for auto mode - most reliable
-        const model = hasImage 
-          ? "meta-llama/llama-4-scout-17b-16e-instruct"
-          : "llama-3.3-70b-versatile";
-        result = await callGroq(messagesWithSystem, model, hasImage, BUILTIN_TOOLS);
+        // Use Compound/GPT-OSS for tool queries, regular models for chat
+        if (useCompoundTools || useGptOssTools || isCompoundModel(targetModel) || isGptOssModel(targetModel)) {
+          result = await callGroq(
+            messagesWithSystem, 
+            targetModel, 
+            hasImage, 
+            [],
+            useCompoundTools,
+            useGptOssTools
+          );
+        } else if (hasImage) {
+          result = await callGroq(messagesWithSystem, targetModel, hasImage, BUILTIN_TOOLS);
+        } else {
+          result = await callGroq(messagesWithSystem, "llama-3.3-70b-versatile", false, BUILTIN_TOOLS);
+        }
       } else if (finalProvider === "groq" || GROQ_CHAT_MODELS[finalModel]) {
-        result = await callGroq(messagesWithSystem, finalModel, hasImage, BUILTIN_TOOLS);
+        result = await callGroq(
+          messagesWithSystem, 
+          finalModel, 
+          hasImage, 
+          BUILTIN_TOOLS,
+          isCompoundModel(finalModel),
+          isGptOssModel(finalModel)
+        );
       } else if (finalProvider === "openrouter") {
         result = await callOpenRouter(messagesWithSystem, hasImage, BUILTIN_TOOLS);
       } else if (finalProvider === "cloudflare" || finalModel.startsWith("@cf/")) {
@@ -1608,6 +1718,25 @@ export async function POST(req: NextRequest) {
       { status: 500 }
     );
   }
+}
+
+export async function GET(req: NextRequest) {
+  const { searchParams } = new URL(req.url);
+  const id = searchParams.get("conversationId");
+
+  if (!id) {
+    const list = Array.from(conversations.values()).map((c: any) => ({
+      id: c.id,
+      createdAt: c.createdAt,
+      messageCount: c.messages.length,
+    }));
+    return Response.json({ conversations: list });
+  }
+
+  const conv = conversations.get(id);
+  if (!conv) return Response.json({ error: "Not found" }, { status: 404 });
+
+  return Response.json({ conversation: conv });
 }
 
 export async function GET(req: NextRequest) {
