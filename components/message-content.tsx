@@ -10,13 +10,15 @@ interface MessageContentProps {
 }
 
 interface ContentPart {
-  type: 'text' | 'code' | 'image' | 'terminal';
+  type: 'text' | 'code' | 'image' | 'terminal' | 'search' | 'website' | 'code-execution' | 'error';
   content: string;
   language?: string;
   alt?: string;
   command?: string;
   output?: string;
   error?: string | null;
+  title?: string;
+  url?: string;
 }
 
 function formatText(text: string | undefined | null): string {
@@ -116,7 +118,7 @@ function parseContent(content: string | undefined | null): ContentPart[] {
   const { text: cleanedContent, terminals } = parseTerminalBlocks(unescapedContent);
 
   const parts: ContentPart[] = [];
-  const regex = /```(\w+)?\n([\s\S]*?)```|!\[([^\]]*)\]\((https?:\/\/[^\)]+)\)|__TERMINAL_(\d+)__/g;
+  const regex = /```([\w-]+)?\n([\s\S]*?)```|!\[([^\]]*)\]\((https?:\/\/[^\)]+)\)|__TERMINAL_(\d+)__/g;
 
   let lastIndex = 0;
   let match;
@@ -139,11 +141,37 @@ function parseContent(content: string | undefined | null): ContentPart[] {
         });
       }
     } else if (match[0].startsWith('```')) {
-      parts.push({
-        type: 'code',
-        language: match[1] || 'text',
-        content: match[2].trim(),
-      });
+      const blockType = match[1] || 'text';
+      const blockContent = match[2].trim();
+      
+      // Route different block types
+      if (blockType === 'search-results') {
+        parts.push({
+          type: 'search',
+          content: blockContent,
+        });
+      } else if (blockType === 'website-content') {
+        parts.push({
+          type: 'website',
+          content: blockContent,
+        });
+      } else if (blockType === 'code-execution') {
+        parts.push({
+          type: 'code-execution',
+          content: blockContent,
+        });
+      } else if (blockType === 'code-error') {
+        parts.push({
+          type: 'error',
+          content: blockContent,
+        });
+      } else {
+        parts.push({
+          type: 'code',
+          language: blockType,
+          content: blockContent,
+        });
+      }
     } else {
       parts.push({
         type: 'image',
@@ -296,6 +324,70 @@ export function MessageContent({ content }: MessageContentProps) {
                 error={part.error}
                 interactive={true}
               />
+            </div>
+          );
+        }
+
+        if (part.type === 'search') {
+          return (
+            <div key={`search-${index}`} className="my-3 rounded-lg border border-blue-500/30 overflow-hidden bg-blue-950/20">
+              <div className="px-4 py-3 bg-blue-900/40 border-b border-blue-500/20 flex items-center gap-2">
+                <span className="text-blue-400">🔍</span>
+                <span className="text-sm font-semibold text-blue-300">Search Results</span>
+              </div>
+              <div className="px-4 py-3">
+                <pre className="text-xs font-mono text-blue-100 whitespace-pre-wrap break-words leading-relaxed max-h-96 overflow-y-auto">
+                  {part.content}
+                </pre>
+              </div>
+            </div>
+          );
+        }
+
+        if (part.type === 'website') {
+          return (
+            <div key={`website-${index}`} className="my-3 rounded-lg border border-purple-500/30 overflow-hidden bg-purple-950/20">
+              <div className="px-4 py-3 bg-purple-900/40 border-b border-purple-500/20 flex items-center gap-2">
+                <span className="text-purple-400">🌐</span>
+                <span className="text-sm font-semibold text-purple-300">Website Content</span>
+              </div>
+              <div className="px-4 py-3">
+                <pre className="text-xs font-mono text-purple-100 whitespace-pre-wrap break-words leading-relaxed max-h-96 overflow-y-auto">
+                  {part.content}
+                </pre>
+              </div>
+            </div>
+          );
+        }
+
+        if (part.type === 'code-execution') {
+          return (
+            <div key={`exec-${index}`} className="my-3 rounded-lg border border-emerald-500/30 overflow-hidden bg-emerald-950/20">
+              <div className="px-4 py-3 bg-emerald-900/40 border-b border-emerald-500/20 flex items-center gap-2">
+                <span className="text-emerald-400">▶</span>
+                <span className="text-sm font-semibold text-emerald-300">Code Execution</span>
+              </div>
+              <div className="px-4 py-3">
+                <pre className="text-xs font-mono text-emerald-100 whitespace-pre-wrap break-words leading-relaxed max-h-96 overflow-y-auto">
+                  {part.content}
+                </pre>
+              </div>
+            </div>
+          );
+        }
+
+        if (part.type === 'error') {
+          return (
+            <div key={`error-${index}`} className="my-3 rounded-lg border border-red-500/30 overflow-hidden bg-red-950/20">
+              <div className="px-4 py-3 bg-red-900/40 border-b border-red-500/20 flex items-center gap-2">
+                <span className="text-red-400">⚠</span>
+                <span className="text-sm font-semibold text-red-300">Error</span>
+              </div>
+              <div className="px-4 py-3">
+                <pre className="text-xs font-mono text-red-100 whitespace-pre-wrap break-words leading-relaxed max-h-96 overflow-y-auto">
+                  {part.content}
+                </pre>
+              </div>
             </div>
           );
         }
