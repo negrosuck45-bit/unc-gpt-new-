@@ -1920,25 +1920,6 @@ export async function GET(req: NextRequest) {
   return Response.json({ conversation: conv });
 }
 
-export async function GET(req: NextRequest) {
-  const { searchParams } = new URL(req.url);
-  const id = searchParams.get("conversationId");
-
-  if (!id) {
-    const list = Array.from(conversations.values()).map((c: any) => ({
-      id: c.id,
-      createdAt: c.createdAt,
-      messageCount: c.messages.length,
-    }));
-    return Response.json({ conversations: list });
-  }
-
-  const conv = conversations.get(id);
-  if (!conv) return Response.json({ error: "Not found" }, { status: 404 });
-
-  return Response.json({ conversation: conv });
-}
-
 export async function DELETE(req: NextRequest) {
   const { searchParams } = new URL(req.url);
   const id = searchParams.get("conversationId");
