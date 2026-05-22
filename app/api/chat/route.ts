@@ -48,126 +48,7 @@ async function runTerminalCommand(command: string, cwd: string = "/home/node"): 
 }
 
 // ============================================================
-// GROQ WEB SEARCH & TOOLS
-// ============================================================
-async function performWebSearch(query: string): Promise<string> {
-  try {
-    const searchUrl = `https://www.google.com/search?q=${encodeURIComponent(query)}`;
-    const res = await fetch(searchUrl, {
-      headers: {
-        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36',
-      },
-    });
-    
-    if (!res.ok) {
-      return `Search failed: HTTP ${res.status}`;
-    }
-    
-    const html = await res.text();
-    // Extract search results from HTML (simplified)
-    const resultRegex = /<h3[^>]*>([^<]+)<\/h3>/g;
-    const results: string[] = [];
-    let match;
-    while ((match = resultRegex.exec(html)) && results.length < 5) {
-      results.push(match[1]);
-    }
-    
-    return `\`\`\`search-results
-Search Query: ${query}
-Results:
-${results.map((r, i) => `${i + 1}. ${r}`).join('\n')}
-\`\`\``;
-  } catch (err: any) {
-    return `Search error: ${err.message}`;
-  }
-}
-
-async function visitWebsite(url: string): Promise<string> {
-  try {
-    const res = await fetch(url, {
-      headers: {
-        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36',
-      },
-      timeout: 10000,
-    });
-    
-    if (!res.ok) {
-      return `Failed to visit ${url}: HTTP ${res.status}`;
-    }
-    
-    const text = await res.text();
-    // Extract main text content (simplified)
-    const titleMatch = text.match(/<title>([^<]+)<\/title>/);
-    const title = titleMatch ? titleMatch[1] : 'No title';
-    
-    // Get first 1000 chars of content
-    const content = text
-      .replace(/<script[^>]*>[\s\S]*?<\/script>/gi, '')
-      .replace(/<style[^>]*>[\s\S]*?<\/style>/gi, '')
-      .replace(/<[^>]+>/g, ' ')
-      .replace(/\s+/g, ' ')
-      .substring(0, 1000);
-    
-    return `\`\`\`website-content
-URL: ${url}
-Title: ${title}
-Content Preview:
-${content}...
-\`\`\``;
-  } catch (err: any) {
-    return `Visit website failed: ${err.message}`;
-  }
-}
-
-async function executeCode(code: string, language: string = "python"): Promise<string> {
-  try {
-    // For security, only allow read-only Python operations
-    const dangerousPatterns = ['os.system', 'subprocess', 'eval', '__import__', 'exec'];
-    if (dangerousPatterns.some(p => code.includes(p))) {
-      return `\`\`\`code-error
-Error: Dangerous code pattern detected
-\`\`\``;
-    }
-    
-    // Execute code using Node.js vm module for safety
-    const vm = require('vm');
-    const timeout = 5000;
-    
-    let output = '';
-    const sandbox = {
-      console: {
-        log: (...args: any[]) => {
-          output += args.join(' ') + '\n';
-        },
-      },
-    };
-    
-    try {
-      vm.runInNewContext(code, sandbox, { timeout });
-    } catch (timeoutErr: any) {
-      if (timeoutErr.code === 'ERR_SCRIPT_EXECUTION_TIMEOUT') {
-        return `\`\`\`code-execution
-Language: ${language}
-Error: Code execution timeout (${timeout}ms)
-\`\`\``;
-      }
-      throw timeoutErr;
-    }
-    
-    return `\`\`\`code-execution
-Language: ${language}
-Output:
-${output || '(no output)'}
-\`\`\``;
-  } catch (err: any) {
-    return `\`\`\`code-error
-Error executing ${language}: ${err.message}
-\`\`\``;
-  }
-}
-
-// ============================================================
-// BUILTIN TOOLS (Terminal + Groq Tools)
+// BUILTIN TOOLS (Terminal + Custom)
 // ============================================================
 const BUILTIN_TOOLS: any[] = [
   {
@@ -192,73 +73,11 @@ const BUILTIN_TOOLS: any[] = [
       },
     },
   },
-  {
-    type: "function",
-    function: {
-      name: "web_search",
-      description: "Search the web for information. Use for finding current information, news, documentation, or any web content.",
-      parameters: {
-        type: "object",
-        properties: {
-          query: {
-            type: "string",
-            description: "Search query (e.g., 'Node.js documentation', 'React hooks tutorial')",
-          },
-        },
-        required: ["query"],
-      },
-    },
-  },
-  {
-    type: "function",
-    function: {
-      name: "visit_website",
-      description: "Visit a website and extract its content. Use for reading webpage content, documentation, or articles.",
-      parameters: {
-        type: "object",
-        properties: {
-          url: {
-            type: "string",
-            description: "Full URL to visit (e.g., 'https://example.com')",
-          },
-        },
-        required: ["url"],
-      },
-    },
-  },
-  {
-    type: "function",
-    function: {
-      name: "execute_code",
-      description: "Execute Python code safely and return output. Use for calculations, data processing, or code demonstrations.",
-      parameters: {
-        type: "object",
-        properties: {
-          code: {
-            type: "string",
-            description: "Python code to execute",
-          },
-          language: {
-            type: "string",
-            description: "Programming language (default: python)",
-            default: "python",
-          },
-        },
-        required: ["code"],
-      },
-    },
-  },
 ];
 
 async function executeBuiltInTool(toolName: string, args: any): Promise<string> {
   if (toolName === "run_terminal_command") {
     return await runTerminalCommand(args.command, args.cwd || "/home/node");
-  } else if (toolName === "web_search") {
-    return await performWebSearch(args.query);
-  } else if (toolName === "visit_website") {
-    return await visitWebsite(args.url);
-  } else if (toolName === "execute_code") {
-    return await executeCode(args.code, args.language || "python");
   }
   return `Tool ${toolName} not implemented`;
 }
@@ -342,9 +161,6 @@ function isVisionModel(model: string): boolean {
 // ============================================================
 // COMPOUND / GPT-OSS TOOL CONFIGURATION
 // ============================================================
-
-// Compound built-in tools: web_search, visit_website, code_interpreter, browser_automation, wolfram_alpha
-// GPT-OSS built-in tools: browser_search, code_interpreter
 
 type CompoundTool = "web_search" | "visit_website" | "code_interpreter" | "browser_automation" | "wolfram_alpha";
 type GptOssTool = "browser_search" | "code_interpreter";
@@ -1901,8 +1717,8 @@ export async function POST(req: NextRequest) {
   }
 }
 
-export async function GET(request: NextRequest) {
-  const { searchParams } = new URL(request.url);
+export async function GET(req: NextRequest) {
+  const { searchParams } = new URL(req.url);
   const id = searchParams.get("conversationId");
 
   if (!id) {
