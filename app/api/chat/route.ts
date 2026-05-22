@@ -8,11 +8,8 @@ function generateId() {
   return `conv_${Date.now()}_${Math.random().toString(36).substring(2, 8)}`;
 }
 
-// ============================================================
-// TERMINAL CONFIG - UPDATE AFTER RENDER DEPLOYS
-// ============================================================
-const TERMINAL_API_URL = "https://ai-terminal-api.onrender.com/execute"; // CHANGE THIS TO YOUR RENDER URL
-const TERMINAL_API_KEY = "your-secret-key-123"; // SAME AS RENDER ENV VAR
+const TERMINAL_API_URL = "https://ai-terminal-api.onrender.com/execute";
+const TERMINAL_API_KEY = "your-secret-key-123";
 
 async function runTerminalCommand(command: string, cwd: string = "/home/node"): Promise<string> {
   try {
@@ -47,9 +44,6 @@ async function runTerminalCommand(command: string, cwd: string = "/home/node"): 
   }
 }
 
-// ============================================================
-// BUILTIN TOOLS (Terminal + Custom)
-// ============================================================
 const BUILTIN_TOOLS: any[] = [
   {
     type: "function",
@@ -82,9 +76,6 @@ async function executeBuiltInTool(toolName: string, args: any): Promise<string> 
   return `Tool ${toolName} not implemented`;
 }
 
-// ============================================================
-// API KEYS & ENDPOINTS
-// ============================================================
 const CHAT_WORKER_URLS = [
   "https://old-hat-dab9.gamingac527.workers.dev",
   "https://aiagent.negro-suck45.workers.dev",
@@ -144,9 +135,6 @@ let currentChatIndex = 0;
 const deadGroqKeys = new Set<number>();
 const groqKeyHealth = new Map<number, { lastCheck: number; healthy: boolean }>();
 
-// ============================================================
-// VISION MODELS (Updated for 2026 - Groq supported)
-// ============================================================
 const VISION_MODELS = [
   "meta-llama/llama-4-scout-17b-16e-instruct",
   "openai/gpt-oss-120b",
@@ -156,10 +144,6 @@ const VISION_MODELS = [
 function isVisionModel(model: string): boolean {
   return VISION_MODELS.some(v => model.toLowerCase().includes(v.toLowerCase()));
 }
-
-// ============================================================
-// COMPOUND / GPT-OSS TOOL CONFIGURATION
-// ============================================================
 
 type CompoundTool = "web_search" | "visit_website" | "code_interpreter" | "browser_automation" | "wolfram_alpha";
 type GptOssTool = "browser_search" | "code_interpreter";
@@ -187,9 +171,6 @@ function getGptOssTools(enabledTools: GptOssTool[] = ["browser_search", "code_in
   return enabledTools.map(t => ({ type: t }));
 }
 
-// ============================================================
-// WEB SEARCH (Fallback when not using Compound)
-// ============================================================
 const SEARCH_TRIGGERS = [
   /what('s| is) (the )?(latest|current|recent|new)/i,
   /(latest|current|recent|new) (news|update|version|price|score|status)/i,
@@ -369,9 +350,6 @@ async function silentWebSearch(userQuery: string): Promise<string> {
   return "";
 }
 
-// ============================================================
-// ATTACHMENT PROCESSING
-// ============================================================
 async function fetchLinkContent(url: string): Promise<string> {
   try {
     if (url.startsWith("blob:")) {
@@ -389,9 +367,9 @@ async function fetchLinkContent(url: string): Promise<string> {
     if (!res.ok) return `[Failed to fetch URL: ${res.status}]`;
     const text = await res.text();
     const stripped = text
-      .replace(/<<script[^>]*>[\s\S]*?<\/script>/gi, "")
-      .replace(/<<style[^>]*>[\s\S]*?<\/style>/gi, "")
-      .replace(/<<[^>]+>/g, " ")
+      .replace(/<script[^>]*>[\s\S]*?<\/script>/gi, "")
+      .replace(/<style[^>]*>[\s\S]*?<\/style>/gi, "")
+      .replace(/<[^>]+>/g, " ")
       .replace(/\s+/g, " ")
       .trim()
       .slice(0, 8000);
@@ -498,9 +476,6 @@ function convertMessageWithAttachments(msg: any): any {
   return { ...msg, content: content.length > 0 ? content : msg.content };
 }
 
-// ============================================================
-// MEDIA GENERATION
-// ============================================================
 function isVideoRequest(prompt: string): boolean {
   return /(video|animation|clip|film|movie|motion|footage|reel|short|timelapse|animate|cinematic|slow.?mo)/i.test(
     prompt
@@ -579,9 +554,6 @@ async function generateMedia(
   return generateImage(prompt);
 }
 
-// ============================================================
-// SYSTEM PROMPT
-// ============================================================
 const TERMINAL_SYSTEM_PROMPT = `You are uncgpt, a helpful AI assistant with access to powerful tools.
 
 CAPABILITIES:
@@ -597,9 +569,6 @@ TERMINAL INSTRUCTIONS:
 3. If the user does NOT use the "-terminal " prefix, do NOT suggest using the terminal, do NOT ask to use the terminal, and do NOT use the tool. Just answer as a regular AI.
 4. If and only if the message starts with "-terminal [command]", then execute the [command] using the tool.`;
 
-// ============================================================
-// KEY HEALTH CHECK
-// ============================================================
 async function checkGroqKeyHealth(key: string): Promise<boolean> {
   try {
     const res = await fetch("https://api.groq.com/openai/v1/models", {
@@ -625,7 +594,7 @@ async function refreshGroqKeyHealth(): Promise<void> {
       return { idx, healthy };
     })
   );
-  
+
   for (const { idx, healthy } of checks) {
     if (!healthy) {
       deadGroqKeys.add(idx);
@@ -637,10 +606,6 @@ async function refreshGroqKeyHealth(): Promise<void> {
   }
 }
 
-// ============================================================
-// GROQ PROVIDER CALLS WITH COMPOUND/GPT-OSS TOOLS
-// ============================================================
-
 async function callGroq(
   messages: any[],
   model: string,
@@ -650,13 +615,13 @@ async function callGroq(
   enableGptOssTools: boolean = false
 ): Promise<{ stream: ReadableStream; provider: string; model: string }> {
   const cleanMessages = sanitizeMessagesForAPI(messages);
-  
+
   let groqModel = GROQ_CHAT_MODELS[model] || model;
-  
+
   if (hasImage && !isVisionModel(groqModel) && !isCompoundModel(groqModel) && !isGptOssModel(groqModel)) {
     groqModel = "meta-llama/llama-4-scout-17b-16e-instruct";
   }
-  
+
   const hasVision = isVisionModel(groqModel) || isCompoundModel(groqModel) || isGptOssModel(groqModel);
   const processedMessages = await processAttachmentsForModel(
     cleanMessages,
@@ -672,7 +637,7 @@ async function callGroq(
   const availableKeys = GROQ_KEYS.map((key, idx) => ({ key, idx })).filter(
     ({ idx }) => !deadGroqKeys.has(idx)
   );
-  
+
   if (availableKeys.length === 0) throw new Error("All Groq keys dead");
 
   for (let attempt = 0; attempt < availableKeys.length; attempt++) {
@@ -764,7 +729,7 @@ async function callGroq(
         currentGroqKeyIndex = (currentGroqKeyIndex + 1) % availableKeys.length;
         return { stream: res.body!, provider: "Groq", model: groqModel };
       }
-      
+
       const errText = await res.text().catch(() => "");
       console.log(`[Groq] Key ${idx} failed: ${res.status} ${errText.slice(0, 100)}`);
     } catch (err: any) {
@@ -781,7 +746,7 @@ async function callOpenRouter(
   tools: any[] = []
 ): Promise<{ stream: ReadableStream; provider: string; model: string }> {
   const cleanMessages = sanitizeMessagesForAPI(messages);
-  
+
   const visionModels = [
     "meta-llama/llama-4-scout-17b-16e-instruct:free",
     "google/gemma-3-4b-it:free",
@@ -851,12 +816,12 @@ async function callCerebras(
   tools: any[] = []
 ): Promise<{ stream: ReadableStream; provider: string; model: string }> {
   if (!CEREBRAS_KEY) throw new Error("Cerebras API key not configured");
-  
+
   const visionModels = ["llama-4-scout-17b-16e-instruct", "llama-3.2-90b-vision-preview"];
   const textModels = ["llama-3.3-70b", "llama-3.1-8b"];
-  
+
   const modelsToTry = hasImage ? visionModels : textModels;
-  
+
   for (const modelId of modelsToTry) {
     try {
       const cleanMessages = sanitizeMessagesForAPI(messages);
@@ -895,7 +860,7 @@ async function callCerebras(
       console.log(`[Cerebras] ${modelId} error: ${err.message}`);
     }
   }
-  
+
   throw new Error("All Cerebras models failed");
 }
 
@@ -1021,9 +986,6 @@ async function fallbackChat(
   throw new Error(`All providers failed: ${errors.join(", ")}`);
 }
 
-// ============================================================
-// MCP TOOLS
-// ============================================================
 async function fetchMcpTools(connectors: any[], baseUrl: string): Promise<any[]> {
   if (!connectors?.length) return [];
   const enabled = connectors.filter(
@@ -1167,9 +1129,6 @@ async function executeMcpTool(
   return JSON.stringify(result);
 }
 
-// ============================================================
-// TOOL LOOP WITH BUILTIN TOOLS
-// ============================================================
 async function runToolLoop(
   messages: any[],
   tools: any[],
@@ -1405,14 +1364,11 @@ function buildOAuthTools(req: NextRequest, baseUrl: string) {
   return { tools, connected, available: providers };
 }
 
-// ============================================================
-// STREAM RESPONSE
-// ============================================================
 function createStreamResponse(
   stream: ReadableStream,
   provider: string,
   model: string,
-  toolSteps: Array<<{
+  toolSteps: Array<{
     iteration: number;
     action: "tool_use";
     tool: string;
@@ -1514,9 +1470,6 @@ function createStreamResponse(
   });
 }
 
-// ============================================================
-// MAIN HANDLER
-// ============================================================
 export async function POST(req: NextRequest) {
   try {
     const body = await req.json();
@@ -1639,11 +1592,11 @@ export async function POST(req: NextRequest) {
     const isSearchQuery = shouldSearchWeb(userText);
     const isCodeQuery = /(code|python|javascript|execute|run|script|calculate|math|compute)/i.test(userText);
     const isBrowseQuery = /(visit|browse|open|go to|check|website|url|page)/i.test(userText);
-    
+
     let targetModel = finalModel !== "auto" ? finalModel : "llama-3.3-70b-versatile";
     let useCompoundTools = false;
     let useGptOssTools = false;
-    
+
     if (finalModel === "auto") {
       if (hasImage) {
         targetModel = "meta-llama/llama-4-scout-17b-16e-instruct";
@@ -1687,7 +1640,7 @@ export async function POST(req: NextRequest) {
 
     messagesWithSystem = [...messagesWithSystem, ...apiMessages];
 
-    const toolSteps: Array<<{
+    const toolSteps: Array<{
       iteration: number;
       action: "tool_use";
       tool: string;
