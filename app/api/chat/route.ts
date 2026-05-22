@@ -105,7 +105,6 @@ const IMAGE_MODELS = [
   "@cf/leonardo-ai/phoenix-1.0",
 ];
 
-// Groq Models (Updated for 2026)
 const GROQ_CHAT_MODELS: Record<string, string> = {
   "llama-3.3-70b-versatile": "llama-3.3-70b-versatile",
   "llama-3.1-8b-instant": "llama-3.1-8b-instant",
@@ -148,7 +147,6 @@ const groqKeyHealth = new Map<number, { lastCheck: number; healthy: boolean }>()
 // ============================================================
 // VISION MODELS (Updated for 2026 - Groq supported)
 // ============================================================
-// Priority order: Llama-4 Scout (best) -> GPT-OSS 120B (fallback) -> GPT-OSS 20B (lightweight)
 const VISION_MODELS = [
   "meta-llama/llama-4-scout-17b-16e-instruct",
   "openai/gpt-oss-120b",
@@ -653,10 +651,8 @@ async function callGroq(
 ): Promise<{ stream: ReadableStream; provider: string; model: string }> {
   const cleanMessages = sanitizeMessagesForAPI(messages);
   
-  // Vision model selection with fallback chain
   let groqModel = GROQ_CHAT_MODELS[model] || model;
   
-  // If image but model doesn't support vision, pick best available vision model
   if (hasImage && !isVisionModel(groqModel) && !isCompoundModel(groqModel) && !isGptOssModel(groqModel)) {
     groqModel = "meta-llama/llama-4-scout-17b-16e-instruct";
   }
@@ -668,7 +664,6 @@ async function callGroq(
     hasVision
   );
 
-  // Refresh key health if all keys are dead
   if (deadGroqKeys.size >= GROQ_KEYS.length) {
     console.log("[Groq] All keys dead, refreshing health check...");
     await refreshGroqKeyHealth();
@@ -697,7 +692,6 @@ async function callGroq(
         max_tokens: 4096,
       };
 
-      // Add Compound custom tools configuration
       if (enableCompoundTools && isCompoundModel(groqModel)) {
         requestBody.compound_custom = getCompoundCustomTools([
           "web_search",
@@ -705,14 +699,10 @@ async function callGroq(
           "code_interpreter",
           "browser_automation"
         ]);
-      } 
-      // Add GPT-OSS tools configuration
-      else if (enableGptOssTools && isGptOssModel(groqModel)) {
+      } else if (enableGptOssTools && isGptOssModel(groqModel)) {
         requestBody.tools = getGptOssTools(["browser_search", "code_interpreter"]);
         requestBody.tool_choice = "auto";
-      }
-      // Regular tool calling for non-compound models
-      else if (tools.length > 0 && !isCompoundModel(groqModel) && !isGptOssModel(groqModel)) {
+      } else if (tools.length > 0 && !isCompoundModel(groqModel) && !isGptOssModel(groqModel)) {
         requestBody.tools = tools;
         requestBody.tool_choice = "auto";
       }
@@ -732,7 +722,6 @@ async function callGroq(
         continue;
       }
       if (res.status === 404 && groqModel.includes("llama-4")) {
-        // Llama-4 not available, try GPT-OSS 120B as vision fallback
         console.log(`[Groq] Llama-4 not available, falling back to GPT-OSS 120B...`);
         const fallbackBody = {
           ...requestBody,
@@ -750,7 +739,6 @@ async function callGroq(
         if (fallbackRes.ok) {
           return { stream: fallbackRes.body!, provider: "Groq", model: "openai/gpt-oss-120b" };
         }
-        // If GPT-OSS also fails, try GPT-OSS 20B
         const fallbackBody2 = {
           ...requestBody,
           model: "openai/gpt-oss-20b",
@@ -794,7 +782,6 @@ async function callOpenRouter(
 ): Promise<{ stream: ReadableStream; provider: string; model: string }> {
   const cleanMessages = sanitizeMessagesForAPI(messages);
   
-  // Updated vision models for OpenRouter 2026
   const visionModels = [
     "meta-llama/llama-4-scout-17b-16e-instruct:free",
     "google/gemma-3-4b-it:free",
@@ -865,7 +852,6 @@ async function callCerebras(
 ): Promise<{ stream: ReadableStream; provider: string; model: string }> {
   if (!CEREBRAS_KEY) throw new Error("Cerebras API key not configured");
   
-  // Cerebras vision models 2026
   const visionModels = ["llama-4-scout-17b-16e-instruct", "llama-3.2-90b-vision-preview"];
   const textModels = ["llama-3.3-70b", "llama-3.1-8b"];
   
@@ -989,13 +975,11 @@ async function fallbackChat(
   const errors: string[] = [];
 
   if (hasImage) {
-    // Try OpenRouter first for vision (most reliable free tier)
     try {
       return await callOpenRouter(messages, true, tools);
     } catch (err: any) {
       errors.push(`OpenRouter: ${err.message}`);
     }
-    // Try Cerebras for vision
     if (CEREBRAS_KEY) {
       try {
         return await callCerebras(messages, true, tools);
@@ -1003,7 +987,6 @@ async function fallbackChat(
         errors.push(`Cerebras: ${err.message}`);
       }
     }
-    // Try Groq with GPT-OSS as last resort
     try {
       return await callGroq(messages, "openai/gpt-oss-120b", true, tools);
     } catch (err: any) {
@@ -1012,7 +995,6 @@ async function fallbackChat(
     throw new Error(`No vision providers available: ${errors.join(", ")}`);
   }
 
-  // Text-only fallback chain
   try {
     return await callOpenRouter(messages, false, tools);
   } catch (err: any) {
@@ -1481,7 +1463,6 @@ function createStreamResponse(
                 if (!content && data.content) content = data.content;
                 if (!content && typeof data === "string") content = data;
 
-                // Handle Compound executed_tools in stream
                 if (data.choices?.[0]?.message?.executed_tools) {
                   controller.enqueue(
                     encoder.encode(
@@ -1564,7 +1545,6 @@ export async function POST(req: NextRequest) {
       ? lastMsg.content.find((c: any) => c.type === "text")?.text || ""
       : lastMsg?.content || "";
 
-    // ==================== SILENT WEB SEARCH (Fallback) ====================
     let searchContext = "";
     const needsSearch =
       webSearch === true || shouldSearchWeb(userText);
@@ -1604,7 +1584,6 @@ export async function POST(req: NextRequest) {
       }
     }
 
-    // ==================== MEDIA GENERATION ====================
     if (mediaType === "image" || mediaType === "video") {
       const encoder = new TextEncoder();
       const providerName =
@@ -1656,25 +1635,19 @@ export async function POST(req: NextRequest) {
       });
     }
 
-    // ==================== CHAT WITH TOOLS ====================
-    
-    // Determine if we should use Compound or GPT-OSS for built-in tools
     const isTerminalRequest = userText.trim().startsWith("-terminal");
     const isSearchQuery = shouldSearchWeb(userText);
     const isCodeQuery = /(code|python|javascript|execute|run|script|calculate|math|compute)/i.test(userText);
     const isBrowseQuery = /(visit|browse|open|go to|check|website|url|page)/i.test(userText);
     
-    // Auto-select model based on query type
     let targetModel = finalModel !== "auto" ? finalModel : "llama-3.3-70b-versatile";
     let useCompoundTools = false;
     let useGptOssTools = false;
     
     if (finalModel === "auto") {
       if (hasImage) {
-        // For images, try Llama-4 Scout first, fallback to GPT-OSS handled in callGroq
         targetModel = "meta-llama/llama-4-scout-17b-16e-instruct";
       } else if (isSearchQuery || isCodeQuery || isBrowseQuery) {
-        // Use Compound for web search/code/browser automation
         targetModel = "groq/compound";
         useCompoundTools = true;
       }
@@ -1693,7 +1666,6 @@ export async function POST(req: NextRequest) {
       hasVisionCapability
     );
 
-    // Build system prompt
     const systemParts: string[] = [TERMINAL_SYSTEM_PROMPT];
     if (projectInstructions) {
       systemParts.push(`\n\nProject Instructions:\n${projectInstructions}`);
@@ -1723,7 +1695,6 @@ export async function POST(req: NextRequest) {
       result: string;
     }> = [];
 
-    // ==================== TOOL SETUP ====================
     try {
       const oauthBundle = buildOAuthTools(req, baseUrl);
       let mcpTools: any[] = [];
@@ -1731,7 +1702,6 @@ export async function POST(req: NextRequest) {
         mcpTools = await fetchMcpTools(mcpConnectors, baseUrl);
       }
 
-      // Terminal tool is always available via local tool loop for non-compound models
       const combinedTools = (!useCompoundTools && !useGptOssTools) ? [
         ...BUILTIN_TOOLS,
         ...oauthBundle.tools,
@@ -1750,12 +1720,10 @@ export async function POST(req: NextRequest) {
       console.error("Tool loop error:", e.message);
     }
 
-    // ==================== CALL MODEL ====================
     let result: { stream: ReadableStream; provider: string; model: string };
 
     try {
       if (finalProvider === "auto") {
-        // Use Compound/GPT-OSS for tool queries, regular models for chat
         if (useCompoundTools || useGptOssTools || isCompoundModel(targetModel) || isGptOssModel(targetModel)) {
           result = await callGroq(
             messagesWithSystem, 
