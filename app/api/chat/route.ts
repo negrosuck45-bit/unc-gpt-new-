@@ -105,18 +105,18 @@ const IMAGE_MODELS = [
   "@cf/leonardo-ai/phoenix-1.0",
 ];
 
-// Groq Models
+// Groq Models (Updated for 2026)
 const GROQ_CHAT_MODELS: Record<string, string> = {
   "llama-3.3-70b-versatile": "llama-3.3-70b-versatile",
   "llama-3.1-8b-instant": "llama-3.1-8b-instant",
   "meta-llama/llama-4-scout-17b-16e-instruct": "meta-llama/llama-4-scout-17b-16e-instruct",
-  "meta-llama/llama-4-maverick-17b-128e-instruct": "meta-llama/llama-4-maverick-17b-128e-instruct",
   "deepseek-r1-distill-llama-70b": "deepseek-r1-distill-llama-70b",
   "mixtral-8x7b-32768": "mixtral-8x7b-32768",
   "compound-beta": "groq/compound",
   "compound-mini": "groq/compound-mini",
   "openai/gpt-oss-120b": "openai/gpt-oss-120b",
   "openai/gpt-oss-20b": "openai/gpt-oss-20b",
+  "qwen/qwen3-32b": "qwen/qwen3-32b",
 };
 
 const GROQ_KEYS: string[] = [
@@ -143,15 +143,16 @@ const CEREBRAS_KEY = "csk-tt4rvyyfwr5ytrm9vn33nhv5myc6p3thynkcv2j9cdtce62d";
 let currentGroqKeyIndex = 0;
 let currentChatIndex = 0;
 const deadGroqKeys = new Set<number>();
+const groqKeyHealth = new Map<number, { lastCheck: number; healthy: boolean }>();
 
 // ============================================================
 // VISION MODELS (Updated for 2026 - Groq supported)
 // ============================================================
+// Priority order: Llama-4 Scout (best) -> GPT-OSS 120B (fallback) -> GPT-OSS 20B (lightweight)
 const VISION_MODELS = [
   "meta-llama/llama-4-scout-17b-16e-instruct",
-  "meta-llama/llama-4-maverick-17b-128e-instruct",
-  "llama-3.2-90b-vision-preview",
-  "llama-3.2-11b-vision-preview",
+  "openai/gpt-oss-120b",
+  "openai/gpt-oss-20b",
 ];
 
 function isVisionModel(model: string): boolean {
@@ -390,9 +391,9 @@ async function fetchLinkContent(url: string): Promise<string> {
     if (!res.ok) return `[Failed to fetch URL: ${res.status}]`;
     const text = await res.text();
     const stripped = text
-      .replace(/<script[^>]*>[\s\S]*?<\/script>/gi, "")
-      .replace(/<style[^>]*>[\s\S]*?<\/style>/gi, "")
-      .replace(/<[^>]+>/g, " ")
+      .replace(/<<script[^>]*>[\s\S]*?<\/script>/gi, "")
+      .replace(/<<style[^>]*>[\s\S]*?<\/style>/gi, "")
+      .replace(/<<[^>]+>/g, " ")
       .replace(/\s+/g, " ")
       .trim()
       .slice(0, 8000);
@@ -599,6 +600,46 @@ TERMINAL INSTRUCTIONS:
 4. If and only if the message starts with "-terminal [command]", then execute the [command] using the tool.`;
 
 // ============================================================
+// KEY HEALTH CHECK
+// ============================================================
+async function checkGroqKeyHealth(key: string): Promise<boolean> {
+  try {
+    const res = await fetch("https://api.groq.com/openai/v1/models", {
+      method: "GET",
+      headers: {
+        "Authorization": `Bearer ${key}`,
+        "Content-Type": "application/json",
+      },
+      signal: AbortSignal.timeout(5000),
+    });
+    return res.ok;
+  } catch {
+    return false;
+  }
+}
+
+async function refreshGroqKeyHealth(): Promise<void> {
+  const checks = await Promise.all(
+    GROQ_KEYS.map(async (key, idx) => {
+      if (!key || key.length < 20) return { idx, healthy: false };
+      const healthy = await checkGroqKeyHealth(key);
+      groqKeyHealth.set(idx, { lastCheck: Date.now(), healthy });
+      return { idx, healthy };
+    })
+  );
+  
+  for (const { idx, healthy } of checks) {
+    if (!healthy) {
+      deadGroqKeys.add(idx);
+      console.log(`[Groq] Key ${idx} marked as dead`);
+    } else {
+      deadGroqKeys.delete(idx);
+      console.log(`[Groq] Key ${idx} is healthy`);
+    }
+  }
+}
+
+// ============================================================
 // GROQ PROVIDER CALLS WITH COMPOUND/GPT-OSS TOOLS
 // ============================================================
 
@@ -609,11 +650,13 @@ async function callGroq(
   tools: any[] = [],
   enableCompoundTools: boolean = false,
   enableGptOssTools: boolean = false
-): Promise<{ stream: ReadableStream; provider: string; model: string; response?: any }> {
+): Promise<{ stream: ReadableStream; provider: string; model: string }> {
   const cleanMessages = sanitizeMessagesForAPI(messages);
   
-  // Vision model selection
+  // Vision model selection with fallback chain
   let groqModel = GROQ_CHAT_MODELS[model] || model;
+  
+  // If image but model doesn't support vision, pick best available vision model
   if (hasImage && !isVisionModel(groqModel) && !isCompoundModel(groqModel) && !isGptOssModel(groqModel)) {
     groqModel = "meta-llama/llama-4-scout-17b-16e-instruct";
   }
@@ -625,9 +668,16 @@ async function callGroq(
     hasVision
   );
 
+  // Refresh key health if all keys are dead
+  if (deadGroqKeys.size >= GROQ_KEYS.length) {
+    console.log("[Groq] All keys dead, refreshing health check...");
+    await refreshGroqKeyHealth();
+  }
+
   const availableKeys = GROQ_KEYS.map((key, idx) => ({ key, idx })).filter(
     ({ idx }) => !deadGroqKeys.has(idx)
   );
+  
   if (availableKeys.length === 0) throw new Error("All Groq keys dead");
 
   for (let attempt = 0; attempt < availableKeys.length; attempt++) {
@@ -655,7 +705,6 @@ async function callGroq(
           "code_interpreter",
           "browser_automation"
         ]);
-        // Compound models handle tools server-side, don't pass local tools
       } 
       // Add GPT-OSS tools configuration
       else if (enableGptOssTools && isGptOssModel(groqModel)) {
@@ -673,26 +722,21 @@ async function callGroq(
         headers: {
           "Content-Type": "application/json",
           Authorization: `Bearer ${key}`,
-          ...(isCompoundModel(groqModel) || isGptOssModel(groqModel) ? { "Groq-Model-Version": "latest" } : {}),
         },
         body: JSON.stringify(requestBody),
       });
 
-      if (res.status === 401) {
+      if (res.status === 401 || res.status === 403) {
         deadGroqKeys.add(idx);
+        console.log(`[Groq] Key ${idx} auth failed (${res.status})`);
         continue;
       }
-      if (res.status === 429) continue;
-      if (res.ok) {
-        currentGroqKeyIndex = (currentGroqKeyIndex + 1) % availableKeys.length;
-        return { stream: res.body!, provider: "Groq", model: groqModel };
-      }
-      
-      // Fallback for Llama-4 vision if 404
       if (res.status === 404 && groqModel.includes("llama-4")) {
+        // Llama-4 not available, try GPT-OSS 120B as vision fallback
+        console.log(`[Groq] Llama-4 not available, falling back to GPT-OSS 120B...`);
         const fallbackBody = {
           ...requestBody,
-          model: "llama-3.2-90b-vision-preview",
+          model: "openai/gpt-oss-120b",
         };
         delete fallbackBody.compound_custom;
         const fallbackRes = await fetch("https://api.groq.com/openai/v1/chat/completions", {
@@ -703,9 +747,41 @@ async function callGroq(
           },
           body: JSON.stringify(fallbackBody),
         });
-        if (fallbackRes.ok) return { stream: fallbackRes.body!, provider: "Groq", model: "llama-3.2-90b-vision-preview" };
+        if (fallbackRes.ok) {
+          return { stream: fallbackRes.body!, provider: "Groq", model: "openai/gpt-oss-120b" };
+        }
+        // If GPT-OSS also fails, try GPT-OSS 20B
+        const fallbackBody2 = {
+          ...requestBody,
+          model: "openai/gpt-oss-20b",
+        };
+        const fallbackRes2 = await fetch("https://api.groq.com/openai/v1/chat/completions", {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            Authorization: `Bearer ${key}`,
+          },
+          body: JSON.stringify(fallbackBody2),
+        });
+        if (fallbackRes2.ok) {
+          return { stream: fallbackRes2.body!, provider: "Groq", model: "openai/gpt-oss-20b" };
+        }
+        continue;
       }
-    } catch {}
+      if (res.status === 429) {
+        console.log(`[Groq] Key ${idx} rate limited`);
+        continue;
+      }
+      if (res.ok) {
+        currentGroqKeyIndex = (currentGroqKeyIndex + 1) % availableKeys.length;
+        return { stream: res.body!, provider: "Groq", model: groqModel };
+      }
+      
+      const errText = await res.text().catch(() => "");
+      console.log(`[Groq] Key ${idx} failed: ${res.status} ${errText.slice(0, 100)}`);
+    } catch (err: any) {
+      console.log(`[Groq] Key ${idx} error: ${err.message}`);
+    }
   }
 
   throw new Error("All Groq keys failed");
@@ -717,14 +793,17 @@ async function callOpenRouter(
   tools: any[] = []
 ): Promise<{ stream: ReadableStream; provider: string; model: string }> {
   const cleanMessages = sanitizeMessagesForAPI(messages);
+  
+  // Updated vision models for OpenRouter 2026
   const visionModels = [
     "meta-llama/llama-4-scout-17b-16e-instruct:free",
-    "meta-llama/llama-3.2-11b-vision-instruct:free",
     "google/gemma-3-4b-it:free",
+    "openai/gpt-4o-mini:free",
   ];
   const textModels = [
     "meta-llama/llama-3.1-8b-instruct:free",
     "mistralai/mistral-7b-instruct:free",
+    "google/gemma-2-9b-it:free",
   ];
 
   const modelsToTry = hasImage ? visionModels : textModels;
@@ -770,7 +849,10 @@ async function callOpenRouter(
 
       clearTimeout(timeoutId);
       if (res.ok) return { stream: res.body!, provider: "OpenRouter (Free)", model: modelId };
-    } catch {}
+      console.log(`[OpenRouter] ${modelId} failed: ${res.status}`);
+    } catch (err: any) {
+      console.log(`[OpenRouter] ${modelId} error: ${err.message}`);
+    }
   }
 
   throw new Error("All OpenRouter free models failed");
@@ -782,40 +864,53 @@ async function callCerebras(
   tools: any[] = []
 ): Promise<{ stream: ReadableStream; provider: string; model: string }> {
   if (!CEREBRAS_KEY) throw new Error("Cerebras API key not configured");
-  const cleanMessages = sanitizeMessagesForAPI(messages);
-  const model = hasImage ? "llama-4-scout-17b-16e-instruct" : "llama-3.3-70b";
-  const processedMessages = hasImage
-    ? await processAttachmentsForModel(cleanMessages, model, true)
-    : cleanMessages;
+  
+  // Cerebras vision models 2026
+  const visionModels = ["llama-4-scout-17b-16e-instruct", "llama-3.2-90b-vision-preview"];
+  const textModels = ["llama-3.3-70b", "llama-3.1-8b"];
+  
+  const modelsToTry = hasImage ? visionModels : textModels;
+  
+  for (const modelId of modelsToTry) {
+    try {
+      const cleanMessages = sanitizeMessagesForAPI(messages);
+      const processedMessages = hasImage
+        ? await processAttachmentsForModel(cleanMessages, modelId, true)
+        : cleanMessages;
 
-  const body: any = {
-    model,
-    messages: [
-      { role: "system", content: TERMINAL_SYSTEM_PROMPT },
-      ...processedMessages,
-    ],
-    stream: true,
-    temperature: 0.7,
-    max_tokens: 4096,
-  };
+      const body: any = {
+        model: modelId,
+        messages: [
+          { role: "system", content: TERMINAL_SYSTEM_PROMPT },
+          ...processedMessages,
+        ],
+        stream: true,
+        temperature: 0.7,
+        max_tokens: 4096,
+      };
 
-  if (tools.length > 0) {
-    body.tools = tools;
-    body.tool_choice = "auto";
+      if (tools.length > 0 && !hasImage) {
+        body.tools = tools;
+        body.tool_choice = "auto";
+      }
+
+      const res = await fetch(CEREBRAS_URL, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${CEREBRAS_KEY}`,
+        },
+        body: JSON.stringify(body),
+      });
+
+      if (res.ok) return { stream: res.body!, provider: "Cerebras", model: modelId };
+      console.log(`[Cerebras] ${modelId} failed: ${res.status}`);
+    } catch (err: any) {
+      console.log(`[Cerebras] ${modelId} error: ${err.message}`);
+    }
   }
-
-  const res = await fetch(CEREBRAS_URL, {
-    method: "POST",
-    headers: {
-      "Content-Type": "application/json",
-      Authorization: `Bearer ${CEREBRAS_KEY}`,
-    },
-    body: JSON.stringify(body),
-  });
-
-  if (res.ok) return { stream: res.body!, provider: "Cerebras", model };
-  const err = await res.text().catch(() => "");
-  throw new Error(`Cerebras failed: ${res.status} ${err.slice(0, 100)}`);
+  
+  throw new Error("All Cerebras models failed");
 }
 
 async function callChatWorkers(
@@ -894,21 +989,13 @@ async function fallbackChat(
   const errors: string[] = [];
 
   if (hasImage) {
-    try {
-      return await callGroq(
-        messages,
-        "meta-llama/llama-4-scout-17b-16e-instruct",
-        true,
-        tools
-      );
-    } catch (err: any) {
-      errors.push(`Groq: ${err.message}`);
-    }
+    // Try OpenRouter first for vision (most reliable free tier)
     try {
       return await callOpenRouter(messages, true, tools);
     } catch (err: any) {
       errors.push(`OpenRouter: ${err.message}`);
     }
+    // Try Cerebras for vision
     if (CEREBRAS_KEY) {
       try {
         return await callCerebras(messages, true, tools);
@@ -916,14 +1003,16 @@ async function fallbackChat(
         errors.push(`Cerebras: ${err.message}`);
       }
     }
-    throw new Error(`No vision providers: ${errors.join(", ")}`);
+    // Try Groq with GPT-OSS as last resort
+    try {
+      return await callGroq(messages, "openai/gpt-oss-120b", true, tools);
+    } catch (err: any) {
+      errors.push(`Groq GPT-OSS: ${err.message}`);
+    }
+    throw new Error(`No vision providers available: ${errors.join(", ")}`);
   }
 
-  try {
-    return await callGroq(messages, "llama-3.3-70b-versatile", false, tools);
-  } catch (err: any) {
-    errors.push(`Groq: ${err.message}`);
-  }
+  // Text-only fallback chain
   try {
     return await callOpenRouter(messages, false, tools);
   } catch (err: any) {
@@ -938,6 +1027,13 @@ async function fallbackChat(
     );
   } catch (err: any) {
     errors.push(`Cloudflare: ${err.message}`);
+  }
+  if (CEREBRAS_KEY) {
+    try {
+      return await callCerebras(messages, false, tools);
+    } catch (err: any) {
+      errors.push(`Cerebras: ${err.message}`);
+    }
   }
 
   throw new Error(`All providers failed: ${errors.join(", ")}`);
@@ -1334,7 +1430,7 @@ function createStreamResponse(
   stream: ReadableStream,
   provider: string,
   model: string,
-  toolSteps: Array<{
+  toolSteps: Array<<{
     iteration: number;
     action: "tool_use";
     tool: string;
@@ -1575,6 +1671,7 @@ export async function POST(req: NextRequest) {
     
     if (finalModel === "auto") {
       if (hasImage) {
+        // For images, try Llama-4 Scout first, fallback to GPT-OSS handled in callGroq
         targetModel = "meta-llama/llama-4-scout-17b-16e-instruct";
       } else if (isSearchQuery || isCodeQuery || isBrowseQuery) {
         // Use Compound for web search/code/browser automation
@@ -1618,7 +1715,7 @@ export async function POST(req: NextRequest) {
 
     messagesWithSystem = [...messagesWithSystem, ...apiMessages];
 
-    const toolSteps: Array<{
+    const toolSteps: Array<<{
       iteration: number;
       action: "tool_use";
       tool: string;
