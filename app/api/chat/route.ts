@@ -32,11 +32,15 @@ async function runTerminalCommand(command: string, cwd: string = "/home/node"): 
     const output = data.output || "";
     const error = data.error || null;
 
-    let result = `\`\`\`terminal\n$ ${command}\n${output}`;
+    let result = `\`\`\`terminal
+$ ${command}
+${output}`;
     if (error) {
-      result += `\n[ERROR]: ${error}`;
+      result += `
+[ERROR]: ${error}`;
     }
-    result += `\n\`\`\``;
+    result += `
+\`\`\``;
 
     return result;
   } catch (err: any) {
@@ -135,10 +139,12 @@ let currentChatIndex = 0;
 const deadGroqKeys = new Set<number>();
 const groqKeyHealth = new Map<number, { lastCheck: number; healthy: boolean }>();
 
+// FIXED: Only valid Groq vision model as of 2026
+// llama-3.2-11b-vision-preview and llama-3.2-90b-vision-preview were deprecated April 14, 2025
+// llava-v1.5-7b-4096-preview was deprecated October 28, 2024
+// GPT-OSS models are TEXT-ONLY, not vision models
 const VISION_MODELS = [
   "meta-llama/llama-4-scout-17b-16e-instruct",
-  "openai/gpt-oss-120b",
-  "openai/gpt-oss-20b",
 ];
 
 function isVisionModel(model: string): boolean {
@@ -181,7 +187,7 @@ const SEARCH_TRIGGERS = [
   /(died|passed away|birthday|age of)/i,
   /(net worth|how much|how many|population of)/i,
   /(search|look up|find out|google|check)/i,
-  /\b(2024|2025|2026)\b.*\b(news|update|happened|event)\b/i,
+  /(2024|2025|2026).*(news|update|happened|event)/i,
   /btc|bitcoin|eth|ethereum|solana|cardano|crypto|xrp|doge/i,
   /nft|opensea|blur/i,
 ];
@@ -618,11 +624,12 @@ async function callGroq(
 
   let groqModel = GROQ_CHAT_MODELS[model] || model;
 
-  if (hasImage && !isVisionModel(groqModel) && !isCompoundModel(groqModel) && !isGptOssModel(groqModel)) {
+  // FIXED: Only valid vision model is Llama 4 Scout. GPT-OSS models do NOT support vision.
+  if (hasImage && !isVisionModel(groqModel) && !isCompoundModel(groqModel)) {
     groqModel = "meta-llama/llama-4-scout-17b-16e-instruct";
   }
 
-  const hasVision = isVisionModel(groqModel) || isCompoundModel(groqModel) || isGptOssModel(groqModel);
+  const hasVision = isVisionModel(groqModel) || isCompoundModel(groqModel);
   const processedMessages = await processAttachmentsForModel(
     cleanMessages,
     groqModel,
@@ -686,8 +693,10 @@ async function callGroq(
         console.log(`[Groq] Key ${idx} auth failed (${res.status})`);
         continue;
       }
-      if (res.status === 404 && groqModel.includes("llama-4")) {
-        console.log(`[Groq] Llama-4 not available, falling back to GPT-OSS 120B...`);
+      // FIXED: Removed deprecated llama-4-maverick fallback. Only scout is valid for vision.
+      // If scout fails with 404, fall back to GPT-OSS for text-only.
+      if (res.status === 404 && groqModel.includes("llama-4-scout")) {
+        console.log(`[Groq] Llama-4-Scout not available, falling back to GPT-OSS 120B...`);
         const fallbackBody = {
           ...requestBody,
           model: "openai/gpt-oss-120b",
@@ -817,7 +826,8 @@ async function callCerebras(
 ): Promise<{ stream: ReadableStream; provider: string; model: string }> {
   if (!CEREBRAS_KEY) throw new Error("Cerebras API key not configured");
 
-  const visionModels = ["llama-4-scout-17b-16e-instruct", "llama-3.2-90b-vision-preview"];
+  // FIXED: Removed deprecated llama-3.2-90b-vision-preview. Cerebras only has text models now.
+  const visionModels = ["meta-llama/llama-4-scout-17b-16e-instruct"];
   const textModels = ["llama-3.3-70b", "llama-3.1-8b"];
 
   const modelsToTry = hasImage ? visionModels : textModels;
@@ -952,11 +962,8 @@ async function fallbackChat(
         errors.push(`Cerebras: ${err.message}`);
       }
     }
-    try {
-      return await callGroq(messages, "openai/gpt-oss-120b", true, tools);
-    } catch (err: any) {
-      errors.push(`Groq GPT-OSS: ${err.message}`);
-    }
+    // FIXED: Removed GPT-OSS as vision fallback — GPT-OSS does NOT support vision.
+    // Only Llama 4 Scout is valid. If OpenRouter and Cerebras fail, no vision fallback remains.
     throw new Error(`No vision providers available: ${errors.join(", ")}`);
   }
 
@@ -1610,7 +1617,8 @@ export async function POST(req: NextRequest) {
       useGptOssTools = true;
     }
 
-    const hasVisionCapability = isVisionModel(targetModel) || hasImage;
+    // FIXED: Vision capability only for Llama 4 Scout and Compound models. GPT-OSS does NOT have vision.
+    const hasVisionCapability = isVisionModel(targetModel) || isCompoundModel(targetModel);
 
     const messagesWithVisionFormat = messages.map(convertMessageWithAttachments);
     const apiMessages = await processAttachmentsForModel(
