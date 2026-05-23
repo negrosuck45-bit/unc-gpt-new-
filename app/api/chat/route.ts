@@ -108,13 +108,15 @@ const IMAGE_MODELS = [
 const GROQ_CHAT_MODELS: Record<string, string> = {
   "llama-3.3-70b-versatile": "llama-3.3-70b-versatile",
   "llama-3.1-8b-instant": "llama-3.1-8b-instant",
+  "meta-llama/llama-4-scout-17b-16e-instruct": "llama-3.2-90b-vision-preview", // ✅ Maps to working model
+  "meta-llama/llama-4-maverick-17b-128e-instruct": "llama-3.2-11b-vision-preview", // ✅ Maps to working model
   "deepseek-r1-distill-llama-70b": "deepseek-r1-distill-llama-70b",
   "mixtral-8x7b-32768": "mixtral-8x7b-32768",
 };
 
 const GROQ_VISION_MODELS = [
-  "llama-3.2-90b-vision-preview",
-  "llama-3.2-11b-vision-preview",
+  "llama-3.2-90b-vision-preview",    // ✅ Real model
+  "llama-3.2-11b-vision-preview",    // ✅ Real model
 ];
 
 const GROQ_KEYS: string[] = (process.env.GROQ_KEYS || "").split(",").filter(k => k.trim().length > 10) || [
