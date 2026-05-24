@@ -22,6 +22,8 @@ import {
   MoreHorizontal,
   Code,
   Palette,
+  History,
+  Clock,
 } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { motion, AnimatePresence } from "framer-motion"
@@ -38,6 +40,134 @@ import {
   DropdownMenuItem,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu"
+
+// ═══════════════════════════════════════════════════════════════
+// GROK-STYLE CUSTOM ICONS (Outlined, minimal, 1.5px stroke)
+// ═══════════════════════════════════════════════════════════════
+
+/** Search — magnifying glass, outlined */
+function IconSearch({ className }: { className?: string }) {
+  return (
+    <svg
+      className={className}
+      viewBox="0 0 24 24"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="1.5"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+    >
+      <circle cx="11" cy="11" r="7" />
+      <path d="m21 21-3.5-3.5" />
+    </svg>
+  )
+}
+
+/** New Chat — square with pencil / compose, outlined */
+function IconNewChat({ className }: { className?: string }) {
+  return (
+    <svg
+      className={className}
+      viewBox="0 0 24 24"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="1.5"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+    >
+      <path d="M12 20h9" />
+      <path d="M16.5 3.5a2.12 2.12 0 0 1 3 3L7 19l-4 1 1-4Z" />
+    </svg>
+  )
+}
+
+/** Chat — speech bubble, FILLED (like the red one in the image) */
+function IconChat({ className }: { className?: string }) {
+  return (
+    <svg
+      className={className}
+      viewBox="0 0 24 24"
+      fill="currentColor"
+      stroke="none"
+    >
+      <path d="M20.5 2h-17A2.5 2.5 0 0 0 1 4.5v11A2.5 2.5 0 0 0 3.5 18H6v4.5a.5.5 0 0 0 .85.35L11.71 18h8.79A2.5 2.5 0 0 0 23 15.5v-11A2.5 2.5 0 0 0 20.5 2z" />
+    </svg>
+  )
+}
+
+/** History — clock with circular arrow, outlined */
+function IconHistory({ className }: { className?: string }) {
+  return (
+    <svg
+      className={className}
+      viewBox="0 0 24 24"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="1.5"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+    >
+      <path d="M3 12a9 9 0 1 0 9-9 9.75 9.75 0 0 0-6.74 2.74L3 8" />
+      <path d="M3 3v5h5" />
+      <path d="M12 7v5l4 2" />
+    </svg>
+  )
+}
+
+/** Refresh — circular arrow, outlined */
+function IconRefresh({ className }: { className?: string }) {
+  return (
+    <svg
+      className={className}
+      viewBox="0 0 24 24"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="1.5"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+    >
+      <path d="M21 12a9 9 0 0 0-9-9 9.75 9.75 0 0 0-6.74 2.74L3 8" />
+      <path d="M3 3v5h5" />
+      <path d="M3 12a9 9 0 0 0 9 9 9.75 9.75 0 0 0 6.74-2.74L21 16" />
+      <path d="M16 16h5v5" />
+    </svg>
+  )
+}
+
+/** Imagine / Sparkle — star/sparkle, outlined */
+function IconImagine({ className }: { className?: string }) {
+  return (
+    <svg
+      className={className}
+      viewBox="0 0 24 24"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="1.5"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+    >
+      <path d="m12 3 1.5 4.5L18 9l-4.5 1.5L12 15l-1.5-4.5L6 9l4.5-1.5z" />
+      <path d="M5 3v4M3 5h4M19 17v4M17 19h4" />
+    </svg>
+  )
+}
+
+/** Projects — folder, outlined */
+function IconProjects({ className }: { className?: string }) {
+  return (
+    <svg
+      className={className}
+      viewBox="0 0 24 24"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="1.5"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+    >
+      <path d="M20 20a2 2 0 0 0 2-2V8a2 2 0 0 0-2-2h-7.9a2 2 0 0 1-1.69-.9L9.6 3.9A2 2 0 0 0 7.93 3H4a2 2 0 0 0-2 2v13a2 2 0 0 0 2 2Z" />
+    </svg>
+  )
+}
 
 // Discord SVG icon component
 function DiscordIcon({ className }: { className?: string }) {
@@ -195,7 +325,9 @@ export function ChatSidebar({
     }
   }
 
-  // Collapsed icon-rail for DESKTOP only.
+  // ═══════════════════════════════════════════════════════════════
+  // COLLAPSED RAIL — ORIGINAL COLORS KEPT, only icons changed
+  // ═══════════════════════════════════════════════════════════════
   if (!isOpen && !isMobile) {
     return (
       <motion.aside
@@ -222,13 +354,13 @@ export function ChatSidebar({
         </button>
 
         <RailButton title="New chat" onClick={() => handleNew("text")}>
-          <Plus className="h-5 w-5" />
+          <IconNewChat className="h-5 w-5" />
         </RailButton>
         <RailButton title="Search" onClick={() => { onToggle(); setShowSearch(true) }}>
-          <Search className="h-5 w-5" />
+          <IconSearch className="h-5 w-5" />
         </RailButton>
         <RailButton title="Imagine" onClick={() => onModeChange("imagine")}>
-          <Sparkles className="h-5 w-5" />
+          <IconImagine className="h-5 w-5" />
         </RailButton>
 
         <div className="flex-1" />
@@ -300,21 +432,21 @@ export function ChatSidebar({
               </button>
             </div>
 
-            {/* Navigation Items - Claude style */}
+            {/* Navigation Items - using custom Grok-style icons, removed duplicate Chat */}
             <div className="px-2 space-y-0.5">
               <NavItem
-                icon={<Plus className="h-4 w-4" />}
+                icon={<IconNewChat className="h-4 w-4" />}
                 label="New chat"
                 onClick={() => handleNew("text")}
               />
               <NavItem
-                icon={<Search className="h-4 w-4" />}
+                icon={<IconSearch className="h-4 w-4" />}
                 label="Search"
                 onClick={() => setShowSearch(!showSearch)}
               />
               <NavItem
-                icon={<MessageSquare className="h-4 w-4" />}
-                label="Chats"
+                icon={<IconHistory className="h-4 w-4" />}
+                label="History"
                 onClick={() => setHistoryOpen(true)}
               />
               <NavItem
@@ -660,15 +792,19 @@ interface RailButtonProps {
   title: string
   onClick: () => void
   children: React.ReactNode
+  active?: boolean
 }
 
-function RailButton({ title, onClick, children }: RailButtonProps) {
+function RailButton({ title, onClick, children, active }: RailButtonProps) {
   return (
     <button
       onClick={onClick}
       title={title}
       aria-label={title}
-      className="h-10 w-10 rounded-lg flex items-center justify-center text-sidebar-foreground/80 hover:text-sidebar-foreground hover:bg-accent/50 transition-colors"
+      className={cn(
+        "h-10 w-10 rounded-lg flex items-center justify-center text-sidebar-foreground/80 hover:text-sidebar-foreground hover:bg-accent/50 transition-colors",
+        active && "bg-accent text-accent-foreground"
+      )}
     >
       {children}
     </button>
