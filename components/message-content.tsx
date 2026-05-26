@@ -1,4 +1,5 @@
 'use client';
+
 import { useMemo, useState, useCallback } from 'react';
 import { CodeBlock } from './code-block';
 import { TerminalBlock } from './terminal-block';
@@ -46,7 +47,6 @@ function parseTerminalBlocks(text: string): { text: string; terminals: Array<{ c
   let cleanedText = text;
 
   // Match function-style terminal calls: <function(run_terminal_command){...}</function>
-  // Pattern: match opening brace, then any content (lazy), then closing brace
   const functionRegex = /<function\(run_terminal_command\)(\{[\s\S]*?\})<\/function>/g;
   let funcMatch;
 
@@ -393,12 +393,10 @@ export function MessageContent({ content }: MessageContentProps) {
         }
 
         // Handle text that may contain function markup - extract and display as styled block
-        // Match function tags more flexibly
         const functionMatch = part.content.match(/<function[^>]*run_terminal_command[^>]*>([^<]*)<\/function>/);
         
         if (functionMatch) {
           const content = functionMatch[1];
-          // Try to parse as JSON
           try {
             const parsed = JSON.parse(content);
             const command = parsed.command || '';
@@ -419,7 +417,7 @@ export function MessageContent({ content }: MessageContentProps) {
               );
             }
           } catch (e) {
-            // If JSON parse fails, just show the raw content in styled block
+            // Fallback to raw content
             return (
               <div key={`terminal-output-${index}`} className="my-3 rounded-lg border border-zinc-800 overflow-hidden bg-zinc-950/50">
                 <div className="px-3 py-2 bg-zinc-900/80 border-b border-zinc-800 flex items-center gap-2">
