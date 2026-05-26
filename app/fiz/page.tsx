@@ -71,7 +71,7 @@ export default function FizPage() {
   const [transparency, setTransparency] = useState(0.7);
   const [visitorCount, setVisitorCount] = useState(50);
 
-  const backgroundVideoRef = useRef<HTMLVideoElement>(null);
+  const backgroundVideoRef = useRef<HTMLImageElement>(null);
   const backgroundMusicRef = useRef<HTMLAudioElement>(null);
   const hackerMusicRef = useRef<HTMLAudioElement>(null);
   const rainMusicRef = useRef<HTMLAudioElement>(null);
@@ -206,12 +206,12 @@ export default function FizPage() {
   }, [transparency]);
 
   const switchTheme = useCallback(async (
-    videoSrc: string, audioRef: RefObject<HTMLAudioElement | null>, themeClass: string,
+    bgSrc: string, audioRef: RefObject<HTMLAudioElement | null>, themeClass: string,
     showOverlay = false, overlayOverProfile = false
   ) => {
-    const video = backgroundVideoRef.current; if (!video) return;
-    await gsap.to(video, { opacity: 0, duration: 0.5, ease: "power2.in" });
-    video.src = videoSrc;
+    const bg = backgroundVideoRef.current; if (!bg) return;
+    await gsap.to(bg, { opacity: 0, duration: 0.5, ease: "power2.in" });
+    bg.src = bgSrc;
 
     // Stop current audio
     currentAudioRef.current?.current?.pause();
@@ -234,7 +234,7 @@ export default function FizPage() {
     }
     const btn = document.getElementById("results-button-container");
     btn?.classList.toggle("hidden", themeClass !== "hacker-theme");
-    gsap.to(video, { opacity: 1, duration: 0.5, ease: "power2.out" });
+    gsap.to(bg, { opacity: 1, duration: 0.5, ease: "power2.out" });
   }, []);
 
   const handleStart = useCallback(async () => {
@@ -249,7 +249,7 @@ export default function FizPage() {
     }
     setIsMuted(false);
 
-    backgroundVideoRef.current?.play().catch(() => {});
+    // Background GIF auto-plays, no play() needed for img
 
     const profile = profileBlockRef.current;
     if (profile) {
@@ -316,8 +316,8 @@ export default function FizPage() {
         </div>
       )}
 
-      <video ref={backgroundVideoRef} id="background" className={styles.backgroundVideo}
-        src="/background 1.mp4" loop muted autoPlay playsInline />
+      <img ref={backgroundVideoRef as any} id="background" className={styles.backgroundVideo}
+        src="/background.gif" alt="Background" />
 
       <div className={styles.glitchOverlay} ref={glitchOverlayRef}></div>
       <div id="hacker-overlay" className={`${styles.overlay} hidden`}></div>
@@ -401,11 +401,11 @@ export default function FizPage() {
       </div>
 
       <div className={styles.controls}>
-        <div className={styles.themeButton} onClick={() => switchTheme("/background 1.mp4", backgroundMusicRef, "home-theme")}>1</div>
-        <div className={styles.themeButton} onClick={() => switchTheme("/real.mp4", hackerMusicRef, "hacker-theme", true)}>2</div>
-        <div className={styles.themeButton} onClick={() => switchTheme("/rain_background.mp4", rainMusicRef, "rain-theme", false, true)}>3</div>
-        <div className={styles.themeButton} onClick={() => switchTheme("/anime_background.mp4", animeMusicRef, "anime-theme")}>4</div>
-        <div className={styles.themeButton} onClick={() => switchTheme("/hacker_background.mp4", carMusicRef, "car-theme")}>5</div>
+        <div className={styles.themeButton} onClick={() => switchTheme("/background.gif", backgroundMusicRef, "home-theme")}>1</div>
+        <div className={styles.themeButton} onClick={() => switchTheme("/real.gif", hackerMusicRef, "hacker-theme", true)}>2</div>
+        <div className={styles.themeButton} onClick={() => switchTheme("/rain_background.gif", rainMusicRef, "rain-theme", false, true)}>3</div>
+        <div className={styles.themeButton} onClick={() => switchTheme("/anime_background.gif", animeMusicRef, "anime-theme")}>4</div>
+        <div className={styles.themeButton} onClick={() => switchTheme("/hacker_background.gif", carMusicRef, "car-theme")}>5</div>
       </div>
 
       <div className={styles.topControls}>
