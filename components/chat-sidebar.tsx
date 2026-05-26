@@ -42,7 +42,7 @@ import {
 } from "@/components/ui/dropdown-menu"
 
 // ═══════════════════════════════════════════════════════════════
-// GROK-STYLE CUSTOM ICONS (Outlined, minimal, 1.5px stroke)
+// CLEAN OUTLINED ICONS - Matching sidebar style
 // ═══════════════════════════════════════════════════════════════
 
 /** Search — magnifying glass, outlined */
@@ -53,17 +53,17 @@ function IconSearch({ className }: { className?: string }) {
       viewBox="0 0 24 24"
       fill="none"
       stroke="currentColor"
-      strokeWidth="1.5"
+      strokeWidth="2"
       strokeLinecap="round"
       strokeLinejoin="round"
     >
-      <circle cx="11" cy="11" r="7" />
-      <path d="m21 21-3.5-3.5" />
+      <circle cx="11" cy="11" r="8" />
+      <path d="m21 21-4.35-4.35" />
     </svg>
   )
 }
 
-/** New Chat — square with pencil / compose, outlined */
+/** New Chat — pencil/compose, outlined */
 function IconNewChat({ className }: { className?: string }) {
   return (
     <svg
@@ -71,31 +71,17 @@ function IconNewChat({ className }: { className?: string }) {
       viewBox="0 0 24 24"
       fill="none"
       stroke="currentColor"
-      strokeWidth="1.5"
+      strokeWidth="2"
       strokeLinecap="round"
       strokeLinejoin="round"
     >
-      <path d="M12 20h9" />
-      <path d="M16.5 3.5a2.12 2.12 0 0 1 3 3L7 19l-4 1 1-4Z" />
+      <path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7" />
+      <path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z" />
     </svg>
   )
 }
 
-/** Chat — speech bubble, FILLED (like the red one in the image) */
-function IconChat({ className }: { className?: string }) {
-  return (
-    <svg
-      className={className}
-      viewBox="0 0 24 24"
-      fill="currentColor"
-      stroke="none"
-    >
-      <path d="M20.5 2h-17A2.5 2.5 0 0 0 1 4.5v11A2.5 2.5 0 0 0 3.5 18H6v4.5a.5.5 0 0 0 .85.35L11.71 18h8.79A2.5 2.5 0 0 0 23 15.5v-11A2.5 2.5 0 0 0 20.5 2z" />
-    </svg>
-  )
-}
-
-/** History — clock with circular arrow, outlined */
+/** History — clock, outlined */
 function IconHistory({ className }: { className?: string }) {
   return (
     <svg
@@ -103,51 +89,12 @@ function IconHistory({ className }: { className?: string }) {
       viewBox="0 0 24 24"
       fill="none"
       stroke="currentColor"
-      strokeWidth="1.5"
+      strokeWidth="2"
       strokeLinecap="round"
       strokeLinejoin="round"
     >
-      <path d="M3 12a9 9 0 1 0 9-9 9.75 9.75 0 0 0-6.74 2.74L3 8" />
-      <path d="M3 3v5h5" />
-      <path d="M12 7v5l4 2" />
-    </svg>
-  )
-}
-
-/** Refresh — circular arrow, outlined */
-function IconRefresh({ className }: { className?: string }) {
-  return (
-    <svg
-      className={className}
-      viewBox="0 0 24 24"
-      fill="none"
-      stroke="currentColor"
-      strokeWidth="1.5"
-      strokeLinecap="round"
-      strokeLinejoin="round"
-    >
-      <path d="M21 12a9 9 0 0 0-9-9 9.75 9.75 0 0 0-6.74 2.74L3 8" />
-      <path d="M3 3v5h5" />
-      <path d="M3 12a9 9 0 0 0 9 9 9.75 9.75 0 0 0 6.74-2.74L21 16" />
-      <path d="M16 16h5v5" />
-    </svg>
-  )
-}
-
-/** Imagine / Sparkle — star/sparkle, outlined */
-function IconImagine({ className }: { className?: string }) {
-  return (
-    <svg
-      className={className}
-      viewBox="0 0 24 24"
-      fill="none"
-      stroke="currentColor"
-      strokeWidth="1.5"
-      strokeLinecap="round"
-      strokeLinejoin="round"
-    >
-      <path d="m12 3 1.5 4.5L18 9l-4.5 1.5L12 15l-1.5-4.5L6 9l4.5-1.5z" />
-      <path d="M5 3v4M3 5h4M19 17v4M17 19h4" />
+      <circle cx="12" cy="12" r="10" />
+      <polyline points="12 6 12 12 16 14" />
     </svg>
   )
 }
@@ -160,16 +107,66 @@ function IconProjects({ className }: { className?: string }) {
       viewBox="0 0 24 24"
       fill="none"
       stroke="currentColor"
-      strokeWidth="1.5"
+      strokeWidth="2"
       strokeLinecap="round"
       strokeLinejoin="round"
     >
-      <path d="M20 20a2 2 0 0 0 2-2V8a2 2 0 0 0-2-2h-7.9a2 2 0 0 1-1.69-.9L9.6 3.9A2 2 0 0 0 7.93 3H4a2 2 0 0 0-2 2v13a2 2 0 0 0 2 2Z" />
+      <path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z" />
     </svg>
   )
 }
 
-// Discord SVG icon component
+/** Chat — speech bubble, FILLED */
+function IconChat({ className }: { className?: string }) {
+  return (
+    <svg
+      className={className}
+      viewBox="0 0 24 24"
+      fill="currentColor"
+      stroke="none"
+    >
+      <path d="M20 2H4a2 2 0 0 0-2 2v18l4-4h14a2 2 0 0 0 2-2V4a2 2 0 0 0-2-2z" />
+    </svg>
+  )
+}
+
+/** Refresh — circular arrow, outlined */
+function IconRefresh({ className }: { className?: string }) {
+  return (
+    <svg
+      className={className}
+      viewBox="0 0 24 24"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="2"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+    >
+      <polyline points="23 4 23 10 17 10" />
+      <polyline points="1 20 1 14 7 14" />
+      <path d="M3.51 9a9 9 0 0 1 14.85-3.36M20.49 15a9 9 0 0 1-14.85 3.36" />
+    </svg>
+  )
+}
+
+/** Imagine / Sparkle — star/sparkle, outlined */
+function IconImagine({ className }: { className?: string }) {
+  return (
+    <svg
+      className={className}
+      viewBox="0 0 24 24"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="2"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+    >
+      <path d="M12 3v6m0 6v6M3 12h6m6 0h6M5.64 5.64l4.24 4.24m5.64 5.64l4.24 4.24M18.36 5.64l-4.24 4.24m-5.64 5.64l-4.24 4.24" />
+    </svg>
+  )
+}
+
+/** Discord SVG icon component */
 function DiscordIcon({ className }: { className?: string }) {
   return (
     <svg
@@ -326,7 +323,7 @@ export function ChatSidebar({
   }
 
   // ═══════════════════════════════════════════════════════════════
-  // COLLAPSED RAIL — ORIGINAL COLORS KEPT, only icons changed
+  // COLLAPSED RAIL — CLEAN OUTLINED ICON STYLE
   // ═══════════════════════════════════════════════════════════════
   if (!isOpen && !isMobile) {
     return (
@@ -359,8 +356,11 @@ export function ChatSidebar({
         <RailButton title="Search" onClick={() => { onToggle(); setShowSearch(true) }}>
           <IconSearch className="h-5 w-5" />
         </RailButton>
-        <RailButton title="Imagine" onClick={() => onModeChange("imagine")}>
-          <IconImagine className="h-5 w-5" />
+        <RailButton title="History" onClick={() => setHistoryOpen(true)}>
+          <IconHistory className="h-5 w-5" />
+        </RailButton>
+        <RailButton title="Projects" onClick={() => setProjectsOpen(true)}>
+          <IconProjects className="h-5 w-5" />
         </RailButton>
 
         <div className="flex-1" />
@@ -369,7 +369,7 @@ export function ChatSidebar({
           title="Join our Discord"
           onClick={() => window.open(DISCORD_URL, "_blank")}
         >
-          <DiscordIcon className="h-5 w-5 text-muted-foreground" />
+          <DiscordIcon className="h-5 w-5" />
         </RailButton>
         <RailButton title="Memory" onClick={() => setMemoryOpen(true)}>
           <Brain className="h-5 w-5" />
@@ -432,7 +432,7 @@ export function ChatSidebar({
               </button>
             </div>
 
-            {/* Navigation Items - using custom Grok-style icons, removed duplicate Chat */}
+            {/* Navigation Items - Clean outlined icons */}
             <div className="px-2 space-y-0.5">
               <NavItem
                 icon={<IconNewChat className="h-4 w-4" />}
@@ -450,7 +450,7 @@ export function ChatSidebar({
                 onClick={() => setHistoryOpen(true)}
               />
               <NavItem
-                icon={<FolderOpen className="h-4 w-4" />}
+                icon={<IconProjects className="h-4 w-4" />}
                 label="Projects"
                 onClick={() => setProjectsOpen(true)}
               />
@@ -479,8 +479,6 @@ export function ChatSidebar({
 
             {/* Recents section */}
             <div className="flex-1 overflow-y-auto px-2 pt-4">
-
-
               <div className="text-xs font-medium text-muted-foreground px-2 pb-2">
                 Recents
               </div>
