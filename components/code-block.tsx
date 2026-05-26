@@ -113,7 +113,7 @@ function tokenize(code: string): Token[][] {
     let remaining = line
 
     while (remaining.length > 0) {
-      // Comments
+      // Single-line comments
       if (remaining.startsWith('//') || remaining.startsWith('#')) {
         tokens.push({ type: 'comment', content: remaining })
         break
@@ -349,7 +349,6 @@ export function CodeBlock({ code, language = 'text' }: CodeBlockProps) {
             transition={{ duration: 0.2 }}
             className="overflow-hidden"
           >
-            {/* KEY FIX: overflow-x-auto on wrapper, pre stays block-level */}
             <div 
               className="overflow-x-auto"
               style={{ WebkitOverflowScrolling: 'touch' }}
