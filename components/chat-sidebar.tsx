@@ -323,7 +323,7 @@ export function ChatSidebar({
   }
 
   // ═══════════════════════════════════════════════════════════════
-  // COLLAPSED RAIL — CLEAN OUTLINED ICON STYLE
+  // COLLAPSED RAIL — CLEAN OUTLINED ICON STYLE WITH SMALLER ICONS
   // ═══════════════════════════════════════════════════════════════
   if (!isOpen && !isMobile) {
     return (
@@ -338,29 +338,29 @@ export function ChatSidebar({
           onClick={onToggle}
           title="Open sidebar"
           aria-label="Open sidebar"
-          className="group relative h-10 w-10 rounded-lg flex items-center justify-center hover:bg-accent/50 transition-colors mb-1"
+          className="group relative h-10 w-10 rounded-xl flex items-center justify-center hover:bg-accent/50 transition-colors mb-1"
         >
           <Image
             src="/uncgpt.png"
             alt="uncgpt"
-            width={28}
-            height={28}
-            className="rounded-md shadow-sm transition-opacity duration-150 group-hover:opacity-0"
+            width={24}
+            height={24}
+            className="rounded-lg shadow-sm transition-opacity duration-150 group-hover:opacity-0"
           />
-          <PanelLeft className="h-5 w-5 absolute opacity-0 group-hover:opacity-100 transition-opacity duration-150" />
+          <PanelLeft className="h-4 w-4 absolute opacity-0 group-hover:opacity-100 transition-opacity duration-150" />
         </button>
 
         <RailButton title="New chat" onClick={() => handleNew("text")}>
-          <IconNewChat className="h-5 w-5" />
+          <IconNewChat className="h-4 w-4" />
         </RailButton>
         <RailButton title="Search" onClick={() => { onToggle(); setShowSearch(true) }}>
-          <IconSearch className="h-5 w-5" />
+          <IconSearch className="h-4 w-4" />
         </RailButton>
         <RailButton title="History" onClick={() => setHistoryOpen(true)}>
-          <IconHistory className="h-5 w-5" />
+          <IconHistory className="h-4 w-4" />
         </RailButton>
         <RailButton title="Projects" onClick={() => setProjectsOpen(true)}>
-          <IconProjects className="h-5 w-5" />
+          <IconProjects className="h-4 w-4" />
         </RailButton>
 
         <div className="flex-1" />
@@ -369,13 +369,13 @@ export function ChatSidebar({
           title="Join our Discord"
           onClick={() => window.open(DISCORD_URL, "_blank")}
         >
-          <DiscordIcon className="h-5 w-5" />
+          <DiscordIcon className="h-4 w-4" />
         </RailButton>
         <RailButton title="Memory" onClick={() => setMemoryOpen(true)}>
-          <Brain className="h-5 w-5" />
+          <Brain className="h-4 w-4" />
         </RailButton>
         <RailButton title="Settings" onClick={() => setSettingsPageOpen(true)}>
-          <SettingsIcon className="h-5 w-5" />
+          <SettingsIcon className="h-4 w-4" />
         </RailButton>
 
         <SettingsDialog open={settingsOpen} onOpenChange={setSettingsOpen} />
@@ -658,7 +658,7 @@ function NavItem({ icon, label, badge, onClick, active }: NavItemProps) {
     <button
       onClick={onClick}
       className={cn(
-        "w-full flex items-center gap-3 px-3 py-2 rounded-lg text-sm transition-colors",
+        "w-full flex items-center gap-3 px-3 py-2 rounded-lg text-sm transition-all duration-200",
         active
           ? "bg-accent text-accent-foreground"
           : "text-sidebar-foreground hover:bg-accent/50"
@@ -667,7 +667,7 @@ function NavItem({ icon, label, badge, onClick, active }: NavItemProps) {
       <span className="opacity-70">{icon}</span>
       <span className="flex-1 text-left">{label}</span>
       {badge && (
-        <span className="text-[10px] font-medium px-1.5 py-0.5 rounded bg-primary/10 text-primary">
+        <span className="text-[10px] font-medium px-1.5 py-0.5 rounded-md bg-primary/10 text-primary">
           {badge}
         </span>
       )}
@@ -739,7 +739,7 @@ function ChatGroup({
                 onMouseEnter={() => setHoveredChatId(chat.id)}
                 onMouseLeave={() => setHoveredChatId(null)}
                 className={cn(
-                  "group flex items-center gap-2 px-2 py-1.5 rounded-lg cursor-pointer text-sm transition-colors",
+                  "group flex items-center gap-2 px-2 py-1.5 rounded-lg cursor-pointer text-sm transition-all duration-200",
                   currentChatId === chat.id
                     ? "bg-accent text-accent-foreground"
                     : "hover:bg-accent/50"
@@ -800,7 +800,7 @@ function RailButton({ title, onClick, children, active }: RailButtonProps) {
       title={title}
       aria-label={title}
       className={cn(
-        "h-10 w-10 rounded-lg flex items-center justify-center text-sidebar-foreground/80 hover:text-sidebar-foreground hover:bg-accent/50 transition-colors",
+        "h-9 w-9 rounded-xl flex items-center justify-center text-sidebar-foreground/70 hover:text-sidebar-foreground hover:bg-accent/50 transition-all duration-200",
         active && "bg-accent text-accent-foreground"
       )}
     >
