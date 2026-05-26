@@ -1,4 +1,5 @@
 'use client'
+
 import React, { useMemo, useState, useRef, useEffect, useCallback } from 'react'
 import { Button } from '@/components/ui/button'
 import {
@@ -119,7 +120,6 @@ function textToFileAttachment(text: string, filename?: string): Attachment {
   };
 }
 
-// ... (compressImage, uploadToSupabase, useIsDarkMode, ToastNotification remain unchanged)
 async function compressImage(file: File): Promise<File> {
   return new Promise((resolve, reject) => {
     const reader = new FileReader()
@@ -281,7 +281,52 @@ export function ChatInput({
     return <span className="h-4 w-4 text-xs font-bold flex items-center justify-center text-muted-foreground">{family[0].toUpperCase()}</span>
   }
 
-  // ================= TYPING PLACEHOLDER EFFECT =================
+  const hasUploadingImages = Array.from(uploadStatus.values()).some(status => status.status === 'uploading')
+
+  // ============= FIXED HANDLE SUBMIT FUNCTION =============
+  const handleSubmit = useCallback(() => {
+    // Check if we can send
+    if (isStreaming || disabled || hasUploadingImages) return;
+    
+    // Get the message text
+    const messageText = input.trim();
+    if (!messageText && attachments.length === 0) return;
+    
+    // Check message size limit
+    const messageBytes = new TextEncoder().encode(messageText).length;
+    if (messageBytes > MAX_MESSAGE_BYTES) {
+      setToast(`Message too long (${Math.round(messageBytes / 1024)}KB). Maximum is ${MAX_MESSAGE_BYTES / 1024}KB.`);
+      return;
+    }
+    
+    // Check if any attachments have errors
+    const hasError = Array.from(uploadStatus.values()).some(status => status.status === 'error');
+    if (hasError) {
+      setToast('Some attachments failed to upload. Please remove them and try again.');
+      return;
+    }
+    
+    // Check if any attachments are still uploading
+    if (hasUploadingImages) {
+      setToast('Please wait for images to finish uploading.');
+      return;
+    }
+    
+    // Send the message
+    onSend(messageText, attachments.length > 0 ? attachments : undefined);
+    
+    // Clear input and attachments after sending
+    setInput('');
+    setAttachments([]);
+    setUploadStatus(new Map());
+    
+    // Reset textarea height
+    if (textareaRef.current) {
+      textareaRef.current.style.height = 'auto';
+    }
+  }, [input, attachments, uploadStatus, isStreaming, disabled, onSend, hasUploadingImages]);
+
+  // ============= TYPING PLACEHOLDER EFFECT =============
   useEffect(() => {
     if (input.length > 0) {
       setDisplayText('')
@@ -301,7 +346,7 @@ export function ChatInput({
         currentText += (wordIndex > 0 ? ' ' : '') + words[wordIndex]
         setDisplayText(currentText)
         wordIndex++
-        interval = setTimeout(typeNextWord, 70) // typing speed
+        interval = setTimeout(typeNextWord, 70)
       } else {
         timeout = setTimeout(() => {
           setIsTypingPlaceholder(false)
@@ -322,13 +367,135 @@ export function ChatInput({
       clearTimeout(timeout)
       clearTimeout(interval)
     }
-  }, [placeholderIndex, input])
+  }, [placeholderIndex, input.length])
 
-  // ... rest of your existing functions (handlePasteEvent, handleSubmit, etc.) ...
-  const handlePasteEvent = async (e: React.ClipboardEvent<HTMLTextAreaElement>) => { /* unchanged */ }
-  const handleSubmit = useCallback(() => { /* unchanged */ }, [input, attachments, uploadStatus, isStreaming, disabled, onSend])
-  // ... (all other functions remain the same)
+  // ============= PASTE HANDLER =============
+  const handlePasteEvent = async (e: React.ClipboardEvent<HTMLTextAreaElement>) => {
+    const items = e.clipboardData?.items;
+    if (!items) return;
 
+    for (const item of Array.from(items)) {
+      if (item.type.startsWith('image/')) {
+        e.preventDefault();
+        const file = item.getAsFile();
+        if (file) {
+          const compressed = await compressImage(file);
+          const reader = new FileReader();
+          reader.onload = (e) => {
+            const newAttachment: Attachment = {
+              name: `pasted-image-${Date.now()}.jpg`,
+              url: e.target?.result as string,
+              type: 'image',
+              size: compressed.size,
+            };
+            setAttachments(prev => [...prev, newAttachment]);
+          };
+          reader.readAsDataURL(compressed);
+        }
+      } else if (item.type === 'text/plain') {
+        item.getAsString(async (text) => {
+          if (text.length > 100) {
+            e.preventDefault();
+            const attachment = textToFileAttachment(text);
+            setAttachments(prev => [...prev, attachment]);
+            setToast('Long text pasted as file attachment');
+          }
+        });
+      }
+    }
+  };
+
+  // ============= FILE SELECT HANDLER =============
+  const handleFileSelect = async (e: React.ChangeEvent<HTMLInputElement>, type: 'file' | 'image') => {
+    const files = Array.from(e.target.files || []);
+    if (files.length === 0) return;
+
+    setIsUploading(true);
+    
+    for (const file of files) {
+      const id = `${Date.now()}-${file.name}`;
+      setUploadStatus(prev => new Map(prev).set(id, { status: 'uploading' }));
+      
+      try {
+        let processedFile = file;
+        if (type === 'image') {
+          processedFile = await compressImage(file);
+        }
+        
+        let url: string;
+        if (supabase) {
+          url = await uploadToSupabase(processedFile, file.name);
+        } else {
+          const reader = await new Promise<string>((resolve) => {
+            const reader = new FileReader();
+            reader.onload = (e) => resolve(e.target?.result as string);
+            reader.readAsDataURL(processedFile);
+          });
+          url = reader;
+        }
+        
+        const attachment: Attachment = {
+          name: file.name,
+          url,
+          type,
+          size: processedFile.size,
+        };
+        
+        setAttachments(prev => [...prev, attachment]);
+        setUploadStatus(prev => new Map(prev).set(id, { status: 'completed', url }));
+      } catch (error) {
+        console.error('Upload failed:', error);
+        setUploadStatus(prev => new Map(prev).set(id, { status: 'error' }));
+        setToast(`Failed to upload ${file.name}`);
+      }
+    }
+    
+    setIsUploading(false);
+    e.target.value = '';
+  };
+
+  // ============= LINK HANDLER =============
+  const handleAddLink = () => {
+    if (linkUrl.trim()) {
+      const attachment: Attachment = {
+        name: linkUrl,
+        url: linkUrl,
+        type: 'link',
+      };
+      setAttachments(prev => [...prev, attachment]);
+      setLinkUrl('');
+      setShowLinkInput(false);
+    }
+  };
+
+  // ============= REMOVE ATTACHMENT =============
+  const removeAttachment = (index: number) => {
+    setAttachments(prev => prev.filter((_, i) => i !== index));
+  };
+
+  // ============= VOICE INPUT =============
+  const toggleVoiceInput = async () => {
+    if (isRecording) {
+      recognitionRef.current?.stop();
+    } else {
+      try {
+        await navigator.mediaDevices.getUserMedia({ audio: true });
+        recognitionRef.current?.start();
+      } catch (err) {
+        setToast('Microphone access denied');
+      }
+    }
+  };
+
+  // ============= KEY DOWN HANDLER =============
+  const handleKeyDown = (e: React.KeyboardEvent<HTMLTextAreaElement>) => {
+    if (e.key === 'Enter' && !e.shiftKey) {
+      e.preventDefault();
+      handleSubmit();
+    }
+  };
+
+  // ============= EFFECTS =============
   useEffect(() => {
     if (textareaRef.current) {
       textareaRef.current.style.height = 'auto'
@@ -343,7 +510,7 @@ export function ChatInput({
     }
   }, [initialValue, onClearInitialValue])
 
-  // Speech recognition setup (unchanged)
+  // Speech recognition setup
   useEffect(() => {
     if (typeof window === 'undefined') return
     const SR = (window as any).SpeechRecognition || (window as any).webkitSpeechRecognition
@@ -365,15 +532,8 @@ export function ChatInput({
     return () => rec.abort()
   }, [])
 
-  const toggleVoiceInput = async () => { /* unchanged */ }
-  const handleKeyDown = (e: React.KeyboardEvent) => { /* unchanged */ }
-  const handleFileSelect = async (e: React.ChangeEvent<HTMLInputElement>, type: 'file' | 'image') => { /* unchanged */ }
-  const handleAddLink = () => { /* unchanged */ }
-  const removeAttachment = (id: string) => { /* unchanged */ }
-
   const imageAttachments = attachments.filter((a) => a.type === 'image')
   const otherAttachments = attachments.filter((a) => a.type !== 'image')
-  const hasUploadingImages = Array.from(uploadStatus.values()).some(status => status.status === 'uploading')
 
   return (
     <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} className="bg-background">
@@ -385,7 +545,36 @@ export function ChatInput({
         <AnimatePresence>
           {attachments.length > 0 && (
             <motion.div initial={{ opacity: 0, height: 0 }} animate={{ opacity: 1, height: 'auto' }} exit={{ opacity: 0, height: 0 }} className="mb-3 px-3 space-y-2 max-h-56 overflow-y-auto">
-              {/* ... your attachment UI unchanged ... */}
+              {imageAttachments.length > 0 && (
+                <div className="flex gap-2 flex-wrap">
+                  {imageAttachments.map((att, idx) => (
+                    <div key={idx} className="relative group">
+                      <div className="relative w-16 h-16 rounded-lg overflow-hidden border border-border">
+                        <NextImage src={att.url} alt={att.name} fill className="object-cover" />
+                      </div>
+                      <button onClick={() => removeAttachment(idx)} className="absolute -top-2 -right-2 p-0.5 bg-destructive text-destructive-foreground rounded-full opacity-0 group-hover:opacity-100 transition-opacity">
+                        <X className="h-3 w-3" />
+                      </button>
+                    </div>
+                  ))}
+                </div>
+              )}
+              {otherAttachments.length > 0 && (
+                <div className="space-y-1">
+                  {otherAttachments.map((att, idx) => (
+                    <div key={idx} className="flex items-center gap-2 p-2 rounded-lg bg-muted/50 group">
+                      <FileText className="h-4 w-4 shrink-0" />
+                      <span className="text-sm truncate flex-1">{att.name}</span>
+                      <button onClick={() => setViewingAttachment(att)} className="p-1 hover:bg-muted rounded">
+                        <Eye className="h-3 w-3" />
+                      </button>
+                      <button onClick={() => removeAttachment(idx)} className="p-1 hover:bg-muted rounded">
+                        <X className="h-3 w-3" />
+                      </button>
+                    </div>
+                  ))}
+                </div>
+              )}
             </motion.div>
           )}
         </AnimatePresence>
@@ -481,7 +670,12 @@ export function ChatInput({
                   </Button>
                 ) : (
                   (input.trim() || attachments.length > 0) ? (
-                    <Button onClick={handleSubmit} disabled={isStreaming || disabled || hasUploadingImages} size="icon" className="h-9 w-9 rounded-full bg-primary hover:bg-primary/90">
+                    <Button 
+                      onClick={handleSubmit} 
+                      disabled={isStreaming || disabled || hasUploadingImages} 
+                      size="icon" 
+                      className="h-9 w-9 rounded-full bg-primary hover:bg-primary/90"
+                    >
                       {hasUploadingImages ? <Loader2 className="h-4 w-4 animate-spin" /> : <ArrowUp className="h-4 w-4" />}
                     </Button>
                   ) : (
