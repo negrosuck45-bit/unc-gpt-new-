@@ -14,7 +14,6 @@ import {
   Mic,
   FolderOpen,
   Settings as SettingsIcon,
-  Brain,
   Edit2,
   Search,
   Sparkles,
@@ -380,9 +379,6 @@ export function ChatSidebar({
         >
           <DiscordIcon className="h-4 w-4" />
         </RailButton>
-        <RailButton title="Memory" onClick={() => setMemoryOpen(true)}>
-          <Brain className="h-4 w-4" />
-        </RailButton>
         <RailButton title="Settings" onClick={() => setSettingsPageOpen(true)}>
           <SettingsIcon className="h-4 w-4" />
         </RailButton>
@@ -598,11 +594,6 @@ export function ChatSidebar({
                 icon={<DiscordIcon className="h-4 w-4" />}
                 label="Join Discord"
                 onClick={() => window.open(DISCORD_URL, "_blank")}
-              />
-              <NavItem
-                icon={<Brain className="h-4 w-4" />}
-                label="Memory"
-                onClick={() => setMemoryOpen(true)}
               />
               <NavItem
                 icon={<SettingsIcon className="h-4 w-4" />}
