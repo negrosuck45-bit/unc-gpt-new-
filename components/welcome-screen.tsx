@@ -20,8 +20,8 @@ export function WelcomeScreen({ onSelectPrompt, project }: WelcomeScreenProps) {
         <Image
           src="/uncgptt.png"
           alt="UNC GPT"
-          width={400}
-          height={3+380}
+          width={700}
+          height={180}
           className="object-cover"
           priority
         />
