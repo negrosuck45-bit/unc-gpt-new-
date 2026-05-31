@@ -335,7 +335,10 @@ function FeedbackModal({ open, onClose, message, onSubmit }: { open: boolean; on
             <motion.div initial={{ opacity: 0, scale: 0.8 }} animate={{ opacity: 1, scale: 1 }} className="text-center py-8">
               <div className="w-14 h-14 rounded-full bg-green-500/10 flex items-center justify-center mx-auto mb-4"><Check className="h-7 w-7 text-green-400" /></div>
               <h3 className="text-lg font-semibold text-white mb-1">Thank you!</h3>
-              <p className="text-sm text-white/50">Your feedback has been saved.</p>
+              <p className="text-sm text-white/50 mb-4">Your feedback has been saved.</p>
+              <a href="/feedback" target="_blank" rel="noopener noreferrer" className="inline-flex items-center gap-1.5 text-sm text-blue-400 hover:text-blue-300 underline underline-offset-2 transition-colors">
+                View all feedback →
+              </a>
             </motion.div>
           ) : (
             <>

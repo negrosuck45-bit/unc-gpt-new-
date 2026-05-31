@@ -12,7 +12,6 @@ import {
   PanelLeftClose,
   PanelLeft,
   Mic,
-  ChevronDown,
   FolderOpen,
   Settings as SettingsIcon,
   Brain,
@@ -271,6 +270,16 @@ export function ChatSidebar({
   }, [filteredChats])
 
   const handleNew = (type: "text" | "voice") => {
+    // If there's already an empty new chat of the same type, just switch to it
+    const existingEmpty = chats.find(
+      (c) => c.type === type && c.messages.length === 0 && c.title === "New Chat"
+    )
+    if (existingEmpty) {
+      setCurrentChat(existingEmpty.id)
+      onModeChange(type)
+      onChatSelect(existingEmpty.id, type)
+      return
+    }
     const id = createNewChat(type)
     setCurrentChat(id)
     onModeChange(type)
@@ -418,9 +427,6 @@ export function ChatSidebar({
                   className="rounded-md"
                 />
                 <span className="font-semibold text-base">uncgpt</span>
-                <button className="ml-1 p-1 hover:bg-accent/50 rounded-md">
-                  <ChevronDown className="h-4 w-4 opacity-60" />
-                </button>
               </div>
               <button
                 onClick={onToggle}
@@ -587,7 +593,7 @@ export function ChatSidebar({
             </div>
 
             {/* Bottom bar */}
-            <div className="border-t border-sidebar-border bg-sidebar p-2 space-y-0.5">
+            <div className="bg-sidebar p-2 space-y-0.5">
               <NavItem
                 icon={<DiscordIcon className="h-4 w-4" />}
                 label="Join Discord"

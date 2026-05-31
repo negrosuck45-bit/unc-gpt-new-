@@ -22,6 +22,7 @@ export function ChatInterface({ onSwitchToImagine, onOpenSidebar, isSidebarOpen 
   const {
     currentChatId,
     createNewChat,
+    setCurrentChat,
     addMessage,
     updateMessage,
     deleteMessage,
@@ -73,7 +74,11 @@ export function ChatInterface({ onSwitchToImagine, onOpenSidebar, isSidebarOpen 
   const handleSend = useCallback(async (content: string, attachments?: Attachment[]) => {
     if (!content?.trim() && (!attachments || attachments.length === 0)) return;
 
-    const chatId = currentChatId || createNewChat("text", null, settings.model, settings.provider);
+    const chatId = currentChatId || (() => {
+      const id = createNewChat("text", null, settings.model, settings.provider);
+      setCurrentChat(id);
+      return id;
+    })();
 
     addMessage(chatId, {
       role: "user",
@@ -103,7 +108,7 @@ export function ChatInterface({ onSwitchToImagine, onOpenSidebar, isSidebarOpen 
       setIsThinking(false);
       abortControllerRef.current = null;
     }
-  }, [currentChatId, createNewChat, addMessage, updateChatTitle, setIsStreaming, settings]);
+  }, [currentChatId, createNewChat, setCurrentChat, addMessage, updateChatTitle, setIsStreaming, settings]);
 
   const processAIResponse = async (chatId: string, messages: any[]) => {
     const currentChat = useChatStore.getState().chats.find(c => c.id === chatId);
