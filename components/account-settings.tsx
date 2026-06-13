@@ -611,10 +611,3 @@ async function compressAvatar(file: File): Promise<File> {
     reader.readAsDataURL(file)
   })
 }
-      img.onerror = () => resolve(file)
-      img.src = e.target?.result as string
-    }
-    reader.onerror = () => resolve(file)
-    reader.readAsDataURL(file)
-  })
-}
