@@ -379,18 +379,31 @@ export function ChatInput({
         e.preventDefault();
         const file = item.getAsFile();
         if (file) {
-          const compressed = await compressImage(file);
-          const reader = new FileReader();
-          reader.onload = (e) => {
+          try {
+            const compressed = await compressImage(file);
+            setIsUploading(true);
+            const id = `pasted-${Date.now()}`;
+            setUploadStatus(prev => new Map(prev).set(id, { status: 'uploading' }));
+            
+            const url = await uploadToSupabase(compressed, `pasted-image-${Date.now()}`);
+            
             const newAttachment: Attachment = {
               name: `pasted-image-${Date.now()}.jpg`,
-              url: e.target?.result as string,
+              url: url,
               type: 'image',
               size: compressed.size,
             };
             setAttachments(prev => [...prev, newAttachment]);
-          };
-          reader.readAsDataURL(compressed);
+            setUploadStatus(prev => {
+              const updated = new Map(prev);
+              updated.set(id, { status: 'completed', url });
+              return updated;
+            });
+            setIsUploading(false);
+          } catch (err: any) {
+            setToast(`Failed to upload pasted image: ${err.message}`);
+            setIsUploading(false);
+          }
         }
       } else if (item.type === 'text/plain') {
         item.getAsString(async (text) => {
