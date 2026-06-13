@@ -158,24 +158,43 @@ async function compressImage(file: File): Promise<File> {
 
 async function uploadToSupabase(file: File, fileName: string): Promise<string> {
   if (!supabase) throw new Error('Supabase not configured')
-  const fileExt = file.name.split('.').pop() || 'jpg'
-  const timestamp = Date.now()
-  const randomStr = Math.random().toString(36).substring(2, 8)
-  const safeFileName = fileName.replace(/[^a-zA-Z0-9]/g, '_').slice(0, 50)
-  const uniqueFileName = `${timestamp}_${randomStr}_${safeFileName}.${fileExt}`
-  const filePath = `chat-images/${uniqueFileName}`
+  try {
+    const fileExt = file.name.split('.').pop() || 'jpg'
+    const timestamp = Date.now()
+    const randomStr = Math.random().toString(36).substring(2, 8)
+    const safeFileName = fileName.replace(/[^a-zA-Z0-9]/g, '_').slice(0, 50)
+    const uniqueFileName = `${timestamp}_${randomStr}_${safeFileName}.${fileExt}`
+    const filePath = `chat-images/${uniqueFileName}`
 
-  const { data, error } = await supabase.storage
-    .from('chat-attachments')
-    .upload(filePath, file, { cacheControl: '3600', upsert: false, contentType: file.type })
+    // Check if bucket exists and file upload works
+    const { data, error } = await supabase.storage
+      .from('chat-attachments')
+      .upload(filePath, file, { 
+        cacheControl: '3600', 
+        upsert: false, 
+        contentType: file.type,
+      })
 
-  if (error) throw error
+    if (error) {
+      console.error('[v0] Upload error details:', error)
+      // If bucket doesn't exist, try creating the path first
+      if (error.message?.includes('Bucket not found')) {
+        throw new Error('Storage not configured. Please create the chat-attachments bucket in Supabase Storage.')
+      }
+      throw error
+    }
 
-  const { data: { publicUrl } } = supabase.storage
-    .from('chat-attachments')
-    .getPublicUrl(filePath)
+    // Get public URL
+    const { data: { publicUrl } } = supabase.storage
+      .from('chat-attachments')
+      .getPublicUrl(filePath)
 
-  return publicUrl
+    console.log('[v0] File uploaded successfully:', publicUrl)
+    return publicUrl
+  } catch (err: any) {
+    console.error('[v0] Upload failed:', err.message)
+    throw err
+  }
 }
 
 function useIsDarkMode() {

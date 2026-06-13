@@ -44,24 +44,32 @@ export function useAuth() {
     return () => subscription.unsubscribe()
   }, [])
 
+  const getOAuthRedirectUrl = () => {
+    if (typeof window === 'undefined') return 'http://localhost:3000/auth/callback'
+    const url = new URL(window.location.origin)
+    // For localhost development, use full URL
+    // For production, Supabase will use the configured URL
+    return `${url.origin}/auth/callback`
+  }
+
   const signInWithGithub = useCallback(async () => {
     await supabase.auth.signInWithOAuth({
       provider: 'github',
-      options: { redirectTo: `${window.location.origin}/auth/callback` },
+      options: { redirectTo: getOAuthRedirectUrl() },
     })
   }, [])
 
   const signInWithGoogle = useCallback(async () => {
     await supabase.auth.signInWithOAuth({
       provider: 'google',
-      options: { redirectTo: `${window.location.origin}/auth/callback` },
+      options: { redirectTo: getOAuthRedirectUrl() },
     })
   }, [])
 
   const signInWithGitlab = useCallback(async () => {
     await supabase.auth.signInWithOAuth({
       provider: 'gitlab',
-      options: { redirectTo: `${window.location.origin}/auth/callback` },
+      options: { redirectTo: getOAuthRedirectUrl() },
     })
   }, [])
 

@@ -5,7 +5,7 @@ import Image from "next/image"
 import { useChatStore } from "@/lib/chat-store"
 import { cn } from "@/lib/utils"
 import {
-  Trash2, PanelLeftClose, PanelLeft, Edit2, MoreHorizontal,
+  Trash2, PanelLeftClose, PanelLeft, Edit2, MoreHorizontal, Settings,
 } from "lucide-react"
 import { motion, AnimatePresence } from "framer-motion"
 import { ProjectsDialog } from "./projects-dialog"
@@ -272,9 +272,10 @@ export function ChatSidebar({ isOpen, onToggle, onChatSelect, onModeChange, isMo
               )}
             </div>
 
-            {/* Bottom — Discord + profile (no Memory, no Settings icon) */}
+            {/* Bottom — Discord + settings + profile */}
             <div className="px-2 pb-3 pt-2 space-y-0.5 shrink-0">
               <NavItem icon={<DiscordIcon className="h-4 w-4" />} label="Join Discord" onClick={() => window.open(DISCORD_URL, "_blank")} />
+              <NavItem icon={<Settings className="h-4 w-4" />} label="Settings" onClick={() => setSettingsOpen(true)} />
               <ProfileButton />
             </div>
           </motion.aside>
