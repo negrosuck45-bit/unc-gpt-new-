@@ -143,9 +143,7 @@ export function AuthDialog({ open, onOpenChange }: AuthDialogProps) {
         <div className="p-7">
           {/* Logo / branding */}
           <div className="flex items-center gap-2.5 mb-7">
-            <div className="w-8 h-8 rounded-xl bg-foreground flex items-center justify-center">
-              <span className="text-background font-bold text-sm">u</span>
-            </div>
+            <img src="/uncgpt.png" alt="UNC GPT" className="w-8 h-8 rounded-xl" />
             <span className="font-semibold text-base">uncgpt</span>
           </div>
 

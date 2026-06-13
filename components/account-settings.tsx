@@ -10,6 +10,13 @@ import { Label } from '@/components/ui/label'
 import { Switch } from '@/components/ui/switch'
 import { Slider } from '@/components/ui/slider'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
+import { createClient } from '@supabase/supabase-js'
+
+// Initialize Supabase for password change
+const supabase = createClient(
+  process.env.NEXT_PUBLIC_SUPABASE_URL || '',
+  process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || ''
+)
 import {
   X, ChevronLeft, User, Zap, Shield, Palette, Sparkles,
   Puzzle, PlugZap, Sun, Moon, Smartphone, Key, Eye, EyeOff,
@@ -317,6 +324,7 @@ export function AccountSettings({ open, onClose }: AccountSettingsProps) {
         {activeTab === 'advanced' && (
           <>
             <SectionTitle title="Advanced" description="For power users" />
+            <PasswordChangeSection profile={profile} />
             <Row label="Debug Mode" description="Log debug info to console" right={<Switch />} />
             <Row label="Experimental Features" description="Try new features early" right={<Switch />} />
             <div className="p-4 rounded-xl bg-muted/40 border border-border">
@@ -509,6 +517,75 @@ function ModelBadge({ family }: { family: string }) {
   return <span className={cn('font-bold text-sm w-5 text-center inline-block', color)}>{letter}</span>
 }
 
+// ── Password Change Component ─────────────────────────────────────────────────
+function PasswordChangeSection({ profile }: { profile: any }) {
+  const [showPassword, setShowPassword] = useState(false)
+  const [currentPass, setCurrentPass] = useState('')
+  const [newPass, setNewPass] = useState('')
+  const [confirmPass, setConfirmPass] = useState('')
+  const [loading, setLoading] = useState(false)
+  const [error, setError] = useState<string | null>(null)
+  const [success, setSuccess] = useState(false)
+
+  if (!profile?.email) return null
+
+  const handlePasswordChange = async () => {
+    setError(null)
+    if (!currentPass || !newPass || !confirmPass) {
+      setError('All fields are required')
+      return
+    }
+    if (newPass !== confirmPass) {
+      setError('New passwords do not match')
+      return
+    }
+    if (newPass.length < 8) {
+      setError('Password must be at least 8 characters')
+      return
+    }
+    
+    setLoading(true)
+    try {
+      const { error } = await supabase.auth.updateUser({ password: newPass })
+      if (error) throw error
+      setSuccess(true)
+      setCurrentPass('')
+      setNewPass('')
+      setConfirmPass('')
+      setTimeout(() => setSuccess(false), 3000)
+    } catch (err: any) {
+      setError(err.message || 'Failed to change password')
+    }
+    setLoading(false)
+  }
+
+  return (
+    <div className="space-y-3 p-4 rounded-xl bg-muted/20 border border-border">
+      <p className="text-sm font-medium">Change Password</p>
+      {error && <div className="text-xs text-red-500 flex gap-2"><AlertCircle className="h-3 w-3 mt-0.5" />{error}</div>}
+      {success && <div className="text-xs text-green-500 flex gap-2"><Check className="h-3 w-3 mt-0.5" />Password changed successfully</div>}
+      <div className="space-y-2.5">
+        <div className="relative">
+          <Input type={showPassword ? 'text' : 'password'} placeholder="Current password" value={currentPass} onChange={e => setCurrentPass(e.target.value)} disabled={loading} />
+        </div>
+        <div className="relative">
+          <Input type={showPassword ? 'text' : 'password'} placeholder="New password" value={newPass} onChange={e => setNewPass(e.target.value)} disabled={loading} />
+        </div>
+        <div className="relative">
+          <Input type={showPassword ? 'text' : 'password'} placeholder="Confirm new password" value={confirmPass} onChange={e => setConfirmPass(e.target.value)} disabled={loading} />
+          <button onClick={() => setShowPassword(!showPassword)} className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground">
+            {showPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+          </button>
+        </div>
+        <Button size="sm" onClick={handlePasswordChange} disabled={loading} className="w-full">
+          {loading ? <Loader2 className="h-4 w-4 animate-spin mr-2" /> : <Key className="h-4 w-4 mr-2" />}
+          {loading ? 'Updating...' : 'Update Password'}
+        </Button>
+      </div>
+    </div>
+  )
+}
+
 async function compressAvatar(file: File): Promise<File> {
   return new Promise(resolve => {
     const reader = new FileReader()
@@ -517,15 +594,23 @@ async function compressAvatar(file: File): Promise<File> {
       img.onload = () => {
         const MAX = 400
         let w = img.width, h = img.height
-        if (w > h) { if (w > MAX) { h = Math.round(h * MAX / w); w = MAX } }
-        else { if (h > MAX) { w = Math.round(w * MAX / h); h = MAX } }
+        if (w > MAX || h > MAX) { w > h ? (h *= MAX / w, w = MAX) : (w *= MAX / h, h = MAX) }
         const canvas = document.createElement('canvas')
         canvas.width = w; canvas.height = h
-        canvas.getContext('2d')?.drawImage(img, 0, 0, w, h)
+        const ctx = canvas.getContext('2d')!
+        ctx.drawImage(img, 0, 0, w, h)
         canvas.toBlob(blob => {
-          resolve(blob ? new File([blob], file.name, { type: 'image/jpeg' }) : file)
-        }, 'image/jpeg', 0.88)
+          const f = new File([blob!], file.name.split('.')[0] + '.jpg', { type: 'image/jpeg' })
+          resolve(f)
+        }, 'image/jpeg', 0.8)
       }
+      img.onerror = () => resolve(file)
+      img.src = e.target?.result as string
+    }
+    reader.onerror = () => resolve(file)
+    reader.readAsDataURL(file)
+  })
+}
       img.onerror = () => resolve(file)
       img.src = e.target?.result as string
     }
