@@ -58,16 +58,9 @@ const PLACEHOLDER_EXAMPLES = [
   "Tell me a dark humor joke about AI"
 ]
 
-// Initialize Supabase client - use the one from lib/supabase/client.ts
-import { createClient as createSupabaseClient } from '@supabase/supabase-js'
-let supabase: any = null
-if (typeof window !== 'undefined') {
-  const url = process.env.NEXT_PUBLIC_SUPABASE_URL
-  const key = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY
-  if (url && key) {
-    supabase = createSupabaseClient(url, key)
-  }
-}
+// Use shared Supabase client from lib
+import { createClient } from '@/lib/supabase/client'
+const supabase = createClient()
 
 // ====================== FAMILY ICONS ======================
 const familyIcons: Record<string, string> = {

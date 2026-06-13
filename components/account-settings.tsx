@@ -10,13 +10,9 @@ import { Label } from '@/components/ui/label'
 import { Switch } from '@/components/ui/switch'
 import { Slider } from '@/components/ui/slider'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
-import { createClient } from '@supabase/supabase-js'
-
-// Initialize Supabase for password change
-const supabase = createClient(
-  process.env.NEXT_PUBLIC_SUPABASE_URL || '',
-  process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || ''
-)
+// Use shared Supabase client
+import { createClient } from '@/lib/supabase/client'
+const supabase = createClient()
 import {
   X, ChevronLeft, User, Zap, Shield, Palette, Sparkles,
   Puzzle, PlugZap, Sun, Moon, Smartphone, Key, Eye, EyeOff,
@@ -471,7 +467,7 @@ export function UserAvatar({ profile, size = 36, className }: {
 
   if (profile?.avatar_url && !imgError) {
     return (
-      <img src={profile.avatar_url} alt={profile.name ?? 'User'} width={size} height={size}
+      <img src={profile.avatar_url} alt={profile.name ?? 'User'}
         onError={() => setImgError(true)} referrerPolicy="no-referrer"
         className={cn('rounded-full object-cover shrink-0', className)}
         style={{ width: size, height: size }} />
