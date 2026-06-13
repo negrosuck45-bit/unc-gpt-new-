@@ -44,7 +44,7 @@ import {
   DropdownMenuLabel,
 } from '@/components/ui/dropdown-menu'
 import NextImage from 'next/image'
-import { createClient } from '@supabase/supabase-js'
+import { createClient } from '@/lib/supabase/client'
 
 // ============= CONSTANTS =============
 const MAX_MESSAGE_BYTES = 4000;
@@ -59,7 +59,6 @@ const PLACEHOLDER_EXAMPLES = [
 ]
 
 // Use shared Supabase client from lib
-import { createClient } from '@/lib/supabase/client'
 const supabase = createClient()
 
 // ====================== FAMILY ICONS ======================
