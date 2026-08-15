@@ -14,19 +14,16 @@ import {
   Mic,
   FolderOpen,
   Settings as SettingsIcon,
-  Brain,
   Edit2,
   Search,
   Sparkles,
   MoreHorizontal,
   Code,
   Palette,
-  KeyRound,
 } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { motion, AnimatePresence } from "framer-motion"
 import { SettingsPage } from "./settings-page"
-import { hasFeedbackPasskey, verifyFeedbackPasskey } from "@/lib/passkey"
 import { ProjectsDialog } from "./projects-dialog"
 import { MemoryImportDialog } from "./memory-import-dialog"
 import { MemoryExportDialog } from "./memory-export-dialog"
@@ -90,12 +87,6 @@ export function ChatSidebar({
   const [searchQuery, setSearchQuery] = useState("")
   const [showSearch, setShowSearch] = useState(false)
 
-  const openFeedback = async () => {
-    if (hasFeedbackPasskey()) {
-      try { await verifyFeedbackPasskey() } catch { return }
-    }
-    window.location.href = '/feedback'
-  }
 
   const [projectsOpen, setProjectsOpen] = useState(false)
   const [memoryOpen, setMemoryOpen] = useState(false)
@@ -249,12 +240,6 @@ export function ChatSidebar({
           onClick={() => window.open(DISCORD_URL, "_blank")}
         >
           <DiscordIcon className="h-5 w-5 text-muted-foreground" />
-        </RailButton>
-        <RailButton title="Feedback" onClick={openFeedback}>
-          <KeyRound className="h-5 w-5" />
-        </RailButton>
-        <RailButton title="Memory" onClick={() => setMemoryOpen(true)}>
-          <Brain className="h-5 w-5" />
         </RailButton>
         <RailButton title="Settings" onClick={openSettings}>
           <SettingsIcon className="h-5 w-5" />
@@ -466,16 +451,6 @@ export function ChatSidebar({
                 icon={<DiscordIcon className="h-4 w-4" />}
                 label="Join Discord"
                 onClick={() => window.open(DISCORD_URL, "_blank")}
-              />
-              <NavItem
-                icon={<KeyRound className="h-4 w-4" />}
-                label="Feedback"
-                onClick={openFeedback}
-              />
-              <NavItem
-                icon={<Brain className="h-4 w-4" />}
-                label="Memory"
-                onClick={() => setMemoryOpen(true)}
               />
               <NavItem
                 icon={<SettingsIcon className="h-4 w-4" />}
