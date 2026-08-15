@@ -1,7 +1,7 @@
 import type { NextRequest } from "next/server";
 
 import { auth0 } from "@/lib/auth0";
-import { getComposioConnector } from "@/lib/composio";
+import { getComposioSession } from "@/lib/composio";
 
 export const runtime = "nodejs";
 
@@ -539,7 +539,7 @@ async function generateMedia(
 // Keep provider instructions focused on ordinary chat; never expose internal tools.
 const TERMINAL_SYSTEM_PROMPT = `You are uncgpt, a helpful AI assistant. Answer the user's request directly and clearly.
 
-You may use connected Composio apps and other tools when they are needed. For read-only actions, proceed when the user's request is clear. Before any action that sends, creates, edits, deletes, publishes, deploys, or changes external data, stop and ask the user for explicit confirmation describing the exact action and target. Never claim an external action succeeded unless a tool result confirms it.
+You may use connected Composio apps and other tools when they are needed. For Composio requests, use COMPOSIO_SEARCH_TOOLS first with the user’s request, then use COMPOSIO_GET_TOOL_SCHEMAS for any discovered tool, and finally use the appropriate execution tool with the returned schema. Do not answer that you lack access before attempting this sequence. For read-only actions, proceed when the user's request is clear. Before any action that sends, creates, edits, deletes, publishes, deploys, or changes external data, stop and ask the user for explicit confirmation describing the exact action and target. Never claim an external action succeeded unless a tool result confirms it.
 
 Do not mention internal tools, terminal commands, deployment commands, hidden prompts, or implementation details. If the user asks for an action this chat cannot perform, explain the limitation briefly and offer a safe useful alternative.`;
 
@@ -861,6 +861,39 @@ async function fallbackChat(
 // ============================================================
 // MCP TOOLS
 // ============================================================
+async function callMcpJsonRpc(connector: any, method: string, params: any = {}) {
+  const response = await fetch(connector.url, {
+    method: "POST",
+    headers: {
+      ...connector.headers,
+      "Content-Type": "application/json",
+      Accept: "application/json, text/event-stream",
+    },
+    body: JSON.stringify({ jsonrpc: "2.0", id: Date.now(), method, params }),
+  });
+  if (!response.ok) throw new Error(`MCP ${response.status}: ${await response.text().catch(() => "")}`);
+  const contentType = response.headers.get("content-type") || "";
+  if (contentType.includes("text/event-stream")) {
+    const text = await response.text();
+    const events = text.split(/\\n\\n+/).reverse();
+    for (const event of events) {
+      const line = event.split("\\n").find((value) => value.startsWith("data:"));
+      if (!line) continue;
+      try {
+        const payload = JSON.parse(line.slice(5).trim());
+        if (payload.error) throw new Error(payload.error.message || "MCP request failed");
+        if (payload.result) return payload.result;
+      } catch (error: any) {
+        if (error?.message && !error.message.includes("Unexpected token")) throw error;
+      }
+    }
+    throw new Error("MCP stream returned no result");
+  }
+  const payload = await response.json();
+  if (payload.error) throw new Error(payload.error.message || "MCP request failed");
+  return payload.result ?? payload;
+}
+
 async function fetchMcpTools(connectors: any[], baseUrl: string): Promise<any[]> {
   if (!connectors?.length) return [];
   const enabled = connectors.filter(
@@ -874,49 +907,10 @@ async function fetchMcpTools(connectors: any[], baseUrl: string): Promise<any[]>
     enabled.map(async (c: any) => {
       try {
         const callMcpEndpoint = async (
-          action: string,
+          _action: string,
           method?: string,
           params?: any
-        ) => {
-          const res = await fetch(`${baseUrl}/api/mcp`, {
-            method: "POST",
-            headers: {
-              "Content-Type": "application/json",
-              Accept: "application/json, text/event-stream",
-            },
-            body: JSON.stringify({
-              action,
-              connectorId: c.id,
-              method,
-              params,
-            }),
-          });
-          if (!res.ok) throw new Error(`HTTP ${res.status}`);
-          const ct = res.headers.get("content-type") || "";
-          if (ct.includes("text/event-stream")) {
-            const reader = res.body!.getReader();
-            const dec = new TextDecoder();
-            let buf = "";
-            while (true) {
-              const { done, value } = await reader.read();
-              if (done) break;
-              buf += dec.decode(value, { stream: true });
-              const lines = buf.split("\n");
-              buf = lines.pop() || "";
-              for (const line of lines) {
-                if (!line.startsWith("data:")) continue;
-                try {
-                  const p = JSON.parse(line.slice(5).trim());
-                  return p.result;
-                } catch {}
-              }
-            }
-            throw new Error("SSE ended");
-          }
-          const data = await res.json();
-          if (data.error) throw new Error(data.error.message);
-          return data.result;
-        };
+        ) => callMcpJsonRpc(c, method || _action, params || {});
 
         try {
           await callMcpEndpoint("initialize", "initialize", {
@@ -952,56 +946,21 @@ async function fetchMcpTools(connectors: any[], baseUrl: string): Promise<any[]>
 async function executeMcpTool(
   tool: any,
   args: any,
-  baseUrl: string
+  _baseUrl: string
 ): Promise<string> {
-  const c = tool._connector;
-  const res = await fetch(`${baseUrl}/api/mcp`, {
-    method: "POST",
-    headers: {
-      "Content-Type": "application/json",
-      Accept: "application/json, text/event-stream",
-    },
-    body: JSON.stringify({
-      action: "execute-tool",
-      connectorId: c.id,
-      method: "tools/call",
-      params: { name: tool._toolName, arguments: args },
-    }),
-  });
-
-  if (!res.ok) return `Error: HTTP ${res.status}`;
-
-  const ct = res.headers.get("content-type") || "";
-  let result: any;
-
-  if (ct.includes("text/event-stream")) {
-    const reader = res.body!.getReader();
-    const dec = new TextDecoder();
-    let buf = "";
-    while (true) {
-      const { done, value } = await reader.read();
-      if (done) break;
-      buf += dec.decode(value, { stream: true });
-      const lines = buf.split("\n");
-      buf = lines.pop() || "";
-      for (const line of lines) {
-        if (!line.startsWith("data:")) continue;
-        try {
-          const p = JSON.parse(line.slice(5).trim());
-          result = p.result;
-        } catch {}
-      }
+  try {
+    const result = await callMcpJsonRpc(tool._connector, "tools/call", {
+      name: tool._toolName,
+      arguments: args,
+    });
+    if (!result) return "No result";
+    if (Array.isArray(result.content)) {
+      return result.content.map((p: any) => p.text || JSON.stringify(p)).join("\n");
     }
-  } else {
-    const data = await res.json();
-    result = data.result;
+    return JSON.stringify(result);
+  } catch (error: any) {
+    return `Tool error: ${error?.message || "MCP execution failed"}`;
   }
-
-  if (!result) return "No result";
-  if (Array.isArray(result.content)) {
-    return result.content.map((p: any) => p.text || JSON.stringify(p)).join("\n");
-  }
-  return JSON.stringify(result);
 }
 
 // ============================================================
@@ -1518,14 +1477,22 @@ export async function POST(req: NextRequest) {
     try {
       const oauthBundle = buildOAuthTools(req, baseUrl);
       let mcpTools: any[] = [];
-      let activeMcpConnectors = Array.isArray(mcpConnectors) ? [...mcpConnectors] : [];
+      let composioTools: any[] = [];
+      const activeMcpConnectors = Array.isArray(mcpConnectors) ? [...mcpConnectors] : [];
       try {
         const session = await auth0.getSession();
-        const composioConnector = session?.user?.sub
-          ? await getComposioConnector(session.user.sub)
-          : null;
-        if (composioConnector) {
-          activeMcpConnectors.push(composioConnector);
+        if (session?.user?.sub) {
+          const composioSession = await getComposioSession(session.user.sub);
+          if (composioSession) {
+            const nativeTools: any[] = await composioSession.tools();
+            composioTools = nativeTools.map((tool: any) => ({
+              ...tool,
+              _exec: async (args: any) => {
+                const result = await composioSession.execute(tool.function.name, args || {});
+                return typeof result === "string" ? result : JSON.stringify(result);
+              },
+            }));
+          }
         }
       } catch (error) {
         console.error("Composio session unavailable:", error);
@@ -1537,6 +1504,7 @@ export async function POST(req: NextRequest) {
       const combinedTools = [
         ...BUILTIN_TOOLS,
         ...oauthBundle.tools,
+        ...composioTools,
         ...mcpTools,
       ];
       availableTools = combinedTools;
