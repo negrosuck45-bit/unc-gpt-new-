@@ -180,6 +180,11 @@ export function ChatSidebar({
     if (currentChatId) updateChatProject(currentChatId, id)
   }
 
+  const openSettings = () => {
+    setSettingsPageOpen(true)
+    if (isOpen) onToggle()
+  }
+
   const handleImportMemory = (text: string) => {
     let projectId = currentProjectId
     if (!projectId) {
@@ -242,14 +247,14 @@ export function ChatSidebar({
         <RailButton title="Memory" onClick={() => setMemoryOpen(true)}>
           <Brain className="h-5 w-5" />
         </RailButton>
-        <RailButton title="Settings" onClick={() => setSettingsPageOpen(true)}>
+        <RailButton title="Settings" onClick={openSettings}>
           <SettingsIcon className="h-5 w-5" />
         </RailButton>
 
         <SettingsDialog open={settingsOpen} onOpenChange={setSettingsOpen} />
         {settingsPageOpen && (
-          <div className="fixed inset-0 z-50 flex items-center justify-center bg-zinc-900/50 backdrop-blur-sm overflow-y-auto">
-            <div className="w-full max-w-2xl my-8">
+          <div className="fixed inset-0 z-50 flex items-start sm:items-center justify-center bg-black/70 sm:bg-black/60 sm:backdrop-blur-sm overflow-y-auto p-0 sm:p-4">
+            <div className="w-full max-w-5xl min-h-dvh sm:min-h-0 sm:my-8">
               <SettingsPage onClose={() => setSettingsPageOpen(false)} />
             </div>
           </div>
@@ -471,7 +476,7 @@ export function ChatSidebar({
               <NavItem
                 icon={<SettingsIcon className="h-4 w-4" />}
                 label="Settings"
-                onClick={() => setSettingsPageOpen(true)}
+                onClick={openSettings}
               />
             </div>
           </motion.aside>
@@ -480,8 +485,8 @@ export function ChatSidebar({
 
       <SettingsDialog open={settingsOpen} onOpenChange={setSettingsOpen} />
       {settingsPageOpen && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-zinc-900/50 backdrop-blur-sm overflow-y-auto">
-          <div className="w-full max-w-2xl my-8">
+        <div className="fixed inset-0 z-50 flex items-start sm:items-center justify-center bg-black/70 sm:bg-black/60 sm:backdrop-blur-sm overflow-y-auto p-0 sm:p-4">
+          <div className="w-full max-w-5xl min-h-dvh sm:min-h-0 sm:my-8">
             <SettingsPage onClose={() => setSettingsPageOpen(false)} />
           </div>
         </div>
