@@ -1,3 +1,4 @@
+import Image from "next/image"
 import { AUTH0_CONNECTIONS } from "@/lib/auth0"
 
 type AuthPanelProps = {
@@ -31,12 +32,28 @@ function AuthLink({
   )
 }
 
+function UncgptLogo({ size = 56 }: { size?: number }) {
+  return (
+    <Image
+      src="/uncgpt.png"
+      alt="uncgpt"
+      width={size}
+      height={size}
+      priority
+      className="rounded-2xl object-cover shadow-lg shadow-fuchsia-950/40"
+    />
+  )
+}
+
 export function AuthPanel({ user }: AuthPanelProps) {
   if (user) {
     return (
       <div className="flex min-h-screen items-center justify-center bg-[#080808] px-6 text-white">
         <div className="w-full max-w-md rounded-3xl border border-white/10 bg-white/[0.04] p-8 text-center shadow-2xl shadow-black/40">
-          <p className="text-sm text-white/50">Signed in as</p>
+          <div className="mx-auto flex justify-center">
+            <UncgptLogo />
+          </div>
+          <p className="mt-6 text-sm text-white/50">Signed in as</p>
           <h1 className="mt-2 text-2xl font-semibold">{user.name || user.email || "Your account"}</h1>
           {user.email && <p className="mt-2 text-sm text-white/55">{user.email}</p>}
           <div className="mt-8 grid gap-3">
@@ -52,8 +69,8 @@ export function AuthPanel({ user }: AuthPanelProps) {
     <main className="flex min-h-screen items-center justify-center bg-[#080808] px-6 py-12 text-white">
       <div className="w-full max-w-md rounded-3xl border border-white/10 bg-white/[0.04] p-7 shadow-2xl shadow-black/40 sm:p-9">
         <div className="mb-8 text-center">
-          <div className="mx-auto flex h-14 w-14 items-center justify-center rounded-2xl bg-gradient-to-br from-fuchsia-400 to-violet-600 text-xl font-bold shadow-lg shadow-fuchsia-950/40">
-            U
+          <div className="mx-auto flex h-14 w-14 items-center justify-center">
+            <UncgptLogo />
           </div>
           <h1 className="mt-5 text-3xl font-semibold tracking-tight">Welcome to uncgpt</h1>
           <p className="mt-2 text-sm leading-6 text-white/55">Sign in to continue to your AI workspace.</p>

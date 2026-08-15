@@ -18,7 +18,7 @@ export function WelcomeScreen({ onSelectPrompt, project }: WelcomeScreenProps) {
         transition={{ duration: 0.6, ease: "easeOut" }}
       >
         <Image
-          src="/uncgptt.png"
+          src="/uncgpt.png"
           alt="UNC GPT"
           width={600}
           height={480}
