@@ -266,7 +266,6 @@ export function ChatInterface({ onSwitchToImagine, onOpenSidebar, isSidebarOpen 
                 onSend={handleSend}
                 onStop={() => abortControllerRef.current?.abort()}
                 isStreaming={isCurrentChatStreaming}
-                disabled={isCurrentChatStreaming}
                 key={currentChatId || 'new-chat'}
               />
             </div>
@@ -284,7 +283,6 @@ export function ChatInterface({ onSwitchToImagine, onOpenSidebar, isSidebarOpen 
                 onSend={handleSend}
                 onStop={() => abortControllerRef.current?.abort()}
                 isStreaming={isCurrentChatStreaming}
-                disabled={isCurrentChatStreaming}
                 key={currentChatId || 'new-chat'}
               />
             </div>

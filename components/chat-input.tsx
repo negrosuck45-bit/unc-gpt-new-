@@ -651,7 +651,7 @@ export function ChatInput({
               onKeyDown={handleKeyDown}
               placeholder="Write a message... (paste images directly!)"
               className="w-full bg-transparent px-4 pt-3 pb-2 resize-none focus:outline-none min-h-[52px]"
-              disabled={isStreaming || disabled}
+              disabled={disabled}
               rows={1}
             />
 
@@ -679,8 +679,8 @@ export function ChatInput({
 
               <div className="flex items-center gap-1">
                 <DropdownMenu>
-                  <DropdownMenuTrigger asChild disabled={isStreaming}>
-                    <Button variant="ghost" size="sm" className="gap-1.5 h-8 px-2" disabled={isStreaming}>
+                    <DropdownMenuTrigger asChild disabled={disabled}>
+                    <Button variant="ghost" size="sm" className="gap-1.5 h-8 px-2" disabled={disabled}>
                       <span className="text-xs font-medium">{currentModel.label}</span>
                       <ChevronDown className="h-3 w-3" />
                     </Button>

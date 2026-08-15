@@ -208,7 +208,7 @@ export function ChatSidebar({
         animate={{ width: 56, opacity: 1 }}
         transition={{ duration: 0.18, ease: [0.4, 0, 0.2, 1] }}
         style={{ width: 56, minWidth: 56, height: '100dvh', maxHeight: '100dvh' }}
-        className="bg-sidebar text-sidebar-foreground border-r border-sidebar-border flex flex-col items-center py-3 gap-1 overflow-y-auto overflow-x-hidden sticky top-0"
+        className="bg-sidebar/90 supports-[backdrop-filter]:backdrop-blur-2xl text-sidebar-foreground border-r border-sidebar-border/80 shadow-[8px_0_32px_rgba(0,0,0,0.18)] flex flex-col items-center py-3 gap-1 overflow-y-auto overflow-x-hidden sticky top-0"
       >
         <button
           onClick={onToggle}
@@ -278,10 +278,10 @@ export function ChatSidebar({
             exit={{ x: -280, opacity: 0 }}
             transition={{ duration: 0.22, ease: [0.4, 0, 0.2, 1] }}
             style={{ width: 280, minWidth: 280, height: '100dvh', maxHeight: '100dvh' }}
-            className={cn("bg-sidebar text-sidebar-foreground border-r border-sidebar-border flex flex-col overflow-y-auto", isMobile ? "fixed inset-y-0 left-0 z-[100] shadow-2xl" : "relative")}
+            className={cn("bg-sidebar/95 supports-[backdrop-filter]:backdrop-blur-2xl text-sidebar-foreground border-r border-sidebar-border/80 shadow-[8px_0_32px_rgba(0,0,0,0.24)] flex flex-col overflow-y-auto", isMobile ? "fixed inset-y-0 left-0 z-[100] shadow-2xl" : "relative")}
           >
             {/* Header - Claude style */}
-            <div className="p-4 flex items-center justify-between">
+            <div className="p-3.5 sm:p-4 flex items-center justify-between border-b border-sidebar-border/60">
               <div className="flex items-center gap-2">
                 <Image
                   src="/uncgpt.png"
@@ -533,10 +533,10 @@ function NavItem({ icon, label, badge, onClick, active }: NavItemProps) {
     <button
       onClick={onClick}
       className={cn(
-        "w-full flex items-center gap-3 px-3 py-2 rounded-lg text-sm transition-colors",
+        "w-full flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm transition-colors",
         active
-          ? "bg-accent text-accent-foreground"
-          : "text-sidebar-foreground hover:bg-accent/50"
+          ? "bg-white/10 text-foreground shadow-sm"
+          : "text-sidebar-foreground/80 hover:bg-white/[0.06] hover:text-foreground"
       )}
     >
       <span className="opacity-70">{icon}</span>
