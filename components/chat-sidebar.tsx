@@ -21,10 +21,12 @@ import {
   MoreHorizontal,
   Code,
   Palette,
+  KeyRound,
 } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { motion, AnimatePresence } from "framer-motion"
 import { SettingsPage } from "./settings-page"
+import { hasFeedbackPasskey, verifyFeedbackPasskey } from "@/lib/passkey"
 import { ProjectsDialog } from "./projects-dialog"
 import { MemoryImportDialog } from "./memory-import-dialog"
 import { MemoryExportDialog } from "./memory-export-dialog"
@@ -87,6 +89,13 @@ export function ChatSidebar({
   const [renamingText, setRenamingText] = useState<string>("")
   const [searchQuery, setSearchQuery] = useState("")
   const [showSearch, setShowSearch] = useState(false)
+
+  const openFeedback = async () => {
+    if (hasFeedbackPasskey()) {
+      try { await verifyFeedbackPasskey() } catch { return }
+    }
+    window.location.href = '/feedback'
+  }
 
   const [projectsOpen, setProjectsOpen] = useState(false)
   const [memoryOpen, setMemoryOpen] = useState(false)
@@ -218,7 +227,7 @@ export function ChatSidebar({
             alt="uncgpt"
             width={28}
             height={28}
-            className="rounded-md shadow-sm transition-opacity duration-150 group-hover:opacity-0"
+            className="rounded-md transition-opacity duration-150 group-hover:opacity-0"
           />
           <PanelLeft className="h-5 w-5 absolute opacity-0 group-hover:opacity-100 transition-opacity duration-150" />
         </button>
@@ -240,6 +249,9 @@ export function ChatSidebar({
           onClick={() => window.open(DISCORD_URL, "_blank")}
         >
           <DiscordIcon className="h-5 w-5 text-muted-foreground" />
+        </RailButton>
+        <RailButton title="Feedback" onClick={openFeedback}>
+          <KeyRound className="h-5 w-5" />
         </RailButton>
         <RailButton title="Memory" onClick={() => setMemoryOpen(true)}>
           <Brain className="h-5 w-5" />
@@ -279,7 +291,7 @@ export function ChatSidebar({
             {/* Borderless sidebar identity row with the Mars logo restored. */}
             <div className="p-3.5 sm:p-4 pt-[max(0.875rem,env(safe-area-inset-top))] flex items-center justify-between">
               <div className="flex items-center gap-2.5 min-w-0">
-                <Image src="/uncgpt.png" alt="uncgpt logo" width={34} height={34} className="h-[34px] w-[34px] rounded-full object-cover shadow-[0_0_18px_rgba(255,255,255,0.14)]" />
+                <Image src="/uncgpt.png" alt="uncgpt logo" width={34} height={34} className="h-[34px] w-[34px] rounded-full object-cover" />
                 <span className="font-semibold text-base truncate">uncgpt</span>
               </div>
               <button
@@ -454,6 +466,11 @@ export function ChatSidebar({
                 icon={<DiscordIcon className="h-4 w-4" />}
                 label="Join Discord"
                 onClick={() => window.open(DISCORD_URL, "_blank")}
+              />
+              <NavItem
+                icon={<KeyRound className="h-4 w-4" />}
+                label="Feedback"
+                onClick={openFeedback}
               />
               <NavItem
                 icon={<Brain className="h-4 w-4" />}

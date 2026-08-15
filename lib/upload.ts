@@ -16,6 +16,11 @@ export interface UploadResult {
   path?: string
 }
 
+export interface UploadOptions {
+  folder?: string
+  allowLocalFallback?: boolean
+}
+
 const SUPABASE_URL = process.env.NEXT_PUBLIC_SUPABASE_URL;
 
 function randomId(): string {
@@ -50,13 +55,16 @@ function fileToDataUrl(file: Blob): Promise<string> {
 }
 
 /** Upload a File/Blob. Falls back to a data URL if Supabase isn't configured. */
-export async function uploadFile(file: File | Blob, opts?: { folder?: string }): Promise<UploadResult> {
+export async function uploadFile(file: File | Blob, opts?: UploadOptions): Promise<UploadResult> {
   const supabase = getSupabase()
   
   // Check if supabase is ready AND we have environment variables
   if (!supabase || !SUPABASE_URL) {
-    const url = await fileToDataUrl(file)
-    return { url, storedRemotely: false }
+    if (opts?.allowLocalFallback) {
+      const url = await fileToDataUrl(file)
+      return { url, storedRemotely: false }
+    }
+    throw new Error('Supabase Storage is not configured in this browser')
   }
 
   const folder = opts?.folder ?? 'images'
@@ -71,9 +79,11 @@ export async function uploadFile(file: File | Blob, opts?: { folder?: string }):
     })
 
   if (error) {
-    // Network or RLS failure — degrade gracefully.
-    const url = await fileToDataUrl(file)
-    return { url, storedRemotely: false }
+    if (opts?.allowLocalFallback) {
+      const url = await fileToDataUrl(file)
+      return { url, storedRemotely: false }
+    }
+    throw new Error(`Supabase Storage upload failed: ${error.message}`)
   }
 
   const { data } = supabase.storage.from(SUPABASE_BUCKET).getPublicUrl(path)

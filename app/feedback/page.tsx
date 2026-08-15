@@ -5,6 +5,7 @@ import { motion, AnimatePresence } from "framer-motion";
 import { Camera, X, Check, Trash2, Wand2, LogOut, Settings, Shield, ShieldCheck, Loader2, Bug, RefreshCw } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { createClient } from "@/lib/supabase/client";
+import { hasFeedbackPasskey, isPasskeySupported, registerFeedbackPasskey, verifyFeedbackPasskey } from "@/lib/passkey";
 
 interface FeedbackItem {
   id: string;
@@ -37,6 +38,9 @@ export default function FeedbackPage() {
   const [cameraError, setCameraError] = useState<string | null>(null);
   const [scanProgress, setScanProgress] = useState(0);
   const [loading, setLoading] = useState(true);
+  const [hasPasskey, setHasPasskey] = useState(false);
+  const [passkeyBusy, setPasskeyBusy] = useState(false);
+  const [passkeyError, setPasskeyError] = useState<string | null>(null);
 
   // Load feedback from Supabase
   const loadFeedback = useCallback(async () => {
@@ -95,7 +99,30 @@ export default function FeedbackPage() {
     if (setup === "true") {
       setIsSetup(true);
     }
+    setHasPasskey(hasFeedbackPasskey());
   }, [loadFeedback]);
+
+  const handlePasskey = async () => {
+    setPasskeyBusy(true);
+    setPasskeyError(null);
+    try {
+      if (!isPasskeySupported()) throw new Error('Use Safari on iPhone or a browser with passkey support.')
+      if (!hasFeedbackPasskey()) {
+        await registerFeedbackPasskey();
+        setHasPasskey(true);
+      } else {
+        await verifyFeedbackPasskey();
+      }
+      localStorage.setItem('feedback_auth', 'true');
+      localStorage.setItem('feedback_setup', 'true');
+      setIsAuthenticated(true);
+      setIsSetup(true);
+    } catch (error) {
+      setPasskeyError(error instanceof Error ? error.message : 'Passkey verification failed')
+    } finally {
+      setPasskeyBusy(false);
+    }
+  };
 
   // Dismiss feedback - deletes from Supabase
   const dismissFeedback = async (itemId: string) => {
@@ -131,7 +158,7 @@ export default function FeedbackPage() {
 
   // Initialize camera for face detection
   useEffect(() => {
-    if (!isAuthenticated || !isSetup) {
+    if (false) {
       const startCamera = async () => {
         try {
           setCameraError(null);
@@ -340,7 +367,25 @@ export default function FeedbackPage() {
     }
   };
 
-  // ============ AUTH / SETUP PHASE ============
+  // ============ PASSKEY AUTH PHASE ============
+  if (!isSetup || !isAuthenticated) {
+    return (
+      <div className="min-h-screen bg-gradient-to-br from-gray-900 via-black to-gray-900 flex items-center justify-center p-4">
+        <motion.div initial={{ opacity: 0, scale: 0.96 }} animate={{ opacity: 1, scale: 1 }} className="w-full max-w-md rounded-3xl border border-white/10 bg-black/50 p-8 text-white shadow-2xl backdrop-blur-xl">
+          <div className="mx-auto mb-5 flex h-14 w-14 items-center justify-center rounded-2xl bg-white/[0.08]"><ShieldCheck className="h-7 w-7 text-white/80" /></div>
+          <h1 className="text-center text-2xl font-semibold">Feedback is protected</h1>
+          <p className="mt-2 text-center text-sm text-white/55">Use Face ID, Touch ID, or your device passkey to enter the Feedback Center.</p>
+          <Button onClick={handlePasskey} disabled={passkeyBusy} className="mt-7 h-12 w-full bg-white text-black hover:bg-white/90">
+            {passkeyBusy ? <><Loader2 className="mr-2 h-4 w-4 animate-spin" />Waiting for passkey…</> : <><Shield className="mr-2 h-4 w-4" />{hasPasskey ? 'Unlock with Face ID / passkey' : 'Set up Face ID / passkey'}</>}
+          </Button>
+          {passkeyError && <p className="mt-4 rounded-xl bg-red-500/10 px-3 py-2 text-center text-xs text-red-200">{passkeyError}</p>}
+          <p className="mt-5 text-center text-xs text-white/35">Your biometric data stays on your device. The site receives only a passkey response.</p>
+        </motion.div>
+      </div>
+    );
+  }
+
+  // ============ LEGACY CAMERA PHASE (unreachable; retained for compatibility) ============
   if (!isSetup || !isAuthenticated) {
     return (
       <div className="min-h-screen bg-gradient-to-br from-gray-900 via-black to-gray-900 flex items-center justify-center p-4">

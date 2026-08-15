@@ -17,8 +17,8 @@ with wave.open(str(output), 'wb') as wav:
         attack = min(1.0, t / 0.004)
         release = max(0.0, min(1.0, (duration - t) / 0.085))
         envelope = attack * release
-        body = math.sin(2 * math.pi * 410 * t) * 0.82
+        body = math.sin(2 * math.pi * 620 * t) * 0.82
         tail_env = max(0.0, min(1.0, (0.115 - t) / 0.075))
-        glass_tail = math.sin(2 * math.pi * 1180 * t) * 0.12 * tail_env
+        glass_tail = math.sin(2 * math.pi * 1450 * t) * 0.10 * tail_env
         sample = max(-1.0, min(1.0, 0.030 * envelope * (body + glass_tail)))
         wav.writeframes(int(sample * 32767).to_bytes(2, 'little', signed=True))
