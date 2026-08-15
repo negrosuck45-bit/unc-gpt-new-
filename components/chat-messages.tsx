@@ -33,6 +33,7 @@ import { Button } from '@/components/ui/button';
 import { SearchResults, type SearchResult } from './search-results';
 import { MarsAvatar } from './mars-avatar';
 import { useChatStore, type ModelFamily } from '@/lib/chat-store';
+import { readUserPreferences, subscribeToUserPreferences, type UserPreferences } from '@/lib/user-preferences';
 import { createClient } from '@/lib/supabase/client';
 import { Light as SyntaxHighlighter } from 'react-syntax-highlighter';
 import { oneDark, oneLight } from 'react-syntax-highlighter/dist/esm/styles/prism';
@@ -592,7 +593,10 @@ export function ChatMessages({ messages, isStreaming, isThinking, onRegenerate, 
   const [viewingAttachment, setViewingAttachment] = useState<Attachment | null>(null);
   const [feedbackMessage, setFeedbackMessage] = useState<Message | null>(null);
   const [toast, setToast] = useState<string | null>(null);
+  const [preferences, setPreferences] = useState<UserPreferences>(readUserPreferences());
   const streamingFamily = useMemo(() => getModelFamilyFromModel(currentChat?.model || settings.model), [currentChat?.model, settings.model]);
+
+  useEffect(() => subscribeToUserPreferences(setPreferences), []);
 
   const shownToastsRef = useRef<Set<string>>(new Set());
 
@@ -639,7 +643,10 @@ export function ChatMessages({ messages, isStreaming, isThinking, onRegenerate, 
         )}
       </AnimatePresence>
       <div className="flex-1 overflow-y-auto scroll-smooth">
-        <div className="max-w-3xl xl:max-w-4xl mx-auto px-3 sm:px-4 md:px-6 py-3 space-y-6">
+        <div className={cn(
+          "max-w-3xl xl:max-w-4xl mx-auto px-3 sm:px-4 md:px-6 py-3",
+          preferences.messageDensity === 'compact' ? 'space-y-3' : preferences.messageDensity === 'comfortable' ? 'space-y-8' : 'space-y-6'
+        )} style={{ fontSize: `${preferences.fontSize}px` }}>
           {processedMessages.map((message, index) => {
             const isAssistant = message.role === 'assistant';
             const isLast = index === messages.length - 1;
@@ -670,6 +677,7 @@ export function ChatMessages({ messages, isStreaming, isThinking, onRegenerate, 
                   {/* Message Content - No bubble styling */}
                   <div className={cn(
                     'flex flex-col max-w-[92%] sm:max-w-[85%] md:max-w-[78%] lg:max-w-[72%]',
+                    'leading-relaxed',
                     isAssistant ? 'items-start' : 'items-end'
                   )}>
 

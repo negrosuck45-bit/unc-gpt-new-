@@ -24,6 +24,7 @@ import {
 import { motion, AnimatePresence } from 'framer-motion'
 import { cn } from '@/lib/utils'
 import { Attachment, useChatStore, MODELS, type ModelInfo } from '@/lib/chat-store'
+import { readUserPreferences, subscribeToUserPreferences } from '@/lib/user-preferences'
 import { Light as SyntaxHighlighter } from 'react-syntax-highlighter'
 import { oneDark } from 'react-syntax-highlighter/dist/esm/styles/prism'
 import { oneLight } from 'react-syntax-highlighter/dist/esm/styles/prism'
@@ -277,6 +278,7 @@ export function ChatInput({
   const [viewingAttachment, setViewingAttachment] = useState<Attachment | null>(null)
   const [uploadStatus, setUploadStatus] = useState<Map<string, { status: 'uploading' | 'completed' | 'error', progress?: number, url?: string }>>(new Map())
   const [toast, setToast] = useState<string | null>(null)
+  const [sendOnEnter, setSendOnEnter] = useState(true)
 
   const textareaRef = useRef<HTMLTextAreaElement>(null)
   const fileInputRef = useRef<HTMLInputElement>(null)
@@ -286,6 +288,11 @@ export function ChatInput({
   const { settings, updateSettings, getCurrentChat, updateChatModel } = useChatStore()
   const currentChat = getCurrentChat()
   const isDark = useIsDarkMode()
+
+  useEffect(() => {
+    setSendOnEnter(readUserPreferences().sendOnEnter)
+    return subscribeToUserPreferences((preferences) => setSendOnEnter(preferences.sendOnEnter))
+  }, [])
 
   const currentModel = useMemo(() => {
     const val = currentChat?.model || settings.model
@@ -504,7 +511,7 @@ export function ChatInput({
   }
 
   const handleKeyDown = (e: React.KeyboardEvent) => {
-    if (e.key === 'Enter' && !e.shiftKey) {
+    if (e.key === 'Enter' && !e.shiftKey && sendOnEnter) {
       e.preventDefault()
       handleSubmit()
     }

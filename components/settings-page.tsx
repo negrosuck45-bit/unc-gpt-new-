@@ -20,6 +20,7 @@ import { cn } from '@/lib/utils';
 import { useTheme } from 'next-themes';
 import { OAuthConnectors } from './oauth-connectors';
 import { SkillsPanel } from './skills-panel';
+import { DEFAULT_USER_PREFERENCES, readUserPreferences, writeUserPreferences, type MessageDensity } from '@/lib/user-preferences';
 
 interface SettingsPageProps { onClose?: () => void; }
 
@@ -38,30 +39,38 @@ export function SettingsPage({ onClose }: SettingsPageProps) {
   const [sendOnEnter, setSendOnEnter] = useState(true);
   const [soundEnabled, setSoundEnabled] = useState(false);
   const [fontSize, setFontSize] = useState(14);
-  const [messageDensity, setMessageDensity] = useState<'compact' | 'normal' | 'comfortable'>('normal');
+  const [messageDensity, setMessageDensity] = useState<MessageDensity>(DEFAULT_USER_PREFERENCES.messageDensity);
+  const [debugMode, setDebugMode] = useState(DEFAULT_USER_PREFERENCES.debugMode);
+  const [experimentalFeatures, setExperimentalFeatures] = useState(DEFAULT_USER_PREFERENCES.experimentalFeatures);
 
   const currentChat = getCurrentChat();
   const isLocked = false;
 
   useEffect(() => {
-    const prefs = localStorage.getItem('user-preferences');
-    if (prefs) {
-      const p = JSON.parse(prefs);
-      setStreamingEnabled(p.streaming ?? true);
-      setAutoScroll(p.autoScroll ?? true);
-      setSendOnEnter(p.sendOnEnter ?? true);
-      setSoundEnabled(p.sound ?? false);
-      setFontSize(p.fontSize ?? 14);
-      setMessageDensity(p.messageDensity ?? 'normal');
-    }
+    const p = readUserPreferences();
+    setStreamingEnabled(p.streaming);
+    setAutoScroll(p.autoScroll);
+    setSendOnEnter(p.sendOnEnter);
+    setSoundEnabled(p.sound);
+    setFontSize(p.fontSize);
+    setMessageDensity(p.messageDensity);
+    setDebugMode(p.debugMode);
+    setExperimentalFeatures(p.experimentalFeatures);
   }, []);
 
   const handleSave = () => {
     const selectedModel = MODELS.find(m => m.value === model);
     updateSettings({ model, provider: selectedModel?.provider ?? settings.provider, anthropicApiKey: anthropicKey || undefined });
-    localStorage.setItem('user-preferences', JSON.stringify({
-      streaming: streamingEnabled, autoScroll, sendOnEnter, sound: soundEnabled, fontSize, messageDensity,
-    }));
+    writeUserPreferences({
+      streaming: streamingEnabled,
+      autoScroll,
+      sendOnEnter,
+      sound: soundEnabled,
+      fontSize,
+      messageDensity,
+      debugMode,
+      experimentalFeatures,
+    });
     onClose?.();
   };
 
@@ -77,16 +86,16 @@ export function SettingsPage({ onClose }: SettingsPageProps) {
   ];
 
   return (
-    <div className="w-full max-w-5xl mx-auto bg-zinc-950 rounded-2xl border border-white/10 shadow-2xl overflow-hidden">
+    <div className="w-full max-w-5xl mx-auto bg-zinc-950/90 supports-[backdrop-filter]:backdrop-blur-2xl rounded-2xl border border-white/15 shadow-[0_24px_80px_rgba(0,0,0,0.45)] overflow-hidden">
       {/* Header */}
-      <div className="flex items-center justify-between px-4 sm:px-6 py-4 border-b border-white/10 bg-zinc-950">
+      <div className="flex items-center justify-between px-4 sm:px-6 py-4 border-b border-white/10 bg-white/[0.035]">
         <h1 className="text-xl font-semibold">Settings</h1>
         <Button variant="ghost" size="icon" onClick={onClose}><X className="h-5 w-5" /></Button>
       </div>
 
       <div className="flex min-h-[560px] flex-col sm:flex-row">
         {/* Sidebar */}
-        <div className="w-full sm:w-52 shrink-0 border-b sm:border-b-0 sm:border-r border-white/10 bg-zinc-900/40 p-2 sm:p-3 overflow-x-auto">
+        <div className="w-full sm:w-52 shrink-0 border-b sm:border-b-0 sm:border-r border-white/10 bg-white/[0.025] p-2 sm:p-3 overflow-x-auto">
             <nav className="flex sm:block gap-1 min-w-max sm:min-w-0">
             {tabs.map(tab => (
               <button
@@ -107,7 +116,7 @@ export function SettingsPage({ onClose }: SettingsPageProps) {
         </div>
 
         {/* Content */}
-        <div className="flex-1 min-w-0 overflow-y-auto p-4 sm:p-6 bg-zinc-950">
+        <div className="flex-1 min-w-0 overflow-y-auto p-4 sm:p-6 bg-zinc-950/65">
           <AnimatePresence mode="wait">
             <motion.div
               key={activeTab}
@@ -121,16 +130,16 @@ export function SettingsPage({ onClose }: SettingsPageProps) {
                 <div className="space-y-6">
                   <SectionTitle title="General Settings" description="Basic app preferences" />
                   <SettingRow label="Send on Enter" description="Press Enter to send, Shift+Enter for new line">
-                    <Switch checked={sendOnEnter} onCheckedChange={setSendOnEnter} />
+                    <Switch checked={sendOnEnter} onCheckedChange={(value) => { setSendOnEnter(value); writeUserPreferences({ sendOnEnter: value }) }} />
                   </SettingRow>
                   <SettingRow label="Auto-scroll" description="Automatically scroll to new messages">
-                    <Switch checked={autoScroll} onCheckedChange={setAutoScroll} />
+                    <Switch checked={autoScroll} onCheckedChange={(value) => { setAutoScroll(value); writeUserPreferences({ autoScroll: value }) }} />
                   </SettingRow>
                   <SettingRow label="Sound Effects" description="Play sounds for notifications">
-                    <Switch checked={soundEnabled} onCheckedChange={setSoundEnabled} />
+                    <Switch checked={soundEnabled} onCheckedChange={(value) => { setSoundEnabled(value); writeUserPreferences({ sound: value }) }} />
                   </SettingRow>
                   <SettingRow label="Streaming Responses" description="Show AI responses as they generate">
-                    <Switch checked={streamingEnabled} onCheckedChange={setStreamingEnabled} />
+                    <Switch checked={streamingEnabled} onCheckedChange={(value) => { setStreamingEnabled(value); writeUserPreferences({ streaming: value }) }} />
                   </SettingRow>
                 </div>
               )}
@@ -311,8 +320,8 @@ export function SettingsPage({ onClose }: SettingsPageProps) {
               {activeTab === 'advanced' && (
                 <div className="space-y-6">
                   <SectionTitle title="Advanced Settings" description="For power users" />
-                  <SettingRow label="Debug Mode" description="Show debug info in console"><Switch /></SettingRow>
-                  <SettingRow label="Experimental Features" description="Try new features early"><Switch /></SettingRow>
+                  <SettingRow label="Debug Mode" description="Show diagnostic details while testing"><Switch checked={debugMode} onCheckedChange={(value) => { setDebugMode(value); writeUserPreferences({ debugMode: value }) }} /></SettingRow>
+                  <SettingRow label="Experimental Features" description="Enable optional features as they become available"><Switch checked={experimentalFeatures} onCheckedChange={(value) => { setExperimentalFeatures(value); writeUserPreferences({ experimentalFeatures: value }) }} /></SettingRow>
                   <div className="p-4 rounded-lg bg-muted/50 border border-border">
                     <h4 className="font-medium mb-2">System Information</h4>
                     <div className="text-sm text-muted-foreground space-y-1">
@@ -332,9 +341,9 @@ export function SettingsPage({ onClose }: SettingsPageProps) {
       </div>
 
       {/* Footer */}
-      <div className="flex gap-3 px-6 py-4 border-t border-border bg-muted/30">
-        <Button variant="outline" onClick={onClose} className="flex-1">Cancel</Button>
-        <Button onClick={handleSave} className="flex-1">Save Changes</Button>
+      <div className="flex flex-col-reverse sm:flex-row gap-3 px-4 sm:px-6 py-4 border-t border-white/10 bg-white/[0.025]">
+        <Button variant="outline" onClick={onClose} className="flex-1 min-h-11 border-white/15 bg-white/[0.03] hover:bg-white/[0.08]">Cancel</Button>
+        <Button onClick={handleSave} className="flex-1 min-h-11">Save Changes</Button>
       </div>
     </div>
   );
