@@ -87,23 +87,23 @@ export function SettingsPage({ onClose }: SettingsPageProps) {
   ];
 
   return (
-    <div className="flex h-full min-h-0 w-full flex-col overflow-hidden bg-black/55 supports-[backdrop-filter]:bg-white/[0.055] supports-[backdrop-filter]:backdrop-blur-[32px] text-foreground pb-[env(safe-area-inset-bottom)]">
+    <div className="w-full max-w-5xl mx-auto bg-black/65 supports-[backdrop-filter]:bg-white/[0.07] supports-[backdrop-filter]:backdrop-blur-[30px] rounded-[28px] border border-white/15 shadow-[0_24px_90px_rgba(0,0,0,0.5)] overflow-hidden pb-[env(safe-area-inset-bottom)]">
       {/* Header */}
-      <div className="flex shrink-0 items-center justify-between px-4 sm:px-8 pt-[max(1rem,env(safe-area-inset-top))] pb-4 border-b border-white/[0.08] bg-white/[0.035]">
+      <div className="flex items-center justify-between px-4 sm:px-6 py-4 border-b border-white/10 bg-white/[0.035]">
         <h1 className="text-xl font-semibold">Settings</h1>
         <Button variant="ghost" size="icon" onClick={onClose}><X className="h-5 w-5" /></Button>
       </div>
 
-      <div className="flex min-h-0 flex-1 flex-col sm:flex-row overflow-hidden">
+      <div className="flex min-h-[560px] flex-col sm:flex-row">
         {/* Sidebar */}
-        <div className="w-full shrink-0 border-b border-white/[0.08] bg-white/[0.025] p-3 sm:w-56 sm:border-b-0 sm:border-r sm:overflow-y-auto sm:overflow-x-hidden">
-            <nav className="grid grid-cols-2 gap-1 sm:block sm:space-y-1">
+        <div className="w-full sm:w-52 shrink-0 border-b sm:border-b-0 sm:border-r border-white/10 bg-white/[0.025] p-2 sm:p-3 overflow-x-auto">
+            <nav className="flex sm:block gap-1 min-w-max sm:min-w-0">
             {tabs.map(tab => (
               <button
                 key={tab.id}
                 onClick={() => setActiveTab(tab.id)}
                 className={cn(
-                  'w-full min-w-0 flex items-center gap-2 px-3 py-2.5 rounded-xl text-sm transition-colors',
+                  'w-full flex items-center gap-2 px-3 py-2 rounded-lg text-sm transition-colors whitespace-nowrap',
                   activeTab === tab.id
                     ? 'bg-primary text-primary-foreground'
                     : 'text-muted-foreground hover:text-foreground hover:bg-accent/50'
@@ -117,7 +117,7 @@ export function SettingsPage({ onClose }: SettingsPageProps) {
         </div>
 
         {/* Content */}
-        <div className="min-h-0 min-w-0 flex-1 overflow-y-auto overscroll-contain p-4 sm:p-8 bg-black/20">
+        <div className="flex-1 min-w-0 overflow-y-auto p-4 sm:p-6 bg-zinc-950/65">
           <AnimatePresence mode="wait">
             <motion.div
               key={activeTab}
@@ -349,7 +349,7 @@ export function SettingsPage({ onClose }: SettingsPageProps) {
       </div>
 
       {/* Footer */}
-      <div className="flex shrink-0 flex-col-reverse sm:flex-row gap-3 px-4 sm:px-8 py-4 border-t border-white/[0.08] bg-white/[0.025]">
+      <div className="flex flex-col-reverse sm:flex-row gap-3 px-4 sm:px-6 py-4 border-t border-white/10 bg-white/[0.025]">
         <Button variant="outline" onClick={onClose} className="flex-1 min-h-11 border-white/15 bg-white/[0.03] hover:bg-white/[0.08]">Cancel</Button>
         <Button onClick={handleSave} className="flex-1 min-h-11">Save Changes</Button>
       </div>

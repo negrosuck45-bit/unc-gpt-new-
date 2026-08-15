@@ -249,8 +249,8 @@ export function ChatSidebar({
         </RailButton>
 
         {settingsPageOpen && (
-          <div className="fixed inset-0 z-[200] h-[100dvh] w-full overflow-hidden bg-[#070708]/90 supports-[backdrop-filter]:bg-black/35 supports-[backdrop-filter]:backdrop-blur-[24px]">
-            <div className="h-full w-full overflow-hidden">
+          <div className="fixed inset-0 z-50 flex items-start sm:items-center justify-center bg-black/70 sm:bg-black/60 sm:backdrop-blur-sm overflow-y-auto p-0 sm:p-4">
+            <div className="w-full max-w-5xl min-h-dvh sm:min-h-0 sm:my-8">
               <SettingsPage onClose={() => setSettingsPageOpen(false)} />
             </div>
           </div>
@@ -279,7 +279,7 @@ export function ChatSidebar({
             {/* Borderless sidebar identity row with the Mars logo restored. */}
             <div className="p-3.5 sm:p-4 pt-[max(0.875rem,env(safe-area-inset-top))] flex items-center justify-between">
               <div className="flex items-center gap-2.5 min-w-0">
-                <Image src="/mars-3d.png" alt="uncgpt Mars logo" width={34} height={34} className="h-[34px] w-[34px] rounded-full object-cover shadow-[0_0_18px_rgba(244,120,70,0.22)]" />
+                <Image src="/uncgpt.png" alt="uncgpt logo" width={34} height={34} className="h-[34px] w-[34px] rounded-full object-cover shadow-[0_0_18px_rgba(255,255,255,0.14)]" />
                 <span className="font-semibold text-base truncate">uncgpt</span>
               </div>
               <button
@@ -471,8 +471,8 @@ export function ChatSidebar({
       </AnimatePresence>
 
       {settingsPageOpen && (
-        <div className="fixed inset-0 z-[200] h-[100dvh] w-full overflow-hidden bg-[#070708]/90 supports-[backdrop-filter]:bg-black/35 supports-[backdrop-filter]:backdrop-blur-[24px]">
-          <div className="h-full w-full overflow-hidden">
+        <div className="fixed inset-0 z-50 flex items-start sm:items-center justify-center bg-black/70 sm:bg-black/60 sm:backdrop-blur-sm overflow-y-auto p-0 sm:p-4">
+          <div className="w-full max-w-5xl min-h-dvh sm:min-h-0 sm:my-8">
             <SettingsPage onClose={() => setSettingsPageOpen(false)} />
           </div>
         </div>
