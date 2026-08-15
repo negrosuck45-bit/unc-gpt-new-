@@ -164,13 +164,15 @@ async function uploadToSupabase(file: File, fileName: string): Promise<string> {
     return result.url
   }
 
-  if (response.status === 503 || response.status === 401) {
+  // Use direct Supabase Storage as a resilient fallback. This still returns a
+  // durable Supabase URL, unlike the old blob/data-URL fallback.
+  try {
     const fallback = await uploadFile(file, { folder: 'images' })
-    return fallback.url
-  }
+    if (fallback.storedRemotely) return fallback.url
+  } catch {}
 
   const result = await response.json().catch(() => ({}))
-  throw new Error(result.error || 'Image upload failed')
+  throw new Error(result.error || 'Image upload failed; Supabase Storage did not return a URL')
 }
 
 function useIsDarkMode() {
