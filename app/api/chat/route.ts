@@ -1,5 +1,8 @@
 import type { NextRequest } from "next/server";
 
+import { auth0 } from "@/lib/auth0";
+import { getComposioConnector } from "@/lib/composio";
+
 export const runtime = "nodejs";
 
 const conversations = new Map<string, any>();
@@ -1512,8 +1515,20 @@ export async function POST(req: NextRequest) {
     try {
       const oauthBundle = buildOAuthTools(req, baseUrl);
       let mcpTools: any[] = [];
-      if (Array.isArray(mcpConnectors) && mcpConnectors.length > 0) {
-        mcpTools = await fetchMcpTools(mcpConnectors, baseUrl);
+      let activeMcpConnectors = Array.isArray(mcpConnectors) ? [...mcpConnectors] : [];
+      try {
+        const session = await auth0.getSession();
+        const composioConnector = session?.user?.sub
+          ? await getComposioConnector(session.user.sub)
+          : null;
+        if (composioConnector) {
+          activeMcpConnectors.push(composioConnector);
+        }
+      } catch (error) {
+        console.error("Composio session unavailable:", error);
+      }
+      if (activeMcpConnectors.length > 0) {
+        mcpTools = await fetchMcpTools(activeMcpConnectors, baseUrl);
       }
 
       const combinedTools = [

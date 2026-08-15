@@ -10,7 +10,7 @@ interface WelcomeScreenProps {
 
 export function WelcomeScreen({ onSelectPrompt, project }: WelcomeScreenProps) {
   return (
-    <div className="flex flex-col items-center justify-center px-4">
+    <div className="flex flex-col items-center justify-center px-4 py-8">
       {/* Logo only - no subtitle, no prompts */}
       <motion.div
         initial={{ opacity: 0, y: 20 }}
@@ -20,9 +20,9 @@ export function WelcomeScreen({ onSelectPrompt, project }: WelcomeScreenProps) {
         <Image
           src="/uncgpt.png"
           alt="UNC GPT"
-          width={600}
-          height={480}
-          className="object-cover"
+          width={156}
+          height={156}
+          className="h-28 w-28 sm:h-36 sm:w-36 rounded-full object-cover ring-1 ring-white/10 shadow-[0_12px_40px_rgba(0,0,0,0.35)]"
           priority
         />
       </motion.div>

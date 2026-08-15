@@ -1,0 +1,37 @@
+import { Composio } from "@composio/core";
+
+export interface ComposioConnector {
+  id: string;
+  name: string;
+  url: string;
+  headers: Record<string, string>;
+  enabled: boolean;
+}
+
+/**
+ * Creates a short-lived per-user hosted MCP session when COMPOSIO_API_KEY is configured.
+ * The API key stays server-side; only the session URL and headers are used internally by
+ * the chat route to discover and execute tools.
+ */
+export async function getComposioConnector(userId: string): Promise<ComposioConnector | null> {
+  const apiKey = process.env.COMPOSIO_API_KEY;
+  if (!apiKey || !userId) return null;
+
+  const composio = new Composio({ apiKey });
+  const session = await composio.sessions.create(userId, {
+    mcp: true,
+    manageConnections: true,
+  });
+
+  return {
+    id: `composio_${userId}`.replace(/[^a-zA-Z0-9_]/g, "_").slice(0, 48),
+    name: "Composio",
+    url: session.mcp.url,
+    headers: session.mcp.headers || { "x-api-key": apiKey },
+    enabled: true,
+  };
+}
+
+export function isComposioConfigured() {
+  return Boolean(process.env.COMPOSIO_API_KEY);
+}

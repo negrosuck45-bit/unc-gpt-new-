@@ -3,7 +3,7 @@
 import { useEffect, useState } from 'react';
 import { Button } from '@/components/ui/button';
 import { cn } from '@/lib/utils';
-import { Loader2 } from 'lucide-react';
+import { Loader2, Network } from 'lucide-react';
 
 // ─── Brand SVG Icons ──────────────────────────────────────────────────────────
 
@@ -79,6 +79,7 @@ const PROVIDERS = [
 ];
 
 interface ProviderStatus { connected: boolean; configured: boolean; }
+interface ComposioStatus { authenticated: boolean; configured: boolean; label: string; description: string; setupUrl: string; }
 
 // ─── Compact pill strip (for sidebar / header) ─────────────────────────────────
 export function OAuthConnectorPills() {
@@ -111,9 +112,13 @@ export function OAuthConnectors() {
   const [status, setStatus] = useState<Record<string, ProviderStatus>>({});
   const [loading, setLoading] = useState(true);
   const [busy, setBusy] = useState<string | null>(null);
+  const [composio, setComposio] = useState<ComposioStatus | null>(null);
 
   const refresh = () =>
-    fetch('/api/mcp/oauth/status').then(r => r.json()).then(setStatus).finally(() => setLoading(false));
+    Promise.all([
+      fetch('/api/mcp/oauth/status').then(r => r.json()),
+      fetch('/api/connectors/composio').then(r => r.json()),
+    ]).then(([oauth, composioStatus]) => { setStatus(oauth); setComposio(composioStatus); }).finally(() => setLoading(false));
 
   useEffect(() => { refresh(); }, []);
 
@@ -132,7 +137,28 @@ export function OAuthConnectors() {
   );
 
   return (
-    <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+    <div className="space-y-4">
+      {composio && (
+        <div className={cn(
+          'flex items-center gap-3 rounded-xl border p-4 transition-colors',
+          composio.configured ? 'border-emerald-500/30 bg-emerald-500/[0.06]' : 'border-white/10 bg-white/[0.03]'
+        )}>
+          <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-violet-500/10 text-violet-300">
+            <Network className="h-5 w-5" />
+          </div>
+          <div className="min-w-0 flex-1">
+            <div className="flex items-center gap-2">
+              <span className="text-sm font-medium">Composio</span>
+              <span className={cn('rounded-full px-2 py-0.5 text-[10px] font-semibold', composio.configured ? 'bg-emerald-400/10 text-emerald-300' : 'bg-white/10 text-zinc-400')}>
+                {composio.configured ? 'Ready' : 'Needs setup'}
+              </span>
+            </div>
+            <p className="mt-1 text-xs leading-relaxed text-zinc-400">{composio.description}</p>
+          </div>
+          {!composio.configured && <a href={composio.setupUrl} target="_blank" rel="noreferrer" className="shrink-0 text-xs font-medium text-violet-300 hover:text-violet-200">Docs</a>}
+        </div>
+      )}
+      <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
       {PROVIDERS.map(p => {
         const s = status[p.name];
         const isConnected = !!s?.connected;
@@ -186,6 +212,7 @@ export function OAuthConnectors() {
           </div>
         );
       })}
+      </div>
     </div>
   );
 }
