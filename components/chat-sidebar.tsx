@@ -5,7 +5,6 @@ import Image from "next/image"
 
 import { useChatStore } from "@/lib/chat-store"
 import { cn } from "@/lib/utils"
-import { MarsAvatar } from "@/components/mars-avatar"
 import {
   Plus,
   MessageSquare,
@@ -278,12 +277,12 @@ export function ChatSidebar({
             exit={{ x: -280, opacity: 0 }}
             transition={{ duration: 0.22, ease: [0.4, 0, 0.2, 1] }}
             style={{ width: 280, minWidth: 280, height: '100dvh', maxHeight: '100dvh' }}
-            className={cn("bg-sidebar/95 supports-[backdrop-filter]:backdrop-blur-2xl text-sidebar-foreground border-r border-sidebar-border/80 shadow-[8px_0_32px_rgba(0,0,0,0.24)] flex flex-col overflow-y-auto", isMobile ? "fixed inset-y-0 left-0 z-[100] shadow-2xl" : "relative")}
+            className={cn("bg-black/60 supports-[backdrop-filter]:bg-black/35 supports-[backdrop-filter]:backdrop-blur-[28px] text-sidebar-foreground border-r border-white/10 shadow-[10px_0_40px_rgba(0,0,0,0.32)] flex flex-col overflow-y-auto", isMobile ? "fixed inset-y-0 left-0 z-[100] shadow-2xl" : "relative")}
           >
             {/* Borderless sidebar identity row with the Mars logo restored. */}
-            <div className="p-3.5 sm:p-4 flex items-center justify-between">
+            <div className="p-3.5 sm:p-4 pt-[max(0.875rem,env(safe-area-inset-top))] flex items-center justify-between">
               <div className="flex items-center gap-2.5 min-w-0">
-                <MarsAvatar size={34} family="auto" useSimpleIcon />
+                <Image src="/mars-3d.png" alt="uncgpt Mars logo" width={34} height={34} className="h-[34px] w-[34px] rounded-full object-cover shadow-[0_0_18px_rgba(244,120,70,0.22)]" />
                 <span className="font-semibold text-base truncate">uncgpt</span>
               </div>
               <button
@@ -453,7 +452,7 @@ export function ChatSidebar({
             </div>
 
             {/* Bottom bar */}
-            <div className="bg-sidebar/40 p-2 space-y-0.5">
+            <div className="bg-black/20 p-2 pb-[max(0.5rem,env(safe-area-inset-bottom))] space-y-0.5">
               <NavItem
                 icon={<DiscordIcon className="h-4 w-4" />}
                 label="Join Discord"

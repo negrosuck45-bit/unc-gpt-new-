@@ -13,7 +13,7 @@ import {
 import {
   Settings, Brain, Smartphone, Trash2, Sun, Moon, X,
   Palette, Shield, Zap, Key, Download, RefreshCw, Sparkles,
-  Eye, EyeOff, Puzzle, PlugZap,
+  Eye, EyeOff, Puzzle, PlugZap, Volume2,
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { cn } from '@/lib/utils';
@@ -21,6 +21,7 @@ import { useTheme } from 'next-themes';
 import { OAuthConnectors } from './oauth-connectors';
 import { SkillsPanel } from './skills-panel';
 import { DEFAULT_USER_PREFERENCES, readUserPreferences, writeUserPreferences, type MessageDensity } from '@/lib/user-preferences';
+import { playReplySound, unlockReplySound } from '@/lib/notifications';
 
 interface SettingsPageProps { onClose?: () => void; }
 
@@ -86,7 +87,7 @@ export function SettingsPage({ onClose }: SettingsPageProps) {
   ];
 
   return (
-    <div className="w-full max-w-5xl mx-auto bg-zinc-950/90 supports-[backdrop-filter]:backdrop-blur-2xl rounded-2xl border border-white/15 shadow-[0_24px_80px_rgba(0,0,0,0.45)] overflow-hidden">
+    <div className="w-full max-w-5xl mx-auto bg-black/65 supports-[backdrop-filter]:bg-white/[0.07] supports-[backdrop-filter]:backdrop-blur-[30px] rounded-[28px] border border-white/15 shadow-[0_24px_90px_rgba(0,0,0,0.5)] overflow-hidden pb-[env(safe-area-inset-bottom)]">
       {/* Header */}
       <div className="flex items-center justify-between px-4 sm:px-6 py-4 border-b border-white/10 bg-white/[0.035]">
         <h1 className="text-xl font-semibold">Settings</h1>
@@ -138,6 +139,13 @@ export function SettingsPage({ onClose }: SettingsPageProps) {
                   <SettingRow label="Sound Effects" description="Play a soft tone when an assistant reply finishes">
                     <Switch checked={soundEnabled} onCheckedChange={(value) => { setSoundEnabled(value); writeUserPreferences({ sound: value }) }} />
                   </SettingRow>
+                  <div className="flex items-center justify-between gap-4 rounded-2xl border border-white/10 bg-white/[0.045] px-4 py-3">
+                    <div className="flex items-center gap-3 min-w-0">
+                      <Volume2 className="h-4 w-4 text-muted-foreground shrink-0" />
+                      <span className="text-sm text-muted-foreground">Preview the reply sound on this device</span>
+                    </div>
+                    <Button variant="outline" size="sm" className="shrink-0 border-white/15 bg-white/[0.04] hover:bg-white/[0.1]" onClick={() => { writeUserPreferences({ sound: true }); setSoundEnabled(true); unlockReplySound(); playReplySound(); }}>Test sound</Button>
+                  </div>
                   <SettingRow label="Streaming Responses" description="Show response text live or wait until the reply is complete">
                     <Switch checked={streamingEnabled} onCheckedChange={(value) => { setStreamingEnabled(value); writeUserPreferences({ streaming: value }) }} />
                   </SettingRow>

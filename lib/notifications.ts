@@ -16,7 +16,23 @@ function getAudioContext() {
 export function unlockReplySound() {
   if (!readUserPreferences().sound) return
   const context = getAudioContext()
-  if (context?.state === 'suspended') void context.resume()
+  if (!context) return
+
+  const prime = () => {
+    const oscillator = context.createOscillator()
+    const gain = context.createGain()
+    gain.gain.value = 0.00001
+    oscillator.connect(gain)
+    gain.connect(context.destination)
+    oscillator.start()
+    oscillator.stop(context.currentTime + 0.03)
+  }
+
+  if (context.state === 'suspended') {
+    void context.resume().then(prime)
+  } else {
+    prime()
+  }
 }
 
 export function playReplySound() {
