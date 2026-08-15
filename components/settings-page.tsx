@@ -11,7 +11,7 @@ import {
   Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
 } from '@/components/ui/select';
 import {
-  Settings, Brain, Smartphone, Lock, Trash2, Sun, Moon, X,
+  Settings, Brain, Smartphone, Trash2, Sun, Moon, X,
   Palette, Shield, Zap, Key, Download, RefreshCw, Sparkles,
   Eye, EyeOff, Puzzle, PlugZap,
 } from 'lucide-react';
@@ -41,7 +41,7 @@ export function SettingsPage({ onClose }: SettingsPageProps) {
   const [messageDensity, setMessageDensity] = useState<'compact' | 'normal' | 'comfortable'>('normal');
 
   const currentChat = getCurrentChat();
-  const isLocked = !!currentChat && currentChat.messages.length > 0;
+  const isLocked = false;
 
   useEffect(() => {
     const prefs = localStorage.getItem('user-preferences');
@@ -141,9 +141,9 @@ export function SettingsPage({ onClose }: SettingsPageProps) {
                   <SectionTitle title="AI Models" description="Configure your preferred AI model" />
                   <div className="space-y-3">
                     <Label className="flex items-center gap-2">
-                      Default Model {isLocked && <Lock className="h-3 w-3 opacity-50" />}
+                      Default Model
                     </Label>
-                    <Select value={model} onValueChange={setModel} disabled={isLocked}>
+                    <Select value={model} onValueChange={setModel}>
                       <SelectTrigger><SelectValue /></SelectTrigger>
                       <SelectContent className="max-h-80">
                         {MODELS.map(m => (
@@ -157,7 +157,7 @@ export function SettingsPage({ onClose }: SettingsPageProps) {
                         ))}
                       </SelectContent>
                     </Select>
-                    {isLocked && <p className="text-xs text-muted-foreground">Model locked for this chat. Start a new chat to change.</p>}
+
                   </div>
 
                   <div className="space-y-3 pt-4 border-t border-border">

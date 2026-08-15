@@ -19,7 +19,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select';
-import { Trash2, Lock, Plug } from 'lucide-react';
+import { Trash2, Plug } from 'lucide-react';
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip"
 
 
@@ -32,14 +32,14 @@ export function SettingsDialog({ open, onOpenChange }: SettingsDialogProps) {
   const { settings, updateSettings, clearAllChats, getCurrentChat } = useChatStore();
 
   const currentChat = getCurrentChat();
-  const isLocked = !!currentChat && currentChat.messages.length > 0;
+  const isLocked = false;
   
-  const initialModel = isLocked && currentChat.model ? currentChat.model : settings.model;
+  const initialModel = currentChat?.model ?? settings.model;
   const [model, setModel] = useState<string>(initialModel);
 
   useEffect(() => {
     if (open) {
-      const activeModel = isLocked && currentChat.model ? currentChat.model : settings.model;
+      const activeModel = currentChat?.model ?? settings.model;
       setModel(activeModel);
     }
   }, [open, settings.model, isLocked, currentChat?.model]);
@@ -52,21 +52,17 @@ export function SettingsDialog({ open, onOpenChange }: SettingsDialogProps) {
   }, [model, settings.model]);
 
   const handleSave = () => {
-    if (isLocked) {
-      onOpenChange(false);
-      return;
-    }
-
     const modelToSave = MODELS.find((m) => m.value === model)
       ? model
       : MODELS[0]?.value ?? settings.model;
 
     const selectedModelInfo = MODELS.find(m => m.value === modelToSave);
 
-    updateSettings({
-      model: modelToSave,
-      provider: selectedModelInfo?.provider ?? settings.provider,
-    });
+    const provider = selectedModelInfo?.provider ?? settings.provider;
+    updateSettings({ model: modelToSave, provider });
+    if (currentChat) {
+      useChatStore.getState().updateChatModel(currentChat.id, modelToSave, provider);
+    }
 
     onOpenChange(false);
   };
@@ -90,14 +86,14 @@ export function SettingsDialog({ open, onOpenChange }: SettingsDialogProps) {
             <div className="space-y-2">
               <Label className="flex items-center gap-2">
                 Model
-                {isLocked && <Lock className="h-3 w-3 opacity-50" />}
+
               </Label>
               <TooltipProvider>
                 <Tooltip delayDuration={0}>
                   <TooltipTrigger asChild>
                     <div className="w-full">
-                      <Select value={model} onValueChange={(v) => setModel(v)} disabled={isLocked}>
-                        <SelectTrigger disabled={isLocked} className={isLocked ? "opacity-70" : ""}>
+                      <Select value={model} onValueChange={(v) => setModel(v)}>
+                        <SelectTrigger>
                           <SelectValue />
                         </SelectTrigger>
                         <SelectContent>
@@ -117,11 +113,7 @@ export function SettingsDialog({ open, onOpenChange }: SettingsDialogProps) {
                       </Select>
                     </div>
                   </TooltipTrigger>
-                  {isLocked && (
-                    <TooltipContent side="bottom">
-                      <p className="text-xs">Model is locked for this chat. Create a new chat to use another model.</p>
-                    </TooltipContent>
-                  )}
+
                 </Tooltip>
               </TooltipProvider>
             </div>
@@ -148,7 +140,7 @@ export function SettingsDialog({ open, onOpenChange }: SettingsDialogProps) {
               Cancel
             </Button>
             <Button onClick={handleSave}>
-              {isLocked ? "Close" : "Save Settings"}
+              Save Settings
             </Button>
           </DialogFooter>
         </DialogContent>

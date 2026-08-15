@@ -18,8 +18,8 @@ import {
   Sparkles,
   Cpu,
   Lock,
-  PanelLeft,
   PanelLeftClose,
+  Menu,
 } from "lucide-react"
 import { SettingsDialog } from "./settings-dialog"
 import { ProjectsDialog } from "./projects-dialog"
@@ -44,22 +44,23 @@ export function ChatHeader({ project, chat, activeModelInfo, onOpenSidebar, isSi
 
   return (
     <>
-      <div className="flex flex-col border-b border-border bg-background/80 backdrop-blur-sm">
-      <header className="flex items-center gap-2 px-3 py-2.5 min-h-[48px]">
+      <div className="flex flex-col flex-shrink-0 border-b border-border bg-background/80 backdrop-blur-sm">
+      <header className="flex items-center gap-2 px-3 py-2.5 min-h-[52px]">
         {/* Sidebar trigger — always visible so the sidebar can be opened or collapsed on any screen size */}
         {onOpenSidebar && (
           <Button
             variant="ghost"
             size="icon"
             onClick={onOpenSidebar}
-            className="h-8 w-8 shrink-0 hover:bg-accent/50"
+            data-testid="sidebar-toggle"
+            className="h-9 w-9 shrink-0 rounded-lg border border-border bg-muted/50 hover:bg-accent/70"
             title={isSidebarOpen ? "Close sidebar" : "Open sidebar"}
             aria-label={isSidebarOpen ? "Close sidebar" : "Open sidebar"}
           >
             {isSidebarOpen ? (
               <PanelLeftClose className="h-5 w-5" />
             ) : (
-              <PanelLeft className="h-5 w-5" />
+              <Menu className="h-5 w-5" />
             )}
           </Button>
         )}

@@ -5,6 +5,7 @@ import { truncateMemory } from "@/lib/memory-parsers";
 import { ChatMessages } from "@/components/chat-messages";
 import { ChatInput } from "@/components/chat-input";
 import { WelcomeScreen } from "@/components/welcome-screen";
+import { ChatHeader } from "@/components/chat-header";
 
 interface ChatInterfaceProps {
   onSwitchToImagine?: () => void;
@@ -239,6 +240,12 @@ export function ChatInterface({ onSwitchToImagine, onOpenSidebar, isSidebarOpen 
 
   return (
     <div className="flex flex-col h-full bg-background relative overflow-hidden">
+      <ChatHeader
+        project={currentProject}
+        chat={currentChat}
+        onOpenSidebar={onOpenSidebar}
+        isSidebarOpen={isSidebarOpen}
+      />
       {hasMessages ? (
         <div className="flex-1 flex flex-col min-h-0 overflow-hidden relative">
           <div 

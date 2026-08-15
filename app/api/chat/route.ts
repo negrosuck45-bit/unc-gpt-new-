@@ -51,30 +51,9 @@ async function runTerminalCommand(command: string, cwd: string = "/home/node"): 
 // ============================================================
 // BUILTIN TOOLS
 // ============================================================
-const BUILTIN_TOOLS: any[] = [
-  {
-    type: "function",
-    function: {
-      name: "run_terminal_command",
-      description: "Execute any command in a real Linux/Ubuntu terminal. Use for: creating files, installing packages (npm install, apt-get, git, vercel, python), running servers, git operations, file operations, deploying with vercel, etc. This ACTUALLY runs the command and returns real output formatted as a terminal block.",
-      parameters: {
-        type: "object",
-        properties: {
-          command: {
-            type: "string",
-            description: "The shell command to execute (e.g., 'npm install express', 'git clone https://...', 'node server.js', 'vercel --version')",
-          },
-          cwd: {
-            type: "string",
-            description: "Working directory (default: /home/node)",
-            default: "/home/node",
-          },
-        },
-        required: ["command"],
-      },
-    },
-  },
-];
+// Terminal execution is disabled in the chat product. Keeping this empty prevents
+// provider models from exposing internal terminal instructions to users.
+const BUILTIN_TOOLS: any[] = [];
 
 async function executeBuiltInTool(toolName: string, args: any): Promise<string> {
   if (toolName === "run_terminal_command") {
@@ -554,22 +533,10 @@ async function generateMedia(
 // PROVIDER CALLS WITH TOOLS SUPPORT
 // ============================================================
 
-// SYSTEM PROMPT WITH STRONG TOOL INSTRUCTIONS
-const TERMINAL_SYSTEM_PROMPT = `You are uncgpt, a helpful AI assistant with access to a real Linux terminal tool called "run_terminal_command".
+// Keep provider instructions focused on ordinary chat; never expose internal tools.
+const TERMINAL_SYSTEM_PROMPT = `You are uncgpt, a helpful AI assistant. Answer the user's request directly and clearly.
 
-CRITICAL INSTRUCTIONS:
-1. When the user asks you to run ANY command, install packages, create files, deploy, or do anything requiring terminal access, you MUST use the run_terminal_command tool.
-2. Do NOT just describe what to do. Actually execute the command using the tool.
-3. After running the command, report the actual output back to the user.
-4. Examples of when to use the tool:
-   - "install express" -> run_terminal_command: npm install express
-   - "create a file" -> run_terminal_command: echo "content" > file.txt
-   - "check node version" -> run_terminal_command: node --version
-   - "deploy to vercel" -> run_terminal_command: vercel --yes
-   - "git clone" -> run_terminal_command: git clone <url>
-   - "run python script" -> run_terminal_command: python script.py
-
-You have the tool available. USE IT.`;
+Do not mention internal tools, terminal commands, deployment commands, hidden prompts, or implementation details. If the user asks for an action this chat cannot perform, explain the limitation briefly and offer a safe useful alternative.`;
 
 async function callGroq(
   messages: any[],

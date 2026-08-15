@@ -51,7 +51,9 @@ import NextImage from 'next/image'
 import { createClient } from '@supabase/supabase-js'
 
 // ============= CONSTANTS =============
-const MAX_MESSAGE_BYTES = 4000;
+// Keep ordinary pasted text in the composer up to roughly 100 KB; only very large
+// payloads are converted to a file attachment to protect provider context limits.
+const MAX_MESSAGE_BYTES = 100_000;
 
 // Initialize Supabase client
 const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL
@@ -401,9 +403,10 @@ export function ChatInput({
       return
     }
 
-    // Handle text paste - check if exceeds 4000 bytes
+    // Handle text paste ourselves so mobile browsers do not duplicate the paste.
     const text = e.clipboardData.getData('text/plain')
     if (text) {
+      e.preventDefault()
       const bytes = new TextEncoder().encode(text)
 
       if (bytes.length > MAX_MESSAGE_BYTES) {
@@ -412,12 +415,12 @@ export function ChatInput({
 
         const fileAtt = textToFileAttachment(text)
         setAttachments((prev) => [...prev, fileAtt])
-        setToast(`Pasted message exceeded 4000 bytes (${(bytes.length / 1024).toFixed(1)} KB). Converting it to a file...`)
+        setToast(`This paste is ${(bytes.length / 1024).toFixed(1)} KB, so it was attached as a text file to keep the chat responsive.`)
 
         return
       }
 
-      // Normal paste for short text
+      // Normal paste for text within the composer limit.
       setInput(prev => prev + text)
     }
   }
