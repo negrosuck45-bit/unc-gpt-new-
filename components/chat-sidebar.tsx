@@ -5,6 +5,7 @@ import Image from "next/image"
 
 import { useChatStore } from "@/lib/chat-store"
 import { cn } from "@/lib/utils"
+import { MarsAvatar } from "@/components/mars-avatar"
 import {
   Plus,
   MessageSquare,
@@ -279,8 +280,12 @@ export function ChatSidebar({
             style={{ width: 280, minWidth: 280, height: '100dvh', maxHeight: '100dvh' }}
             className={cn("bg-sidebar/95 supports-[backdrop-filter]:backdrop-blur-2xl text-sidebar-foreground border-r border-sidebar-border/80 shadow-[8px_0_32px_rgba(0,0,0,0.24)] flex flex-col overflow-y-auto", isMobile ? "fixed inset-y-0 left-0 z-[100] shadow-2xl" : "relative")}
           >
-            {/* Compact close control; the extra branding row is intentionally omitted. */}
-            <div className="p-3.5 sm:p-4 flex items-center justify-end">
+            {/* Borderless sidebar identity row with the Mars logo restored. */}
+            <div className="p-3.5 sm:p-4 flex items-center justify-between">
+              <div className="flex items-center gap-2.5 min-w-0">
+                <MarsAvatar size={34} family="auto" useSimpleIcon />
+                <span className="font-semibold text-base truncate">uncgpt</span>
+              </div>
               <button
                 onClick={onToggle}
                 title="Close sidebar"
