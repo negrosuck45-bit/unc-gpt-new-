@@ -1,6 +1,7 @@
 import { readUserPreferences } from './user-preferences'
 
 let audioContext: AudioContext | null = null
+let replyAudio: HTMLAudioElement | null = null
 
 function getAudioContext() {
   if (typeof window === 'undefined') return null
@@ -12,12 +13,35 @@ function getAudioContext() {
   return audioContext
 }
 
-/** Call from the send button/Enter gesture so iOS permits a later completion sound. */
+function getReplyAudio() {
+  if (typeof window === 'undefined') return null
+  if (!replyAudio) {
+    replyAudio = new Audio('/reply-complete.wav')
+    replyAudio.preload = 'auto'
+    replyAudio.volume = 0.28
+  }
+  return replyAudio
+}
+
+/** Prime both playback paths from a user gesture so iOS permits later completion audio. */
 export function unlockReplySound() {
-  if (!readUserPreferences().sound) return
+  if (!readUserPreferences().sound || typeof window === 'undefined') return
+
+  const audio = getReplyAudio()
+  if (audio) {
+    audio.muted = true
+    audio.currentTime = 0
+    void audio.play().then(() => {
+      audio.pause()
+      audio.currentTime = 0
+      audio.muted = false
+    }).catch(() => {
+      audio.muted = false
+    })
+  }
+
   const context = getAudioContext()
   if (!context) return
-
   const prime = () => {
     const oscillator = context.createOscillator()
     const gain = context.createGain()
@@ -27,19 +51,13 @@ export function unlockReplySound() {
     oscillator.start()
     oscillator.stop(context.currentTime + 0.03)
   }
-
-  if (context.state === 'suspended') {
-    void context.resume().then(prime)
-  } else {
-    prime()
-  }
+  if (context.state === 'suspended') void context.resume().then(prime)
+  else prime()
 }
 
-export function playReplySound() {
-  if (!readUserPreferences().sound) return
+function playWebAudioFallback() {
   const context = getAudioContext()
   if (!context) return
-
   const play = () => {
     const now = context.currentTime
     const gain = context.createGain()
@@ -55,7 +73,19 @@ export function playReplySound() {
     oscillator.start(now)
     oscillator.stop(now + 0.3)
   }
-
   if (context.state === 'suspended') void context.resume().then(play)
   else play()
+}
+
+export function playReplySound() {
+  if (!readUserPreferences().sound || typeof window === 'undefined') return
+  const audio = getReplyAudio()
+  if (audio) {
+    audio.muted = false
+    audio.currentTime = 0
+    const attempt = audio.play()
+    if (attempt) void attempt.catch(() => playWebAudioFallback())
+    return
+  }
+  playWebAudioFallback()
 }

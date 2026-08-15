@@ -24,7 +24,6 @@ import {
 } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { motion, AnimatePresence } from "framer-motion"
-import { SettingsDialog } from "./settings-dialog"
 import { SettingsPage } from "./settings-page"
 import { ProjectsDialog } from "./projects-dialog"
 import { MemoryImportDialog } from "./memory-import-dialog"
@@ -89,7 +88,6 @@ export function ChatSidebar({
   const [searchQuery, setSearchQuery] = useState("")
   const [showSearch, setShowSearch] = useState(false)
 
-  const [settingsOpen, setSettingsOpen] = useState(false)
   const [projectsOpen, setProjectsOpen] = useState(false)
   const [memoryOpen, setMemoryOpen] = useState(false)
   const [memoryExportOpen, setMemoryExportOpen] = useState(false)
@@ -250,10 +248,9 @@ export function ChatSidebar({
           <SettingsIcon className="h-5 w-5" />
         </RailButton>
 
-        <SettingsDialog open={settingsOpen} onOpenChange={setSettingsOpen} />
         {settingsPageOpen && (
-          <div className="fixed inset-0 z-50 flex items-start sm:items-center justify-center bg-black/70 sm:bg-black/60 sm:backdrop-blur-sm overflow-y-auto p-0 sm:p-4">
-            <div className="w-full max-w-5xl min-h-dvh sm:min-h-0 sm:my-8">
+          <div className="fixed inset-0 z-[200] h-[100dvh] w-full overflow-hidden bg-[#070708]/90 supports-[backdrop-filter]:bg-black/35 supports-[backdrop-filter]:backdrop-blur-[24px]">
+            <div className="h-full w-full overflow-hidden">
               <SettingsPage onClose={() => setSettingsPageOpen(false)} />
             </div>
           </div>
@@ -473,10 +470,9 @@ export function ChatSidebar({
         )}
       </AnimatePresence>
 
-      <SettingsDialog open={settingsOpen} onOpenChange={setSettingsOpen} />
       {settingsPageOpen && (
-        <div className="fixed inset-0 z-50 flex items-start sm:items-center justify-center bg-black/70 sm:bg-black/60 sm:backdrop-blur-sm overflow-y-auto p-0 sm:p-4">
-          <div className="w-full max-w-5xl min-h-dvh sm:min-h-0 sm:my-8">
+        <div className="fixed inset-0 z-[200] h-[100dvh] w-full overflow-hidden bg-[#070708]/90 supports-[backdrop-filter]:bg-black/35 supports-[backdrop-filter]:backdrop-blur-[24px]">
+          <div className="h-full w-full overflow-hidden">
             <SettingsPage onClose={() => setSettingsPageOpen(false)} />
           </div>
         </div>

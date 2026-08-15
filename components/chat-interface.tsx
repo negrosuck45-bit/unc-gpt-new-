@@ -66,7 +66,7 @@ export function ChatInterface({ onSwitchToImagine, onOpenSidebar, isSidebarOpen 
       completed = true;
     } catch (error: any) {
       if (error.name !== "AbortError") {
-        addMessage(chatId, { role: "assistant", content: "Sorry, something went wrong." });
+        addMessage(chatId, { role: "assistant", content: `❌ ${error?.message || "Sorry, something went wrong."}` });
       }
     } finally {
       setIsStreaming(false);
@@ -105,7 +105,7 @@ export function ChatInterface({ onSwitchToImagine, onOpenSidebar, isSidebarOpen 
       completed = true;
     } catch (error: any) {
       if (error.name !== "AbortError") {
-        addMessage(chatId, { role: "assistant", content: "Sorry, something went wrong." });
+        addMessage(chatId, { role: "assistant", content: `❌ ${error?.message || "Sorry, something went wrong."}` });
       }
     } finally {
       setIsStreaming(false);
@@ -181,8 +181,7 @@ export function ChatInterface({ onSwitchToImagine, onOpenSidebar, isSidebarOpen 
         const err = await response.json();
         if (err?.error) msg = err.error;
       } catch {}
-      addMessage(chatId, { role: "assistant", content: `❌ ${msg}` });
-      return;
+      throw new Error(msg);
     }
 
     const reader = response.body!.getReader();
