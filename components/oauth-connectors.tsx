@@ -113,6 +113,7 @@ export function OAuthConnectors() {
   const [loading, setLoading] = useState(true);
   const [busy, setBusy] = useState<string | null>(null);
   const [composio, setComposio] = useState<ComposioStatus | null>(null);
+  const [oauthError, setOauthError] = useState<string | null>(null);
 
   const refresh = () =>
     Promise.all([
@@ -120,7 +121,15 @@ export function OAuthConnectors() {
       fetch('/api/connectors/composio').then(r => r.json()),
     ]).then(([oauth, composioStatus]) => { setStatus(oauth); setComposio(composioStatus); }).finally(() => setLoading(false));
 
-  useEffect(() => { refresh(); }, []);
+  useEffect(() => {
+    refresh();
+    const params = new URLSearchParams(window.location.search);
+    const error = params.get('mcp_error');
+    if (error) {
+      setOauthError(error);
+      window.history.replaceState({}, '', window.location.pathname);
+    }
+  }, []);
 
   const connect = (name: string) => { setBusy(name); window.location.href = `/api/mcp/oauth/${name}/start`; };
   const disconnect = async (name: string) => {
@@ -138,6 +147,12 @@ export function OAuthConnectors() {
 
   return (
     <div className="space-y-4">
+      {oauthError && (
+        <div role="alert" className="flex items-start justify-between gap-3 rounded-xl border border-amber-400/25 bg-amber-400/[0.08] px-3 py-2.5 text-sm text-amber-100">
+          <div><p className="font-medium">Connector connection needs attention</p><p className="mt-0.5 text-xs text-amber-100/70">{oauthError}</p></div>
+          <button onClick={() => setOauthError(null)} className="text-amber-100/60 hover:text-amber-100" aria-label="Dismiss connector error">×</button>
+        </div>
+      )}
       {composio && (
         <div className={cn(
           'flex items-center gap-3 rounded-xl border p-4 transition-colors',

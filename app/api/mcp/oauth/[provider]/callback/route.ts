@@ -2,18 +2,18 @@ import { NextRequest, NextResponse } from "next/server";
 
 const OAUTH_CONFIG = {
   github: {
-    clientId: "Ov23liEIVtsLZnu1vy8K",
-    clientSecret: "594ad5a6b65f230e50f3495be5c7451d0ea81f11",
+    clientId: process.env.GITHUB_CLIENT_ID || "",
+    clientSecret: process.env.GITHUB_CLIENT_SECRET || "",
     tokenUrl: "https://github.com/login/oauth/access_token",
   },
   linear: {
-    clientId: "f977b36deb20417ea5a13400c7fc7ed7",
-    clientSecret: "af95b0553d0dc9c00f98f3e5f7d5194b",
+    clientId: process.env.LINEAR_CLIENT_ID || "",
+    clientSecret: process.env.LINEAR_CLIENT_SECRET || "",
     tokenUrl: "https://api.linear.app/oauth/token",
   },
   slack: {
-    clientId: "11100863267972.11095194503062",
-    clientSecret: "c6f76d0fda5d6dbcbbae722cf3da0e8c",
+    clientId: process.env.SLACK_CLIENT_ID || "",
+    clientSecret: process.env.SLACK_CLIENT_SECRET || "",
     tokenUrl: "https://slack.com/api/oauth.v2.access",
   },
 };
@@ -23,16 +23,18 @@ export async function GET(
   { params }: { params: Promise<{ provider: string }> }
 ) {
   const { provider: providerParam } = await params;
+  const baseUrl = process.env.NEXT_PUBLIC_APP_URL || process.env.OAUTH_REDIRECT_BASE_URL || "https://unc-gptt.vercel.app";
+  const fail = (message: string) => NextResponse.redirect(`${baseUrl}/?mcp_error=${encodeURIComponent(message)}`);
   
   if (!providerParam) {
-    return NextResponse.json({ error: "Provider parameter is required" }, { status: 400 });
+    return fail("Provider parameter is required");
   }
   
   const provider = providerParam.toLowerCase();
   const config = OAUTH_CONFIG[provider as keyof typeof OAUTH_CONFIG];
 
   if (!config) {
-    return NextResponse.json({ error: "Unknown provider" }, { status: 400 });
+    return fail("Unknown provider");
   }
 
   const searchParams = request.nextUrl.searchParams;
@@ -41,11 +43,11 @@ export async function GET(
   const error = searchParams.get("error");
 
   if (error) {
-    return NextResponse.json({ error }, { status: 400 });
+    return fail(`${provider} authorization was cancelled or denied: ${error}`);
   }
 
   if (!code) {
-    return NextResponse.json({ error: "Missing code" }, { status: 400 });
+    return fail(`${provider} did not return an authorization code`);
   }
 
   const storedState = request.cookies.get(`oauth_state_${provider}`)?.value;
@@ -59,21 +61,10 @@ export async function GET(
   });
 
   if (!state || state !== storedState) {
-    return NextResponse.json({ 
-      error: "State mismatch",
-      debug: {
-        provider,
-        hasState: !!state,
-        hasStoredState: !!storedState,
-        statesMatch: state === storedState,
-        urlState: state?.slice(0, 20),
-        cookieState: storedState?.slice(0, 20),
-      }
-    }, { status: 400 });
+    return fail(`${provider} authorization expired. Please try connecting again.`);
   }
 
   try {
-    const baseUrl = process.env.OAUTH_REDIRECT_BASE_URL || "https://unc-gpt.vercel.app";
     const redirectUri = `${baseUrl}/api/mcp/oauth/${provider}/callback`;
 
     let tokenResponse;
@@ -129,19 +120,13 @@ export async function GET(
     tokenData = await tokenResponse.json();
 
     if (!tokenResponse.ok) {
-      return NextResponse.json(
-        { error: "Token exchange failed", details: tokenData },
-        { status: 400 }
-      );
+      return fail(`${provider} token exchange failed. Check its OAuth callback URL and client credentials.`);
     }
 
     const accessToken = tokenData.access_token || tokenData.authed_user?.access_token;
 
     if (!accessToken) {
-      return NextResponse.json(
-        { error: "Failed to get access token", details: tokenData },
-        { status: 400 }
-      );
+      return fail(`${provider} did not return an access token.`);
     }
 
     const response = NextResponse.redirect(`${baseUrl}/`);
@@ -166,9 +151,6 @@ export async function GET(
     return response;
   } catch (error) {
     console.error(`OAuth callback error for ${provider}:`, error);
-    return NextResponse.json(
-      { error: "Token exchange failed" },
-      { status: 500 }
-    );
+    return fail(`${provider} connection failed unexpectedly. Please try again.`);
   }
 }

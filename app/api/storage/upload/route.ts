@@ -15,6 +15,15 @@ export async function POST(request: NextRequest) {
   const supabase = getSupabaseAdmin()
   if (!supabase) return Response.json({ error: 'Supabase storage is not configured' }, { status: 503 })
 
+  const storage = supabase.storage.from(CHAT_UPLOAD_BUCKET)
+  const { data: bucket } = await supabase.storage.getBucket(CHAT_UPLOAD_BUCKET)
+  if (!bucket) {
+    const { error: bucketError } = await supabase.storage.createBucket(CHAT_UPLOAD_BUCKET, { public: true, fileSizeLimit: '15MB' })
+    if (bucketError && !bucketError.message.toLowerCase().includes('already exists')) {
+      return Response.json({ error: `Storage bucket setup failed: ${bucketError.message}` }, { status: 500 })
+    }
+  }
+
   const formData = await request.formData()
   const file = formData.get('file')
   const chatId = String(formData.get('chatId') || '')
@@ -27,15 +36,19 @@ export async function POST(request: NextRequest) {
   const path = `users/${userId}/images/${Date.now()}-${crypto.randomUUID()}.${extension}`
   const buffer = Buffer.from(await file.arrayBuffer())
 
-  const { error: uploadError } = await supabase.storage.from(CHAT_UPLOAD_BUCKET).upload(path, buffer, {
+  const { error: uploadError } = await storage.upload(path, buffer, {
     contentType: file.type,
     cacheControl: '31536000',
     upsert: false,
   })
-  if (uploadError) return Response.json({ error: uploadError.message }, { status: 500 })
+  if (uploadError) return Response.json({ error: `Storage upload failed: ${uploadError.message}` }, { status: 500 })
 
   const { data: publicUrlData } = supabase.storage.from(CHAT_UPLOAD_BUCKET).getPublicUrl(path)
   const publicUrl = publicUrlData.publicUrl
+  if (!publicUrl || !publicUrl.includes(`/storage/v1/object/public/${CHAT_UPLOAD_BUCKET}/`)) {
+    await storage.remove([path])
+    return Response.json({ error: 'Supabase uploaded the image but did not return a valid public Storage URL' }, { status: 502 })
+  }
 
   const { data: metadata, error: metadataError } = await supabase
     .from('chat_attachments')
@@ -52,7 +65,7 @@ export async function POST(request: NextRequest) {
     .single()
 
   if (metadataError) {
-    await supabase.storage.from(CHAT_UPLOAD_BUCKET).remove([path])
+    await storage.remove([path])
     return Response.json({ error: metadataError.message }, { status: 500 })
   }
 

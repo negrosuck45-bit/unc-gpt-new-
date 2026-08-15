@@ -11,9 +11,8 @@ export async function GET(request: NextRequest) {
     const hasConnected = !!request.cookies.get(`mcp_oauth_${provider}_connected`)?.value;
     const isConnected  = hasToken || hasConnected;
 
-    // configured = env var set OR OAuth creds hard-coded in start/route.ts
-    const hardCoded    = ["github", "linear", "slack"].includes(provider);
-    const isConfigured = hardCoded || !!process.env[`${provider.toUpperCase()}_CLIENT_ID`];
+    const envPrefix = provider.toUpperCase();
+    const isConfigured = !!process.env[`${envPrefix}_CLIENT_ID`] && !!process.env[`${envPrefix}_CLIENT_SECRET`];
 
     status[provider] = { connected: isConnected, configured: isConfigured };
   }

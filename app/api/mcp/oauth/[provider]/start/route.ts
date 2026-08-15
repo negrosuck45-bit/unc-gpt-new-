@@ -9,25 +9,25 @@ import { randomBytes } from "crypto";
 
 const OAUTH_CONFIG: Record<string, {
   clientId: string;
-  clientSecret: string;
+  clientSecret?: string;
   authUrl: string;
   scopes: string[];
 }> = {
   github: {
-    clientId: process.env.GITHUB_CLIENT_ID || "Ov23liEIVtsLZnu1vy8K",
-    clientSecret: process.env.GITHUB_CLIENT_SECRET || "594ad5a6b65f230e50f3495be5c7451d0ea81f11",
+    clientId: process.env.GITHUB_CLIENT_ID || "",
+    clientSecret: process.env.GITHUB_CLIENT_SECRET,
     authUrl: "https://github.com/login/oauth/authorize",
     scopes: ["repo", "user", "read:org"],
   },
   linear: {
-    clientId: process.env.LINEAR_CLIENT_ID || "f977b36deb20417ea5a13400c7fc7ed7",
-    clientSecret: process.env.LINEAR_CLIENT_SECRET || "af95b0553d0dc9c00f98f3e5f7d5194b",
+    clientId: process.env.LINEAR_CLIENT_ID || "",
+    clientSecret: process.env.LINEAR_CLIENT_SECRET,
     authUrl: "https://linear.app/oauth/authorize",
     scopes: ["read", "write", "issues:create"],
   },
   slack: {
-    clientId: process.env.SLACK_CLIENT_ID || "11100863267972.11095194503062",
-    clientSecret: process.env.SLACK_CLIENT_SECRET || "c6f76d0fda5d6dbcbbae722cf3da0e8c",
+    clientId: process.env.SLACK_CLIENT_ID || "",
+    clientSecret: process.env.SLACK_CLIENT_SECRET,
     authUrl: "https://slack.com/oauth/v2/authorize",
     scopes: ["chat:write", "channels:read", "channels:history", "users:read"],
   },
@@ -59,25 +59,25 @@ export async function GET(
   { params }: { params: Promise<{ provider: string }> }
 ) {
   const { provider: providerParam } = await params;
+  const appUrl = process.env.NEXT_PUBLIC_APP_URL || process.env.OAUTH_REDIRECT_BASE_URL || "https://unc-gptt.vercel.app";
+  const fail = (message: string) => NextResponse.redirect(`${appUrl}/?mcp_error=${encodeURIComponent(message)}`);
+
   if (!providerParam) {
-    return NextResponse.json({ error: "Provider parameter is required" }, { status: 400 });
+    return fail("Provider parameter is required");
   }
 
   const provider = providerParam.toLowerCase();
   const config = OAUTH_CONFIG[provider];
 
   if (!config) {
-    return NextResponse.json({ error: "Unknown provider" }, { status: 400 });
+    return fail("Unknown provider");
   }
 
   if (!config.clientId) {
-    return NextResponse.json(
-      { error: `${provider} OAuth not configured. Set ${provider.toUpperCase()}_CLIENT_ID in your environment.` },
-      { status: 400 }
-    );
+    return fail(`${provider} OAuth is not configured. Add its client ID and secret in Vercel environment variables.`);
   }
 
-  const baseUrl = process.env.OAUTH_REDIRECT_BASE_URL || "https://unc-gpt.vercel.app";
+  const baseUrl = appUrl;
   const redirectUri = `${baseUrl}/api/mcp/oauth/${provider}/callback`;
   const state = randomBytes(32).toString("hex");
 
