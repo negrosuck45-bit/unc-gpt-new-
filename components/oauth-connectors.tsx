@@ -222,7 +222,7 @@ export function OAuthConnectors() {
           </div>
           <input value={catalogQuery} onChange={(event) => setCatalogQuery(event.target.value)} placeholder="Search apps…" className="mt-3 h-9 w-full rounded-lg border border-white/10 bg-black/20 px-3 text-sm text-zinc-200 outline-none placeholder:text-zinc-600" />
           <div className="mt-3 grid max-h-80 grid-cols-1 gap-2 overflow-y-auto sm:grid-cols-2">
-            {catalog.filter((item) => `${item.name} ${item.slug} ${item.description}`.toLowerCase().includes(catalogQuery.toLowerCase())).slice(0, 40).map((item) => (
+            {catalog.filter((item) => `${item.name} ${item.slug} ${item.description}`.toLowerCase().includes(catalogQuery.toLowerCase())).map((item) => (
               <button key={item.slug} onClick={() => connectComposio(item.slug)} disabled={composioBusy} className="flex items-center gap-3 rounded-lg border border-white/8 bg-white/[0.025] p-2.5 text-left transition-colors hover:bg-white/[0.07] disabled:opacity-50">
                 {item.logo ? <img src={item.logo} alt="" className="h-7 w-7 rounded-md object-contain" /> : <span className="flex h-7 w-7 items-center justify-center rounded-md bg-violet-500/10 text-xs font-semibold text-violet-300">{String(item.name || item.slug).slice(0, 1).toUpperCase()}</span>}
                 <span className="min-w-0"><span className="block truncate text-xs font-medium text-zinc-200">{item.name}</span><span className="block truncate text-[10px] text-zinc-500">{item.slug}</span></span>
@@ -231,7 +231,7 @@ export function OAuthConnectors() {
           </div>
         </div>
       )}
-      <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+      {!composio?.configured && <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
       {PROVIDERS.map(p => {
         const s = status[p.name];
         const isConnected = !!s?.connected;
@@ -285,7 +285,7 @@ export function OAuthConnectors() {
           </div>
         );
       })}
-      </div>
+      </div>}
     </div>
   );
 }
