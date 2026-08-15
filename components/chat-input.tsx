@@ -49,21 +49,13 @@ import {
   DropdownMenuLabel,
 } from '@/components/ui/dropdown-menu'
 import NextImage from 'next/image'
-import { createClient } from '@supabase/supabase-js'
+import { uploadFile } from '@/lib/upload'
 
 // ============= CONSTANTS =============
 // Keep ordinary pasted text in the composer up to roughly 100 KB; only very large
 // payloads are converted to a file attachment to protect provider context limits.
 const MAX_MESSAGE_BYTES = 100_000;
 
-// Initialize Supabase client
-const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL
-const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY
-
-let supabase: any = null
-if (supabaseUrl && supabaseAnonKey) {
-  supabase = createClient(supabaseUrl, supabaseAnonKey)
-}
 
 // ====================== FAMILY ICONS ======================
 const familyIcons: Record<string, string> = {
@@ -160,57 +152,25 @@ async function compressImage(file: File): Promise<File> {
   })
 }
 
-// Upload image to Supabase Storage
+// Upload through the Auth0-protected server route. If Supabase is not configured,
+// preserve the local data-URL fallback so image sending remains usable.
 async function uploadToSupabase(file: File, fileName: string): Promise<string> {
-  if (!supabase) {
-    throw new Error('Supabase not configured')
+  const formData = new FormData()
+  formData.append('file', file, fileName)
+
+  const response = await fetch('/api/storage/upload', { method: 'POST', body: formData })
+  if (response.ok) {
+    const result = await response.json()
+    return result.url
   }
 
-  const fileExt = file.name.split('.').pop() || 'jpg'
-  const timestamp = Date.now()
-  const randomStr = Math.random().toString(36).substring(2, 8)
-  const safeFileName = fileName.replace(/[^a-zA-Z0-9]/g, '_').slice(0, 50)
-  const uniqueFileName = `${timestamp}_${randomStr}_${safeFileName}.${fileExt}`
-  const filePath = `chat-images/${uniqueFileName}`
-
-  console.log('Uploading to Supabase:', filePath)
-
-  const { data, error } = await supabase.storage
-    .from('chat-attachments')
-    .upload(filePath, file, {
-      cacheControl: '3600',
-      upsert: false,
-      contentType: file.type,
-    })
-
-  if (error) {
-    console.error('Upload error:', error)
-    throw error
+  if (response.status === 503 || response.status === 401) {
+    const fallback = await uploadFile(file, { folder: 'images' })
+    return fallback.url
   }
 
-  const { data: { publicUrl } } = supabase.storage
-    .from('chat-attachments')
-    .getPublicUrl(filePath)
-
-  console.log('Upload success:', publicUrl)
-
-  // Store metadata in database
-  try {
-    await supabase.from('attachments').insert({
-      id: uniqueFileName,
-      url: publicUrl,
-      file_path: filePath,
-      created_at: new Date().toISOString(),
-      expires_at: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString(),
-      file_name: file.name,
-      file_size: file.size,
-      mime_type: file.type,
-    })
-  } catch (dbError) {
-    console.error('Failed to save metadata:', dbError)
-  }
-
-  return publicUrl
+  const result = await response.json().catch(() => ({}))
+  throw new Error(result.error || 'Image upload failed')
 }
 
 function useIsDarkMode() {

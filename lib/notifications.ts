@@ -18,12 +18,13 @@ function getReplyAudio() {
   if (!replyAudio) {
     replyAudio = new Audio('/reply-complete.wav')
     replyAudio.preload = 'auto'
-    replyAudio.volume = 0.28
+    // Haptics are the primary feedback; this is only a barely audible fallback.
+    replyAudio.volume = 0.045
   }
   return replyAudio
 }
 
-/** Prime both playback paths from a user gesture so iOS permits later completion audio. */
+/** Prime playback from a user gesture so iOS permits later completion audio. */
 export function unlockReplySound() {
   if (!readUserPreferences().sound || typeof window === 'undefined') return
 
@@ -49,7 +50,7 @@ export function unlockReplySound() {
     oscillator.connect(gain)
     gain.connect(context.destination)
     oscillator.start()
-    oscillator.stop(context.currentTime + 0.03)
+    oscillator.stop(context.currentTime + 0.02)
   }
   if (context.state === 'suspended') void context.resume().then(prime)
   else prime()
@@ -62,26 +63,28 @@ function playWebAudioFallback() {
     const now = context.currentTime
     const gain = context.createGain()
     const oscillator = context.createOscillator()
-    oscillator.type = 'sine'
-    oscillator.frequency.setValueAtTime(660, now)
-    oscillator.frequency.exponentialRampToValueAtTime(880, now + 0.12)
+    oscillator.type = 'triangle'
+    oscillator.frequency.setValueAtTime(180, now)
+    oscillator.frequency.exponentialRampToValueAtTime(125, now + 0.045)
     gain.gain.setValueAtTime(0.0001, now)
-    gain.gain.exponentialRampToValueAtTime(0.08, now + 0.015)
-    gain.gain.exponentialRampToValueAtTime(0.0001, now + 0.28)
+    gain.gain.exponentialRampToValueAtTime(0.018, now + 0.004)
+    gain.gain.exponentialRampToValueAtTime(0.0001, now + 0.075)
     oscillator.connect(gain)
     gain.connect(context.destination)
     oscillator.start(now)
-    oscillator.stop(now + 0.3)
+    oscillator.stop(now + 0.09)
   }
   if (context.state === 'suspended') void context.resume().then(play)
   else play()
 }
 
+/** Play a short, low-volume tactile click; haptics remain the main feedback. */
 export function playReplySound() {
   if (!readUserPreferences().sound || typeof window === 'undefined') return
   const audio = getReplyAudio()
   if (audio) {
     audio.muted = false
+    audio.volume = 0.045
     audio.currentTime = 0
     const attempt = audio.play()
     if (attempt) void attempt.catch(() => playWebAudioFallback())

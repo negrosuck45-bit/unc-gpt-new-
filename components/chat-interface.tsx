@@ -16,6 +16,36 @@ interface ChatInterfaceProps {
   isSidebarOpen?: boolean;
 }
 
+async function persistNeuralMemory(chatId: string, messages: any[], responseContent: string | undefined) {
+  const latestUser = [...messages].reverse().find((message) => message.role === 'user')
+  if (!latestUser && !responseContent) return
+
+  const imageAttachments = (latestUser?.attachments || [])
+    .filter((attachment: any) => attachment.type === 'image')
+    .map((attachment: any) => ({ name: attachment.name, url: attachment.url, mimeType: attachment.mimeType }))
+
+  const content = [
+    latestUser?.content ? `User: ${latestUser.content}` : '',
+    imageAttachments.length ? `Images attached: ${imageAttachments.map((image: any) => image.name).join(', ')}` : '',
+    responseContent ? `Assistant: ${responseContent}` : '',
+  ].filter(Boolean).join('\\n')
+
+  if (!content) return
+  await fetch('/api/memory', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({
+      chatId,
+      content,
+      memoryType: imageAttachments.length ? 'context' : 'conversation',
+      source: 'auto-summary',
+      importance: imageAttachments.length ? 0.7 : 0.55,
+      tags: imageAttachments.length ? ['image', 'vision'] : ['conversation'],
+      metadata: { images: imageAttachments },
+    }),
+  })
+}
+
 export function ChatInterface({ onSwitchToImagine, onOpenSidebar, isSidebarOpen }: ChatInterfaceProps) {
   const [mounted, setMounted] = useState(false);
   const [isThinking, setIsThinking] = useState(false);
@@ -64,7 +94,8 @@ export function ChatInterface({ onSwitchToImagine, onOpenSidebar, isSidebarOpen 
     let completed = false;
     try {
       const messagesToSend = messages.slice(0, assistantIndex);
-      await processAIResponse(chatId, messagesToSend);
+      const responseContent = await processAIResponse(chatId, messagesToSend);
+      void persistNeuralMemory(chatId, messagesToSend, responseContent);
       completed = true;
     } catch (error: any) {
       if (error.name !== "AbortError") {
@@ -108,7 +139,8 @@ export function ChatInterface({ onSwitchToImagine, onOpenSidebar, isSidebarOpen 
     let completed = false;
     try {
       const messagesToSend = freshChat?.messages || [];
-      await processAIResponse(chatId, messagesToSend);
+      const responseContent = await processAIResponse(chatId, messagesToSend);
+      void persistNeuralMemory(chatId, messagesToSend, responseContent);
       completed = true;
     } catch (error: any) {
       if (error.name !== "AbortError") {
@@ -158,6 +190,18 @@ export function ChatInterface({ onSwitchToImagine, onOpenSidebar, isSidebarOpen 
       preferredModel: selectedModel,
       preferredProvider: selectedProvider,
     };
+
+    try {
+      const query = String(messages[messages.length - 1]?.content || '').slice(0, 160);
+      const memoryResponse = await fetch(`/api/memory?query=${encodeURIComponent(query)}`);
+      const memoryJson = await memoryResponse.json().catch(() => ({}));
+      if (Array.isArray(memoryJson.memories) && memoryJson.memories.length > 0) {
+        payload.neuralMemory = memoryJson.memories
+          .slice(0, 8)
+          .map((memory: any) => memory.content)
+          .join('\n');
+      }
+    } catch {}
 
     if (selectedProvider === "anthropic" && settings.anthropicApiKey) {
       payload.anthropicApiKey = settings.anthropicApiKey;
@@ -258,6 +302,8 @@ export function ChatInterface({ onSwitchToImagine, onOpenSidebar, isSidebarOpen 
       setIsThinking(false);
       addMessage(chatId, { role: "assistant", content: fullContent });
     }
+
+    return fullContent;
   };
 
   if (!mounted) return null;
