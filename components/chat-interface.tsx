@@ -6,6 +6,7 @@ import { ChatMessages } from "@/components/chat-messages";
 import { ChatInput } from "@/components/chat-input";
 import { WelcomeScreen } from "@/components/welcome-screen";
 import { ChatHeader } from "@/components/chat-header";
+import { playReplySound, unlockReplySound } from "@/lib/notifications";
 import { readUserPreferences } from "@/lib/user-preferences";
 import { triggerHaptic } from "@/lib/haptics";
 
@@ -85,6 +86,7 @@ export function ChatInterface({ onSwitchToImagine, onOpenSidebar, isSidebarOpen 
 
     deleteMessage(chatId, messageId);
     triggerHaptic("send");
+    unlockReplySound();
     setIsStreaming(true, chatId);
     setIsThinking(true);
     abortControllerRef.current = new AbortController();
@@ -106,6 +108,7 @@ export function ChatInterface({ onSwitchToImagine, onOpenSidebar, isSidebarOpen 
       abortControllerRef.current = null;
       if (completed) {
         triggerHaptic("reply");
+        playReplySound();
       }
     }
   }, [currentChat, isCurrentChatStreaming, addMessage, deleteMessage, setIsStreaming]);
@@ -128,6 +131,7 @@ export function ChatInterface({ onSwitchToImagine, onOpenSidebar, isSidebarOpen 
     }
 
     triggerHaptic("send");
+    unlockReplySound();
     setIsStreaming(true, chatId);
     setIsThinking(true);
     abortControllerRef.current = new AbortController();
@@ -149,6 +153,7 @@ export function ChatInterface({ onSwitchToImagine, onOpenSidebar, isSidebarOpen 
       abortControllerRef.current = null;
       if (completed) {
         triggerHaptic("reply");
+        playReplySound();
       }
     }
   }, [currentChatId, createNewChat, addMessage, updateChatTitle, setIsStreaming, settings]);

@@ -13,7 +13,7 @@ import {
 import {
   Settings, Brain, Smartphone, Trash2, Sun, Moon, X,
   Palette, Shield, Zap, Key, Download, RefreshCw, Sparkles,
-  Eye, EyeOff, Puzzle, PlugZap,
+  Eye, EyeOff, Puzzle, PlugZap, Volume2,
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { cn } from '@/lib/utils';
@@ -21,6 +21,7 @@ import { useTheme } from 'next-themes';
 import { OAuthConnectors } from './oauth-connectors';
 import { SkillsPanel } from './skills-panel';
 import { DEFAULT_USER_PREFERENCES, readUserPreferences, writeUserPreferences, type MessageDensity } from '@/lib/user-preferences';
+import { playReplySound, unlockReplySound } from '@/lib/notifications';
 
 interface SettingsPageProps { onClose?: () => void; }
 
@@ -37,6 +38,7 @@ export function SettingsPage({ onClose }: SettingsPageProps) {
   const [streamingEnabled, setStreamingEnabled] = useState(true);
   const [autoScroll, setAutoScroll] = useState(true);
   const [sendOnEnter, setSendOnEnter] = useState(true);
+  const [soundEnabled, setSoundEnabled] = useState(false);
   const [hapticsEnabled, setHapticsEnabled] = useState(true);
   const [fontSize, setFontSize] = useState(14);
   const [messageDensity, setMessageDensity] = useState<MessageDensity>(DEFAULT_USER_PREFERENCES.messageDensity);
@@ -51,6 +53,7 @@ export function SettingsPage({ onClose }: SettingsPageProps) {
     setStreamingEnabled(p.streaming);
     setAutoScroll(p.autoScroll);
     setSendOnEnter(p.sendOnEnter);
+    setSoundEnabled(p.sound);
     setHapticsEnabled(p.haptics);
     setFontSize(p.fontSize);
     setMessageDensity(p.messageDensity);
@@ -65,7 +68,7 @@ export function SettingsPage({ onClose }: SettingsPageProps) {
       streaming: streamingEnabled,
       autoScroll,
       sendOnEnter,
-      sound: false,
+      sound: soundEnabled,
       haptics: hapticsEnabled,
       fontSize,
       messageDensity,
@@ -136,9 +139,19 @@ export function SettingsPage({ onClose }: SettingsPageProps) {
                   <SettingRow label="Auto-scroll" description="Automatically scroll to new messages">
                     <Switch checked={autoScroll} onCheckedChange={(value) => { setAutoScroll(value); writeUserPreferences({ autoScroll: value }) }} />
                   </SettingRow>
+                  <SettingRow label="Sound Effects" description="Play the clean reply tone when an assistant reply finishes">
+                    <Switch checked={soundEnabled} onCheckedChange={(value) => { setSoundEnabled(value); writeUserPreferences({ sound: value }) }} />
+                  </SettingRow>
                   <SettingRow label="Haptic Feedback" description="Use device vibration when supported">
                     <Switch checked={hapticsEnabled} onCheckedChange={(value) => { setHapticsEnabled(value); writeUserPreferences({ haptics: value }) }} />
                   </SettingRow>
+                  <div className="flex items-center justify-between gap-4 rounded-2xl border border-white/10 bg-white/[0.045] px-4 py-3">
+                    <div className="flex items-center gap-3 min-w-0">
+                      <Volume2 className="h-4 w-4 text-muted-foreground shrink-0" />
+                      <span className="text-sm text-muted-foreground">Preview the clean reply tone</span>
+                    </div>
+                    <Button variant="outline" size="sm" className="shrink-0 border-white/15 bg-white/[0.04] hover:bg-white/[0.1]" onClick={() => { writeUserPreferences({ sound: true }); setSoundEnabled(true); unlockReplySound(); setTimeout(playReplySound, 40) }}>Test sound</Button>
+                  </div>
                   <SettingRow label="Streaming Responses" description="Show response text live or wait until the reply is complete">
                     <Switch checked={streamingEnabled} onCheckedChange={(value) => { setStreamingEnabled(value); writeUserPreferences({ streaming: value }) }} />
                   </SettingRow>
