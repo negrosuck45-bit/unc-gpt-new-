@@ -114,6 +114,8 @@ export function OAuthConnectors() {
   const [busy, setBusy] = useState<string | null>(null);
   const [composio, setComposio] = useState<ComposioStatus | null>(null);
   const [oauthError, setOauthError] = useState<string | null>(null);
+  const [composioToolkit, setComposioToolkit] = useState('github');
+  const [composioBusy, setComposioBusy] = useState(false);
 
   const refresh = () =>
     Promise.all([
@@ -132,6 +134,24 @@ export function OAuthConnectors() {
   }, []);
 
   const connect = (name: string) => { setBusy(name); window.location.href = `/api/mcp/oauth/${name}/start`; };
+  const connectComposio = async () => {
+    setComposioBusy(true);
+    setOauthError(null);
+    try {
+      const response = await fetch('/api/connectors/composio/connect', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ toolkit: composioToolkit }),
+      });
+      const data = await response.json();
+      if (!response.ok || !data.redirectUrl) throw new Error(data.error || 'Unable to start the connection');
+      window.location.href = data.redirectUrl;
+    } catch (error: any) {
+      setOauthError(error?.message || 'Unable to start the connection');
+      setComposioBusy(false);
+    }
+  };
+
   const disconnect = async (name: string) => {
     setBusy(name);
     await fetch('/api/mcp/oauth/disconnect', { method: 'POST', headers: {'Content-Type':'application/json'}, body: JSON.stringify({ provider: name }) });
@@ -169,6 +189,23 @@ export function OAuthConnectors() {
               </span>
             </div>
             <p className="mt-1 text-xs leading-relaxed text-zinc-400">{composio.description}</p>
+            <p className="mt-1 text-[11px] leading-relaxed text-zinc-500">Choose an app below, finish its sign-in once, and compatible models can use it for your requests.</p>
+            <div className="mt-3 flex flex-wrap items-center gap-2">
+              <select value={composioToolkit} onChange={(event) => setComposioToolkit(event.target.value)} className="h-8 rounded-lg border border-white/10 bg-black/20 px-2 text-xs text-zinc-200 outline-none">
+                <option value="github">GitHub</option>
+                <option value="gmail">Gmail</option>
+                <option value="slack">Slack</option>
+                <option value="notion">Notion</option>
+                <option value="linear">Linear</option>
+                <option value="google_drive">Google Drive</option>
+                <option value="googlecalendar">Google Calendar</option>
+                <option value="vercel">Vercel</option>
+              </select>
+              <Button size="sm" variant="secondary" onClick={connectComposio} disabled={composioBusy || !composio.configured}>
+                {composioBusy ? <Loader2 className="mr-1.5 h-3.5 w-3.5 animate-spin" /> : null}
+                Connect app
+              </Button>
+            </div>
           </div>
           {!composio.configured && <a href={composio.setupUrl} target="_blank" rel="noreferrer" className="shrink-0 text-xs font-medium text-violet-300 hover:text-violet-200">Docs</a>}
         </div>
