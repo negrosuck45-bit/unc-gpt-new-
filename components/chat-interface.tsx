@@ -6,6 +6,8 @@ import { ChatMessages } from "@/components/chat-messages";
 import { ChatInput } from "@/components/chat-input";
 import { WelcomeScreen } from "@/components/welcome-screen";
 import { ChatHeader } from "@/components/chat-header";
+import { playReplySound, unlockReplySound } from "@/lib/notifications";
+import { readUserPreferences } from "@/lib/user-preferences";
 
 interface ChatInterfaceProps {
   onSwitchToImagine?: () => void;
@@ -52,13 +54,16 @@ export function ChatInterface({ onSwitchToImagine, onOpenSidebar, isSidebarOpen 
     if (userIndex < 0 || messages[userIndex].role !== "user") return;
 
     deleteMessage(chatId, messageId);
+    unlockReplySound();
     setIsStreaming(true, chatId);
     setIsThinking(true);
     abortControllerRef.current = new AbortController();
 
+    let completed = false;
     try {
       const messagesToSend = messages.slice(0, assistantIndex);
       await processAIResponse(chatId, messagesToSend);
+      completed = true;
     } catch (error: any) {
       if (error.name !== "AbortError") {
         addMessage(chatId, { role: "assistant", content: "Sorry, something went wrong." });
@@ -67,6 +72,7 @@ export function ChatInterface({ onSwitchToImagine, onOpenSidebar, isSidebarOpen 
       setIsStreaming(false);
       setIsThinking(false);
       abortControllerRef.current = null;
+      if (completed) playReplySound();
     }
   }, [currentChat, isCurrentChatStreaming, addMessage, deleteMessage, setIsStreaming]);
 
@@ -87,13 +93,16 @@ export function ChatInterface({ onSwitchToImagine, onOpenSidebar, isSidebarOpen 
       updateChatTitle(chatId, title);
     }
 
+    unlockReplySound();
     setIsStreaming(true, chatId);
     setIsThinking(true);
     abortControllerRef.current = new AbortController();
 
+    let completed = false;
     try {
       const messagesToSend = freshChat?.messages || [];
       await processAIResponse(chatId, messagesToSend);
+      completed = true;
     } catch (error: any) {
       if (error.name !== "AbortError") {
         addMessage(chatId, { role: "assistant", content: "Sorry, something went wrong." });
@@ -102,6 +111,7 @@ export function ChatInterface({ onSwitchToImagine, onOpenSidebar, isSidebarOpen 
       setIsStreaming(false);
       setIsThinking(false);
       abortControllerRef.current = null;
+      if (completed) playReplySound();
     }
   }, [currentChatId, createNewChat, addMessage, updateChatTitle, setIsStreaming, settings]);
 
@@ -181,6 +191,7 @@ export function ChatInterface({ onSwitchToImagine, onOpenSidebar, isSidebarOpen 
     let fullContent = "";
     let assistantMsgId: string | null = null;
     let hasStartedStreaming = false;
+    const streamingPreference = readUserPreferences().streaming;
 
     while (true) {
       const { done, value } = await reader.read();
@@ -202,13 +213,13 @@ export function ChatInterface({ onSwitchToImagine, onOpenSidebar, isSidebarOpen 
             const parsed = JSON.parse(dataStr);
 
             if (parsed.content) {
+              fullContent += parsed.content;
+              if (!streamingPreference) continue;
               if (!hasStartedStreaming) {
                 hasStartedStreaming = true;
                 setIsThinking(false);
                 assistantMsgId = addMessage(chatId, { role: "assistant", content: parsed.content });
-                fullContent = parsed.content;
               } else {
-                fullContent += parsed.content;
                 if (assistantMsgId) updateMessage(chatId, assistantMsgId, fullContent);
               }
             } 
@@ -231,6 +242,11 @@ export function ChatInterface({ onSwitchToImagine, onOpenSidebar, isSidebarOpen 
           } catch (e) {}
         }
       }
+    }
+
+    if (!streamingPreference && fullContent && !assistantMsgId) {
+      setIsThinking(false);
+      addMessage(chatId, { role: "assistant", content: fullContent });
     }
   };
 

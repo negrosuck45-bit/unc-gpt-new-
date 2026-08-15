@@ -135,10 +135,10 @@ export function SettingsPage({ onClose }: SettingsPageProps) {
                   <SettingRow label="Auto-scroll" description="Automatically scroll to new messages">
                     <Switch checked={autoScroll} onCheckedChange={(value) => { setAutoScroll(value); writeUserPreferences({ autoScroll: value }) }} />
                   </SettingRow>
-                  <SettingRow label="Sound Effects" description="Play sounds for notifications">
+                  <SettingRow label="Sound Effects" description="Play a soft tone when an assistant reply finishes">
                     <Switch checked={soundEnabled} onCheckedChange={(value) => { setSoundEnabled(value); writeUserPreferences({ sound: value }) }} />
                   </SettingRow>
-                  <SettingRow label="Streaming Responses" description="Show AI responses as they generate">
+                  <SettingRow label="Streaming Responses" description="Show response text live or wait until the reply is complete">
                     <Switch checked={streamingEnabled} onCheckedChange={(value) => { setStreamingEnabled(value); writeUserPreferences({ streaming: value }) }} />
                   </SettingRow>
                 </div>

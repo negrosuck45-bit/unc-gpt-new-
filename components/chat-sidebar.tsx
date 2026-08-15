@@ -12,7 +12,6 @@ import {
   PanelLeftClose,
   PanelLeft,
   Mic,
-  ChevronDown,
   FolderOpen,
   Settings as SettingsIcon,
   Brain,
@@ -280,21 +279,8 @@ export function ChatSidebar({
             style={{ width: 280, minWidth: 280, height: '100dvh', maxHeight: '100dvh' }}
             className={cn("bg-sidebar/95 supports-[backdrop-filter]:backdrop-blur-2xl text-sidebar-foreground border-r border-sidebar-border/80 shadow-[8px_0_32px_rgba(0,0,0,0.24)] flex flex-col overflow-y-auto", isMobile ? "fixed inset-y-0 left-0 z-[100] shadow-2xl" : "relative")}
           >
-            {/* Header - Claude style */}
-            <div className="p-3.5 sm:p-4 flex items-center justify-between border-b border-sidebar-border/60">
-              <div className="flex items-center gap-2">
-                <Image
-                  src="/uncgpt.png"
-                  alt="uncgpt"
-                  width={28}
-                  height={28}
-                  className="rounded-md"
-                />
-                <span className="font-semibold text-base">uncgpt</span>
-                <button className="ml-1 p-1 hover:bg-accent/50 rounded-md">
-                  <ChevronDown className="h-4 w-4 opacity-60" />
-                </button>
-              </div>
+            {/* Compact close control; the extra branding row is intentionally omitted. */}
+            <div className="p-3.5 sm:p-4 flex items-center justify-end">
               <button
                 onClick={onToggle}
                 title="Close sidebar"
@@ -462,7 +448,7 @@ export function ChatSidebar({
             </div>
 
             {/* Bottom bar */}
-            <div className="border-t border-sidebar-border bg-sidebar p-2 space-y-0.5">
+            <div className="bg-sidebar/40 p-2 space-y-0.5">
               <NavItem
                 icon={<DiscordIcon className="h-4 w-4" />}
                 label="Join Discord"
