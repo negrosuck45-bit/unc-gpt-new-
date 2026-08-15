@@ -5,6 +5,7 @@ export interface UserPreferences {
   autoScroll: boolean
   sendOnEnter: boolean
   sound: boolean
+  haptics: boolean
   fontSize: number
   messageDensity: MessageDensity
   debugMode: boolean
@@ -16,6 +17,7 @@ export const DEFAULT_USER_PREFERENCES: UserPreferences = {
   autoScroll: true,
   sendOnEnter: true,
   sound: false,
+  haptics: true,
   fontSize: 14,
   messageDensity: 'normal',
   debugMode: false,

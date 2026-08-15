@@ -39,6 +39,7 @@ export function SettingsPage({ onClose }: SettingsPageProps) {
   const [autoScroll, setAutoScroll] = useState(true);
   const [sendOnEnter, setSendOnEnter] = useState(true);
   const [soundEnabled, setSoundEnabled] = useState(false);
+  const [hapticsEnabled, setHapticsEnabled] = useState(true);
   const [fontSize, setFontSize] = useState(14);
   const [messageDensity, setMessageDensity] = useState<MessageDensity>(DEFAULT_USER_PREFERENCES.messageDensity);
   const [debugMode, setDebugMode] = useState(DEFAULT_USER_PREFERENCES.debugMode);
@@ -53,6 +54,7 @@ export function SettingsPage({ onClose }: SettingsPageProps) {
     setAutoScroll(p.autoScroll);
     setSendOnEnter(p.sendOnEnter);
     setSoundEnabled(p.sound);
+    setHapticsEnabled(p.haptics);
     setFontSize(p.fontSize);
     setMessageDensity(p.messageDensity);
     setDebugMode(p.debugMode);
@@ -67,6 +69,7 @@ export function SettingsPage({ onClose }: SettingsPageProps) {
       autoScroll,
       sendOnEnter,
       sound: soundEnabled,
+      haptics: hapticsEnabled,
       fontSize,
       messageDensity,
       debugMode,
@@ -138,6 +141,9 @@ export function SettingsPage({ onClose }: SettingsPageProps) {
                   </SettingRow>
                   <SettingRow label="Sound Effects" description="Play a soft tone when an assistant reply finishes">
                     <Switch checked={soundEnabled} onCheckedChange={(value) => { setSoundEnabled(value); writeUserPreferences({ sound: value }) }} />
+                  </SettingRow>
+                  <SettingRow label="Haptic Feedback" description="Use device vibration when supported">
+                    <Switch checked={hapticsEnabled} onCheckedChange={(value) => { setHapticsEnabled(value); writeUserPreferences({ haptics: value }) }} />
                   </SettingRow>
                   <div className="flex items-center justify-between gap-4 rounded-2xl border border-white/10 bg-white/[0.045] px-4 py-3">
                     <div className="flex items-center gap-3 min-w-0">

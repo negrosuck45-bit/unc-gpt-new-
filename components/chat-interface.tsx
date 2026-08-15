@@ -8,6 +8,7 @@ import { WelcomeScreen } from "@/components/welcome-screen";
 import { ChatHeader } from "@/components/chat-header";
 import { playReplySound, unlockReplySound } from "@/lib/notifications";
 import { readUserPreferences } from "@/lib/user-preferences";
+import { triggerHaptic } from "@/lib/haptics";
 
 interface ChatInterfaceProps {
   onSwitchToImagine?: () => void;
@@ -54,6 +55,7 @@ export function ChatInterface({ onSwitchToImagine, onOpenSidebar, isSidebarOpen 
     if (userIndex < 0 || messages[userIndex].role !== "user") return;
 
     deleteMessage(chatId, messageId);
+    triggerHaptic("send");
     unlockReplySound();
     setIsStreaming(true, chatId);
     setIsThinking(true);
@@ -66,13 +68,17 @@ export function ChatInterface({ onSwitchToImagine, onOpenSidebar, isSidebarOpen 
       completed = true;
     } catch (error: any) {
       if (error.name !== "AbortError") {
+        triggerHaptic("error");
         addMessage(chatId, { role: "assistant", content: `❌ ${error?.message || "Sorry, something went wrong."}` });
       }
     } finally {
       setIsStreaming(false);
       setIsThinking(false);
       abortControllerRef.current = null;
-      if (completed) playReplySound();
+      if (completed) {
+        triggerHaptic("reply");
+        playReplySound();
+      }
     }
   }, [currentChat, isCurrentChatStreaming, addMessage, deleteMessage, setIsStreaming]);
 
@@ -93,6 +99,7 @@ export function ChatInterface({ onSwitchToImagine, onOpenSidebar, isSidebarOpen 
       updateChatTitle(chatId, title);
     }
 
+    triggerHaptic("send");
     unlockReplySound();
     setIsStreaming(true, chatId);
     setIsThinking(true);
@@ -105,13 +112,17 @@ export function ChatInterface({ onSwitchToImagine, onOpenSidebar, isSidebarOpen 
       completed = true;
     } catch (error: any) {
       if (error.name !== "AbortError") {
+        triggerHaptic("error");
         addMessage(chatId, { role: "assistant", content: `❌ ${error?.message || "Sorry, something went wrong."}` });
       }
     } finally {
       setIsStreaming(false);
       setIsThinking(false);
       abortControllerRef.current = null;
-      if (completed) playReplySound();
+      if (completed) {
+        triggerHaptic("reply");
+        playReplySound();
+      }
     }
   }, [currentChatId, createNewChat, addMessage, updateChatTitle, setIsStreaming, settings]);
 
