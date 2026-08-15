@@ -9,6 +9,7 @@
     "lint": "eslint ."
   },
   "dependencies": {
+    "@auth0/nextjs-auth0": "^4.26.0",
     "@heyputer/puter.js": "^2.0.0",
     "@hookform/resolvers": "^3.9.1",
     "@radix-ui/react-accordion": "1.2.12",

@@ -1,10 +1,13 @@
 import { NextRequest } from "next/server";
 import { createClient } from "@supabase/supabase-js";
 
-const supabase = createClient(
-  process.env.NEXT_PUBLIC_SUPABASE_URL!,
-  process.env.SUPABASE_SERVICE_ROLE_KEY!
-);
+const supabase =
+  process.env.NEXT_PUBLIC_SUPABASE_URL && process.env.SUPABASE_SERVICE_ROLE_KEY
+    ? createClient(
+        process.env.NEXT_PUBLIC_SUPABASE_URL,
+        process.env.SUPABASE_SERVICE_ROLE_KEY
+      )
+    : null;
 
 export async function GET(req: NextRequest) {
   try {
@@ -14,6 +17,10 @@ export async function GET(req: NextRequest) {
 
     if (!userId) {
       return Response.json({ error: "Missing userId" }, { status: 400 });
+    }
+
+    if (!supabase) {
+      return Response.json({ success: true, userId, period, stats: { totalEvents: 0, eventsByType: {}, timeline: [], trends: { lastDay: 0, lastWeek: 0, total: 0 } }, configured: false });
     }
 
     // Get analytics data from Supabase
@@ -52,6 +59,10 @@ export async function POST(req: NextRequest) {
 
     if (!userId || !event) {
       return Response.json({ error: "Missing userId or event" }, { status: 400 });
+    }
+
+    if (!supabase) {
+      return Response.json({ success: true, configured: false });
     }
 
     const { error } = await supabase.from("analytics").insert({

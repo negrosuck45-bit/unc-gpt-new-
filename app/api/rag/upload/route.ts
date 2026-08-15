@@ -2,10 +2,13 @@ import { NextRequest } from "next/server";
 import { createClient } from "@supabase/supabase-js";
 import pdfParse from "pdf-parse";
 
-const supabase = createClient(
-  process.env.NEXT_PUBLIC_SUPABASE_URL!,
-  process.env.SUPABASE_SERVICE_ROLE_KEY!
-);
+const supabase =
+  process.env.NEXT_PUBLIC_SUPABASE_URL && process.env.SUPABASE_SERVICE_ROLE_KEY
+    ? createClient(
+        process.env.NEXT_PUBLIC_SUPABASE_URL,
+        process.env.SUPABASE_SERVICE_ROLE_KEY
+      )
+    : null;
 
 export async function POST(req: NextRequest) {
   try {
@@ -33,6 +36,10 @@ export async function POST(req: NextRequest) {
     );
 
     const embedding = await embeddingResponse.json();
+
+    if (!supabase) {
+      return Response.json({ error: "RAG storage is not configured" }, { status: 503 });
+    }
 
     // Store in Supabase
     const { data, error } = await supabase

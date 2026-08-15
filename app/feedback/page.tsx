@@ -15,7 +15,12 @@ interface FeedbackItem {
   fixContent?: string;
 }
 
-const supabase = createClient();
+const supabase =
+  typeof window !== "undefined" &&
+  process.env.NEXT_PUBLIC_SUPABASE_URL &&
+  process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY
+    ? createClient()
+    : null;
 
 export default function FeedbackPage() {
   const videoRef = useRef<HTMLVideoElement>(null);
@@ -37,6 +42,12 @@ export default function FeedbackPage() {
   const loadFeedback = useCallback(async () => {
     console.log('[FeedbackPage] Loading from Supabase...');
     setLoading(true);
+
+    if (!supabase) {
+      setFeedbackItems([]);
+      setLoading(false);
+      return;
+    }
 
     try {
       const { data, error } = await supabase
@@ -88,6 +99,8 @@ export default function FeedbackPage() {
 
   // Dismiss feedback - deletes from Supabase
   const dismissFeedback = async (itemId: string) => {
+    if (!supabase) return;
+
     try {
       const { error } = await supabase
         .from('message_feedback')
@@ -299,6 +312,8 @@ export default function FeedbackPage() {
 
   // Debug: add test feedback directly to Supabase
   const addTestFeedback = async () => {
+    if (!supabase) return;
+
     try {
       const { data, error } = await supabase
         .from('message_feedback')
