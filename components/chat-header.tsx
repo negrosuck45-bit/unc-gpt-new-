@@ -46,13 +46,13 @@ export function ChatHeader({ project, chat, activeModelInfo, onOpenSidebar, isSi
     <>
       <div className="flex flex-col border-b border-border bg-background/80 backdrop-blur-sm">
       <header className="flex items-center gap-2 px-3 py-2.5 min-h-[48px]">
-        {/* Sidebar trigger — MOBILE ONLY */}
+        {/* Sidebar trigger — always visible so the sidebar can be opened or collapsed on any screen size */}
         {onOpenSidebar && (
           <Button
             variant="ghost"
             size="icon"
             onClick={onOpenSidebar}
-            className="h-8 w-8 shrink-0 hover:bg-accent/50 md:hidden"
+            className="h-8 w-8 shrink-0 hover:bg-accent/50"
             title={isSidebarOpen ? "Close sidebar" : "Open sidebar"}
             aria-label={isSidebarOpen ? "Close sidebar" : "Open sidebar"}
           >
