@@ -18,11 +18,11 @@ export function WelcomeScreen({ onSelectPrompt, project }: WelcomeScreenProps) {
         transition={{ duration: 0.6, ease: "easeOut" }}
       >
         <Image
-          src="/uncgpt.png"
+          src="/uncgptt.png"
           alt="UNC GPT"
-          width={156}
-          height={156}
-          className="h-28 w-28 sm:h-36 sm:w-36 rounded-full object-cover ring-1 ring-white/10 shadow-[0_12px_40px_rgba(0,0,0,0.35)]"
+          width={420}
+          height={120}
+          className="h-auto w-64 max-w-[78vw] object-contain opacity-95"
           priority
         />
       </motion.div>
