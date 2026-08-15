@@ -2,17 +2,6 @@ import { NextRequest } from "next/server";
 import { auth0 } from "@/lib/auth0";
 import { getComposioSession } from "@/lib/composio";
 
-const ALLOWED_TOOLKITS = new Set([
-  "github",
-  "slack",
-  "notion",
-  "linear",
-  "google_drive",
-  "vercel",
-  "gmail",
-  "googlecalendar",
-]);
-
 export async function POST(req: NextRequest) {
   const session = await auth0.getSession();
   const userId = session?.user?.sub;
@@ -25,8 +14,8 @@ export async function POST(req: NextRequest) {
     return Response.json({ error: "Choose an app to connect." }, { status: 400 });
   }
 
-  if (!ALLOWED_TOOLKITS.has(toolkit)) {
-    return Response.json({ error: "That app is not available in the current connector list." }, { status: 400 });
+  if (!/^[a-z0-9][a-z0-9_-]{1,79}$/.test(toolkit) || toolkit.startsWith("composio")) {
+    return Response.json({ error: "Choose a valid Composio app from the catalog." }, { status: 400 });
   }
 
   try {

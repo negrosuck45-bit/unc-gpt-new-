@@ -5,6 +5,7 @@ export interface ComposioConnector {
   name: string;
   url: string;
   headers: Record<string, string>;
+  type: "http";
   enabled: boolean;
 }
 
@@ -33,6 +34,7 @@ export async function getComposioConnector(userId: string): Promise<ComposioConn
     name: "Composio",
     url: session.mcp.url,
     headers: session.mcp.headers || { "x-api-key": apiKey },
+    type: "http",
     enabled: true,
   };
 }

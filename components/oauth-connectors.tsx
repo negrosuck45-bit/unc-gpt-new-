@@ -80,6 +80,7 @@ const PROVIDERS = [
 
 interface ProviderStatus { connected: boolean; configured: boolean; }
 interface ComposioStatus { authenticated: boolean; configured: boolean; label: string; description: string; setupUrl: string; }
+interface ComposioCatalogItem { slug: string; name: string; description: string; logo?: string | null; categories?: string[]; }
 
 // ─── Compact pill strip (for sidebar / header) ─────────────────────────────────
 export function OAuthConnectorPills() {
@@ -116,6 +117,8 @@ export function OAuthConnectors() {
   const [oauthError, setOauthError] = useState<string | null>(null);
   const [composioToolkit, setComposioToolkit] = useState('github');
   const [composioBusy, setComposioBusy] = useState(false);
+  const [catalog, setCatalog] = useState<ComposioCatalogItem[]>([]);
+  const [catalogQuery, setCatalogQuery] = useState('');
 
   const refresh = () =>
     Promise.all([
@@ -125,6 +128,7 @@ export function OAuthConnectors() {
 
   useEffect(() => {
     refresh();
+    fetch('/api/connectors/composio/catalog').then((response) => response.json()).then((data) => setCatalog(data.items || [])).catch(() => setCatalog([]));
     const params = new URLSearchParams(window.location.search);
     const error = params.get('mcp_error');
     if (error) {
@@ -134,14 +138,14 @@ export function OAuthConnectors() {
   }, []);
 
   const connect = (name: string) => { setBusy(name); window.location.href = `/api/mcp/oauth/${name}/start`; };
-  const connectComposio = async () => {
+  const connectComposio = async (toolkit = composioToolkit) => {
     setComposioBusy(true);
     setOauthError(null);
     try {
       const response = await fetch('/api/connectors/composio/connect', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ toolkit: composioToolkit }),
+        body: JSON.stringify({ toolkit }),
       });
       const data = await response.json();
       if (!response.ok || !data.redirectUrl) throw new Error(data.error || 'Unable to start the connection');
@@ -201,13 +205,30 @@ export function OAuthConnectors() {
                 <option value="googlecalendar">Google Calendar</option>
                 <option value="vercel">Vercel</option>
               </select>
-              <Button size="sm" variant="secondary" onClick={connectComposio} disabled={composioBusy || !composio.configured}>
+              <Button size="sm" variant="secondary" onClick={() => connectComposio()} disabled={composioBusy || !composio.configured}>
                 {composioBusy ? <Loader2 className="mr-1.5 h-3.5 w-3.5 animate-spin" /> : null}
                 Connect app
               </Button>
             </div>
           </div>
           {!composio.configured && <a href={composio.setupUrl} target="_blank" rel="noreferrer" className="shrink-0 text-xs font-medium text-violet-300 hover:text-violet-200">Docs</a>}
+        </div>
+      )}
+      {composio?.configured && (
+        <div className="rounded-xl border border-violet-400/15 bg-violet-400/[0.04] p-4">
+          <div className="flex items-center justify-between gap-3">
+            <div><h3 className="text-sm font-medium">All Composio apps</h3><p className="mt-1 text-xs text-zinc-500">Search the catalog, choose an app, and connect it through Composio.</p></div>
+            <span className="text-[10px] font-semibold uppercase tracking-wider text-violet-300">1000+ toolkits</span>
+          </div>
+          <input value={catalogQuery} onChange={(event) => setCatalogQuery(event.target.value)} placeholder="Search apps…" className="mt-3 h-9 w-full rounded-lg border border-white/10 bg-black/20 px-3 text-sm text-zinc-200 outline-none placeholder:text-zinc-600" />
+          <div className="mt-3 grid max-h-80 grid-cols-1 gap-2 overflow-y-auto sm:grid-cols-2">
+            {catalog.filter((item) => `${item.name} ${item.slug} ${item.description}`.toLowerCase().includes(catalogQuery.toLowerCase())).slice(0, 40).map((item) => (
+              <button key={item.slug} onClick={() => connectComposio(item.slug)} disabled={composioBusy} className="flex items-center gap-3 rounded-lg border border-white/8 bg-white/[0.025] p-2.5 text-left transition-colors hover:bg-white/[0.07] disabled:opacity-50">
+                {item.logo ? <img src={item.logo} alt="" className="h-7 w-7 rounded-md object-contain" /> : <span className="flex h-7 w-7 items-center justify-center rounded-md bg-violet-500/10 text-xs font-semibold text-violet-300">{String(item.name || item.slug).slice(0, 1).toUpperCase()}</span>}
+                <span className="min-w-0"><span className="block truncate text-xs font-medium text-zinc-200">{item.name}</span><span className="block truncate text-[10px] text-zinc-500">{item.slug}</span></span>
+              </button>
+            ))}
+          </div>
         </div>
       )}
       <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
