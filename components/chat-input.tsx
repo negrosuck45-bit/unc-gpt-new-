@@ -253,6 +253,7 @@ export function ChatInput({
   const textareaRef = useRef<HTMLTextAreaElement>(null)
   const fileInputRef = useRef<HTMLInputElement>(null)
   const imageInputRef = useRef<HTMLInputElement>(null)
+  const cameraInputRef = useRef<HTMLInputElement>(null)
   const recognitionRef = useRef<any>(null)
 
   const { settings, updateSettings, getCurrentChat, updateChatModel } = useChatStore()
@@ -528,20 +529,12 @@ export function ChatInput({
       setIsUploading(false)
     }
 
-    setAttachMenuOpen(false)
+    if (type !== 'image') setAttachMenuOpen(false)
   }
 
   const handlePlusPress = () => {
-    let photoAccessRequested = false
-    try { photoAccessRequested = window.localStorage.getItem('uncgpt-photo-access-requested') === '1' } catch {}
-
-    if (!photoAccessRequested) {
-      // A real file input keeps the gesture inside Safari's user-activation
-      // flow, allowing iOS to show its native Photos access dialog.
-      imageInputRef.current?.click()
-      return
-    }
-
+    // Open the iOS-style Photos sheet first. The Photo Library and Camera
+    // tiles then invoke the browser's native permission/picker flow.
     setAttachMenuOpen((open) => !open)
     setSheetExpanded(false)
   }
@@ -715,7 +708,7 @@ export function ChatInput({
                           <button type="button" onClick={() => imageInputRef.current?.click()} className="text-sm font-medium text-blue-300 hover:text-blue-200">See all</button>
                         </div>
                         <div className="mb-5 flex gap-2 overflow-x-auto pb-1">
-                          <button type="button" onClick={() => imageInputRef.current?.click()} aria-label="Take or choose a photo" className="flex h-28 w-28 shrink-0 flex-col items-center justify-center gap-2 rounded-[20px] border border-white/[0.08] bg-white/[0.085] text-white/90 shadow-[inset_0_1px_0_rgba(255,255,255,0.07)] backdrop-blur-xl transition hover:bg-white/[0.13] active:scale-[0.98]">
+                          <button type="button" onClick={() => cameraInputRef.current?.click()} aria-label="Camera" className="flex h-28 w-28 shrink-0 flex-col items-center justify-center gap-2 rounded-[20px] border border-white/[0.08] bg-white/[0.085] text-white/90 shadow-[inset_0_1px_0_rgba(255,255,255,0.07)] backdrop-blur-xl transition hover:bg-white/[0.13] active:scale-[0.98]">
                             <Camera className="h-7 w-7" strokeWidth={1.8} />
                             <span className="text-[13px] font-medium">Camera</span>
                           </button>
@@ -726,7 +719,7 @@ export function ChatInput({
                           ))}
                           <button type="button" onClick={() => imageInputRef.current?.click()} aria-label="Choose photos" className="flex h-28 w-28 shrink-0 flex-col items-center justify-center gap-2 rounded-[20px] border border-white/[0.12] bg-white/[0.055] text-white/70 shadow-[inset_0_1px_0_rgba(255,255,255,0.05)] backdrop-blur-xl transition hover:bg-white/[0.10] active:scale-[0.98]">
                             <ImageIcon className="h-7 w-7" strokeWidth={1.8} />
-                            <span className="text-[13px]">Choose photos</span>
+                            <span className="text-[13px]">Photo Library</span>
                           </button>
                         </div>
                         </div>
@@ -794,6 +787,7 @@ export function ChatInput({
 
         <input ref={fileInputRef} type="file" multiple className="hidden" onChange={(e) => handleFileSelect(e, 'file')} />
         <input ref={imageInputRef} type="file" accept="image/*" multiple className="hidden" onChange={(e) => handleFileSelect(e, 'image')} />
+        <input ref={cameraInputRef} type="file" accept="image/*" capture="environment" className="hidden" onChange={(e) => handleFileSelect(e, 'image')} />
 
         <Dialog open={!!viewingAttachment} onOpenChange={(open) => !open && setViewingAttachment(null)}>
           <DialogContent className="max-w-4xl max-h-[85vh] flex flex-col">
