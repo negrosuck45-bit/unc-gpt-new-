@@ -159,6 +159,17 @@ export function ChatSidebar({
   }, [filteredChats])
 
   const handleNew = (type: "text" | "voice") => {
+    const currentChat = useChatStore.getState().chats.find((chat) => chat.id === currentChatId)
+
+    // Keep one reusable blank draft. Once the user has sent a message,
+    // the next New chat click creates a fresh conversation as expected.
+    if (currentChat && currentChat.messages.length === 0) {
+      setCurrentChat(currentChat.id)
+      onModeChange(type)
+      onChatSelect(currentChat.id, currentChat.type)
+      return
+    }
+
     const id = createNewChat(type)
     setCurrentChat(id)
     onModeChange(type)
