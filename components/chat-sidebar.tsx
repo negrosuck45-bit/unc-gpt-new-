@@ -4,9 +4,11 @@ import { useState, useEffect, useMemo } from "react"
 import Image from "next/image"
 
 import { useChatStore } from "@/lib/chat-store"
+import { readUserPreferences, subscribeToUserPreferences, type UserPreferences } from "@/lib/user-preferences"
 import { cn } from "@/lib/utils"
 import {
   Plus,
+  CirclePlus,
   MessageSquare,
   Trash2,
   PanelLeftClose,
@@ -14,6 +16,8 @@ import {
   Mic,
   FolderOpen,
   Settings as SettingsIcon,
+  UserRound,
+  LogOut,
   Edit2,
   Search,
   Sparkles,
@@ -94,6 +98,20 @@ export function ChatSidebar({
   const [imageEditOpen, setImageEditOpen] = useState(false)
   const [historyOpen, setHistoryOpen] = useState(false)
   const [settingsPageOpen, setSettingsPageOpen] = useState(false)
+  const [accountOpen, setAccountOpen] = useState(false)
+  const [authUser, setAuthUser] = useState<{ name?: string | null; email?: string | null; picture?: string | null } | null>(null)
+  const [profilePreferences, setProfilePreferences] = useState<UserPreferences>(readUserPreferences())
+
+  useEffect(() => subscribeToUserPreferences(setProfilePreferences), [])
+
+  useEffect(() => {
+    let active = true
+    fetch('/api/auth/me', { cache: 'no-store' })
+      .then((response) => response.ok ? response.json() : null)
+      .then((payload) => { if (active) setAuthUser(payload?.user ?? null) })
+      .catch(() => { if (active) setAuthUser(null) })
+    return () => { active = false }
+  }, [])
 
   // Filter chats based on search
   const filteredChats = useMemo(() => {
@@ -205,13 +223,13 @@ export function ChatSidebar({
         animate={{ width: 56, opacity: 1 }}
         transition={{ duration: 0.18, ease: [0.4, 0, 0.2, 1] }}
         style={{ width: 56, minWidth: 56, height: '100dvh', maxHeight: '100dvh' }}
-        className="bg-sidebar/90 supports-[backdrop-filter]:backdrop-blur-2xl text-sidebar-foreground border-r border-sidebar-border/80 shadow-[8px_0_32px_rgba(0,0,0,0.18)] flex flex-col items-center py-3 gap-1 overflow-y-auto overflow-x-hidden sticky top-0"
+        className="bg-[#111114]/[0.96] supports-[backdrop-filter]:backdrop-blur-3xl text-sidebar-foreground shadow-[10px_0_40px_rgba(0,0,0,0.28)] flex flex-col items-center py-3 gap-1 overflow-y-auto overflow-x-hidden sticky top-0"
       >
         <button
           onClick={onToggle}
           title="Open sidebar"
           aria-label="Open sidebar"
-          className="group relative h-10 w-10 rounded-lg flex items-center justify-center hover:bg-accent/50 transition-colors mb-1"
+          className="group relative h-10 w-10 rounded-xl flex items-center justify-center text-white/65 hover:bg-white/[0.08] hover:text-white transition-all mb-1"
         >
           <Image
             src="/uncgpt.png"
@@ -247,7 +265,7 @@ export function ChatSidebar({
 
         {settingsPageOpen && (
           <div className="fixed inset-0 z-50 flex items-start sm:items-center justify-center bg-black/70 sm:bg-black/60 sm:backdrop-blur-sm overflow-y-auto p-0 sm:p-4">
-            <div className="w-full max-w-5xl min-h-dvh sm:min-h-0 sm:my-8">
+            <div className="w-full max-w-none sm:max-w-5xl min-h-[calc(100dvh-env(safe-area-inset-top))] sm:min-h-0 sm:my-8">
               <SettingsPage onClose={() => setSettingsPageOpen(false)} />
             </div>
           </div>
@@ -271,46 +289,43 @@ export function ChatSidebar({
             exit={{ x: -280, opacity: 0 }}
             transition={{ duration: 0.22, ease: [0.4, 0, 0.2, 1] }}
             style={{ width: 280, minWidth: 280, height: '100dvh', maxHeight: '100dvh' }}
-            className={cn("bg-black/60 supports-[backdrop-filter]:bg-black/35 supports-[backdrop-filter]:backdrop-blur-[28px] text-sidebar-foreground border-r border-white/10 shadow-[10px_0_40px_rgba(0,0,0,0.32)] flex flex-col overflow-y-auto", isMobile ? "fixed inset-y-0 left-0 z-[100] shadow-2xl" : "relative")}
+            className={cn("bg-[#111114]/[0.96] supports-[backdrop-filter]:backdrop-blur-3xl text-sidebar-foreground shadow-[18px_0_60px_rgba(0,0,0,0.34)] flex flex-col overflow-hidden", isMobile ? "fixed inset-y-0 left-0 z-[100] shadow-2xl" : "relative")}
           >
             {/* Borderless sidebar identity row with the Mars logo restored. */}
-            <div className="p-3.5 sm:p-4 pt-[max(0.875rem,env(safe-area-inset-top))] flex items-center justify-between">
+            <div className="bg-transparent px-3.5 sm:px-4 pt-[max(0.875rem,env(safe-area-inset-top))] pb-3 flex items-center justify-between">
               <div className="flex items-center gap-2.5 min-w-0">
                 <Image src="/uncgpt.png" alt="uncgpt logo" width={34} height={34} className="h-[34px] w-[34px] rounded-full object-cover" />
                 <span className="font-semibold text-base truncate">uncgpt</span>
               </div>
-              <button
-                onClick={onToggle}
-                title="Close sidebar"
-                aria-label="Close sidebar"
-                className="h-8 w-8 flex items-center justify-center rounded-md hover:bg-accent/50 transition-colors"
-              >
-                <PanelLeftClose className="h-5 w-5" />
-              </button>
+              <div className="flex items-center gap-1">
+                <button
+                  onClick={() => setShowSearch((open) => !open)}
+                  title="Search chats"
+                  aria-label="Search chats"
+                  className="flex h-9 w-9 items-center justify-center rounded-full text-white/65 transition-all hover:bg-white/[0.08] hover:text-white"
+                >
+                  <Search className="h-[19px] w-[19px]" />
+                </button>
+                <button
+                  onClick={onToggle}
+                  title="Close sidebar"
+                  aria-label="Close sidebar"
+                  className="flex h-9 w-9 items-center justify-center rounded-full text-white/65 transition-all hover:bg-white/[0.08] hover:text-white"
+                >
+                  <PanelLeftClose className="h-[19px] w-[19px]" />
+                </button>
+              </div>
             </div>
 
-            {/* Navigation Items - Claude style */}
-            <div className="px-2 space-y-0.5">
-              <NavItem
-                icon={<Plus className="h-4 w-4" />}
-                label="New chat"
+            {/* Reference-style primary navigation */}
+            <div className="px-3 pt-1.5 space-y-1.5">
+              <button
                 onClick={() => handleNew("text")}
-              />
-              <NavItem
-                icon={<Search className="h-4 w-4" />}
-                label="Search"
-                onClick={() => setShowSearch(!showSearch)}
-              />
-              <NavItem
-                icon={<MessageSquare className="h-4 w-4" />}
-                label="Chats"
-                onClick={() => setHistoryOpen(true)}
-              />
-              <NavItem
-                icon={<FolderOpen className="h-4 w-4" />}
-                label="Projects"
-                onClick={() => setProjectsOpen(true)}
-              />
+                className="flex w-full items-center justify-center gap-2.5 rounded-full border border-white/[0.14] bg-white/[0.16] px-4 py-3 text-[15px] font-medium text-white/90 shadow-[inset_0_1px_0_rgba(255,255,255,0.08),0_8px_24px_rgba(0,0,0,0.14)] transition hover:bg-white/[0.22] active:scale-[0.99]"
+              >
+                <CirclePlus className="h-[19px] w-[19px]" />
+                <span>New chat</span>
+              </button>
             </div>
 
             {/* Search input */}
@@ -328,17 +343,17 @@ export function ChatSidebar({
                     value={searchQuery}
                     onChange={(e) => setSearchQuery(e.target.value)}
                     autoFocus
-                    className="w-full px-3 py-2 text-sm rounded-lg border border-border bg-background placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-primary/30"
+                    className="w-full rounded-2xl border border-white/[0.10] bg-white/[0.06] px-3 py-2.5 text-sm text-white/90 placeholder:text-white/35 shadow-inner shadow-black/20 focus:outline-none focus:border-white/20 focus:ring-2 focus:ring-white/10"
                   />
                 </motion.div>
               )}
             </AnimatePresence>
 
             {/* Recents section */}
-            <div className="flex-1 overflow-y-auto px-2 pt-4">
+            <div className="flex-1 overflow-y-auto px-2.5 pt-4">
 
 
-              <div className="text-xs font-medium text-muted-foreground px-2 pb-2">
+              <div className="px-2 pb-2 text-[11px] font-semibold uppercase tracking-[0.14em] text-white/38">
                 Recents
               </div>
 
@@ -445,18 +460,26 @@ export function ChatSidebar({
               )}
             </div>
 
-            {/* Bottom bar */}
-            <div className="bg-black/20 p-2 pb-[max(0.5rem,env(safe-area-inset-bottom))] space-y-0.5">
-              <NavItem
-                icon={<DiscordIcon className="h-4 w-4" />}
-                label="Join Discord"
-                onClick={() => window.open(DISCORD_URL, "_blank")}
-              />
-              <NavItem
-                icon={<SettingsIcon className="h-4 w-4" />}
-                label="Settings"
-                onClick={openSettings}
-              />
+            {/* Account menu */}
+            <div className="relative mt-auto p-2 pb-[max(0.75rem,env(safe-area-inset-bottom))]">
+              <AnimatePresence>
+                {accountOpen && (
+                  <motion.div
+                    initial={{ opacity: 0, y: 8, scale: 0.98 }}
+                    animate={{ opacity: 1, y: 0, scale: 1 }}
+                    exit={{ opacity: 0, y: 8, scale: 0.98 }}
+                    className="absolute bottom-[calc(100%-0.2rem)] left-2 right-2 z-20 overflow-hidden rounded-[18px] border border-white/[0.14] bg-[#303034]/[0.98] p-1 shadow-[0_16px_42px_rgba(0,0,0,0.42)] backdrop-blur-2xl"
+                  >
+                    <button onClick={openSettings} className="flex w-full items-center gap-3 rounded-[14px] px-3 py-2.5 text-left text-[14px] text-white/90 transition hover:bg-white/[0.10]"><SettingsIcon className="h-[18px] w-[18px] text-white/75" /> Settings</button>
+                    <a href="/auth/logout" className="flex w-full items-center gap-3 rounded-[14px] px-3 py-2.5 text-left text-[14px] text-red-200 transition hover:bg-red-400/[0.10]"><LogOut className="h-[18px] w-[18px] text-red-200/80" /> Log out</a>
+                  </motion.div>
+                )}
+              </AnimatePresence>
+              <button onClick={() => setAccountOpen((open) => !open)} className="flex w-full items-center gap-3 rounded-[18px] border border-white/[0.08] bg-white/[0.075] px-3 py-2.5 text-left shadow-[inset_0_1px_0_rgba(255,255,255,0.05)] transition hover:bg-white/[0.12]">
+                {profilePreferences.profilePicture || authUser?.picture ? <img src={profilePreferences.profilePicture || authUser?.picture || ''} alt="Profile" className="h-9 w-9 rounded-full object-cover ring-1 ring-white/15" /> : <span className="flex h-9 w-9 items-center justify-center rounded-full bg-emerald-500/80 text-base font-medium text-white ring-1 ring-white/10">{(profilePreferences.profileName || authUser?.name || authUser?.email || 'U').slice(0, 1).toUpperCase()}</span>}
+                <span className="min-w-0 flex-1"><span className="block truncate text-[14px] font-medium leading-5 text-white/92">{profilePreferences.profileName || authUser?.name || 'Account'}</span><span className="block truncate text-[11px] leading-4 text-white/45">{authUser?.email || 'Signed in with Auth0'}</span></span>
+                <MoreHorizontal className="h-[18px] w-[18px] shrink-0 text-white/50" />
+              </button>
             </div>
           </motion.aside>
         )}
@@ -464,7 +487,7 @@ export function ChatSidebar({
 
       {settingsPageOpen && (
         <div className="fixed inset-0 z-50 flex items-start sm:items-center justify-center bg-black/70 sm:bg-black/60 sm:backdrop-blur-sm overflow-y-auto p-0 sm:p-4">
-          <div className="w-full max-w-5xl min-h-dvh sm:min-h-0 sm:my-8">
+          <div className="w-full max-w-none sm:max-w-5xl min-h-[calc(100dvh-env(safe-area-inset-top))] sm:min-h-0 sm:my-8">
             <SettingsPage onClose={() => setSettingsPageOpen(false)} />
           </div>
         </div>
@@ -511,13 +534,13 @@ function NavItem({ icon, label, badge, onClick, active }: NavItemProps) {
     <button
       onClick={onClick}
       className={cn(
-        "w-full flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm transition-colors",
+        "group w-full flex items-center gap-2 rounded-xl px-2.5 py-2.5 text-sm transition-all duration-200",
         active
-          ? "bg-white/10 text-foreground shadow-sm"
-          : "text-sidebar-foreground/80 hover:bg-white/[0.06] hover:text-foreground"
+          ? "bg-white/[0.11] text-white shadow-[inset_0_1px_0_rgba(255,255,255,0.08),0_8px_24px_rgba(0,0,0,0.18)]"
+          : "text-sidebar-foreground/72 hover:bg-white/[0.065] hover:text-white"
       )}
     >
-      <span className="opacity-70">{icon}</span>
+      <span className="flex h-7 w-7 shrink-0 items-center justify-center text-white/55 transition-colors group-hover:text-white">{icon}</span>
       <span className="flex-1 text-left">{label}</span>
       {badge && (
         <span className="text-[10px] font-medium px-1.5 py-0.5 rounded bg-primary/10 text-primary">
@@ -592,10 +615,10 @@ function ChatGroup({
                 onMouseEnter={() => setHoveredChatId(chat.id)}
                 onMouseLeave={() => setHoveredChatId(null)}
                 className={cn(
-                  "group flex items-center gap-2 px-2 py-1.5 rounded-lg cursor-pointer text-sm transition-colors",
+                  "group flex items-center gap-2 px-2.5 py-2 rounded-xl cursor-pointer text-sm transition-all duration-200",
                   currentChatId === chat.id
-                    ? "bg-accent text-accent-foreground"
-                    : "hover:bg-accent/50"
+                    ? "bg-white/[0.10] text-white shadow-[inset_0_1px_0_rgba(255,255,255,0.08)]"
+                    : "text-white/72 hover:bg-white/[0.055] hover:text-white"
                 )}
               >
                 <span className="flex-1 truncate">{chat.title || "Untitled"}</span>
