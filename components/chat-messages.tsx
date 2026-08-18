@@ -329,12 +329,12 @@ function FeedbackModal({ open, onClose, message, onSubmit }: { open: boolean; on
   return (
     <AnimatePresence>
       {open && (
-        <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} className="fixed inset-0 z-50 flex items-center justify-center p-4" onClick={onClose}>
-          <div className="absolute inset-0 bg-black/60 backdrop-blur-sm" />
-          <motion.div initial={{ opacity: 0, scale: 0.95, y: 20 }} animate={{ opacity: 1, scale: 1, y: 0 }} exit={{ opacity: 0, scale: 0.95, y: 20 }} transition={{ type: 'spring', damping: 25, stiffness: 300 }} onClick={(e) => e.stopPropagation()} className="relative w-full max-w-[92vw] sm:max-w-md bg-[#1e1e1e] border border-white/10 rounded-2xl p-4 sm:p-6 shadow-2xl max-h-[85vh] overflow-y-auto">
+        <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} className="fixed inset-0 z-[70] flex items-center justify-center bg-[#050507]/95 p-3 backdrop-blur-md sm:p-4" onClick={onClose}>
+          <div className="absolute inset-0 bg-[#050507]/90" />
+          <motion.div initial={{ opacity: 0, scale: 0.95, y: 20 }} animate={{ opacity: 1, scale: 1, y: 0 }} exit={{ opacity: 0, scale: 0.95, y: 20 }} transition={{ type: 'spring', damping: 25, stiffness: 300 }} onClick={(e) => e.stopPropagation()} className="relative w-full max-w-[92vw] overflow-y-auto rounded-[28px] border border-white/15 bg-[#151519]/95 p-5 shadow-[0_24px_90px_rgba(0,0,0,0.55)] backdrop-blur-2xl max-h-[min(680px,calc(100dvh-2rem))] sm:max-w-md sm:p-6">
           {submitted ? (
-            <motion.div initial={{ opacity: 0, scale: 0.8 }} animate={{ opacity: 1, scale: 1 }} className="text-center py-8">
-              <div className="w-14 h-14 rounded-full bg-green-500/10 flex items-center justify-center mx-auto mb-4"><Check className="h-7 w-7 text-green-400" /></div>
+            <motion.div initial={{ opacity: 0, scale: 0.8 }} animate={{ opacity: 1, scale: 1 }} className="text-center py-6 sm:py-8">
+              <div className="mx-auto mb-5 flex h-16 w-16 items-center justify-center rounded-full border border-white/20 bg-white/[0.035] shadow-[inset_0_1px_0_rgba(255,255,255,0.16),0_0_28px_rgba(255,255,255,0.06)] backdrop-blur-xl"><Check className="h-8 w-8 text-white/95 drop-shadow-[0_0_14px_rgba(255,255,255,0.22)]" strokeWidth={2.1} /></div>
               <h3 className="text-lg font-semibold text-white mb-1">Thank you!</h3>
               <p className="text-sm text-white/50">Your feedback has been saved.</p>
             </motion.div>
@@ -343,8 +343,8 @@ function FeedbackModal({ open, onClose, message, onSubmit }: { open: boolean; on
               <div className="flex items-center justify-between mb-3 sm:mb-5"><h2 className="text-lg sm:text-xl font-semibold text-white">Give negative feedback</h2><button onClick={onClose} className="p-1.5 rounded-lg hover:bg-white/10 transition-colors"><X className="h-4 w-4 text-white/60" /></button></div>
               <div className="space-y-5">
                 <div className="space-y-2"><label className="text-sm text-white/70">What type of issue do you wish to report? <span className="text-white/40">(optional)</span></label>
-                  <div className="relative"><select value={issueType} onChange={(e) => setIssueType(e.target.value)} className="w-full appearance-none bg-[#2a2a2a] border border-white/10 rounded-xl px-3 sm:px-4 py-2.5 sm:py-3 text-sm text-white focus:outline-none focus:border-white/25 transition-colors cursor-pointer"><option value="" disabled>Select...</option>{ISSUE_TYPES.map((t) => (<option key={t} value={t}>{t}</option>))}</select><ChevronDownIcon className="absolute right-3 top-1/2 -translate-y-1/2 h-4 w-4 text-white/40 pointer-events-none" /></div></div>
-                <div className="space-y-2"><label className="text-sm text-white/70">Please provide details: <span className="text-white/40">(optional)</span></label><textarea value={details} onChange={(e) => setDetails(e.target.value)} placeholder="What was unsatisfying about this response?" rows={3} className="w-full bg-[#2a2a2a] border border-white/10 rounded-xl px-3 sm:px-4 py-2.5 sm:py-3 text-sm text-white placeholder:text-white/30 resize-none focus:outline-none focus:border-white/25 transition-colors" /></div>
+                  <div className="relative"><select value={issueType} onChange={(e) => setIssueType(e.target.value)} className="w-full appearance-none rounded-2xl border border-white/10 bg-white/[0.06] px-3 py-2.5 text-sm text-white backdrop-blur-xl transition-colors focus:border-white/25 focus:outline-none cursor-pointer sm:px-4 sm:py-3"><option value="" disabled>Select...</option>{ISSUE_TYPES.map((t) => (<option key={t} value={t}>{t}</option>))}</select><ChevronDownIcon className="absolute right-3 top-1/2 -translate-y-1/2 h-4 w-4 text-white/40 pointer-events-none" /></div></div>
+                <div className="space-y-2"><label className="text-sm text-white/70">Please provide details: <span className="text-white/40">(optional)</span></label><textarea value={details} onChange={(e) => setDetails(e.target.value)} placeholder="What was unsatisfying about this response?" rows={3} className="w-full resize-none rounded-2xl border border-white/10 bg-white/[0.06] px-3 py-2.5 text-sm text-white placeholder:text-white/30 backdrop-blur-xl transition-colors focus:border-white/25 focus:outline-none sm:px-4 sm:py-3" /></div>
                 <p className="text-xs text-white/40 italic leading-relaxed">Submitting this report will save the feedback for future improvements to our models.</p>
                 <div className="flex items-center justify-end gap-2 pt-1"><Button variant="outline" onClick={onClose} className="h-9 sm:h-10 px-4 sm:px-5 bg-transparent border-white/20 text-white hover:bg-white/10 hover:text-white rounded-xl text-sm">Cancel</Button><Button onClick={handleSubmit} className="h-9 sm:h-10 px-5 sm:px-6 bg-white text-black hover:bg-white/90 rounded-xl font-medium text-sm">Submit</Button></div>
               </div>
@@ -644,7 +644,7 @@ export function ChatMessages({ messages, isStreaming, isThinking, onRegenerate, 
       </AnimatePresence>
       <div className="flex-1 overflow-y-auto scroll-smooth">
         <div className={cn(
-          "max-w-3xl xl:max-w-4xl mx-auto px-3 sm:px-4 md:px-6 py-3",
+          "max-w-4xl mx-auto px-4 sm:px-6 md:px-8 py-5",
           preferences.messageDensity === 'compact' ? 'space-y-3' : preferences.messageDensity === 'comfortable' ? 'space-y-8' : 'space-y-6'
         )} style={{ fontSize: `${preferences.fontSize}px` }}>
           {processedMessages.map((message, index) => {
@@ -693,7 +693,7 @@ export function ChatMessages({ messages, isStreaming, isThinking, onRegenerate, 
                     {/* Text content - NO bubble, just plain text */}
                     {message.content && message.content.trim().length > 0 && (
                       <div className={cn(
-                        'text-[13px] sm:text-sm leading-relaxed',
+                        'text-[15px] sm:text-base leading-7',
                         isAssistant ? 'text-zinc-200' : 'text-zinc-100'
                       )}>
                         <MessageContent content={message.content} />
@@ -739,8 +739,8 @@ export function ChatMessages({ messages, isStreaming, isThinking, onRegenerate, 
 
                   {/* User Avatar - Right side */}
                   {!isAssistant && (
-                    <div className="w-7 h-7 rounded-full flex items-center justify-center flex-shrink-0 overflow-hidden bg-zinc-700 mt-0">
-                      <User className="w-3.5 h-3.5 text-zinc-300" />
+                    <div className="mt-0 flex h-7 w-7 flex-shrink-0 items-center justify-center overflow-hidden rounded-full text-white/90">
+                      {preferences.profilePicture ? <img src={preferences.profilePicture} alt={preferences.profileName || 'You'} className="h-full w-full object-cover" /> : <span className="flex h-full w-full items-center justify-center bg-emerald-500/80 text-xs font-medium">{(preferences.profileName || 'U').slice(0, 1).toUpperCase()}</span>}
                     </div>
                   )}
                 </div>
@@ -758,7 +758,7 @@ export function ChatMessages({ messages, isStreaming, isThinking, onRegenerate, 
               animate={{ opacity: 1, y: 0 }} 
               className="flex gap-3 items-start"
             >
-              <div className="w-7 h-7 rounded-full flex items-center justify-center flex-shrink-0 overflow-hidden bg-zinc-800 mt-0">
+              <div className="flex h-7 w-7 flex-shrink-0 items-center justify-center overflow-hidden mt-0">
                 <MarsAvatar size={28} family={streamingFamily} useSimpleIcon />
               </div>
               <div className="flex items-center py-2">
@@ -774,7 +774,7 @@ export function ChatMessages({ messages, isStreaming, isThinking, onRegenerate, 
               animate={{ opacity: 1, y: 0 }} 
               className="flex gap-3 items-start"
             >
-              <div className="w-7 h-7 rounded-full flex items-center justify-center flex-shrink-0 overflow-hidden bg-zinc-800 mt-0">
+              <div className="flex h-7 w-7 flex-shrink-0 items-center justify-center overflow-hidden mt-0">
                 <MarsAvatar size={28} family={streamingFamily} useSimpleIcon />
               </div>
               <div className="flex items-center py-2">

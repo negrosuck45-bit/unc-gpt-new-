@@ -2,6 +2,7 @@ import type { NextRequest } from "next/server";
 
 import { auth0 } from "@/lib/auth0";
 import { getComposioSession } from "@/lib/composio";
+import { chooseUncGptRoute } from "@/lib/uncgpt-router";
 
 export const runtime = "nodejs";
 
@@ -966,6 +967,41 @@ async function executeMcpTool(
 // ============================================================
 // TOOL LOOP WITH BUILTIN TOOLS
 // ============================================================
+async function runDeterministicConnectedAction(
+  messages: any[],
+  tools: any[],
+  onStep: (step: { iteration: number; action: "tool_use"; tool: string; input: any; result: string }) => void,
+): Promise<any[]> {
+  const latestUser = [...messages].reverse().find((message) => message.role === "user");
+  const requestText = typeof latestUser?.content === "string"
+    ? latestUser.content.toLowerCase()
+    : JSON.stringify(latestUser?.content || "").toLowerCase();
+
+  const wantsRepositories = /\b(list|show|fetch|get)\b[\s\w]*(github|my)[\s\w]*(repositories|repos)\b|\b(repositories|repos)\b[\s\w]*(github|my)\b/.test(requestText);
+  if (!wantsRepositories) return messages;
+
+  const repoTool = tools.find((tool: any) =>
+    tool?.function?.name === "github_list_repos" ||
+    tool?.function?.name === "composio_github_list_repositories"
+  );
+  if (!repoTool?._exec) return messages;
+
+  try {
+    const result = await repoTool._exec({});
+    onStep({ iteration: 0, action: "tool_use", tool: repoTool.function.name, input: {}, result: String(result) });
+    return [
+      ...messages,
+      {
+        role: "assistant",
+        content: `Connected GitHub tool result for the user's request:\n${String(result).slice(0, 12000)}`,
+      },
+    ];
+  } catch (error: any) {
+    onStep({ iteration: 0, action: "tool_use", tool: repoTool.function.name, input: {}, result: `Tool error: ${error?.message || "GitHub action failed"}` });
+  }
+  return messages;
+}
+
 async function runToolLoop(
   messages: any[],
   tools: any[],
@@ -1321,8 +1357,9 @@ export async function POST(req: NextRequest) {
       webSearch,
     } = body;
 
-    const finalModel = preferredModel || model || "auto";
-    const finalProvider = preferredProvider || provider || "auto";
+    // The replacement release exposes one model only; old client model values are ignored.
+    const finalModel = "uncgpt";
+    const finalProvider = "auto";
 
     const protocol = req.headers.get("x-forwarded-proto") || "http";
     const host = req.headers.get("host");
@@ -1426,12 +1463,12 @@ export async function POST(req: NextRequest) {
     }
 
     // ==================== CHAT WITH TOOLS ====================
-    const targetModel =
-      finalModel !== "auto"
-        ? finalModel
-        : hasImage
-          ? "meta-llama/llama-4-scout-17b-16e-instruct"
-          : "llama-3.3-70b-versatile";
+    const autoRoute = finalModel === "uncgpt" || finalModel === "auto"
+      ? chooseUncGptRoute(messages, hasImage)
+      : { provider: finalProvider, model: finalModel, reason: "explicit-model" };
+    const resolvedProvider = autoRoute.provider;
+    const resolvedModel = autoRoute.model;
+    const targetModel = resolvedModel;
     const hasVisionCapability = isVisionModel(targetModel) || hasImage;
 
     const messagesWithVisionFormat = messages.map(convertMessageWithAttachments);
@@ -1478,20 +1515,43 @@ export async function POST(req: NextRequest) {
       const oauthBundle = buildOAuthTools(req, baseUrl);
       let mcpTools: any[] = [];
       let composioTools: any[] = [];
+      let composioSession: any = null;
       const activeMcpConnectors = Array.isArray(mcpConnectors) ? [...mcpConnectors] : [];
       try {
         const session = await auth0.getSession();
         if (session?.user?.sub) {
-          const composioSession = await getComposioSession(session.user.sub);
+          composioSession = await getComposioSession(session.user.sub);
           if (composioSession) {
             const nativeTools: any[] = await composioSession.tools();
-            composioTools = nativeTools.map((tool: any) => ({
-              ...tool,
-              _exec: async (args: any) => {
-                const result = await composioSession.execute(tool.function.name, args || {});
+            composioTools = nativeTools
+              .filter((tool: any) => tool?.function?.name && tool?.function?.parameters)
+              .map((tool: any) => ({
+                type: "function",
+                function: {
+                  name: String(tool.function.name).replace(/[^a-zA-Z0-9_-]/g, "_").slice(0, 64),
+                  description: tool.function.description || tool.function.name,
+                  parameters: tool.function.parameters,
+                },
+                _composioSlug: tool.function.name,
+                _exec: async (args: any) => {
+                  const result = await composioSession.execute(tool.function.name, args || {});
+                  return typeof result === "string" ? result : JSON.stringify(result);
+                },
+              }));
+
+            // Keep a stable, model-friendly alias for the common GitHub read action.
+            composioTools.push({
+              type: "function",
+              function: {
+                name: "composio_github_list_repositories",
+                description: "List the authenticated user's GitHub repositories using the connected GitHub account.",
+                parameters: { type: "object", properties: {} },
+              },
+              _exec: async () => {
+                const result = await composioSession.execute("GITHUB_LIST_REPOS", {});
                 return typeof result === "string" ? result : JSON.stringify(result);
               },
-            }));
+            });
           }
         }
       } catch (error) {
@@ -1510,6 +1570,11 @@ export async function POST(req: NextRequest) {
       availableTools = combinedTools;
 
       if (combinedTools.length > 0) {
+        messagesWithSystem = await runDeterministicConnectedAction(
+          messagesWithSystem,
+          combinedTools,
+          (s) => toolSteps.push(s),
+        );
         messagesWithSystem = await runToolLoop(
           messagesWithSystem,
           combinedTools,
@@ -1525,14 +1590,14 @@ export async function POST(req: NextRequest) {
     let result: { stream: ReadableStream; provider: string; model: string };
 
     try {
-      if (finalProvider === "groq" || GROQ_CHAT_MODELS[finalModel]) {
-        result = await callGroq(messagesWithSystem, finalModel, hasImage, availableTools);
-      } else if (finalProvider === "openrouter") {
+      if (resolvedProvider === "groq" || GROQ_CHAT_MODELS[resolvedModel]) {
+        result = await callGroq(messagesWithSystem, resolvedModel, hasImage, availableTools);
+      } else if (resolvedProvider === "openrouter") {
         result = await callOpenRouter(messagesWithSystem, hasImage, availableTools);
-      } else if (finalProvider === "cloudflare" || finalModel.startsWith("@cf/")) {
+      } else if (resolvedProvider === "cloudflare" || resolvedModel.startsWith("@cf/")) {
         result = await callChatWorkers(
           { task: "chat", messages: messagesWithSystem },
-          finalModel,
+          resolvedModel,
           hasImage,
           availableTools
         );

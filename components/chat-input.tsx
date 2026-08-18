@@ -1,6 +1,7 @@
 'use client'
 
 import React, { useMemo, useState, useRef, useEffect, useCallback } from 'react'
+import { createPortal } from 'react-dom'
 import { Button } from '@/components/ui/button'
 import {
   ArrowUp,
@@ -20,6 +21,9 @@ import {
   Puzzle,
   Check,
   Loader2,
+  Camera,
+  Monitor,
+  Presentation,
 } from 'lucide-react'
 import { motion, AnimatePresence } from 'framer-motion'
 import { cn } from '@/lib/utils'
@@ -239,6 +243,7 @@ export function ChatInput({
   const [isRecording, setIsRecording] = useState(false)
   const [isUploading, setIsUploading] = useState(false)
   const [attachMenuOpen, setAttachMenuOpen] = useState(false)
+  const [sheetExpanded, setSheetExpanded] = useState(false)
   const [iconErrors, setIconErrors] = useState<Set<string>>(new Set())
   const [viewingAttachment, setViewingAttachment] = useState<Attachment | null>(null)
   const [uploadStatus, setUploadStatus] = useState<Map<string, { status: 'uploading' | 'completed' | 'error', progress?: number, url?: string }>>(new Map())
@@ -276,6 +281,12 @@ export function ChatInput({
   const handleModelChange = (model: ModelInfo) => {
     updateSettings({ model: model.value, provider: model.provider })
     if (currentChat) updateChatModel(currentChat.id, model.value, model.provider)
+  }
+
+  const handleQuickAction = (prompt: string) => {
+    setAttachMenuOpen(false)
+    setInput(prompt)
+    requestAnimationFrame(() => textareaRef.current?.focus())
   }
 
   function ModelIcon({ family }: { family: string }) {
@@ -546,7 +557,7 @@ export function ChatInput({
   const hasUploadingImages = Array.from(uploadStatus.values()).some(status => status.status === 'uploading')
 
   return (
-    <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} className="bg-background">
+    <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} className="bg-transparent">
       <AnimatePresence>
         {toast && (
           <ToastNotification 
@@ -614,7 +625,7 @@ export function ChatInput({
         </AnimatePresence>
 
         <div className="px-3">
-          <div className="rounded-2xl border border-border bg-muted/30 focus-within:ring-2 focus-within:ring-primary/30 transition-all">
+          <div className="rounded-[28px] border border-white/12 bg-white/[0.065] shadow-[0_12px_42px_rgba(0,0,0,0.24)] backdrop-blur-2xl transition-all duration-200 focus-within:border-white/25 focus-within:bg-white/[0.085] focus-within:shadow-[0_16px_48px_rgba(0,0,0,0.32)]">
             <textarea
               ref={textareaRef}
               value={input}
@@ -622,65 +633,104 @@ export function ChatInput({
               onPaste={handlePasteEvent}
               onKeyDown={handleKeyDown}
               placeholder="Write a message... (paste images directly!)"
-              className="w-full bg-transparent px-4 pt-3 pb-2 resize-none focus:outline-none min-h-[52px]"
+              className="w-full bg-transparent px-5 pt-4 pb-2 resize-none text-[15px] leading-6 placeholder:text-white/35 focus:outline-none min-h-[54px]"
               disabled={disabled}
               rows={1}
             />
 
-            <div className="flex items-center justify-between px-2 pb-2">
+            <div className="flex items-center justify-between px-3 pb-3">
               <div className="flex items-center gap-1">
-                <Popover open={attachMenuOpen} onOpenChange={setAttachMenuOpen}>
-                  <PopoverTrigger asChild>
-                    <Button size="icon" variant="ghost" className="h-8 w-8 rounded-full" disabled={isStreaming || disabled}>
-                      <Plus className="h-5 w-5" />
-                    </Button>
-                  </PopoverTrigger>
-                  <PopoverContent align="start" className="w-56 p-1">
-                    <button onClick={() => imageInputRef.current?.click()} className="flex w-full items-center gap-3 px-3 py-2 rounded-lg hover:bg-accent text-sm">
-                      <ImageIcon className="h-4 w-4 shrink-0" /> Images
-                    </button>
-                    <button onClick={() => fileInputRef.current?.click()} className="flex w-full items-center gap-3 px-3 py-2 rounded-lg hover:bg-accent text-sm">
-                      <Paperclip className="h-4 w-4 shrink-0" /> Files
-                    </button>
-                    <button onClick={() => { setShowLinkInput(true); setAttachMenuOpen(false) }} className="flex w-full items-center gap-3 px-3 py-2 rounded-lg hover:bg-accent text-sm">
-                      <Globe className="h-4 w-4 shrink-0" /> Link
-                    </button>
-                  </PopoverContent>
-                </Popover>
+                <button
+                  type="button"
+                  onClick={() => { setAttachMenuOpen((open) => !open); setSheetExpanded(false) }}
+                  disabled={isStreaming || disabled}
+                  aria-label="Add photos, files, or links"
+                  className="group flex h-9 w-9 items-center justify-center rounded-xl border border-white/[0.12] bg-white/[0.055] text-white/65 shadow-[inset_0_1px_0_rgba(255,255,255,0.09),0_4px_16px_rgba(0,0,0,0.14)] backdrop-blur-xl transition-all hover:border-white/[0.20] hover:bg-white/[0.11] hover:text-white active:scale-[0.94] disabled:opacity-40"
+                >
+                  <Plus className="h-5 w-5" />
+                </button>
+
+                {typeof document !== 'undefined' && createPortal(
+                  <AnimatePresence>
+                    {attachMenuOpen && (
+                    <motion.div
+                      initial={{ opacity: 0 }}
+                      animate={{ opacity: 1 }}
+                      exit={{ opacity: 0 }}
+                      className="fixed inset-0 z-[80] bg-black/[0.70] backdrop-blur-[10px]"
+                      onClick={() => { setAttachMenuOpen(false); setSheetExpanded(false) }}
+                    >
+                      <motion.div
+                        initial={{ y: 56, opacity: 0, height: '42dvh' }}
+                        animate={{ y: 0, opacity: 1, height: sheetExpanded ? '82dvh' : '42dvh' }}
+                        exit={{ y: 56, opacity: 0 }}
+                        drag="y"
+                        dragConstraints={{ top: 0, bottom: 0 }}
+                        dragElastic={0.12}
+                        dragTransition={{ bounceStiffness: 620, bounceDamping: 38 }}
+                        onDragEnd={(_, info) => {
+                          if (info.offset.y < -28 || info.velocity.y < -160) setSheetExpanded(true)
+                          else if (info.offset.y > 28 || info.velocity.y > 160) {
+                            setSheetExpanded(false)
+                            setAttachMenuOpen(false)
+                          }
+                        }}
+                        transition={{
+                          height: { type: 'spring', stiffness: 420, damping: 34, mass: 0.5 },
+                          y: { type: 'spring', stiffness: 620, damping: 38, mass: 0.45 },
+                          opacity: { duration: 0.1, ease: 'easeOut' },
+                        }}
+                        onClick={(event) => event.stopPropagation()}
+                        style={{ willChange: 'height, transform', touchAction: 'none' }}
+                        className="absolute bottom-0 left-0 right-0 flex max-h-[82dvh] flex-col overflow-hidden rounded-t-[30px] rounded-b-none border-x-0 border-b-0 border-t border-white/[0.18] bg-[#1a1a20]/[0.90] p-4 pb-[max(1.25rem,env(safe-area-inset-bottom))] shadow-[0_-24px_90px_rgba(0,0,0,0.64),inset_0_1px_0_rgba(255,255,255,0.08)] backdrop-blur-[36px] sm:bottom-6 sm:left-1/2 sm:right-auto sm:h-auto sm:max-h-[min(680px,calc(100dvh-4rem))] sm:w-[360px] sm:-translate-x-1/2 sm:rounded-[30px] sm:border sm:border-white/[0.18] sm:p-5"
+                      >
+                        <div className="shrink-0" style={{ touchAction: 'pan-y' }}>
+                        <button
+                          type="button"
+                          aria-label={sheetExpanded ? 'Collapse attachment sheet' : 'Expand attachment sheet'}
+                          onClick={() => setSheetExpanded((expanded) => !expanded)}
+                          className="mx-auto mb-4 block h-1.5 w-12 cursor-pointer rounded-full border-0 bg-white/25 p-0 shadow-[0_1px_4px_rgba(0,0,0,0.25)] transition hover:bg-white/45 sm:hidden"
+                        />
+                        <div className="mb-4 flex items-center justify-between">
+                          <h3 className="text-lg font-semibold text-white">Photos</h3>
+                          <button type="button" onClick={() => imageInputRef.current?.click()} className="text-sm font-medium text-blue-300 hover:text-blue-200">See all</button>
+                        </div>
+                        <div className="mb-5 flex gap-2 overflow-x-auto pb-1">
+                          <button type="button" onClick={() => imageInputRef.current?.click()} className="flex h-32 w-32 shrink-0 flex-col items-center justify-center gap-3 rounded-[22px] border border-white/[0.08] bg-white/[0.085] text-white/90 shadow-[inset_0_1px_0_rgba(255,255,255,0.07)] backdrop-blur-xl transition hover:bg-white/[0.13]">
+                            <Camera className="h-8 w-8" strokeWidth={1.8} />
+                            <span className="text-sm font-medium">Camera</span>
+                          </button>
+                          {imageAttachments.map((attachment) => (
+                            <div key={attachment.id} className="relative h-32 w-32 shrink-0 overflow-hidden rounded-[22px] border border-white/12 bg-white/[0.06]">
+                              <img src={attachment.url} alt={attachment.name} className="h-full w-full object-cover" />
+                            </div>
+                          ))}
+                          <button type="button" onClick={() => imageInputRef.current?.click()} className="flex h-32 w-32 shrink-0 flex-col items-center justify-center gap-3 rounded-[22px] border border-white/[0.12] bg-white/[0.055] text-white/70 shadow-[inset_0_1px_0_rgba(255,255,255,0.05)] backdrop-blur-xl transition hover:bg-white/[0.10]">
+                            <ImageIcon className="h-7 w-7" strokeWidth={1.8} />
+                            <span className="text-sm">Choose photos</span>
+                          </button>
+                        </div>
+                        </div>
+                        <div className="min-h-0 flex-1 overflow-y-auto overscroll-contain border-t border-white/[0.12] pt-3" style={{ WebkitOverflowScrolling: 'touch' }}>
+                          <button type="button" onClick={() => fileInputRef.current?.click()} className="flex min-h-12 w-full items-center gap-4 rounded-2xl px-3 text-[15px] text-white/90 transition hover:bg-white/[0.08]"><Paperclip className="h-6 w-6 text-white/75" /> Add files</button>
+                          <button type="button" onClick={() => handleQuickAction('Connect my computer and show me what is available.')} className="flex min-h-12 w-full items-center gap-4 rounded-2xl px-3 text-[15px] text-white/90 transition hover:bg-white/[0.08]"><Monitor className="h-6 w-6 text-white/75" /> Connect My Computer</button>
+                          <button type="button" onClick={() => handleQuickAction('Help me choose and use a skill for this task.')} className="flex min-h-12 w-full items-center gap-4 rounded-2xl px-3 text-[15px] text-white/90 transition hover:bg-white/[0.08]"><Puzzle className="h-6 w-6 text-white/75" /> Add Skills</button>
+                          <button type="button" onClick={() => handleQuickAction('Build a website for me.')} className="flex min-h-12 w-full items-center gap-4 rounded-2xl px-3 text-[15px] text-white/90 transition hover:bg-white/[0.08]"><LayoutGrid className="h-6 w-6 text-white/75" /> Build website</button>
+                          <button type="button" onClick={() => handleQuickAction('Create a slide presentation for me.')} className="flex min-h-12 w-full items-center gap-4 rounded-2xl px-3 text-[15px] text-white/90 transition hover:bg-white/[0.08]"><Presentation className="h-6 w-6 text-white/75" /> Create slides</button>
+                          <button type="button" onClick={() => handleQuickAction('Create an image for me.')} className="flex min-h-12 w-full items-center gap-4 rounded-2xl px-3 text-[15px] text-white/90 transition hover:bg-white/[0.08]"><ImageIcon className="h-6 w-6 text-white/75" /> Create image</button>
+                        </div>
+                      </motion.div>
+                    </motion.div>
+                    )}
+                  </AnimatePresence>,
+                  document.body
+                )}
               </div>
 
               <div className="flex items-center gap-1">
-                <DropdownMenu>
-                    <DropdownMenuTrigger asChild disabled={disabled}>
-                    <Button variant="ghost" size="sm" className="gap-1.5 h-8 px-2" disabled={disabled}>
-                      <span className="text-xs font-medium">{currentModel.label}</span>
-                      <ChevronDown className="h-3 w-3" />
-                    </Button>
-                  </DropdownMenuTrigger>
-                  <DropdownMenuContent align="end" className="w-64 max-h-80 overflow-y-auto">
-                    {Object.entries(modelsByFamily).map(([family, models]) => (
-                      <div key={family}>
-                        <DropdownMenuLabel className="text-xs uppercase text-muted-foreground">
-                          {family === 'auto' ? 'Automatic' : family}
-                        </DropdownMenuLabel>
-                        {models.map((model) => (
-                          <DropdownMenuItem
-                            key={model.value}
-                            onClick={() => handleModelChange(model)}
-                            className={cn("flex items-center gap-2", currentModel.value === model.value && "bg-accent")}
-                          >
-                            <ModelIcon family={model.family} />
-                            <div className="flex-1 min-w-0">
-                              <div className="text-sm font-medium">{model.label}</div>
-                              <div className="text-xs text-muted-foreground truncate">{model.description}</div>
-                            </div>
-                          </DropdownMenuItem>
-                        ))}
-                        <DropdownMenuSeparator />
-                      </div>
-                    ))}
-                  </DropdownMenuContent>
-                </DropdownMenu>
+                <div className="flex h-8 items-center gap-1.5 rounded-full border border-white/10 bg-white/[0.05] px-3 text-xs font-medium text-white/60" aria-label="Automatic model routing">
+                  <span>uncgpt</span>
+                </div>
 
                 {isStreaming ? (
                   <Button onClick={onStop} size="icon" variant="destructive" className="h-9 w-9 rounded-full">
@@ -692,7 +742,7 @@ export function ChatInput({
                       onClick={handleSubmit} 
                       disabled={isStreaming || disabled || hasUploadingImages} 
                       size="icon" 
-                      className="h-9 w-9 rounded-full bg-primary hover:bg-primary/90"
+                      className="h-9 w-9 rounded-full bg-white text-black shadow-lg shadow-black/20 hover:bg-white/90"
                     >
                       {hasUploadingImages ? <Loader2 className="h-4 w-4 animate-spin" /> : <ArrowUp className="h-4 w-4" />}
                     </Button>

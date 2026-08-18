@@ -33,7 +33,7 @@ export async function getComposioConnector(userId: string): Promise<ComposioConn
     id: `composio_${userId}`.replace(/[^a-zA-Z0-9_]/g, "_").slice(0, 48),
     name: "Composio",
     url: session.mcp.url,
-    headers: session.mcp.headers || { "x-api-key": apiKey },
+    headers: session.mcp.headers || {},
     type: "http",
     enabled: true,
   };

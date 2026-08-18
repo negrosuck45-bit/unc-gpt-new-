@@ -307,3 +307,36 @@ select {
   overflow: hidden;
   border-top: 1px solid var(--border);
 }
+
+/* ── Premium workspace polish ── */
+::selection {
+  background: rgba(139, 92, 246, 0.35);
+  color: white;
+}
+
+button,
+a,
+textarea,
+input {
+  -webkit-tap-highlight-color: transparent;
+}
+
+textarea {
+  caret-color: #c4b5fd;
+}
+
+.chat-messages-container {
+  scroll-behavior: smooth;
+  overscroll-behavior-y: contain;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
+}

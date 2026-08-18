@@ -85,175 +85,14 @@ export interface ModelInfo {
 
 // ====================== MODEL DEFINITIONS ======================
 export const MODELS: ModelInfo[] = [
-  // ============ AUTO MODE (Top Priority) ============
   {
-    value: "auto",
-    label: " Auto ",
+    value: "uncgpt",
+    label: "uncgpt",
     provider: "auto",
     family: "auto",
     free: true,
-    description: "Automatically selects the best model for your task",
+    description: "Automatically routes each task to the best available model and connected tools",
     icon: "auto",
-  },
-
-  // ============ DEEPSEEK MODELS (Cloudflare) - NEW ============
-  {
-    value: "@cf/deepseek-ai/deepseek-r1-distill-qwen-32b",
-    label: "DeepSeek R1 32B",
-    provider: "cloudflare",
-    family: "deepseek",
-    free: true,
-    description: "Reasoning model distilled from DeepSeek-R1, excellent for logic",
-    icon: "deepseek",
-  },
-
-  // ============ QWEN MODELS (Cloudflare) - UPDATED ============
-  {
-    value: "@cf/qwen/qwq-32b",
-    label: "QwQ 32B",
-    provider: "cloudflare",
-    family: "qwen",
-    free: true,
-    description: "Experimental reasoning model with advanced thinking capabilities",
-    icon: "qwen",
-  },
-  {
-    value: "@cf/qwen/qwen2.5-coder-32b-instruct",
-    label: "Qwen 2.5 Coder",
-    provider: "cloudflare",
-    family: "qwen",
-    free: true,
-    description: "Specialized model for high-performance coding and technical tasks",
-    icon: "qwen",
-  },
-  {
-    value: "@cf/qwen/qwen3-30b-a3b-fp8",
-    label: "Qwen 3.6",
-    provider: "cloudflare",
-    family: "qwen",
-    free: true,
-    description: "Latest Qwen 3.6 model for agentic coding and thinking",
-    icon: "qwen",
-  },
-  {
-    value: "@cf/qwen/qwen1.5-14b-chat-awq",
-    label: "Qwen 1.5",
-    provider: "cloudflare",
-    family: "qwen",
-    free: true,
-    description: "Efficient and capable general-purpose Qwen model",
-    icon: "qwen",
-  },
-
-  // ============ GEMMA MODELS (Cloudflare) - NEW ============
-  {
-    value: "@cf/google/gemma-4-26b-a4b-it",
-    label: "Gemma 4 26B",
-    provider: "cloudflare",
-    family: "gemma",
-    free: true,
-    description: "Google's latest lightweight open model with strong reasoning",
-    icon: "gemma",
-  },
-
-  // ============ GPT-OSS MODELS (Cloudflare) - NEW ============
-  {
-    value: "@cf/a-lab/gpt-oss-120b",
-    label: "GPT-OSS 120B",
-    provider: "cloudflare",
-    family: "gpt-oss",
-    free: true,
-    description: "Massive open-source scale model for complex tasks",
-    icon: "gpt-oss",
-  },
-
-  // ============ GLM MODELS (Cloudflare) - NEW ============
-  {
-    value: "@cf/zhipuai/glm-4.7-flash",
-    label: "GLM 4.7 Flash",
-    provider: "cloudflare",
-    family: "glm",
-    free: true,
-    description: "Fast and efficient model with excellent bilingual capabilities",
-    icon: "glm",
-  },
-
-  // ============ KIWI MODELS (Cloudflare - Moonshot AI) - FEATURED ============
-  {
-    value: "@cf/moonshot/kimi-k2.6",
-    label: "Kimi K2.6",
-    provider: "cloudflare",
-    family: "kiwi",
-    free: true,
-    description: "Latest 1T parameter model with superior reasoning & vision",
-    icon: "kiwi",
-  },
-  {
-    value: "@cf/moonshot/kimi-k2.5",
-    label: "Kimi K2.5",
-    provider: "cloudflare",
-    family: "kiwi",
-    free: true,
-    description: "Frontier-scale model with multi-turn tool calling & vision",
-    icon: "kiwi",
-  },
-
-  // ============ CLAUDE MODELS (Cloudflare) ============
-  {
-    value: "@cf/anthropic/claude-3-opus",
-    label: "Claude 3 Opus",
-    provider: "cloudflare",
-    family: "claude",
-    free: true,
-    description: "Most powerful and intelligent model in the Claude 3 family",
-    icon: "claude",
-  },
-  {
-    value: "@cf/anthropic/claude-3-sonnet",
-    label: "Claude 3 Sonnet",
-    provider: "cloudflare",
-    family: "claude",
-    free: true,
-    description: "Offers a balance between intelligence and speed",
-    icon: "claude",
-  },
-  {
-    value: "@cf/anthropic/claude-3-haiku",
-    label: "Claude 3 Haiku",
-    provider: "cloudflare",
-    family: "claude",
-    free: true,
-    description: "Fastest and most compact model in the Claude 3 family",
-    icon: "claude",
-  },
-
-  // ============ LLAMA MODELS (Groq) ============
-  {
-    value: "llama-3.3-70b-versatile",
-    label: "Llama 3.3 70B",
-    provider: "groq",
-    family: "llama",
-    free: true,
-    description: "Best for general tasks, fast & uncensored",
-    icon: "llama",
-  },
-  {
-    value: "llama-3.1-8b-instant",
-    label: "Llama 3.1 8B",
-    provider: "groq",
-    family: "llama",
-    free: true,
-    description: "Fastest responses, lightweight tasks",
-    icon: "llama",
-  },
-  {
-    value: "meta-llama/llama-4-scout-17b-16e-instruct",
-    label: "Llama 4 Scout 17B",
-    provider: "groq",
-    family: "llama",
-    free: true,
-    description: "Vision-capable, great for images + text",
-    icon: "llama",
   },
 ];
 
@@ -383,7 +222,7 @@ export const useChatStore = create<ChatStore>()(
       streamingChatId: null,
       settings: {
         provider: "auto",
-        model: "auto",
+        model: "uncgpt",
       },
       setCurrentChat: (id) => set({ currentChatId: id }),
       createNewChat: (type = "text", projectId, model, provider) => {
@@ -394,8 +233,8 @@ export const useChatStore = create<ChatStore>()(
           messages: [],
           createdAt: new Date(),
           projectId: projectId ?? get().currentProjectId ?? null,
-          model: model ?? get().settings.model,
-          provider: provider ?? get().settings.provider,
+          model: "uncgpt",
+          provider: "auto",
         };
         set((state) => ({
           chats: [newChat, ...state.chats],
@@ -471,10 +310,10 @@ export const useChatStore = create<ChatStore>()(
           ),
         }));
       },
-      updateChatModel: (chatId, model, provider) => {
+      updateChatModel: (chatId) => {
         set((state) => ({
           chats: state.chats.map((chat) =>
-            chat.id === chatId ? { ...chat, model, provider } : chat,
+            chat.id === chatId ? { ...chat, model: "uncgpt", provider: "auto" } : chat,
           ),
         }));
       },

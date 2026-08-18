@@ -10,6 +10,8 @@ export interface UserPreferences {
   messageDensity: MessageDensity
   debugMode: boolean
   experimentalFeatures: boolean
+  profileName: string
+  profilePicture: string
 }
 
 export const DEFAULT_USER_PREFERENCES: UserPreferences = {
@@ -22,6 +24,8 @@ export const DEFAULT_USER_PREFERENCES: UserPreferences = {
   messageDensity: 'normal',
   debugMode: false,
   experimentalFeatures: false,
+  profileName: '',
+  profilePicture: '',
 }
 
 const STORAGE_KEY = 'user-preferences'

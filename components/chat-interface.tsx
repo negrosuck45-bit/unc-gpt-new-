@@ -311,7 +311,7 @@ export function ChatInterface({ onSwitchToImagine, onOpenSidebar, isSidebarOpen 
   const hasMessages = currentChat && currentChat.messages.length > 0;
 
   return (
-    <div className="flex flex-col h-full bg-background relative overflow-hidden">
+    <div className="relative flex h-full flex-col overflow-hidden bg-[#08080b] text-foreground">
       <ChatHeader
         project={currentProject}
         chat={currentChat}
@@ -332,8 +332,8 @@ export function ChatInterface({ onSwitchToImagine, onOpenSidebar, isSidebarOpen 
             />
           </div>
 
-          <div className="w-full flex-shrink-0 bg-gradient-to-t from-background via-background to-transparent pb-4 pt-2">
-            <div className="max-w-3xl mx-auto w-full px-4">
+          <div className="w-full flex-shrink-0 bg-gradient-to-t from-[#08080b] via-[#08080b]/95 to-transparent pb-5 pt-3">
+            <div className="mx-auto w-full max-w-4xl px-2 sm:px-4">
               <ChatInput
                 onSend={handleSend}
                 onStop={() => abortControllerRef.current?.abort()}
@@ -350,7 +350,7 @@ export function ChatInterface({ onSwitchToImagine, onOpenSidebar, isSidebarOpen 
           </div>
 
           <div className="flex-shrink-0 pb-5 sm:pb-8">
-            <div className="max-w-3xl mx-auto w-full px-4">
+            <div className="mx-auto w-full max-w-4xl px-2 sm:px-4">
               <ChatInput
                 onSend={handleSend}
                 onStop={() => abortControllerRef.current?.abort()}

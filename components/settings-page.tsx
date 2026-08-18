@@ -11,9 +11,9 @@ import {
   Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
 } from '@/components/ui/select';
 import {
-  Settings, Brain, Smartphone, Trash2, Sun, Moon, X,
+  Settings, Smartphone, Trash2, Sun, Moon, X,
   Palette, Shield, Zap, Key, Download, RefreshCw, Sparkles,
-  Eye, EyeOff, Puzzle, PlugZap, Volume2,
+  Eye, EyeOff, Puzzle, PlugZap, Volume2, UserCircle, LogOut, Database, ChevronRight,
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { cn } from '@/lib/utils';
@@ -25,7 +25,7 @@ import { playReplySound, unlockReplySound } from '@/lib/notifications';
 
 interface SettingsPageProps { onClose?: () => void; }
 
-type SettingsTab = 'general' | 'models' | 'connectors' | 'skills' | 'memory' | 'privacy' | 'appearance' | 'advanced';
+type SettingsTab = string;
 
 export function SettingsPage({ onClose }: SettingsPageProps) {
   const { settings, updateSettings, clearAllChats, getCurrentChat, projects, chats } = useChatStore();
@@ -44,11 +44,15 @@ export function SettingsPage({ onClose }: SettingsPageProps) {
   const [messageDensity, setMessageDensity] = useState<MessageDensity>(DEFAULT_USER_PREFERENCES.messageDensity);
   const [debugMode, setDebugMode] = useState(DEFAULT_USER_PREFERENCES.debugMode);
   const [experimentalFeatures, setExperimentalFeatures] = useState(DEFAULT_USER_PREFERENCES.experimentalFeatures);
+  const [authUser, setAuthUser] = useState<{ name?: string | null; email?: string | null; picture?: string | null } | null>(null);
+  const [profileName, setProfileName] = useState('');
+  const [profilePicture, setProfilePicture] = useState('');
 
   const currentChat = getCurrentChat();
   const isLocked = false;
 
   useEffect(() => {
+    fetch('/api/auth/me', { cache: 'no-store' }).then((response) => response.ok ? response.json() : null).then((payload) => setAuthUser(payload?.user ?? null)).catch(() => setAuthUser(null));
     const p = readUserPreferences();
     setStreamingEnabled(p.streaming);
     setAutoScroll(p.autoScroll);
@@ -59,6 +63,8 @@ export function SettingsPage({ onClose }: SettingsPageProps) {
     setMessageDensity(p.messageDensity);
     setDebugMode(p.debugMode);
     setExperimentalFeatures(p.experimentalFeatures);
+    setProfileName(p.profileName || '');
+    setProfilePicture(p.profilePicture || '');
   }, []);
 
   const handleSave = () => {
@@ -80,24 +86,20 @@ export function SettingsPage({ onClose }: SettingsPageProps) {
 
   const tabs: { id: SettingsTab; label: string; icon: React.ReactNode }[] = [
     { id: 'general',    label: 'General',    icon: <Settings className="h-4 w-4" /> },
-    { id: 'models',     label: 'Models',     icon: <Zap className="h-4 w-4" /> },
+    { id: 'profile',    label: 'Profile',    icon: <UserCircle className="h-4 w-4" /> },
+    { id: 'data',       label: 'Data',       icon: <Database className="h-4 w-4" /> },
     { id: 'connectors', label: 'Connectors', icon: <PlugZap className="h-4 w-4" /> },
-    { id: 'skills',     label: 'Skills',     icon: <Puzzle className="h-4 w-4" /> },
-    { id: 'memory',     label: 'Memory',     icon: <Brain className="h-4 w-4" /> },
-    { id: 'privacy',    label: 'Privacy',    icon: <Shield className="h-4 w-4" /> },
-    { id: 'appearance', label: 'Appearance', icon: <Palette className="h-4 w-4" /> },
-    { id: 'advanced',   label: 'Advanced',   icon: <Sparkles className="h-4 w-4" /> },
   ];
 
   return (
-    <div className="w-full max-w-5xl mx-auto bg-black/65 supports-[backdrop-filter]:bg-white/[0.07] supports-[backdrop-filter]:backdrop-blur-[30px] rounded-[28px] border border-white/15 shadow-[0_24px_90px_rgba(0,0,0,0.5)] overflow-hidden pb-[env(safe-area-inset-bottom)]">
+    <div className="w-full max-w-none sm:max-w-5xl mx-auto min-h-[calc(100dvh-env(safe-area-inset-top))] bg-[#202023]/[0.98] supports-[backdrop-filter]:backdrop-blur-[30px] rounded-t-[30px] rounded-b-none sm:rounded-[28px] border border-white/10 shadow-[0_24px_90px_rgba(0,0,0,0.5)] overflow-hidden pb-[env(safe-area-inset-bottom)]">
       {/* Header */}
-      <div className="flex items-center justify-between px-4 sm:px-6 py-4 border-b border-white/10 bg-white/[0.035]">
-        <h1 className="text-xl font-semibold">Settings</h1>
+      <div className="flex items-center justify-between px-5 sm:px-6 py-4 bg-transparent">
+        <h1 className="text-[19px] font-medium tracking-tight">Settings</h1>
         <Button variant="ghost" size="icon" onClick={onClose}><X className="h-5 w-5" /></Button>
       </div>
 
-      <div className="flex min-h-[560px] flex-col sm:flex-row">
+      <div className="flex min-h-[calc(100dvh-72px)] flex-col sm:min-h-[560px] sm:flex-row">
         {/* Sidebar */}
         <div className="w-full sm:w-52 shrink-0 border-b sm:border-b-0 sm:border-r border-white/10 bg-white/[0.025] p-2 sm:p-3 overflow-x-auto">
             <nav className="flex sm:block gap-1 min-w-max sm:min-w-0">
@@ -106,7 +108,7 @@ export function SettingsPage({ onClose }: SettingsPageProps) {
                 key={tab.id}
                 onClick={() => setActiveTab(tab.id)}
                 className={cn(
-                  'w-full flex items-center gap-2 px-3 py-2 rounded-lg text-sm transition-colors whitespace-nowrap',
+                  'w-full flex items-center gap-2 px-3 py-2.5 rounded-xl text-[13px] transition-colors whitespace-nowrap',
                   activeTab === tab.id
                     ? 'bg-primary text-primary-foreground'
                     : 'text-muted-foreground hover:text-foreground hover:bg-accent/50'
@@ -120,7 +122,7 @@ export function SettingsPage({ onClose }: SettingsPageProps) {
         </div>
 
         {/* Content */}
-        <div className="flex-1 min-w-0 overflow-y-auto p-4 sm:p-6 bg-zinc-950/65">
+        <div className="flex-1 min-w-0 overflow-y-auto px-5 pb-8 pt-4 sm:p-6 bg-transparent">
           <AnimatePresence mode="wait">
             <motion.div
               key={activeTab}
@@ -155,6 +157,42 @@ export function SettingsPage({ onClose }: SettingsPageProps) {
                   <SettingRow label="Streaming Responses" description="Show response text live or wait until the reply is complete">
                     <Switch checked={streamingEnabled} onCheckedChange={(value) => { setStreamingEnabled(value); writeUserPreferences({ streaming: value }) }} />
                   </SettingRow>
+                </div>
+              )}
+
+              {/* ── Profile ─────────────────────────────────────────────── */}
+              {activeTab === 'profile' && (
+                <div className="space-y-5">
+                  <SectionTitle title="Profile" description="Your signed-in Google/Auth0 identity" />
+                  <div className="rounded-[22px] border border-white/[0.14] bg-white/[0.075] p-4 shadow-[inset_0_1px_0_rgba(255,255,255,0.07),0_12px_34px_rgba(0,0,0,0.18)]">
+                    <div className="flex items-center gap-3">
+                      {profilePicture ? <img src={profilePicture} alt="Your profile" className="h-12 w-12 rounded-full object-cover" /> : <div className="flex h-12 w-12 items-center justify-center rounded-full bg-emerald-500/80 text-xl font-medium">{(profileName || authUser?.name || authUser?.email || 'U').slice(0, 1).toUpperCase()}</div>}
+                      <div className="min-w-0 flex-1"><p className="mb-2 text-xs font-medium uppercase tracking-[0.14em] text-white/45">Your profile</p><input value={profileName} onChange={(event) => { setProfileName(event.target.value); writeUserPreferences({ profileName: event.target.value }) }} placeholder={authUser?.name || 'Display name'} className="w-full bg-transparent text-base font-medium text-white outline-none placeholder:text-white/45" /></div>
+                      <label className="cursor-pointer rounded-full border border-white/15 bg-white/[0.06] px-3 py-1.5 text-xs text-white/70 transition hover:bg-white/[0.12]">Change photo<input type="file" accept="image/*" className="hidden" onChange={(event) => { const file = event.target.files?.[0]; if (!file) return; const reader = new FileReader(); reader.onload = () => { const value = String(reader.result || ''); setProfilePicture(value); writeUserPreferences({ profilePicture: value }) }; reader.readAsDataURL(file) }} /></label>
+                    </div>
+                  </div>
+                  <div className="rounded-[22px] border border-white/[0.12] bg-white/[0.045] p-4">
+                    <div className="flex items-center gap-3">
+                      {authUser?.picture ? <img src={authUser.picture} alt="" className="h-10 w-10 rounded-full object-cover" /> : <div className="flex h-10 w-10 items-center justify-center rounded-full bg-white/10 text-lg font-medium">{(authUser?.name || authUser?.email || 'U').slice(0, 1).toUpperCase()}</div>}
+                      <div className="min-w-0 flex-1"><p className="text-xs font-medium uppercase tracking-[0.14em] text-white/45">Connected account</p><p className="truncate text-sm text-white/80">{authUser?.email || 'Authenticated with Auth0'}</p></div>
+                      <GoogleMark />
+                    </div>
+                  </div>
+                  <ProfileRow label="Name" value={authUser?.name || 'Not provided'} />
+                  <ProfileRow label="Email address" value={authUser?.email || 'Hidden'} />
+                  <ProfileRow label="Phone number" value="—" />
+                  <div className="flex items-center justify-between border-t border-white/[0.10] pt-4"><span className="text-sm">Log out of all devices</span><a href="/auth/logout" className="rounded-full border border-red-300/50 px-4 py-2 text-sm text-red-200 transition hover:bg-red-400/10">Log out</a></div>
+                </div>
+              )}
+
+              {/* ── Data ────────────────────────────────────────────────── */}
+              {activeTab === 'data' && (
+                <div className="space-y-5">
+                  <SectionTitle title="Data" description="Manage privacy and local chat data" />
+                  <SettingRow label="Chat history" description={`${chats.reduce((a, c) => a + c.messages.length, 0)} messages stored in your workspace`}><span className="text-sm text-white/55">On device</span></SettingRow>
+                  <SettingRow label="Neural memory" description="Persistent context stays under your control"><span className="text-sm text-emerald-300">Active</span></SettingRow>
+                  <div className="flex items-center justify-between border-t border-white/[0.10] pt-4"><div><p className="text-sm font-medium">Export data</p><p className="text-xs text-white/50">Download your account and chat history</p></div><Button variant="outline" size="sm" className="rounded-full border-white/15 bg-white/[0.04]" onClick={() => { const data = { chats, projects, settings, exportedAt: new Date().toISOString() }; const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' }); const url = URL.createObjectURL(blob); const a = document.createElement('a'); a.href = url; a.download = `uncgpt-export-${new Date().toISOString().split('T')[0]}.json`; a.click(); URL.revokeObjectURL(url); }}>Export</Button></div>
+                  <div className="flex items-center justify-between border-t border-white/[0.10] pt-4"><div><p className="text-sm font-medium">Delete all chats</p><p className="text-xs text-white/50">This cannot be undone</p></div><Button variant="outline" size="sm" className="rounded-full border-red-300/50 text-red-200 hover:bg-red-400/10" onClick={() => { if (confirm('Delete all local chats?')) clearAllChats(); }}>Delete all</Button></div>
                 </div>
               )}
 
@@ -330,8 +368,27 @@ export function SettingsPage({ onClose }: SettingsPageProps) {
                 </div>
               )}
 
+              {/* ── Account ─────────────────────────────────────────────── */}
+              {activeTab === 'account' && (
+                <div className="space-y-6">
+                  <SectionTitle title="Account" description="Manage your uncgpt session" />
+                  <div className="rounded-2xl border border-white/10 bg-white/[0.045] p-4">
+                    <div className="flex items-center gap-3">
+                      <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-white/10"><UserCircle className="h-5 w-5 text-white/70" /></div>
+                      <div>
+                        <p className="text-sm font-medium">Authenticated with Auth0</p>
+                        <p className="text-xs text-muted-foreground">Your password and provider credentials stay with the identity provider.</p>
+                      </div>
+                    </div>
+                  </div>
+                  <a href="/auth/logout" className="flex min-h-11 w-full items-center justify-center gap-2 rounded-xl border border-red-400/20 bg-red-500/10 px-4 text-sm font-medium text-red-200 transition hover:bg-red-500/20">
+                    <LogOut className="h-4 w-4" /> Log out
+                  </a>
+                </div>
+              )}
+
               {/* ── Advanced ────────────────────────────────────────────── */}
-              {activeTab === 'advanced' && (
+              {false && activeTab === 'advanced' && (
                 <div className="space-y-6">
                   <SectionTitle title="Advanced Settings" description="For power users" />
                   <SettingRow label="Debug Mode" description="Show diagnostic details while testing"><Switch checked={debugMode} onCheckedChange={(value) => { setDebugMode(value); writeUserPreferences({ debugMode: value }) }} /></SettingRow>
@@ -354,11 +411,6 @@ export function SettingsPage({ onClose }: SettingsPageProps) {
         </div>
       </div>
 
-      {/* Footer */}
-      <div className="flex flex-col-reverse sm:flex-row gap-3 px-4 sm:px-6 py-4 border-t border-white/10 bg-white/[0.025]">
-        <Button variant="outline" onClick={onClose} className="flex-1 min-h-11 border-white/15 bg-white/[0.03] hover:bg-white/[0.08]">Cancel</Button>
-        <Button onClick={handleSave} className="flex-1 min-h-11">Save Changes</Button>
-      </div>
     </div>
   );
 }
@@ -366,13 +418,35 @@ export function SettingsPage({ onClose }: SettingsPageProps) {
 function SectionTitle({ title, description }: { title: string; description: string }) {
   return (
     <div className="mb-6">
-      <h2 className="text-lg font-semibold">{title}</h2>
+      <h2 className="text-base font-medium tracking-tight">{title}</h2>
       {description && <p className="text-sm text-muted-foreground">{description}</p>}
     </div>
   );
 }
 
-function SettingRow({ label, description, children }: { label: string; description: string; children: React.ReactNode }) {
+function GoogleMark() {
+  return (
+    <span className="flex h-8 w-8 items-center justify-center rounded-full bg-white/[0.08]">
+      <svg viewBox="0 0 24 24" className="h-5 w-5" aria-label="Google account" role="img">
+        <path fill="#4285F4" d="M21.35 12.27c0-.79-.07-1.55-.2-2.27H12v4.3h5.24a4.48 4.48 0 0 1-1.94 2.94v2.45h3.14c1.84-1.69 2.91-4.18 2.91-7.42Z" />
+        <path fill="#34A853" d="M12 21.75c2.63 0 4.84-.87 6.45-2.36l-3.14-2.45c-.87.58-1.98.92-3.31.92-2.54 0-4.69-1.72-5.46-4.03H3.3v2.53A9.75 9.75 0 0 0 12 21.75Z" />
+        <path fill="#FBBC05" d="M6.54 13.83A5.86 5.86 0 0 1 6.23 12c0-.64.11-1.26.31-1.83V7.64H3.3A9.75 9.75 0 0 0 2.25 12c0 1.57.38 3.05 1.05 4.36l3.24-2.53Z" />
+        <path fill="#EA4335" d="M12 6.14c1.43 0 2.71.49 3.72 1.45l2.79-2.79C16.84 3.24 14.63 2.25 12 2.25a9.75 9.75 0 0 0-8.7 5.39l3.24 2.53C7.31 7.86 9.46 6.14 12 6.14Z" />
+      </svg>
+    </span>
+  )
+}
+
+function ProfileRow({ label, value }: { label: string; value: string }) {
+  return (
+    <div className="flex items-center justify-between gap-4 border-b border-white/[0.10] py-4 last:border-0">
+      <span className="text-sm text-white/90">{label}</span>
+      <span className="max-w-[62%] truncate text-right text-sm text-white/70">{value}</span>
+    </div>
+  )
+}
+
+function SettingRow({ label, description, children }: { label: string, description: string, children: React.ReactNode }) {
   return (
     <div className="flex items-center justify-between py-3 border-b border-border last:border-0">
       <div className="flex-1">
