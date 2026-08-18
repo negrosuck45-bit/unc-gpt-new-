@@ -497,6 +497,10 @@ export function ChatInput({
     const files = Array.from(e.target.files || [])
     e.target.value = ''
 
+    if (type === 'image' && typeof window !== 'undefined') {
+      try { window.localStorage.setItem('uncgpt-photo-access-requested', '1') } catch {}
+    }
+
     if (type === 'image') {
       setIsUploading(true)
     }
@@ -525,6 +529,21 @@ export function ChatInput({
     }
 
     setAttachMenuOpen(false)
+  }
+
+  const handlePlusPress = () => {
+    let photoAccessRequested = false
+    try { photoAccessRequested = window.localStorage.getItem('uncgpt-photo-access-requested') === '1' } catch {}
+
+    if (!photoAccessRequested) {
+      // A real file input keeps the gesture inside Safari's user-activation
+      // flow, allowing iOS to show its native Photos access dialog.
+      imageInputRef.current?.click()
+      return
+    }
+
+    setAttachMenuOpen((open) => !open)
+    setSheetExpanded(false)
   }
 
   const handleAddLink = () => {
@@ -642,7 +661,7 @@ export function ChatInput({
               <div className="flex items-center gap-1">
                 <button
                   type="button"
-                  onClick={() => { setAttachMenuOpen((open) => !open); setSheetExpanded(false) }}
+                  onClick={handlePlusPress}
                   disabled={isStreaming || disabled}
                   aria-label="Add photos, files, or links"
                   className="group flex h-9 w-9 items-center justify-center rounded-xl border border-white/[0.12] bg-white/[0.055] text-white/65 shadow-[inset_0_1px_0_rgba(255,255,255,0.09),0_4px_16px_rgba(0,0,0,0.14)] backdrop-blur-xl transition-all hover:border-white/[0.20] hover:bg-white/[0.11] hover:text-white active:scale-[0.94] disabled:opacity-40"
