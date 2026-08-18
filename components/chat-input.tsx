@@ -696,18 +696,18 @@ export function ChatInput({
                           <button type="button" onClick={() => imageInputRef.current?.click()} className="text-sm font-medium text-blue-300 hover:text-blue-200">See all</button>
                         </div>
                         <div className="mb-5 flex gap-2 overflow-x-auto pb-1">
-                          <button type="button" onClick={() => imageInputRef.current?.click()} className="flex h-32 w-32 shrink-0 flex-col items-center justify-center gap-3 rounded-[22px] border border-white/[0.08] bg-white/[0.085] text-white/90 shadow-[inset_0_1px_0_rgba(255,255,255,0.07)] backdrop-blur-xl transition hover:bg-white/[0.13]">
-                            <Camera className="h-8 w-8" strokeWidth={1.8} />
-                            <span className="text-sm font-medium">Camera</span>
+                          <button type="button" onClick={() => imageInputRef.current?.click()} aria-label="Take or choose a photo" className="flex h-28 w-28 shrink-0 flex-col items-center justify-center gap-2 rounded-[20px] border border-white/[0.08] bg-white/[0.085] text-white/90 shadow-[inset_0_1px_0_rgba(255,255,255,0.07)] backdrop-blur-xl transition hover:bg-white/[0.13] active:scale-[0.98]">
+                            <Camera className="h-7 w-7" strokeWidth={1.8} />
+                            <span className="text-[13px] font-medium">Camera</span>
                           </button>
                           {imageAttachments.map((attachment) => (
-                            <div key={attachment.id} className="relative h-32 w-32 shrink-0 overflow-hidden rounded-[22px] border border-white/12 bg-white/[0.06]">
+                            <div key={attachment.id} className="relative h-28 w-28 shrink-0 overflow-hidden rounded-[20px] border border-white/12 bg-white/[0.06]">
                               <img src={attachment.url} alt={attachment.name} className="h-full w-full object-cover" />
                             </div>
                           ))}
-                          <button type="button" onClick={() => imageInputRef.current?.click()} className="flex h-32 w-32 shrink-0 flex-col items-center justify-center gap-3 rounded-[22px] border border-white/[0.12] bg-white/[0.055] text-white/70 shadow-[inset_0_1px_0_rgba(255,255,255,0.05)] backdrop-blur-xl transition hover:bg-white/[0.10]">
+                          <button type="button" onClick={() => imageInputRef.current?.click()} aria-label="Choose photos" className="flex h-28 w-28 shrink-0 flex-col items-center justify-center gap-2 rounded-[20px] border border-white/[0.12] bg-white/[0.055] text-white/70 shadow-[inset_0_1px_0_rgba(255,255,255,0.05)] backdrop-blur-xl transition hover:bg-white/[0.10] active:scale-[0.98]">
                             <ImageIcon className="h-7 w-7" strokeWidth={1.8} />
-                            <span className="text-sm">Choose photos</span>
+                            <span className="text-[13px]">Choose photos</span>
                           </button>
                         </div>
                         </div>
