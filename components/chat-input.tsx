@@ -102,6 +102,12 @@ function detectLanguage(content: string): string {
   return 'text';
 }
 
+function triggerHaptic(duration = 8) {
+  if (typeof navigator !== 'undefined' && 'vibrate' in navigator) {
+    try { navigator.vibrate(duration) } catch {}
+  }
+}
+
 function textToFileAttachment(text: string, filename?: string): Attachment {
   const bytes = new TextEncoder().encode(text);
   const base64 = toBase64(text);
@@ -532,7 +538,16 @@ export function ChatInput({
     if (type !== 'image') setAttachMenuOpen(false)
   }
 
+  const openPhotoPicker = (kind: 'library' | 'camera') => {
+    triggerHaptic(10)
+    requestAnimationFrame(() => {
+      if (kind === 'camera') cameraInputRef.current?.click()
+      else imageInputRef.current?.click()
+    })
+  }
+
   const handlePlusPress = () => {
+    triggerHaptic(8)
     // Open the iOS-style Photos sheet first. The Photo Library and Camera
     // tiles then invoke the browser's native permission/picker flow.
     setAttachMenuOpen((open) => !open)
@@ -673,9 +688,9 @@ export function ChatInput({
                       onClick={() => { setAttachMenuOpen(false); setSheetExpanded(false) }}
                     >
                       <motion.div
-                        initial={{ y: 56, opacity: 0, height: '42dvh' }}
-                        animate={{ y: 0, opacity: 1, height: sheetExpanded ? '82dvh' : '42dvh' }}
-                        exit={{ y: 56, opacity: 0 }}
+                        initial={{ y: 70, opacity: 0, scale: 0.985, height: '42dvh' }}
+                        animate={{ y: 0, opacity: 1, scale: 1, height: sheetExpanded ? '82dvh' : '42dvh' }}
+                        exit={{ y: 70, opacity: 0, scale: 0.985 }}
                         drag="y"
                         dragConstraints={{ top: 0, bottom: 0 }}
                         dragElastic={0.12}
@@ -690,7 +705,8 @@ export function ChatInput({
                         transition={{
                           height: { type: 'spring', stiffness: 420, damping: 34, mass: 0.5 },
                           y: { type: 'spring', stiffness: 620, damping: 38, mass: 0.45 },
-                          opacity: { duration: 0.1, ease: 'easeOut' },
+                          scale: { type: 'spring', stiffness: 520, damping: 34, mass: 0.45 },
+                          opacity: { duration: 0.12, ease: 'easeOut' },
                         }}
                         onClick={(event) => event.stopPropagation()}
                         style={{ willChange: 'height, transform', touchAction: 'none' }}
@@ -708,19 +724,19 @@ export function ChatInput({
                           <button type="button" onClick={() => imageInputRef.current?.click()} className="text-sm font-medium text-blue-300 hover:text-blue-200">See all</button>
                         </div>
                         <div className="mb-5 flex gap-2 overflow-x-auto pb-1">
-                          <button type="button" onClick={() => cameraInputRef.current?.click()} aria-label="Camera" className="flex h-28 w-28 shrink-0 flex-col items-center justify-center gap-2 rounded-[20px] border border-white/[0.08] bg-white/[0.085] text-white/90 shadow-[inset_0_1px_0_rgba(255,255,255,0.07)] backdrop-blur-xl transition hover:bg-white/[0.13] active:scale-[0.98]">
+                          <motion.button type="button" onClick={() => openPhotoPicker('camera')} whileTap={{ scale: 0.96 }} transition={{ type: 'spring', stiffness: 520, damping: 28 }} aria-label="Camera" className="flex h-28 w-28 shrink-0 flex-col items-center justify-center gap-2 rounded-[20px] border border-white/[0.08] bg-white/[0.085] text-white/90 shadow-[inset_0_1px_0_rgba(255,255,255,0.07)] backdrop-blur-xl transition hover:bg-white/[0.13]">
                             <Camera className="h-7 w-7" strokeWidth={1.8} />
                             <span className="text-[13px] font-medium">Camera</span>
-                          </button>
+                          </motion.button>
                           {imageAttachments.map((attachment) => (
                             <div key={attachment.id} className="relative h-28 w-28 shrink-0 overflow-hidden rounded-[20px] border border-white/12 bg-white/[0.06]">
                               <img src={attachment.url} alt={attachment.name} className="h-full w-full object-cover" />
                             </div>
                           ))}
-                          <button type="button" onClick={() => imageInputRef.current?.click()} aria-label="Choose photos" className="flex h-28 w-28 shrink-0 flex-col items-center justify-center gap-2 rounded-[20px] border border-white/[0.12] bg-white/[0.055] text-white/70 shadow-[inset_0_1px_0_rgba(255,255,255,0.05)] backdrop-blur-xl transition hover:bg-white/[0.10] active:scale-[0.98]">
+                          <motion.button type="button" onClick={() => openPhotoPicker('library')} whileTap={{ scale: 0.96 }} transition={{ type: 'spring', stiffness: 520, damping: 28 }} aria-label="Choose photos" className="flex h-28 w-28 shrink-0 flex-col items-center justify-center gap-2 rounded-[20px] border border-white/[0.12] bg-white/[0.055] text-white/70 shadow-[inset_0_1px_0_rgba(255,255,255,0.05)] backdrop-blur-xl transition hover:bg-white/[0.10]">
                             <ImageIcon className="h-7 w-7" strokeWidth={1.8} />
                             <span className="text-[13px]">Photo Library</span>
-                          </button>
+                          </motion.button>
                         </div>
                         </div>
                         <div className="min-h-0 flex-1 overflow-y-auto overscroll-contain border-t border-white/[0.12] pt-3" style={{ WebkitOverflowScrolling: 'touch' }}>
