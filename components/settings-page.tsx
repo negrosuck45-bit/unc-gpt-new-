@@ -47,11 +47,13 @@ export function SettingsPage({ onClose }: SettingsPageProps) {
   const [authUser, setAuthUser] = useState<{ name?: string | null; email?: string | null; picture?: string | null } | null>(null);
   const [profileName, setProfileName] = useState('');
   const [profilePicture, setProfilePicture] = useState('');
+  const [language, setLanguage] = useState('system');
 
   const currentChat = getCurrentChat();
   const isLocked = false;
 
   useEffect(() => {
+    try { setLanguage(localStorage.getItem('uncgpt-language') || 'system') } catch {}
     fetch('/api/auth/me', { cache: 'no-store' }).then((response) => response.ok ? response.json() : null).then((payload) => setAuthUser(payload?.user ?? null)).catch(() => setAuthUser(null));
     const p = readUserPreferences();
     setStreamingEnabled(p.streaming);
@@ -102,15 +104,15 @@ export function SettingsPage({ onClose }: SettingsPageProps) {
       <div className="flex min-h-[calc(100dvh-72px)] flex-col sm:min-h-[560px] sm:flex-row">
         {/* Sidebar */}
         <div className="w-full sm:w-52 shrink-0 border-b sm:border-b-0 sm:border-r border-white/10 bg-white/[0.025] p-2 sm:p-3 overflow-x-auto">
-            <nav className="flex sm:block gap-1 min-w-max sm:min-w-0">
+            <nav className="flex gap-1 min-w-max sm:min-w-0">
             {tabs.map(tab => (
               <button
                 key={tab.id}
                 onClick={() => setActiveTab(tab.id)}
                 className={cn(
-                  'w-full flex items-center gap-2 px-3 py-2.5 rounded-xl text-[13px] transition-colors whitespace-nowrap',
+                  'flex items-center gap-2 px-4 py-3 rounded-[18px] text-[14px] transition-all whitespace-nowrap',
                   activeTab === tab.id
-                    ? 'bg-primary text-primary-foreground'
+                    ? 'bg-white/[0.18] text-white shadow-[inset_0_1px_0_rgba(255,255,255,0.10)]'
                     : 'text-muted-foreground hover:text-foreground hover:bg-accent/50'
                 )}
               >
@@ -135,6 +137,35 @@ export function SettingsPage({ onClose }: SettingsPageProps) {
               {activeTab === 'general' && (
                 <div className="space-y-6">
                   <SectionTitle title="General Settings" description="Basic app preferences" />
+                  <div className="space-y-3">
+                    <Label>Theme</Label>
+                    <div className="grid grid-cols-3 gap-3">
+                      {(['light', 'dark', 'system'] as const).map((t) => (
+                        <button key={t} type="button" onClick={() => setTheme(t)} className={cn(
+                          'flex min-h-[112px] flex-col items-center justify-center gap-3 rounded-[22px] border transition-all',
+                          theme === t ? 'border-white/25 bg-white/[0.18] shadow-[inset_0_1px_0_rgba(255,255,255,0.12)]' : 'border-white/[0.12] bg-white/[0.035] hover:bg-white/[0.08]'
+                        )}>
+                          {t === 'light' && <Sun className="h-6 w-6" />}
+                          {t === 'dark' && <Moon className="h-6 w-6" />}
+                          {t === 'system' && <Smartphone className="h-6 w-6" />}
+                          <span className="text-base capitalize">{t}</span>
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+                  <div className="flex items-center justify-between gap-4">
+                    <Label>Language</Label>
+                    <Select value={language} onValueChange={(value) => { setLanguage(value); try { localStorage.setItem('uncgpt-language', value) } catch {} }}>
+                      <SelectTrigger className="w-[150px] rounded-full border-white/10 bg-white/[0.08] px-4"><SelectValue /></SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="system">System</SelectItem>
+                        <SelectItem value="en">English</SelectItem>
+                        <SelectItem value="es">Español</SelectItem>
+                        <SelectItem value="fr">Français</SelectItem>
+                        <SelectItem value="de">Deutsch</SelectItem>
+                      </SelectContent>
+                    </Select>
+                  </div>
                   <SettingRow label="Send on Enter" description="Press Enter to send, Shift+Enter for new line">
                     <Switch checked={sendOnEnter} onCheckedChange={(value) => { setSendOnEnter(value); writeUserPreferences({ sendOnEnter: value }) }} />
                   </SettingRow>
