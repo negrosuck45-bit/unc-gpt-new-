@@ -637,7 +637,7 @@ export function ChatInput({
         </AnimatePresence>
 
         <div className="px-3">
-          <div className="rounded-[28px] border border-white/12 bg-white/[0.065] shadow-[0_12px_42px_rgba(0,0,0,0.24)] backdrop-blur-2xl transition-all duration-200 focus-within:border-white/25 focus-within:bg-white/[0.085] focus-within:shadow-[0_16px_48px_rgba(0,0,0,0.32)]">
+          <div className="rounded-[26px] border border-white/[0.14] bg-white/[0.07] shadow-[0_12px_42px_rgba(0,0,0,0.24)] backdrop-blur-2xl transition-all duration-200 focus-within:border-white/25 focus-within:bg-white/[0.085] focus-within:shadow-[0_16px_48px_rgba(0,0,0,0.32)]">
             <textarea
               ref={textareaRef}
               value={input}
@@ -645,19 +645,19 @@ export function ChatInput({
               onPaste={handlePasteEvent}
               onKeyDown={handleKeyDown}
               placeholder="Write a message... (paste images directly!)"
-              className="w-full bg-transparent px-5 pt-4 pb-2 resize-none text-[15px] leading-6 placeholder:text-white/35 focus:outline-none min-h-[54px]"
+              className="w-full bg-transparent px-5 pt-3.5 pb-1.5 resize-none text-[15px] leading-6 placeholder:text-white/35 focus:outline-none min-h-[50px]"
               disabled={disabled}
               rows={1}
             />
 
-            <div className="flex items-center justify-between px-3 pb-3">
+            <div className="flex items-center justify-between px-3 pb-2.5">
               <div className="flex items-center gap-1">
                 <button
                   type="button"
                   onClick={handlePlusPress}
                   disabled={isStreaming || disabled}
                   aria-label="Add photos, files, or links"
-                  className="group flex h-9 w-9 items-center justify-center rounded-xl border border-white/[0.12] bg-white/[0.055] text-white/65 shadow-[inset_0_1px_0_rgba(255,255,255,0.09),0_4px_16px_rgba(0,0,0,0.14)] backdrop-blur-xl transition-all hover:border-white/[0.20] hover:bg-white/[0.11] hover:text-white active:scale-[0.94] disabled:opacity-40"
+                  className="group flex h-8 w-8 items-center justify-center rounded-full border border-white/[0.14] bg-white/[0.06] text-white/65 shadow-[inset_0_1px_0_rgba(255,255,255,0.09),0_4px_16px_rgba(0,0,0,0.14)] backdrop-blur-xl transition-all hover:border-white/[0.20] hover:bg-white/[0.11] hover:text-white active:scale-[0.94] disabled:opacity-40"
                 >
                   <Plus className="h-5 w-5" />
                 </button>
@@ -740,7 +740,7 @@ export function ChatInput({
               </div>
 
               <div className="flex items-center gap-1">
-                <div className="flex h-8 items-center gap-1.5 rounded-full border border-white/10 bg-white/[0.05] px-3 text-xs font-medium text-white/60" aria-label="Automatic model routing">
+                <div className="flex h-8 items-center gap-1.5 rounded-full border border-white/10 bg-white/[0.05] px-3 text-[12px] font-medium text-white/60" aria-label="Automatic model routing">
                   <span>uncgpt</span>
                 </div>
 

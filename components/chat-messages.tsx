@@ -690,11 +690,13 @@ export function ChatMessages({ messages, isStreaming, isThinking, onRegenerate, 
                       </div>
                     )}
 
-                    {/* Text content - NO bubble, just plain text */}
+                    {/* Assistant stays flat; user messages use a compact Manus-style bubble. */}
                     {message.content && message.content.trim().length > 0 && (
                       <div className={cn(
                         'text-[15px] sm:text-base leading-7',
-                        isAssistant ? 'text-zinc-200' : 'text-zinc-100'
+                        isAssistant
+                          ? 'text-zinc-200'
+                          : 'rounded-[20px] bg-white/[0.095] px-4 py-2.5 text-zinc-100 shadow-[inset_0_1px_0_rgba(255,255,255,0.08)]'
                       )}>
                         <MessageContent content={message.content} />
                       </div>
@@ -739,8 +741,8 @@ export function ChatMessages({ messages, isStreaming, isThinking, onRegenerate, 
 
                   {/* User Avatar - Right side */}
                   {!isAssistant && (
-                    <div className="mt-0 flex h-7 w-7 flex-shrink-0 items-center justify-center overflow-hidden rounded-full text-white/90">
-                      {preferences.profilePicture ? <img src={preferences.profilePicture} alt={preferences.profileName || 'You'} className="h-full w-full object-cover" /> : <span className="flex h-full w-full items-center justify-center bg-emerald-500/80 text-xs font-medium">{(preferences.profileName || 'U').slice(0, 1).toUpperCase()}</span>}
+                    <div className="mt-0 flex h-8 w-8 flex-shrink-0 items-center justify-center overflow-hidden rounded-full text-white/90 ring-1 ring-white/10">
+                      {preferences.profilePicture ? <img src={preferences.profilePicture} alt={preferences.profileName || 'You'} className="h-full w-full object-cover" /> : <span className="flex h-full w-full items-center justify-center bg-emerald-500/80 text-sm font-medium">{(preferences.profileName || 'U').slice(0, 1).toUpperCase()}</span>}
                     </div>
                   )}
                 </div>
