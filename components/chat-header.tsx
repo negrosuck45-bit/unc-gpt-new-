@@ -44,7 +44,7 @@ export function ChatHeader({ project, chat, activeModelInfo, onOpenSidebar, isSi
 
   return (
     <>
-      <div className="flex flex-col flex-shrink-0 border-b border-white/[0.07] bg-[#08080b]/75 backdrop-blur-2xl">
+      <div className="flex flex-col flex-shrink-0 border-b border-border bg-background/75 backdrop-blur-2xl transition-colors duration-200">
       <header className="flex min-h-[58px] items-center gap-2 px-3 py-2.5 sm:px-5">
         {/* Sidebar trigger — always visible so the sidebar can be opened or collapsed on any screen size */}
         {onOpenSidebar && (
@@ -53,7 +53,7 @@ export function ChatHeader({ project, chat, activeModelInfo, onOpenSidebar, isSi
             size="icon"
             onClick={onOpenSidebar}
             data-testid="sidebar-toggle"
-            className="h-9 w-9 shrink-0 rounded-full border-0 bg-transparent text-white/70 shadow-none transition hover:bg-transparent hover:text-white"
+            className="h-9 w-9 shrink-0 rounded-full border-0 bg-transparent text-muted-foreground shadow-none transition hover:bg-transparent hover:text-foreground"
             title={isSidebarOpen ? "Close sidebar" : "Open sidebar"}
             aria-label={isSidebarOpen ? "Close sidebar" : "Open sidebar"}
           >
@@ -68,7 +68,7 @@ export function ChatHeader({ project, chat, activeModelInfo, onOpenSidebar, isSi
         {/* Project selector */}
         <DropdownMenu>
           <DropdownMenuTrigger asChild>
-            <Button variant="ghost" size="sm" className="gap-1.5 rounded-full px-3 font-medium text-white/70 transition hover:bg-white/[0.07] hover:text-white">
+            <Button variant="ghost" size="sm" className="gap-1.5 rounded-full px-3 font-medium text-muted-foreground transition hover:bg-accent hover:text-foreground">
               <FolderOpen className="h-4 w-4 opacity-60" />
               <span className="hidden sm:inline truncate max-w-[120px]">
                 {project?.name ?? "No project"}

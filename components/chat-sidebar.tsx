@@ -479,17 +479,17 @@ export function ChatSidebar({
                     initial={{ opacity: 0, y: 8, scale: 0.98 }}
                     animate={{ opacity: 1, y: 0, scale: 1 }}
                     exit={{ opacity: 0, y: 8, scale: 0.98 }}
-                    className="absolute bottom-[calc(100%-0.2rem)] left-2 right-2 z-20 overflow-hidden rounded-[18px] border border-white/[0.14] bg-[#303034]/[0.98] p-1 shadow-[0_16px_42px_rgba(0,0,0,0.42)] backdrop-blur-2xl"
+                    className="absolute bottom-[calc(100%-0.2rem)] left-2 right-2 z-20 overflow-hidden rounded-[18px] border border-sidebar-border/[0.14] bg-[#303034]/[0.98] p-1 shadow-[0_16px_42px_rgba(0,0,0,0.42)] backdrop-blur-2xl"
                   >
-                    <button onClick={openSettings} className="flex w-full items-center gap-3 rounded-[14px] px-3 py-2.5 text-left text-[14px] text-white/90 transition hover:bg-white/[0.10]"><SettingsIcon className="h-[18px] w-[18px] text-white/75" /> Settings</button>
+                    <button onClick={openSettings} className="flex w-full items-center gap-3 rounded-[14px] px-3 py-2.5 text-left text-[14px] text-sidebar-foreground/90 transition hover:bg-sidebar-accent/[0.10]"><SettingsIcon className="h-[18px] w-[18px] text-sidebar-foreground/75" /> Settings</button>
                     <a href="/auth/logout" className="flex w-full items-center gap-3 rounded-[14px] px-3 py-2.5 text-left text-[14px] text-red-200 transition hover:bg-red-400/[0.10]"><LogOut className="h-[18px] w-[18px] text-red-200/80" /> Log out</a>
                   </motion.div>
                 )}
               </AnimatePresence>
-              <button onClick={() => setAccountOpen((open) => !open)} className="flex w-full items-center gap-3 rounded-[18px] border border-white/[0.08] bg-white/[0.075] px-3 py-2.5 text-left shadow-[inset_0_1px_0_rgba(255,255,255,0.05)] transition hover:bg-white/[0.12]">
-                {profilePreferences.profilePicture || authUser?.picture ? <img src={profilePreferences.profilePicture || authUser?.picture || ''} alt="Profile" className="h-9 w-9 rounded-full object-cover ring-1 ring-white/15" /> : <span className="flex h-9 w-9 items-center justify-center rounded-full bg-emerald-500/80 text-base font-medium text-white ring-1 ring-white/10">{(profilePreferences.profileName || authUser?.name || authUser?.email || 'U').slice(0, 1).toUpperCase()}</span>}
-                <span className="min-w-0 flex-1"><span className="block truncate text-[14px] font-medium leading-5 text-white/92">{profilePreferences.profileName || authUser?.name || 'Account'}</span><span className="block truncate text-[11px] leading-4 text-white/45">{authUser?.email || 'Signed in with Auth0'}</span></span>
-                <MoreHorizontal className="h-[18px] w-[18px] shrink-0 text-white/50" />
+              <button onClick={() => setAccountOpen((open) => !open)} className="flex w-full items-center gap-3 rounded-[18px] border border-sidebar-border/[0.08] bg-sidebar-accent/[0.075] px-3 py-2.5 text-left shadow-[inset_0_1px_0_rgba(255,255,255,0.05)] transition hover:bg-sidebar-accent/[0.12]">
+                {profilePreferences.profilePicture || authUser?.picture ? <img src={profilePreferences.profilePicture || authUser?.picture || ''} alt="Profile" className="h-9 w-9 rounded-full object-cover ring-1 ring-white/15" /> : <span className="flex h-9 w-9 items-center justify-center rounded-full bg-emerald-500/80 text-base font-medium text-sidebar-foreground ring-1 ring-white/10">{(profilePreferences.profileName || authUser?.name || authUser?.email || 'U').slice(0, 1).toUpperCase()}</span>}
+                <span className="min-w-0 flex-1"><span className="block truncate text-[14px] font-medium leading-5 text-sidebar-foreground/92">{profilePreferences.profileName || authUser?.name || 'Account'}</span><span className="block truncate text-[11px] leading-4 text-sidebar-foreground/45">{authUser?.email || 'Signed in with Auth0'}</span></span>
+                <MoreHorizontal className="h-[18px] w-[18px] shrink-0 text-sidebar-foreground/50" />
               </button>
             </div>
           </motion.aside>
@@ -547,11 +547,11 @@ function NavItem({ icon, label, badge, onClick, active }: NavItemProps) {
       className={cn(
         "group w-full flex items-center gap-2 rounded-xl px-2.5 py-2.5 text-sm transition-all duration-200",
         active
-          ? "bg-white/[0.11] text-white shadow-[inset_0_1px_0_rgba(255,255,255,0.08),0_8px_24px_rgba(0,0,0,0.18)]"
-          : "text-sidebar-foreground/72 hover:bg-white/[0.065] hover:text-white"
+          ? "bg-sidebar-accent/[0.11] text-sidebar-foreground shadow-[inset_0_1px_0_rgba(255,255,255,0.08),0_8px_24px_rgba(0,0,0,0.18)]"
+          : "text-sidebar-foreground/72 hover:bg-sidebar-accent/[0.065] hover:text-sidebar-foreground"
       )}
     >
-      <span className="flex h-7 w-7 shrink-0 items-center justify-center text-white/55 transition-colors group-hover:text-white">{icon}</span>
+      <span className="flex h-7 w-7 shrink-0 items-center justify-center text-sidebar-foreground/55 transition-colors group-hover:text-sidebar-foreground">{icon}</span>
       <span className="flex-1 text-left">{label}</span>
       {badge && (
         <span className="text-[10px] font-medium px-1.5 py-0.5 rounded bg-primary/10 text-primary">
@@ -628,8 +628,8 @@ function ChatGroup({
                 className={cn(
                   "group flex items-center gap-2 px-2.5 py-2 rounded-xl cursor-pointer text-sm transition-all duration-200",
                   currentChatId === chat.id
-                    ? "bg-white/[0.10] text-white shadow-[inset_0_1px_0_rgba(255,255,255,0.08)]"
-                    : "text-white/72 hover:bg-white/[0.055] hover:text-white"
+                    ? "bg-sidebar-accent/[0.10] text-sidebar-foreground shadow-[inset_0_1px_0_rgba(255,255,255,0.08)]"
+                    : "text-sidebar-foreground/72 hover:bg-sidebar-accent/[0.055] hover:text-sidebar-foreground"
                 )}
               >
                 <span className="flex-1 truncate">{chat.title || "Untitled"}</span>

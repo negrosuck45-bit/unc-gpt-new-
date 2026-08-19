@@ -122,7 +122,11 @@ function textToFileAttachment(text: string, filename?: string): Attachment {
 }
 
 async function compressImage(file: File): Promise<File> {
-  return new Promise((resolve, reject) => {
+  // Safari/iOS commonly returns HEIC/HEIF files. Canvas decoding is not
+  // guaranteed for those formats, so upload the original rather than turning
+  // a valid photo into a failed attachment.
+  if (/image\/(heic|heif)/i.test(file.type)) return file
+  return new Promise((resolve) => {
     const reader = new FileReader()
     reader.onload = (e) => {
       const img = new window.Image()
@@ -154,10 +158,10 @@ async function compressImage(file: File): Promise<File> {
           }
         }, 'image/jpeg', 0.7)
       }
-      img.onerror = () => reject(new Error('Failed to load image'))
+      img.onerror = () => resolve(file)
       img.src = e.target?.result as string
     }
-    reader.onerror = () => reject(new Error('Failed to read file'))
+    reader.onerror = () => resolve(file)
     reader.readAsDataURL(file)
   })
 }
@@ -168,25 +172,31 @@ async function uploadToSupabase(file: File, fileName: string): Promise<string> {
   const formData = new FormData()
   formData.append('file', file, fileName)
 
-  const response = await fetch('/api/storage/upload', { method: 'POST', body: formData })
-  if (response.ok) {
-    const result = await response.json()
-    if (typeof result?.url === 'string' && result.url.length > 0) return result.url
-    throw new Error('Supabase Storage returned no usable image URL')
+  let response: Response | null = null
+  let serverResult: any = {}
+  let serverError = ''
+  try {
+    response = await fetch('/api/storage/upload', { method: 'POST', body: formData })
+    serverResult = await response.json().catch(() => ({}))
+    if (response.ok && typeof serverResult?.url === 'string' && serverResult.url.length > 0) {
+      return serverResult.url
+    }
+    serverError = serverResult?.error || `Storage upload returned ${response.status}`
+  } catch (error) {
+    serverError = error instanceof Error ? error.message : String(error)
   }
 
-  // Use direct Supabase Storage as a resilient fallback. This still returns a
-  // durable Supabase URL, unlike the old blob/data-URL fallback.
-  let fallbackError = ''
+  // Keep the image usable if the authenticated route is unavailable. The
+  // direct client path uses Supabase when configured and an inline data URL as
+  // a last-resort preview so the AI can still receive the image content.
   try {
     const fallback = await uploadFile(file, { folder: 'images', allowLocalFallback: true })
-    if (fallback.storedRemotely) return fallback.url
+    if (fallback.url) return fallback.url
   } catch (error) {
-    fallbackError = error instanceof Error ? error.message : String(error)
+    serverError = `${serverError}; ${error instanceof Error ? error.message : String(error)}`
   }
 
-  const result = await response.json().catch(() => ({}))
-  throw new Error(result.error || fallbackError || 'Image upload failed; Supabase Storage did not return a URL')
+  throw new Error(serverError || 'Image upload failed; no usable image URL was returned')
 }
 
 function useIsDarkMode() {
@@ -758,7 +768,7 @@ export function ChatInput({
               </div>
 
               <div className="flex items-center gap-1">
-                <div className="flex h-8 items-center gap-1.5 rounded-full border border-white/10 bg-white/[0.05] px-3 text-[12px] font-medium text-white/60" aria-label="Automatic model routing">
+                <div className="flex h-8 items-center gap-1.5 rounded-full border border-border bg-secondary px-3 text-[12px] font-medium text-muted-foreground" aria-label="Automatic model routing">
                   <span>uncgpt</span>
                 </div>
 
@@ -772,7 +782,7 @@ export function ChatInput({
                       onClick={handleSubmit} 
                       disabled={isStreaming || disabled || hasUploadingImages} 
                       size="icon" 
-                      className="h-9 w-9 rounded-full bg-white text-black shadow-lg shadow-black/20 hover:bg-white/90"
+                      className="h-9 w-9 rounded-full bg-primary text-primary-foreground shadow-lg shadow-black/20 hover:bg-primary/90"
                     >
                       {hasUploadingImages ? <Loader2 className="h-4 w-4 animate-spin" /> : <ArrowUp className="h-4 w-4" />}
                     </Button>

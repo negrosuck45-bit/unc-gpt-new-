@@ -112,7 +112,7 @@ export function SettingsPage({ onClose }: SettingsPageProps) {
                 className={cn(
                   'flex items-center gap-2 px-4 py-3 rounded-[18px] text-[14px] transition-all whitespace-nowrap',
                   activeTab === tab.id
-                    ? 'bg-white/[0.18] text-white shadow-[inset_0_1px_0_rgba(255,255,255,0.10)]'
+                    ? 'bg-muted/[0.18] text-foreground shadow-[inset_0_1px_0_rgba(255,255,255,0.10)]'
                     : 'text-muted-foreground hover:text-foreground hover:bg-accent/50'
                 )}
               >
@@ -143,7 +143,7 @@ export function SettingsPage({ onClose }: SettingsPageProps) {
                       {(['light', 'dark', 'system'] as const).map((t) => (
                         <button key={t} type="button" onClick={() => setTheme(t)} className={cn(
                           'flex min-h-[112px] flex-col items-center justify-center gap-3 rounded-[22px] border transition-all',
-                          theme === t ? 'border-white/25 bg-white/[0.18] shadow-[inset_0_1px_0_rgba(255,255,255,0.12)]' : 'border-white/[0.12] bg-white/[0.035] hover:bg-white/[0.08]'
+                          theme === t ? 'border-border/25 bg-muted/[0.18] shadow-[inset_0_1px_0_rgba(255,255,255,0.12)]' : 'border-border/[0.12] bg-muted/[0.035] hover:bg-muted/[0.08]'
                         )}>
                           {t === 'light' && <Sun className="h-6 w-6" />}
                           {t === 'dark' && <Moon className="h-6 w-6" />}
@@ -156,7 +156,7 @@ export function SettingsPage({ onClose }: SettingsPageProps) {
                   <div className="flex items-center justify-between gap-4">
                     <Label>Language</Label>
                     <Select value={language} onValueChange={(value) => { setLanguage(value); try { localStorage.setItem('uncgpt-language', value) } catch {} }}>
-                      <SelectTrigger className="w-[150px] rounded-full border-white/10 bg-white/[0.08] px-4"><SelectValue /></SelectTrigger>
+                      <SelectTrigger className="w-[150px] rounded-full border-border/10 bg-muted/[0.08] px-4"><SelectValue /></SelectTrigger>
                       <SelectContent>
                         <SelectItem value="system">System</SelectItem>
                         <SelectItem value="en">English</SelectItem>
@@ -178,12 +178,12 @@ export function SettingsPage({ onClose }: SettingsPageProps) {
                   <SettingRow label="Haptic Feedback" description="Use device vibration when supported">
                     <Switch checked={hapticsEnabled} onCheckedChange={(value) => { setHapticsEnabled(value); writeUserPreferences({ haptics: value }) }} />
                   </SettingRow>
-                  <div className="flex items-center justify-between gap-4 rounded-2xl border border-white/10 bg-white/[0.045] px-4 py-3">
+                  <div className="flex items-center justify-between gap-4 rounded-2xl border border-border/10 bg-muted/[0.045] px-4 py-3">
                     <div className="flex items-center gap-3 min-w-0">
                       <Volume2 className="h-4 w-4 text-muted-foreground shrink-0" />
                       <span className="text-sm text-muted-foreground">Preview the clean reply tone</span>
                     </div>
-                    <Button variant="outline" size="sm" className="shrink-0 border-white/15 bg-white/[0.04] hover:bg-white/[0.1]" onClick={() => { writeUserPreferences({ sound: true }); setSoundEnabled(true); unlockReplySound(); setTimeout(playReplySound, 40) }}>Test sound</Button>
+                    <Button variant="outline" size="sm" className="shrink-0 border-border/15 bg-muted/[0.04] hover:bg-muted/[0.1]" onClick={() => { writeUserPreferences({ sound: true }); setSoundEnabled(true); unlockReplySound(); setTimeout(playReplySound, 40) }}>Test sound</Button>
                   </div>
                   <SettingRow label="Streaming Responses" description="Show response text live or wait until the reply is complete">
                     <Switch checked={streamingEnabled} onCheckedChange={(value) => { setStreamingEnabled(value); writeUserPreferences({ streaming: value }) }} />
@@ -198,21 +198,21 @@ export function SettingsPage({ onClose }: SettingsPageProps) {
                   <div className="rounded-[22px] border border-border bg-card p-4 shadow-sm">
                     <div className="flex items-center gap-3">
                       {profilePicture ? <img src={profilePicture} alt="Your profile" className="h-12 w-12 rounded-full object-cover" /> : <div className="flex h-12 w-12 items-center justify-center rounded-full bg-emerald-500/80 text-xl font-medium">{(profileName || authUser?.name || authUser?.email || 'U').slice(0, 1).toUpperCase()}</div>}
-                      <div className="min-w-0 flex-1"><p className="mb-2 text-xs font-medium uppercase tracking-[0.14em] text-white/45">Your profile</p><input value={profileName} onChange={(event) => { setProfileName(event.target.value); writeUserPreferences({ profileName: event.target.value }) }} placeholder={authUser?.name || 'Display name'} className="w-full bg-transparent text-base font-medium text-white outline-none placeholder:text-white/45" /></div>
-                      <label className="cursor-pointer rounded-full border border-white/15 bg-white/[0.06] px-3 py-1.5 text-xs text-white/70 transition hover:bg-white/[0.12]">Change photo<input type="file" accept="image/*" className="hidden" onChange={(event) => { const file = event.target.files?.[0]; if (!file) return; const reader = new FileReader(); reader.onload = () => { const value = String(reader.result || ''); setProfilePicture(value); writeUserPreferences({ profilePicture: value }) }; reader.readAsDataURL(file) }} /></label>
+                      <div className="min-w-0 flex-1"><p className="mb-2 text-xs font-medium uppercase tracking-[0.14em] text-foreground/45">Your profile</p><input value={profileName} onChange={(event) => { setProfileName(event.target.value); writeUserPreferences({ profileName: event.target.value }) }} placeholder={authUser?.name || 'Display name'} className="w-full bg-transparent text-base font-medium text-foreground outline-none placeholder:text-foreground/45" /></div>
+                      <label className="cursor-pointer rounded-full border border-border/15 bg-muted/[0.06] px-3 py-1.5 text-xs text-foreground/70 transition hover:bg-muted/[0.12]">Change photo<input type="file" accept="image/*" className="hidden" onChange={(event) => { const file = event.target.files?.[0]; if (!file) return; const reader = new FileReader(); reader.onload = () => { const value = String(reader.result || ''); setProfilePicture(value); writeUserPreferences({ profilePicture: value }) }; reader.readAsDataURL(file) }} /></label>
                     </div>
                   </div>
                   <div className="rounded-[22px] border border-border bg-card p-4 shadow-sm">
                     <div className="flex items-center gap-3">
-                      {authUser?.picture ? <img src={authUser.picture} alt="" className="h-10 w-10 rounded-full object-cover" /> : <div className="flex h-10 w-10 items-center justify-center rounded-full bg-white/10 text-lg font-medium">{(authUser?.name || authUser?.email || 'U').slice(0, 1).toUpperCase()}</div>}
-                      <div className="min-w-0 flex-1"><p className="text-xs font-medium uppercase tracking-[0.14em] text-white/45">Connected account</p><p className="truncate text-sm text-white/80">{authUser?.email || 'Authenticated with Auth0'}</p></div>
+                      {authUser?.picture ? <img src={authUser.picture} alt="" className="h-10 w-10 rounded-full object-cover" /> : <div className="flex h-10 w-10 items-center justify-center rounded-full bg-muted/10 text-lg font-medium">{(authUser?.name || authUser?.email || 'U').slice(0, 1).toUpperCase()}</div>}
+                      <div className="min-w-0 flex-1"><p className="text-xs font-medium uppercase tracking-[0.14em] text-foreground/45">Connected account</p><p className="truncate text-sm text-foreground/80">{authUser?.email || 'Authenticated with Auth0'}</p></div>
                       <GoogleMark />
                     </div>
                   </div>
                   <ProfileRow label="Name" value={authUser?.name || 'Not provided'} />
                   <ProfileRow label="Email address" value={authUser?.email || 'Hidden'} />
                   <ProfileRow label="Phone number" value="—" />
-                  <div className="flex items-center justify-between border-t border-white/[0.10] pt-4"><span className="text-sm">Log out of all devices</span><a href="/auth/logout" className="rounded-full border border-red-300/50 px-4 py-2 text-sm text-red-200 transition hover:bg-red-400/10">Log out</a></div>
+                  <div className="flex items-center justify-between border-t border-border/[0.10] pt-4"><span className="text-sm">Log out of all devices</span><a href="/auth/logout" className="rounded-full border border-red-300/50 px-4 py-2 text-sm text-red-200 transition hover:bg-red-400/10">Log out</a></div>
                 </div>
               )}
 
@@ -220,10 +220,10 @@ export function SettingsPage({ onClose }: SettingsPageProps) {
               {activeTab === 'data' && (
                 <div className="space-y-5">
                   <SectionTitle title="Data" description="Manage privacy and local chat data" />
-                  <SettingRow label="Chat history" description={`${chats.reduce((a, c) => a + c.messages.length, 0)} messages stored in your workspace`}><span className="text-sm text-white/55">On device</span></SettingRow>
+                  <SettingRow label="Chat history" description={`${chats.reduce((a, c) => a + c.messages.length, 0)} messages stored in your workspace`}><span className="text-sm text-foreground/55">On device</span></SettingRow>
                   <SettingRow label="Neural memory" description="Persistent context stays under your control"><span className="text-sm text-emerald-300">Active</span></SettingRow>
-                  <div className="flex items-center justify-between border-t border-white/[0.10] pt-4"><div><p className="text-sm font-medium">Export data</p><p className="text-xs text-white/50">Download your account and chat history</p></div><Button variant="outline" size="sm" className="rounded-full border-white/15 bg-white/[0.04]" onClick={() => { const data = { chats, projects, settings, exportedAt: new Date().toISOString() }; const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' }); const url = URL.createObjectURL(blob); const a = document.createElement('a'); a.href = url; a.download = `uncgpt-export-${new Date().toISOString().split('T')[0]}.json`; a.click(); URL.revokeObjectURL(url); }}>Export</Button></div>
-                  <div className="flex items-center justify-between border-t border-white/[0.10] pt-4"><div><p className="text-sm font-medium">Delete all chats</p><p className="text-xs text-white/50">This cannot be undone</p></div><Button variant="outline" size="sm" className="rounded-full border-red-300/50 text-red-200 hover:bg-red-400/10" onClick={() => { if (confirm('Delete all local chats?')) clearAllChats(); }}>Delete all</Button></div>
+                  <div className="flex items-center justify-between border-t border-border/[0.10] pt-4"><div><p className="text-sm font-medium">Export data</p><p className="text-xs text-foreground/50">Download your account and chat history</p></div><Button variant="outline" size="sm" className="rounded-full border-border/15 bg-muted/[0.04]" onClick={() => { const data = { chats, projects, settings, exportedAt: new Date().toISOString() }; const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' }); const url = URL.createObjectURL(blob); const a = document.createElement('a'); a.href = url; a.download = `uncgpt-export-${new Date().toISOString().split('T')[0]}.json`; a.click(); URL.revokeObjectURL(url); }}>Export</Button></div>
+                  <div className="flex items-center justify-between border-t border-border/[0.10] pt-4"><div><p className="text-sm font-medium">Delete all chats</p><p className="text-xs text-foreground/50">This cannot be undone</p></div><Button variant="outline" size="sm" className="rounded-full border-red-300/50 text-red-200 hover:bg-red-400/10" onClick={() => { if (confirm('Delete all local chats?')) clearAllChats(); }}>Delete all</Button></div>
                 </div>
               )}
 
@@ -403,9 +403,9 @@ export function SettingsPage({ onClose }: SettingsPageProps) {
               {activeTab === 'account' && (
                 <div className="space-y-6">
                   <SectionTitle title="Account" description="Manage your uncgpt session" />
-                  <div className="rounded-2xl border border-white/10 bg-white/[0.045] p-4">
+                  <div className="rounded-2xl border border-border/10 bg-muted/[0.045] p-4">
                     <div className="flex items-center gap-3">
-                      <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-white/10"><UserCircle className="h-5 w-5 text-white/70" /></div>
+                      <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-muted/10"><UserCircle className="h-5 w-5 text-foreground/70" /></div>
                       <div>
                         <p className="text-sm font-medium">Authenticated with Auth0</p>
                         <p className="text-xs text-muted-foreground">Your password and provider credentials stay with the identity provider.</p>
@@ -457,7 +457,7 @@ function SectionTitle({ title, description }: { title: string; description: stri
 
 function GoogleMark() {
   return (
-    <span className="flex h-8 w-8 items-center justify-center rounded-full bg-white/[0.08]">
+    <span className="flex h-8 w-8 items-center justify-center rounded-full bg-muted/[0.08]">
       <svg viewBox="0 0 24 24" className="h-5 w-5" aria-label="Google account" role="img">
         <path fill="#4285F4" d="M21.35 12.27c0-.79-.07-1.55-.2-2.27H12v4.3h5.24a4.48 4.48 0 0 1-1.94 2.94v2.45h3.14c1.84-1.69 2.91-4.18 2.91-7.42Z" />
         <path fill="#34A853" d="M12 21.75c2.63 0 4.84-.87 6.45-2.36l-3.14-2.45c-.87.58-1.98.92-3.31.92-2.54 0-4.69-1.72-5.46-4.03H3.3v2.53A9.75 9.75 0 0 0 12 21.75Z" />
@@ -470,9 +470,9 @@ function GoogleMark() {
 
 function ProfileRow({ label, value }: { label: string; value: string }) {
   return (
-    <div className="flex items-center justify-between gap-4 border-b border-white/[0.10] py-4 last:border-0">
-      <span className="text-sm text-white/90">{label}</span>
-      <span className="max-w-[62%] truncate text-right text-sm text-white/70">{value}</span>
+    <div className="flex items-center justify-between gap-4 border-b border-border/[0.10] py-4 last:border-0">
+      <span className="text-sm text-foreground/90">{label}</span>
+      <span className="max-w-[62%] truncate text-right text-sm text-foreground/70">{value}</span>
     </div>
   )
 }

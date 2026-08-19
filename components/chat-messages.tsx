@@ -453,7 +453,7 @@ function GlowingThinkingText({ text = "thinking" }: { text?: string }) {
               delay: i * 0.08,
               ease: "easeInOut"
             }}
-            className="text-sm text-zinc-300 font-mono tracking-wider"
+            className="text-sm text-muted-foreground font-mono tracking-wider"
             style={{
               textShadow: '0 0 20px rgba(255,255,255,0.3)',
             }}
@@ -695,8 +695,8 @@ export function ChatMessages({ messages, isStreaming, isThinking, onRegenerate, 
                       <div className={cn(
                         'text-[15px] sm:text-base leading-7',
                         isAssistant
-                          ? 'text-zinc-200'
-                          : 'rounded-[20px] bg-white/[0.095] px-4 py-2.5 text-zinc-100 shadow-[inset_0_1px_0_rgba(255,255,255,0.08)]'
+                          ? 'text-foreground'
+                          : 'rounded-[20px] border border-border bg-secondary px-4 py-2.5 text-foreground shadow-sm'
                       )}>
                         <MessageContent content={message.content} />
                       </div>
@@ -741,8 +741,8 @@ export function ChatMessages({ messages, isStreaming, isThinking, onRegenerate, 
 
                   {/* User Avatar - Right side */}
                   {!isAssistant && (
-                    <div className="mt-0 flex h-8 w-8 flex-shrink-0 items-center justify-center overflow-hidden rounded-full text-white/90 ring-1 ring-white/10">
-                      {preferences.profilePicture ? <img src={preferences.profilePicture} alt={preferences.profileName || 'You'} className="h-full w-full object-cover" /> : <span className="flex h-full w-full items-center justify-center bg-emerald-500/80 text-sm font-medium">{(preferences.profileName || 'U').slice(0, 1).toUpperCase()}</span>}
+                    <div className="mt-0 flex h-8 w-8 flex-shrink-0 items-center justify-center overflow-hidden rounded-full text-foreground ring-1 ring-border">
+                      {preferences.profilePicture ? <img src={preferences.profilePicture} alt={preferences.profileName || 'You'} className="h-full w-full object-cover" /> : <span className="flex h-full w-full items-center justify-center bg-emerald-500/80 text-sm font-medium text-white">{(preferences.profileName || 'U').slice(0, 1).toUpperCase()}</span>}
                     </div>
                   )}
                 </div>
