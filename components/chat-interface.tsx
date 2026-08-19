@@ -145,11 +145,15 @@ export function ChatInterface({ onSwitchToImagine, onOpenSidebar, isSidebarOpen 
         const canRunLocally = await localVisionSupported();
         const localImage = imageAttachment.visionUrl || imageAttachment.url;
         if (canRunLocally && localImage) {
-          const responseContent = await runLocalVision(localImage, content || "Describe this image and answer my question.");
-          addMessage(chatId, { role: "assistant", content: responseContent });
-          void persistNeuralMemory(chatId, messagesToSend, responseContent);
-          completed = true;
-          return;
+          try {
+            const responseContent = await runLocalVision(localImage, content || "Describe this image and answer my question.");
+            addMessage(chatId, { role: "assistant", content: responseContent });
+            void persistNeuralMemory(chatId, messagesToSend, responseContent);
+            completed = true;
+            return;
+          } catch (localError) {
+            console.warn("[uncgpt] Local vision unavailable; falling back to hosted vision.", localError);
+          }
         }
       }
       const responseContent = await processAIResponse(chatId, messagesToSend);
