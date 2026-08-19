@@ -1,6 +1,7 @@
 import type { Metadata, Viewport } from "next"
 import { Analytics } from "@vercel/analytics/next"
 import { Toaster } from "sonner"
+import { ThemeProvider } from "@/components/theme-provider"
 import "./globals.css"
 
 // Google Fonts disabled for build compatibility
@@ -32,11 +33,13 @@ export default function RootLayout({
   children: React.ReactNode
 }>) {
   return (
-    <html lang="en" className="dark bg-background">
+    <html lang="en" suppressHydrationWarning>
       <body className="font-sans antialiased">
-        {children}
-        <Toaster position="bottom-center" theme="dark" />
-        {process.env.NODE_ENV === "production" && <Analytics />}
+        <ThemeProvider attribute="class" defaultTheme="dark" enableSystem disableTransitionOnChange>
+          {children}
+          <Toaster position="bottom-center" theme="system" />
+          {process.env.NODE_ENV === "production" && <Analytics />}
+        </ThemeProvider>
         <script src="https://js.puter.com/v2/"></script>
       </body>
     </html>

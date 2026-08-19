@@ -64,15 +64,18 @@ export async function POST(request: NextRequest) {
     .select('id')
     .single()
 
+  // Storage is the source of truth for chat media. If the optional metadata
+  // table is missing or has an outdated schema, keep the uploaded object and
+  // return its public URL instead of deleting the image and surfacing an X.
   if (metadataError) {
-    await storage.remove([path])
-    return Response.json({ error: metadataError.message }, { status: 500 })
+    console.warn('[storage/upload] metadata insert skipped:', metadataError.message)
   }
 
   return Response.json({
-    id: metadata.id,
+    id: metadata?.id ?? null,
     url: publicUrl,
     path,
     storedRemotely: true,
+    metadataPersisted: !metadataError,
   })
 }

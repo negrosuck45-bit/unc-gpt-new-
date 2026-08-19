@@ -252,7 +252,7 @@ export function ChatInput({
   const [sheetExpanded, setSheetExpanded] = useState(false)
   const [iconErrors, setIconErrors] = useState<Set<string>>(new Set())
   const [viewingAttachment, setViewingAttachment] = useState<Attachment | null>(null)
-  const [uploadStatus, setUploadStatus] = useState<Map<string, { status: 'uploading' | 'completed' | 'error', progress?: number, url?: string }>>(new Map())
+  const [uploadStatus, setUploadStatus] = useState<Map<string, { status: 'uploading' | 'completed' | 'error', progress?: number, url?: string, error?: string }>>(new Map())
   const [toast, setToast] = useState<string | null>(null)
   const [sendOnEnter, setSendOnEnter] = useState(true)
 
@@ -345,7 +345,7 @@ export function ChatInput({
       console.error('Upload failed:', error)
       setUploadStatus(prev => {
         const newMap = new Map(prev)
-        newMap.set(attachmentId, { status: 'error', progress: 0 })
+        newMap.set(attachmentId, { status: 'error', progress: 0, error: error instanceof Error ? error.message : 'Image upload failed' })
         return newMap
       })
       setAttachments((prev) => 
@@ -618,8 +618,9 @@ export function ChatInput({
                         )}
 
                         {hasError && !isUploading && (
-                          <div className="absolute inset-0 bg-red-500/80 flex items-center justify-center">
-                            <X className="h-6 w-6 text-white" />
+                          <div className="absolute inset-0 flex flex-col items-center justify-center gap-1 bg-red-950/85 px-1 text-center" title={status?.error}>
+                            <X className="h-5 w-5 text-red-200" />
+                            <span className="text-[9px] leading-3 text-red-100">Upload failed</span>
                           </div>
                         )}
 
