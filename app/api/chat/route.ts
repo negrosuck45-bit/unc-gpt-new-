@@ -117,7 +117,7 @@ const SEARXNG_INSTANCES = [
 ];
 
 const OPENROUTER_URL = "https://openrouter.ai/api/v1/chat/completions";
-const OPENROUTER_KEY = "";
+const OPENROUTER_KEY = process.env.OPENROUTER_API_KEY || process.env.OPENROUTER_KEY || "";
 const CEREBRAS_URL = "https://api.cerebras.ai/v1/chat/completions";
 const CEREBRAS_KEY = "csk-tt4rvyyfwr5ytrm9vn33nhv5myc6p3thynkcv2j9cdtce62d";
 
@@ -636,9 +636,10 @@ async function callOpenRouter(
 ): Promise<{ stream: ReadableStream; provider: string; model: string }> {
   const cleanMessages = sanitizeMessagesForAPI(messages);
   const visionModels = [
-    "meta-llama/llama-4-scout-17b-16e-instruct:free",
-    "meta-llama/llama-3.2-11b-vision-instruct:free",
-    "google/gemma-3-4b-it:free",
+    "openrouter/free",
+    "google/gemma-4-31b-it:free",
+    "nvidia/nemotron-3-nano-omni-30b-a3b-reasoning:free",
+    "nvidia/nemotron-nano-12b-v2-vl:free",
   ];
   const textModels = [
     "meta-llama/llama-3.1-8b-instruct:free",
@@ -701,7 +702,7 @@ async function callCerebras(
 ): Promise<{ stream: ReadableStream; provider: string; model: string }> {
   if (!CEREBRAS_KEY) throw new Error("Cerebras API key not configured");
   const cleanMessages = sanitizeMessagesForAPI(messages);
-  const model = hasImage ? "llama-4-scout-17b-16e-instruct" : "llama-3.3-70b";
+  const model = hasImage ? "gemma-4-31b" : "llama-3.3-70b";
   const processedMessages = hasImage
     ? await processAttachmentsForModel(cleanMessages, model, true)
     : cleanMessages;
@@ -812,6 +813,20 @@ async function fallbackChat(
   const errors: string[] = [];
 
   if (hasImage) {
+    // Prefer the documented public Cerebras Gemma vision model. This avoids
+    // wasting the request on retired/dead Groq keys before trying free routers.
+    if (CEREBRAS_KEY) {
+      try {
+        return await callCerebras(messages, true, tools);
+      } catch (err: any) {
+        errors.push(`Cerebras: ${err.message}`);
+      }
+    }
+    try {
+      return await callOpenRouter(messages, true, tools);
+    } catch (err: any) {
+      errors.push(`OpenRouter: ${err.message}`);
+    }
     try {
       return await callGroq(
         messages,
@@ -821,18 +836,6 @@ async function fallbackChat(
       );
     } catch (err: any) {
       errors.push(`Groq: ${err.message}`);
-    }
-    try {
-      return await callOpenRouter(messages, true, tools);
-    } catch (err: any) {
-      errors.push(`OpenRouter: ${err.message}`);
-    }
-    if (CEREBRAS_KEY) {
-      try {
-        return await callCerebras(messages, true, tools);
-      } catch (err: any) {
-        errors.push(`Cerebras: ${err.message}`);
-      }
     }
     throw new Error(`No vision providers: ${errors.join(", ")}`);
   }

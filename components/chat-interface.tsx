@@ -332,7 +332,7 @@ export function ChatInterface({ onSwitchToImagine, onOpenSidebar, isSidebarOpen 
             />
           </div>
 
-          <div className="w-full flex-shrink-0 bg-gradient-to-t from-background via-background/95 to-transparent pb-5 pt-3">
+          <div className="w-full flex-shrink-0 bg-background/95 pb-5 pt-3 transition-colors duration-200">
             <div className="mx-auto w-full max-w-4xl px-2 sm:px-4">
               <ChatInput
                 onSend={handleSend}
