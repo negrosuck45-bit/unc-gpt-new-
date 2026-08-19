@@ -583,7 +583,9 @@ async function callGroq(
         max_tokens: 4096,
       };
 
-      if (tools.length > 0) {
+      // Vision endpoints are kept tool-free: Composio schemas can make
+      // otherwise valid image requests fail provider validation.
+      if (!hasImage && tools.length > 0) {
         requestBody.tools = tools;
         requestBody.tool_choice = "auto";
       }
@@ -672,7 +674,7 @@ async function callOpenRouter(
         max_tokens: 4096,
       };
 
-      if (tools.length > 0) {
+      if (!hasImage && tools.length > 0) {
         body.tools = tools;
         body.tool_choice = "auto";
       }
@@ -715,7 +717,7 @@ async function callCerebras(
     max_tokens: 4096,
   };
 
-  if (tools.length > 0) {
+  if (!hasImage && tools.length > 0) {
     body.tools = tools;
     body.tool_choice = "auto";
   }
@@ -779,7 +781,7 @@ async function callChatWorkers(
         ...(hasImage && { vision: true }),
       };
 
-      if (tools.length > 0) {
+      if (!hasImage && tools.length > 0) {
         reqBody.tools = tools;
         reqBody.tool_choice = "auto";
       }

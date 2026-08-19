@@ -673,7 +673,7 @@ export function ChatInput({
         </AnimatePresence>
 
         <div className="px-3">
-          <div className="rounded-[26px] border border-white/[0.14] bg-white/[0.07] shadow-[0_12px_42px_rgba(0,0,0,0.24)] backdrop-blur-2xl transition-all duration-200 focus-within:border-white/25 focus-within:bg-white/[0.085] focus-within:shadow-[0_16px_48px_rgba(0,0,0,0.32)]">
+          <div className="rounded-[26px] border border-border bg-card shadow-md transition-all duration-200 focus-within:border-ring focus-within:bg-card focus-within:shadow-lg">
             <textarea
               ref={textareaRef}
               value={input}
@@ -731,7 +731,7 @@ export function ChatInput({
                         }}
                         onClick={(event) => event.stopPropagation()}
                         style={{ willChange: 'height, transform', touchAction: 'none' }}
-                        className="absolute bottom-0 left-0 right-0 flex max-h-[82dvh] flex-col overflow-hidden rounded-t-[30px] rounded-b-none border-x-0 border-b-0 border-t border-border bg-background/[0.96] p-4 pb-[max(1.25rem,env(safe-area-inset-bottom))] shadow-[0_-24px_90px_rgba(0,0,0,0.64),inset_0_1px_0_rgba(255,255,255,0.08)] backdrop-blur-[36px] sm:bottom-6 sm:left-1/2 sm:right-auto sm:h-auto sm:max-h-[min(680px,calc(100dvh-4rem))] sm:w-[360px] sm:-translate-x-1/2 sm:rounded-[30px] sm:border sm:border-white/[0.18] sm:p-5"
+                        className="absolute bottom-0 left-0 right-0 flex max-h-[82dvh] flex-col overflow-hidden rounded-t-[30px] rounded-b-none border-x-0 border-b-0 border-t border-border bg-card p-4 pb-[max(1.25rem,env(safe-area-inset-bottom))] shadow-[0_-24px_90px_rgba(0,0,0,0.64),inset_0_1px_0_rgba(255,255,255,0.08)] backdrop-blur-[36px] sm:bottom-6 sm:left-1/2 sm:right-auto sm:h-auto sm:max-h-[min(680px,calc(100dvh-4rem))] sm:w-[360px] sm:-translate-x-1/2 sm:rounded-[30px] sm:border sm:border-white/[0.18] sm:p-5"
                       >
                         <div className="shrink-0" style={{ touchAction: 'pan-y' }}>
                         <button
