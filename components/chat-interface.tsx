@@ -9,6 +9,7 @@ import { ChatHeader } from "@/components/chat-header";
 import { playReplySound, unlockReplySound } from "@/lib/notifications";
 import { readUserPreferences } from "@/lib/user-preferences";
 import { triggerHaptic } from "@/lib/haptics";
+import { localVisionSupported, runLocalVision } from "@/lib/local-vision";
 
 interface ChatInterfaceProps {
   onSwitchToImagine?: () => void;
@@ -139,6 +140,18 @@ export function ChatInterface({ onSwitchToImagine, onOpenSidebar, isSidebarOpen 
     let completed = false;
     try {
       const messagesToSend = useChatStore.getState().chats.find((c) => c.id === chatId)?.messages || [];
+      const imageAttachment = attachments?.find((attachment) => attachment.type === "image");
+      if (imageAttachment) {
+        const canRunLocally = await localVisionSupported();
+        const localImage = imageAttachment.visionUrl || imageAttachment.url;
+        if (canRunLocally && localImage) {
+          const responseContent = await runLocalVision(localImage, content || "Describe this image and answer my question.");
+          addMessage(chatId, { role: "assistant", content: responseContent });
+          void persistNeuralMemory(chatId, messagesToSend, responseContent);
+          completed = true;
+          return;
+        }
+      }
       const responseContent = await processAIResponse(chatId, messagesToSend);
       void persistNeuralMemory(chatId, messagesToSend, responseContent);
       completed = true;
