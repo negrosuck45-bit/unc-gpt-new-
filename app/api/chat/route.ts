@@ -702,7 +702,7 @@ async function callHuggingFaceVision(
   tools: any[] = []
 ): Promise<{ stream: ReadableStream; provider: string; model: string }> {
   if (!HF_TOKEN) throw new Error("Hugging Face token not configured");
-  const models = ["google/gemma-3-12b-it", "google/gemma-4-31B-it"];
+  const models = ["google/gemma-4-31B-it", "google/gemma-3-12b-it"];
   const cleanMessages = sanitizeMessagesForAPI(messages);
   let lastError = "";
   for (const model of models) {

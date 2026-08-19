@@ -77,7 +77,7 @@ export function AuthPanel({ user }: AuthPanelProps) {
               <p className="mt-6 max-w-sm text-base leading-7 text-white/55">Your connected AI workspace routes each task to the right intelligence while you stay in control of your data and connected apps.</p>
             </div>
           </div>
-          <div className="flex items-center gap-3 text-xs text-white/40"><span className="h-2 w-2 rounded-full bg-emerald-400 shadow-[0_0_12px_rgba(52,211,153,0.8)]" /> Secure authentication powered by Auth0</div>
+          <div className="flex items-center gap-3 text-xs text-white/40"><span className="h-2 w-2 rounded-full bg-emerald-400 shadow-[0_0_12px_rgba(52,211,153,0.8)]" /> Private, secure sign-in</div>
         </section>
 
         <section className="flex min-h-[610px] flex-col justify-center p-7 sm:p-10 lg:p-12">
@@ -85,12 +85,12 @@ export function AuthPanel({ user }: AuthPanelProps) {
             <div className="mb-5 flex justify-center lg:hidden"><UncgptLogo /></div>
             <p className="text-xs font-medium uppercase tracking-[0.22em] text-violet-300/80">Welcome to uncgpt</p>
             <h2 className="mt-3 text-3xl font-semibold tracking-tight">Sign in to continue</h2>
-            <p className="mt-3 text-sm leading-6 text-white/50">Use your preferred account. Authentication and password security are handled securely by Auth0.</p>
+            <p className="mt-3 text-sm leading-6 text-white/50">Use your preferred account. Your sign-in is protected and your workspace stays private.</p>
           </div>
 
           <div className="grid gap-3">
             <AuthLink href={`/auth/login?connection=${AUTH0_CONNECTIONS.google}`} primary>Continue with Google</AuthLink>
-            <AuthLink href={`/auth/login?connection=${AUTH0_CONNECTIONS.github}`}>Continue with GitHub</AuthLink>
+            <AuthLink href={`/auth/login?connection=${AUTH0_CONNECTIONS.github}&returnTo=%2F`}>Continue with GitHub</AuthLink>
             <div className="my-1 flex items-center gap-3 text-[11px] uppercase tracking-[0.2em] text-white/25"><span className="h-px flex-1 bg-white/10" /> or <span className="h-px flex-1 bg-white/10" /></div>
             <AuthLink href="/auth/login">Continue with email</AuthLink>
             <AuthLink href="/auth/login?screen_hint=signup">Create an account</AuthLink>

@@ -194,7 +194,7 @@ export function SettingsPage({ onClose }: SettingsPageProps) {
               {/* ── Profile ─────────────────────────────────────────────── */}
               {activeTab === 'profile' && (
                 <div className="space-y-5">
-                  <SectionTitle title="Profile" description="Your signed-in Google/Auth0 identity" />
+                  <SectionTitle title="Profile" description="Your signed-in identity" />
                   <div className="rounded-[22px] border border-border bg-card p-4 shadow-sm">
                     <div className="flex items-center gap-3">
                       {profilePicture ? <img src={profilePicture} alt="Your profile" className="h-12 w-12 rounded-full object-cover" /> : <div className="flex h-12 w-12 items-center justify-center rounded-full bg-emerald-500/80 text-xl font-medium">{(profileName || authUser?.name || authUser?.email || 'U').slice(0, 1).toUpperCase()}</div>}
@@ -205,7 +205,7 @@ export function SettingsPage({ onClose }: SettingsPageProps) {
                   <div className="rounded-[22px] border border-border bg-card p-4 shadow-sm">
                     <div className="flex items-center gap-3">
                       {authUser?.picture ? <img src={authUser.picture} alt="" className="h-10 w-10 rounded-full object-cover" /> : <div className="flex h-10 w-10 items-center justify-center rounded-full bg-muted/10 text-lg font-medium">{(authUser?.name || authUser?.email || 'U').slice(0, 1).toUpperCase()}</div>}
-                      <div className="min-w-0 flex-1"><p className="text-xs font-medium uppercase tracking-[0.14em] text-foreground/45">Connected account</p><p className="truncate text-sm text-foreground/80">{authUser?.email || 'Authenticated with Auth0'}</p></div>
+                      <div className="min-w-0 flex-1"><p className="text-xs font-medium uppercase tracking-[0.14em] text-foreground/45">Connected account</p><p className="truncate text-sm text-foreground/80">{authUser?.email || 'Identity and security'}</p></div>
                       <GoogleMark />
                     </div>
                   </div>
@@ -407,7 +407,7 @@ export function SettingsPage({ onClose }: SettingsPageProps) {
                     <div className="flex items-center gap-3">
                       <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-muted/10"><UserCircle className="h-5 w-5 text-foreground/70" /></div>
                       <div>
-                        <p className="text-sm font-medium">Authenticated with Auth0</p>
+                        <p className="text-sm font-medium">Identity and security</p>
                         <p className="text-xs text-muted-foreground">Your password and provider credentials stay with the identity provider.</p>
                       </div>
                     </div>

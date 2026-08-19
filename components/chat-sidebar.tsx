@@ -488,7 +488,7 @@ export function ChatSidebar({
               </AnimatePresence>
               <button onClick={() => setAccountOpen((open) => !open)} className="flex w-full items-center gap-3 rounded-[18px] border border-sidebar-border/[0.08] bg-sidebar-accent/[0.075] px-3 py-2.5 text-left shadow-[inset_0_1px_0_rgba(255,255,255,0.05)] transition hover:bg-sidebar-accent/[0.12]">
                 {profilePreferences.profilePicture || authUser?.picture ? <img src={profilePreferences.profilePicture || authUser?.picture || ''} alt="Profile" className="h-9 w-9 rounded-full object-cover ring-1 ring-white/15" /> : <span className="flex h-9 w-9 items-center justify-center rounded-full bg-emerald-500/80 text-base font-medium text-sidebar-foreground ring-1 ring-white/10">{(profilePreferences.profileName || authUser?.name || authUser?.email || 'U').slice(0, 1).toUpperCase()}</span>}
-                <span className="min-w-0 flex-1"><span className="block truncate text-[14px] font-medium leading-5 text-sidebar-foreground/92">{profilePreferences.profileName || authUser?.name || 'Account'}</span><span className="block truncate text-[11px] leading-4 text-sidebar-foreground/45">{authUser?.email || 'Signed in with Auth0'}</span></span>
+                <span className="min-w-0 flex-1"><span className="block truncate text-[14px] font-medium leading-5 text-sidebar-foreground/92">{profilePreferences.profileName || authUser?.name || 'Account'}</span><span className="block truncate text-[11px] leading-4 text-sidebar-foreground/45">{authUser?.email || 'Signed in securely'}</span></span>
                 <MoreHorizontal className="h-[18px] w-[18px] shrink-0 text-sidebar-foreground/50" />
               </button>
             </div>
