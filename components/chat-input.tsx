@@ -614,7 +614,7 @@ export function ChatInput({
         )}
       </AnimatePresence>
 
-      <div className="max-w-3xl mx-auto w-full px-0 pb-1">
+      <div className="max-w-4xl xl:max-w-5xl mx-auto w-full px-0 pb-1">
         <AnimatePresence>
           {attachments.length > 0 && (
             <motion.div initial={{ opacity: 0, height: 0 }} animate={{ opacity: 1, height: 'auto' }} exit={{ opacity: 0, height: 0 }} className="mb-3 px-3 space-y-2 max-h-56 overflow-y-auto">
@@ -731,7 +731,7 @@ export function ChatInput({
                         }}
                         onClick={(event) => event.stopPropagation()}
                         style={{ willChange: 'height, transform', touchAction: 'none' }}
-                        className="absolute bottom-0 left-0 right-0 flex max-h-[82dvh] flex-col overflow-hidden rounded-t-[30px] rounded-b-none border-x-0 border-b-0 border-t border-border bg-card p-4 pb-[max(1.25rem,env(safe-area-inset-bottom))] shadow-[0_-24px_90px_rgba(0,0,0,0.64),inset_0_1px_0_rgba(255,255,255,0.08)] backdrop-blur-[36px] sm:bottom-6 sm:left-1/2 sm:right-auto sm:h-auto sm:max-h-[min(680px,calc(100dvh-4rem))] sm:w-[360px] sm:-translate-x-1/2 sm:rounded-[30px] sm:border sm:border-white/[0.18] sm:p-5"
+                        className="absolute bottom-0 left-0 right-0 flex max-h-[82dvh] flex-col overflow-hidden rounded-t-[30px] rounded-b-none border-x-0 border-b-0 border-t border-border bg-card p-4 pb-[max(1.25rem,env(safe-area-inset-bottom))] shadow-[0_-24px_90px_rgba(0,0,0,0.64),inset_0_1px_0_rgba(255,255,255,0.08)] backdrop-blur-[36px] sm:bottom-6 sm:left-1/2 sm:right-auto sm:h-auto sm:max-h-[min(680px,calc(100dvh-4rem))] sm:w-[420px] lg:w-[480px] sm:-translate-x-1/2 sm:rounded-[30px] sm:border sm:border-white/[0.18] sm:p-5"
                       >
                         <div className="shrink-0" style={{ touchAction: 'pan-y' }}>
                         <button

@@ -275,8 +275,8 @@ export function ChatSidebar({
         </RailButton>
 
         {settingsPageOpen && (
-          <div className="fixed inset-0 z-50 flex items-start sm:items-center justify-center bg-black/70 sm:bg-black/60 sm:backdrop-blur-sm overflow-y-auto p-0 sm:p-4">
-            <div className="w-full max-w-none sm:max-w-5xl min-h-[calc(100dvh-env(safe-area-inset-top))] sm:min-h-0 sm:my-8">
+          <div className="fixed inset-0 z-50 flex items-start sm:items-center justify-center bg-foreground/20 sm:bg-foreground/15 sm:backdrop-blur-sm overflow-y-auto p-0 sm:p-4">
+            <div className="w-full max-w-none sm:max-w-5xl lg:max-w-6xl min-h-[calc(100dvh-env(safe-area-inset-top))] sm:min-h-0 sm:my-8">
               <SettingsPage onClose={() => setSettingsPageOpen(false)} />
             </div>
           </div>
@@ -479,10 +479,10 @@ export function ChatSidebar({
                     initial={{ opacity: 0, y: 8, scale: 0.98 }}
                     animate={{ opacity: 1, y: 0, scale: 1 }}
                     exit={{ opacity: 0, y: 8, scale: 0.98 }}
-                    className="absolute bottom-[calc(100%-0.2rem)] left-2 right-2 z-20 overflow-hidden rounded-[18px] border border-sidebar-border/[0.14] bg-[#303034]/[0.98] p-1 shadow-[0_16px_42px_rgba(0,0,0,0.42)] backdrop-blur-2xl"
+                    className="absolute bottom-[calc(100%-0.2rem)] left-2 right-2 z-20 overflow-hidden rounded-[18px] border border-border bg-popover p-1 text-popover-foreground shadow-[0_16px_42px_rgba(0,0,0,0.22)] backdrop-blur-2xl"
                   >
                     <button onClick={openSettings} className="flex w-full items-center gap-3 rounded-[14px] px-3 py-2.5 text-left text-[14px] text-sidebar-foreground/90 transition hover:bg-sidebar-accent/[0.10]"><SettingsIcon className="h-[18px] w-[18px] text-sidebar-foreground/75" /> Settings</button>
-                    <a href="/auth/logout" className="flex w-full items-center gap-3 rounded-[14px] px-3 py-2.5 text-left text-[14px] text-red-200 transition hover:bg-red-400/[0.10]"><LogOut className="h-[18px] w-[18px] text-red-200/80" /> Log out</a>
+                    <a href="/auth/logout" className="flex w-full items-center gap-3 rounded-[14px] px-3 py-2.5 text-left text-[14px] text-destructive transition hover:bg-destructive/[0.10]"><LogOut className="h-[18px] w-[18px] text-destructive/80" /> Log out</a>
                   </motion.div>
                 )}
               </AnimatePresence>
@@ -497,8 +497,8 @@ export function ChatSidebar({
       </AnimatePresence>
 
       {settingsPageOpen && (
-        <div className="fixed inset-0 z-50 flex items-start sm:items-center justify-center bg-black/70 sm:bg-black/60 sm:backdrop-blur-sm overflow-y-auto p-0 sm:p-4">
-          <div className="w-full max-w-none sm:max-w-5xl min-h-[calc(100dvh-env(safe-area-inset-top))] sm:min-h-0 sm:my-8">
+        <div className="fixed inset-0 z-50 flex items-start sm:items-center justify-center bg-foreground/20 sm:bg-foreground/15 sm:backdrop-blur-sm overflow-y-auto p-0 sm:p-4">
+          <div className="w-full max-w-none sm:max-w-5xl lg:max-w-6xl min-h-[calc(100dvh-env(safe-area-inset-top))] sm:min-h-0 sm:my-8">
             <SettingsPage onClose={() => setSettingsPageOpen(false)} />
           </div>
         </div>
