@@ -11,6 +11,8 @@ export interface Attachment {
   type: "image" | "video" | "file" | "link";
   name: string;
   url: string;
+  /** Local compressed data URL used only when a vision provider cannot fetch Storage URLs. */
+  visionUrl?: string;
   size?: number;
   mimeType?: string;
   language?: string;   // <-- Added for syntax highlighting

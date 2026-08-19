@@ -110,7 +110,7 @@ export function MarsAvatar({ model, family, size = 32, useSimpleIcon = false }: 
     return (
       <div
         style={{ width: size, height: size }}
-        className="rounded-full overflow-hidden bg-black flex items-center justify-center"
+        className="rounded-full overflow-hidden bg-transparent flex items-center justify-center"
       >
         <Image
           src={iconMap[determinedFamily] || iconMap.auto}
@@ -127,7 +127,7 @@ export function MarsAvatar({ model, family, size = 32, useSimpleIcon = false }: 
   return (
     <div
       style={{ width: size, height: size }}
-      className="rounded-full overflow-hidden bg-black"
+      className="rounded-full overflow-hidden bg-transparent"
     >
       <Canvas camera={{ position: [0, 0, 2.5], fov: 45 }}>
         <ambientLight intensity={0.6} />

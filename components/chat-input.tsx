@@ -121,6 +121,15 @@ function textToFileAttachment(text: string, filename?: string): Attachment {
   };
 }
 
+function readFileAsDataUrl(file: Blob): Promise<string> {
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader()
+    reader.onload = () => resolve(String(reader.result || ''))
+    reader.onerror = () => reject(reader.error || new Error('Failed to read image'))
+    reader.readAsDataURL(file)
+  })
+}
+
 async function compressImage(file: File): Promise<File> {
   // Safari/iOS commonly returns HEIC/HEIF files. Canvas decoding is not
   // guaranteed for those formats, so upload the original rather than turning
@@ -326,8 +335,8 @@ export function ChatInput({
         return newMap
       })
 
-      const compressed = await compressImage(file)
-
+            const compressed = await compressImage(file)
+      const visionUrl = await readFileAsDataUrl(compressed)
       setUploadStatus(prev => {
         const newMap = new Map(prev)
         newMap.set(attachmentId, { status: 'uploading', progress: 50 })
@@ -345,7 +354,7 @@ export function ChatInput({
       setAttachments((prev) => 
         prev.map((a) => 
           a.id === attachmentId 
-            ? { ...a, url: publicUrl, permanentUrl: publicUrl, uploaded: true }
+              ? { ...a, url: publicUrl, visionUrl, permanentUrl: publicUrl, uploaded: true }
             : a
         )
       )

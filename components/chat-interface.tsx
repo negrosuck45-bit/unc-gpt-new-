@@ -175,7 +175,7 @@ export function ChatInterface({ onSwitchToImagine, onOpenSidebar, isSidebarOpen 
         const contentParts: any[] = [{ type: "text", text: m.content || "" }];
         m.attachments.forEach((a: any) => {
           if (a.type === "image") {
-            contentParts.push({ type: "image_url", image_url: { url: a.url } });
+            contentParts.push({ type: "image_url", image_url: { url: a.visionUrl || a.url } });
           } else if (a.type === "file" || a.type === "link") {
             contentParts[0].text += `\n\n[Attached ${a.type}: ${a.name}](${a.url})`;
           }
