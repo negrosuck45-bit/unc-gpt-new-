@@ -118,6 +118,8 @@ const SEARXNG_INSTANCES = [
 
 const OPENROUTER_URL = "https://openrouter.ai/api/v1/chat/completions";
 const OPENROUTER_KEY = process.env.OPENROUTER_API_KEY || process.env.OPENROUTER_KEY || "";
+const HF_URL = "https://router.huggingface.co/v1/chat/completions";
+const HF_TOKEN = process.env.HF_TOKEN || process.env.HUGGINGFACE_API_KEY || "";
 const CEREBRAS_URL = "https://api.cerebras.ai/v1/chat/completions";
 const CEREBRAS_KEY = "csk-tt4rvyyfwr5ytrm9vn33nhv5myc6p3thynkcv2j9cdtce62d";
 
@@ -695,6 +697,49 @@ async function callOpenRouter(
   throw new Error("All OpenRouter free models failed");
 }
 
+async function callHuggingFaceVision(
+  messages: any[],
+  tools: any[] = []
+): Promise<{ stream: ReadableStream; provider: string; model: string }> {
+  if (!HF_TOKEN) throw new Error("Hugging Face token not configured");
+  const models = ["google/gemma-3-12b-it", "google/gemma-4-31B-it"];
+  const cleanMessages = sanitizeMessagesForAPI(messages);
+  let lastError = "";
+  for (const model of models) {
+    try {
+      const processedMessages = await processAttachmentsForModel(cleanMessages, model, true);
+      const controller = new AbortController();
+      const timeoutId = setTimeout(() => controller.abort(), 45000);
+      const res = await fetch(HF_URL, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${HF_TOKEN}`,
+        },
+        body: JSON.stringify({
+          model,
+          messages: [
+            { role: "system", content: "You are uncgpt vision. Analyze the attached image and answer the user clearly. Do not use tools." },
+            ...processedMessages,
+          ],
+          stream: true,
+          temperature: 0.2,
+          max_tokens: 2048,
+        }),
+        signal: controller.signal,
+      });
+      clearTimeout(timeoutId);
+      if (res.ok && res.body) {
+        return { stream: res.body, provider: "Hugging Face", model };
+      }
+      lastError = `${res.status} ${(await res.text().catch(() => "")).slice(0, 180)}`;
+    } catch (error: any) {
+      lastError = error?.message || "request failed";
+    }
+  }
+  throw new Error(`Hugging Face vision failed: ${lastError}`);
+}
+
 async function callCerebras(
   messages: any[],
   hasImage: boolean,
@@ -813,8 +858,14 @@ async function fallbackChat(
   const errors: string[] = [];
 
   if (hasImage) {
-    // Prefer the documented public Cerebras Gemma vision model. This avoids
-    // wasting the request on retired/dead Groq keys before trying free routers.
+    if (HF_TOKEN) {
+      try {
+        return await callHuggingFaceVision(messages, tools);
+      } catch (err: any) {
+        errors.push(`Hugging Face: ${err.message}`);
+      }
+    }
+    // Try Cerebras only after Hugging Face, because this deployment may be on a paid-only key.
     if (CEREBRAS_KEY) {
       try {
         return await callCerebras(messages, true, tools);
