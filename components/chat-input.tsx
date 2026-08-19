@@ -171,14 +171,15 @@ async function uploadToSupabase(file: File, fileName: string): Promise<string> {
   const response = await fetch('/api/storage/upload', { method: 'POST', body: formData })
   if (response.ok) {
     const result = await response.json()
-    return result.url
+    if (typeof result?.url === 'string' && result.url.length > 0) return result.url
+    throw new Error('Supabase Storage returned no usable image URL')
   }
 
   // Use direct Supabase Storage as a resilient fallback. This still returns a
   // durable Supabase URL, unlike the old blob/data-URL fallback.
   let fallbackError = ''
   try {
-    const fallback = await uploadFile(file, { folder: 'images', allowLocalFallback: false })
+    const fallback = await uploadFile(file, { folder: 'images', allowLocalFallback: true })
     if (fallback.storedRemotely) return fallback.url
   } catch (error) {
     fallbackError = error instanceof Error ? error.message : String(error)
@@ -661,7 +662,7 @@ export function ChatInput({
               onPaste={handlePasteEvent}
               onKeyDown={handleKeyDown}
               placeholder="Write a message... (paste images directly!)"
-              className="w-full bg-transparent px-5 pt-3.5 pb-1.5 resize-none text-[15px] leading-6 placeholder:text-white/35 focus:outline-none min-h-[50px]"
+              className="w-full bg-transparent px-5 pt-3.5 pb-1.5 resize-none text-[15px] leading-6 placeholder:text-muted-foreground focus:outline-none min-h-[50px]"
               disabled={disabled}
               rows={1}
             />
@@ -673,7 +674,7 @@ export function ChatInput({
                   onClick={handlePlusPress}
                   disabled={isStreaming || disabled}
                   aria-label="Add photos, files, or links"
-                  className="group flex h-8 w-8 items-center justify-center rounded-full border border-white/[0.14] bg-white/[0.06] text-white/65 shadow-[inset_0_1px_0_rgba(255,255,255,0.09),0_4px_16px_rgba(0,0,0,0.14)] backdrop-blur-xl transition-all hover:border-white/[0.20] hover:bg-white/[0.11] hover:text-white active:scale-[0.94] disabled:opacity-40"
+                  className="group flex h-8 w-8 items-center justify-center rounded-full border border-border bg-secondary text-muted-foreground shadow-sm backdrop-blur-xl transition-all hover:bg-accent hover:text-foreground active:scale-[0.94] disabled:opacity-40"
                 >
                   <Plus className="h-5 w-5" />
                 </button>
@@ -711,7 +712,7 @@ export function ChatInput({
                         }}
                         onClick={(event) => event.stopPropagation()}
                         style={{ willChange: 'height, transform', touchAction: 'none' }}
-                        className="absolute bottom-0 left-0 right-0 flex max-h-[82dvh] flex-col overflow-hidden rounded-t-[30px] rounded-b-none border-x-0 border-b-0 border-t border-white/[0.18] bg-[#1a1a20]/[0.90] p-4 pb-[max(1.25rem,env(safe-area-inset-bottom))] shadow-[0_-24px_90px_rgba(0,0,0,0.64),inset_0_1px_0_rgba(255,255,255,0.08)] backdrop-blur-[36px] sm:bottom-6 sm:left-1/2 sm:right-auto sm:h-auto sm:max-h-[min(680px,calc(100dvh-4rem))] sm:w-[360px] sm:-translate-x-1/2 sm:rounded-[30px] sm:border sm:border-white/[0.18] sm:p-5"
+                        className="absolute bottom-0 left-0 right-0 flex max-h-[82dvh] flex-col overflow-hidden rounded-t-[30px] rounded-b-none border-x-0 border-b-0 border-t border-border bg-background/[0.96] p-4 pb-[max(1.25rem,env(safe-area-inset-bottom))] shadow-[0_-24px_90px_rgba(0,0,0,0.64),inset_0_1px_0_rgba(255,255,255,0.08)] backdrop-blur-[36px] sm:bottom-6 sm:left-1/2 sm:right-auto sm:h-auto sm:max-h-[min(680px,calc(100dvh-4rem))] sm:w-[360px] sm:-translate-x-1/2 sm:rounded-[30px] sm:border sm:border-white/[0.18] sm:p-5"
                       >
                         <div className="shrink-0" style={{ touchAction: 'pan-y' }}>
                         <button
@@ -721,32 +722,32 @@ export function ChatInput({
                           className="mx-auto mb-4 block h-1.5 w-12 cursor-pointer rounded-full border-0 bg-white/25 p-0 shadow-[0_1px_4px_rgba(0,0,0,0.25)] transition hover:bg-white/45 sm:hidden"
                         />
                         <div className="mb-4 flex items-center justify-between">
-                          <h3 className="text-lg font-semibold text-white">Photos</h3>
-                          <button type="button" onClick={() => imageInputRef.current?.click()} className="text-sm font-medium text-blue-300 hover:text-blue-200">See all</button>
+                          <h3 className="text-lg font-semibold text-foreground">Photos</h3>
+                          <button type="button" onClick={() => imageInputRef.current?.click()} className="text-sm font-medium text-primary hover:text-primary/80">See all</button>
                         </div>
                         <div className="mb-5 flex gap-2 overflow-x-auto pb-1">
-                          <motion.button type="button" onClick={() => openPhotoPicker('camera')} whileTap={{ scale: 0.96 }} transition={{ type: 'spring', stiffness: 520, damping: 28 }} aria-label="Camera" className="flex h-28 w-28 shrink-0 flex-col items-center justify-center gap-2 rounded-[20px] border border-white/[0.08] bg-white/[0.085] text-white/90 shadow-[inset_0_1px_0_rgba(255,255,255,0.07)] backdrop-blur-xl transition hover:bg-white/[0.13]">
+                          <motion.button type="button" onClick={() => openPhotoPicker('camera')} whileTap={{ scale: 0.96 }} transition={{ type: 'spring', stiffness: 520, damping: 28 }} aria-label="Camera" className="flex h-28 w-28 shrink-0 flex-col items-center justify-center gap-2 rounded-[20px] border border-border bg-secondary text-foreground shadow-[inset_0_1px_0_rgba(255,255,255,0.07)] backdrop-blur-xl transition hover:bg-white/[0.13]">
                             <Camera className="h-7 w-7" strokeWidth={1.8} />
                             <span className="text-[13px] font-medium">Camera</span>
                           </motion.button>
                           {imageAttachments.map((attachment) => (
-                            <div key={attachment.id} className="relative h-28 w-28 shrink-0 overflow-hidden rounded-[20px] border border-white/12 bg-white/[0.06]">
+                            <div key={attachment.id} className="relative h-28 w-28 shrink-0 overflow-hidden rounded-[20px] border border-border bg-muted">
                               <img src={attachment.url} alt={attachment.name} className="h-full w-full object-cover" />
                             </div>
                           ))}
-                          <motion.button type="button" onClick={() => openPhotoPicker('library')} whileTap={{ scale: 0.96 }} transition={{ type: 'spring', stiffness: 520, damping: 28 }} aria-label="Choose photos" className="flex h-28 w-28 shrink-0 flex-col items-center justify-center gap-2 rounded-[20px] border border-white/[0.12] bg-white/[0.055] text-white/70 shadow-[inset_0_1px_0_rgba(255,255,255,0.05)] backdrop-blur-xl transition hover:bg-white/[0.10]">
+                          <motion.button type="button" onClick={() => openPhotoPicker('library')} whileTap={{ scale: 0.96 }} transition={{ type: 'spring', stiffness: 520, damping: 28 }} aria-label="Choose photos" className="flex h-28 w-28 shrink-0 flex-col items-center justify-center gap-2 rounded-[20px] border border-border bg-muted text-muted-foreground shadow-[inset_0_1px_0_rgba(255,255,255,0.05)] backdrop-blur-xl transition hover:bg-white/[0.10]">
                             <ImageIcon className="h-7 w-7" strokeWidth={1.8} />
                             <span className="text-[13px]">Photo Library</span>
                           </motion.button>
                         </div>
                         </div>
-                        <div className="min-h-0 flex-1 overflow-y-auto overscroll-contain border-t border-white/[0.12] pt-3" style={{ WebkitOverflowScrolling: 'touch' }}>
-                          <button type="button" onClick={() => fileInputRef.current?.click()} className="flex min-h-12 w-full items-center gap-4 rounded-2xl px-3 text-[15px] text-white/90 transition hover:bg-white/[0.08]"><Paperclip className="h-6 w-6 text-white/75" /> Add files</button>
-                          <button type="button" onClick={() => handleQuickAction('Connect my computer and show me what is available.')} className="flex min-h-12 w-full items-center gap-4 rounded-2xl px-3 text-[15px] text-white/90 transition hover:bg-white/[0.08]"><Monitor className="h-6 w-6 text-white/75" /> Connect My Computer</button>
-                          <button type="button" onClick={() => handleQuickAction('Help me choose and use a skill for this task.')} className="flex min-h-12 w-full items-center gap-4 rounded-2xl px-3 text-[15px] text-white/90 transition hover:bg-white/[0.08]"><Puzzle className="h-6 w-6 text-white/75" /> Add Skills</button>
-                          <button type="button" onClick={() => handleQuickAction('Build a website for me.')} className="flex min-h-12 w-full items-center gap-4 rounded-2xl px-3 text-[15px] text-white/90 transition hover:bg-white/[0.08]"><LayoutGrid className="h-6 w-6 text-white/75" /> Build website</button>
-                          <button type="button" onClick={() => handleQuickAction('Create a slide presentation for me.')} className="flex min-h-12 w-full items-center gap-4 rounded-2xl px-3 text-[15px] text-white/90 transition hover:bg-white/[0.08]"><Presentation className="h-6 w-6 text-white/75" /> Create slides</button>
-                          <button type="button" onClick={() => handleQuickAction('Create an image for me.')} className="flex min-h-12 w-full items-center gap-4 rounded-2xl px-3 text-[15px] text-white/90 transition hover:bg-white/[0.08]"><ImageIcon className="h-6 w-6 text-white/75" /> Create image</button>
+                        <div className="min-h-0 flex-1 overflow-y-auto overscroll-contain border-t border-border pt-3" style={{ WebkitOverflowScrolling: 'touch' }}>
+                          <button type="button" onClick={() => fileInputRef.current?.click()} className="flex min-h-12 w-full items-center gap-4 rounded-2xl px-3 text-[15px] text-foreground transition hover:bg-accent"><Paperclip className="h-6 w-6 text-muted-foreground" /> Add files</button>
+                          <button type="button" onClick={() => handleQuickAction('Connect my computer and show me what is available.')} className="flex min-h-12 w-full items-center gap-4 rounded-2xl px-3 text-[15px] text-foreground transition hover:bg-accent"><Monitor className="h-6 w-6 text-muted-foreground" /> Connect My Computer</button>
+                          <button type="button" onClick={() => handleQuickAction('Help me choose and use a skill for this task.')} className="flex min-h-12 w-full items-center gap-4 rounded-2xl px-3 text-[15px] text-foreground transition hover:bg-accent"><Puzzle className="h-6 w-6 text-muted-foreground" /> Add Skills</button>
+                          <button type="button" onClick={() => handleQuickAction('Build a website for me.')} className="flex min-h-12 w-full items-center gap-4 rounded-2xl px-3 text-[15px] text-foreground transition hover:bg-accent"><LayoutGrid className="h-6 w-6 text-muted-foreground" /> Build website</button>
+                          <button type="button" onClick={() => handleQuickAction('Create a slide presentation for me.')} className="flex min-h-12 w-full items-center gap-4 rounded-2xl px-3 text-[15px] text-foreground transition hover:bg-accent"><Presentation className="h-6 w-6 text-muted-foreground" /> Create slides</button>
+                          <button type="button" onClick={() => handleQuickAction('Create an image for me.')} className="flex min-h-12 w-full items-center gap-4 rounded-2xl px-3 text-[15px] text-foreground transition hover:bg-accent"><ImageIcon className="h-6 w-6 text-muted-foreground" /> Create image</button>
                         </div>
                       </motion.div>
                     </motion.div>

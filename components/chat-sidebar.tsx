@@ -234,13 +234,13 @@ export function ChatSidebar({
         animate={{ width: 56, opacity: 1 }}
         transition={{ duration: 0.18, ease: [0.4, 0, 0.2, 1] }}
         style={{ width: 56, minWidth: 56, height: '100dvh', maxHeight: '100dvh' }}
-        className="bg-[#111114]/[0.96] supports-[backdrop-filter]:backdrop-blur-3xl text-sidebar-foreground shadow-[10px_0_40px_rgba(0,0,0,0.28)] flex flex-col items-center py-3 gap-1 overflow-y-auto overflow-x-hidden sticky top-0"
+        className="bg-sidebar supports-[backdrop-filter]:backdrop-blur-3xl text-sidebar-foreground shadow-[10px_0_40px_rgba(0,0,0,0.18)] flex flex-col items-center py-3 gap-1 overflow-y-auto overflow-x-hidden sticky top-0 transition-colors duration-200"
       >
         <button
           onClick={onToggle}
           title="Open sidebar"
           aria-label="Open sidebar"
-          className="group relative h-10 w-10 rounded-xl flex items-center justify-center text-white/65 hover:bg-white/[0.08] hover:text-white transition-all mb-1"
+          className="group relative h-10 w-10 rounded-xl flex items-center justify-center text-sidebar-foreground/65 hover:bg-sidebar-accent hover:text-sidebar-foreground transition-all mb-1"
         >
           <Image
             src="/uncgpt.png"
@@ -300,7 +300,7 @@ export function ChatSidebar({
             exit={{ x: -280, opacity: 0 }}
             transition={{ duration: 0.22, ease: [0.4, 0, 0.2, 1] }}
             style={{ width: 280, minWidth: 280, height: '100dvh', maxHeight: '100dvh' }}
-            className={cn("bg-[#111114]/[0.96] supports-[backdrop-filter]:backdrop-blur-3xl text-sidebar-foreground shadow-[18px_0_60px_rgba(0,0,0,0.34)] flex flex-col overflow-hidden", isMobile ? "fixed inset-y-0 left-0 z-[100] shadow-2xl" : "relative")}
+            className={cn("bg-sidebar supports-[backdrop-filter]:backdrop-blur-3xl text-sidebar-foreground shadow-[18px_0_60px_rgba(0,0,0,0.22)] flex flex-col overflow-hidden transition-colors duration-200", isMobile ? "fixed inset-y-0 left-0 z-[100] shadow-2xl" : "relative")}
           >
             {/* Borderless sidebar identity row with the Mars logo restored. */}
             <div className="bg-transparent px-3.5 sm:px-4 pt-[max(0.875rem,env(safe-area-inset-top))] pb-3 flex items-center justify-between">
@@ -313,7 +313,7 @@ export function ChatSidebar({
                   onClick={() => setShowSearch((open) => !open)}
                   title="Search chats"
                   aria-label="Search chats"
-                  className="flex h-9 w-9 items-center justify-center rounded-full text-white/65 transition-all hover:bg-white/[0.08] hover:text-white"
+                  className="flex h-9 w-9 items-center justify-center rounded-full text-sidebar-foreground/65 transition-all hover:bg-sidebar-accent hover:text-sidebar-foreground"
                 >
                   <Search className="h-[19px] w-[19px]" />
                 </button>
@@ -321,7 +321,7 @@ export function ChatSidebar({
                   onClick={onToggle}
                   title="Close sidebar"
                   aria-label="Close sidebar"
-                  className="flex h-9 w-9 items-center justify-center rounded-full text-white/65 transition-all hover:bg-white/[0.08] hover:text-white"
+                  className="flex h-9 w-9 items-center justify-center rounded-full text-sidebar-foreground/65 transition-all hover:bg-sidebar-accent hover:text-sidebar-foreground"
                 >
                   <PanelLeftClose className="h-[19px] w-[19px]" />
                 </button>
@@ -332,7 +332,7 @@ export function ChatSidebar({
             <div className="px-3 pt-1.5 space-y-1.5">
               <button
                 onClick={() => handleNew("text")}
-                className="flex w-full items-center justify-center gap-2.5 rounded-full border border-white/[0.14] bg-white/[0.16] px-4 py-3 text-[15px] font-medium text-white/90 shadow-[inset_0_1px_0_rgba(255,255,255,0.08),0_8px_24px_rgba(0,0,0,0.14)] transition hover:bg-white/[0.22] active:scale-[0.99]"
+                className="flex w-full items-center justify-center gap-2.5 rounded-full border border-sidebar-border bg-sidebar-accent px-4 py-3 text-[15px] font-medium text-sidebar-foreground shadow-[inset_0_1px_0_rgba(255,255,255,0.08),0_8px_24px_rgba(0,0,0,0.10)] transition hover:bg-sidebar-accent/80 active:scale-[0.99]"
               >
                 <CirclePlus className="h-[19px] w-[19px]" />
                 <span>New chat</span>
@@ -354,7 +354,7 @@ export function ChatSidebar({
                     value={searchQuery}
                     onChange={(e) => setSearchQuery(e.target.value)}
                     autoFocus
-                    className="w-full rounded-2xl border border-white/[0.10] bg-white/[0.06] px-3 py-2.5 text-sm text-white/90 placeholder:text-white/35 shadow-inner shadow-black/20 focus:outline-none focus:border-white/20 focus:ring-2 focus:ring-white/10"
+                    className="w-full rounded-2xl border border-sidebar-border bg-sidebar-accent px-3 py-2.5 text-sm text-sidebar-foreground placeholder:text-muted-foreground shadow-inner focus:outline-none focus:border-sidebar-ring focus:ring-2 focus:ring-sidebar-ring/30"
                   />
                 </motion.div>
               )}
@@ -364,7 +364,7 @@ export function ChatSidebar({
             <div className="flex-1 overflow-y-auto px-2.5 pt-4">
 
 
-              <div className="px-2 pb-2 text-[11px] font-semibold uppercase tracking-[0.14em] text-white/38">
+              <div className="px-2 pb-2 text-[11px] font-semibold uppercase tracking-[0.14em] text-muted-foreground">
                 Recents
               </div>
 

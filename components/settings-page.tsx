@@ -94,7 +94,7 @@ export function SettingsPage({ onClose }: SettingsPageProps) {
   ];
 
   return (
-    <div className="w-full max-w-none sm:max-w-5xl mx-auto min-h-[calc(100dvh-env(safe-area-inset-top))] bg-[#202023]/[0.98] supports-[backdrop-filter]:backdrop-blur-[30px] rounded-t-[30px] rounded-b-none sm:rounded-[28px] border border-white/10 shadow-[0_24px_90px_rgba(0,0,0,0.5)] overflow-hidden pb-[env(safe-area-inset-bottom)]">
+    <div className="w-full max-w-none sm:max-w-5xl mx-auto min-h-[calc(100dvh-env(safe-area-inset-top))] bg-background text-foreground supports-[backdrop-filter]:backdrop-blur-[30px] rounded-t-[30px] rounded-b-none sm:rounded-[28px] border border-border shadow-[0_24px_90px_rgba(0,0,0,0.28)] overflow-hidden pb-[env(safe-area-inset-bottom)] transition-colors duration-200">
       {/* Header */}
       <div className="flex items-center justify-between px-5 sm:px-6 py-4 bg-transparent">
         <h1 className="text-[19px] font-medium tracking-tight">Settings</h1>
@@ -103,7 +103,7 @@ export function SettingsPage({ onClose }: SettingsPageProps) {
 
       <div className="flex min-h-[calc(100dvh-72px)] flex-col sm:min-h-[560px] sm:flex-row">
         {/* Sidebar */}
-        <div className="w-full sm:w-52 shrink-0 border-b sm:border-b-0 sm:border-r border-white/10 bg-white/[0.025] p-2 sm:p-3 overflow-x-auto">
+        <div className="w-full sm:w-52 shrink-0 border-b sm:border-b-0 sm:border-r border-border bg-muted/30 p-2 sm:p-3 overflow-x-auto">
             <nav className="flex gap-1 min-w-max sm:min-w-0">
             {tabs.map(tab => (
               <button
@@ -195,14 +195,14 @@ export function SettingsPage({ onClose }: SettingsPageProps) {
               {activeTab === 'profile' && (
                 <div className="space-y-5">
                   <SectionTitle title="Profile" description="Your signed-in Google/Auth0 identity" />
-                  <div className="rounded-[22px] border border-white/[0.14] bg-white/[0.075] p-4 shadow-[inset_0_1px_0_rgba(255,255,255,0.07),0_12px_34px_rgba(0,0,0,0.18)]">
+                  <div className="rounded-[22px] border border-border bg-card p-4 shadow-sm">
                     <div className="flex items-center gap-3">
                       {profilePicture ? <img src={profilePicture} alt="Your profile" className="h-12 w-12 rounded-full object-cover" /> : <div className="flex h-12 w-12 items-center justify-center rounded-full bg-emerald-500/80 text-xl font-medium">{(profileName || authUser?.name || authUser?.email || 'U').slice(0, 1).toUpperCase()}</div>}
                       <div className="min-w-0 flex-1"><p className="mb-2 text-xs font-medium uppercase tracking-[0.14em] text-white/45">Your profile</p><input value={profileName} onChange={(event) => { setProfileName(event.target.value); writeUserPreferences({ profileName: event.target.value }) }} placeholder={authUser?.name || 'Display name'} className="w-full bg-transparent text-base font-medium text-white outline-none placeholder:text-white/45" /></div>
                       <label className="cursor-pointer rounded-full border border-white/15 bg-white/[0.06] px-3 py-1.5 text-xs text-white/70 transition hover:bg-white/[0.12]">Change photo<input type="file" accept="image/*" className="hidden" onChange={(event) => { const file = event.target.files?.[0]; if (!file) return; const reader = new FileReader(); reader.onload = () => { const value = String(reader.result || ''); setProfilePicture(value); writeUserPreferences({ profilePicture: value }) }; reader.readAsDataURL(file) }} /></label>
                     </div>
                   </div>
-                  <div className="rounded-[22px] border border-white/[0.12] bg-white/[0.045] p-4">
+                  <div className="rounded-[22px] border border-border bg-card p-4 shadow-sm">
                     <div className="flex items-center gap-3">
                       {authUser?.picture ? <img src={authUser.picture} alt="" className="h-10 w-10 rounded-full object-cover" /> : <div className="flex h-10 w-10 items-center justify-center rounded-full bg-white/10 text-lg font-medium">{(authUser?.name || authUser?.email || 'U').slice(0, 1).toUpperCase()}</div>}
                       <div className="min-w-0 flex-1"><p className="text-xs font-medium uppercase tracking-[0.14em] text-white/45">Connected account</p><p className="truncate text-sm text-white/80">{authUser?.email || 'Authenticated with Auth0'}</p></div>

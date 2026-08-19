@@ -124,8 +124,8 @@ export function ChatInterface({ onSwitchToImagine, onOpenSidebar, isSidebarOpen 
       attachments: attachments || [],
     });
 
-    const freshChat = useChatStore.getState().chats.find((c) => c.id === chatId);
-    if (freshChat && freshChat.messages.length <= 1) {
+    const updatedChat = useChatStore.getState().chats.find((c) => c.id === chatId);
+    if (updatedChat && updatedChat.messages.length <= 1) {
       const title = content.slice(0, 40) + (content.length > 40 ? "..." : "");
       updateChatTitle(chatId, title);
     }
@@ -138,7 +138,7 @@ export function ChatInterface({ onSwitchToImagine, onOpenSidebar, isSidebarOpen 
 
     let completed = false;
     try {
-      const messagesToSend = freshChat?.messages || [];
+      const messagesToSend = useChatStore.getState().chats.find((c) => c.id === chatId)?.messages || [];
       const responseContent = await processAIResponse(chatId, messagesToSend);
       void persistNeuralMemory(chatId, messagesToSend, responseContent);
       completed = true;
@@ -311,7 +311,7 @@ export function ChatInterface({ onSwitchToImagine, onOpenSidebar, isSidebarOpen 
   const hasMessages = currentChat && currentChat.messages.length > 0;
 
   return (
-    <div className="relative flex h-full flex-col overflow-hidden bg-[#08080b] text-foreground">
+    <div className="relative flex h-full flex-col overflow-hidden bg-background text-foreground transition-colors duration-200">
       <ChatHeader
         project={currentProject}
         chat={currentChat}
@@ -332,7 +332,7 @@ export function ChatInterface({ onSwitchToImagine, onOpenSidebar, isSidebarOpen 
             />
           </div>
 
-          <div className="w-full flex-shrink-0 bg-gradient-to-t from-[#08080b] via-[#08080b]/95 to-transparent pb-5 pt-3">
+          <div className="w-full flex-shrink-0 bg-gradient-to-t from-background via-background/95 to-transparent pb-5 pt-3">
             <div className="mx-auto w-full max-w-4xl px-2 sm:px-4">
               <ChatInput
                 onSend={handleSend}
