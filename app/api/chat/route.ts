@@ -1690,7 +1690,7 @@ export async function POST(req: NextRequest) {
       const activeMcpConnectors = Array.isArray(mcpConnectors) ? [...mcpConnectors] : [];
       try {
         const session = await auth0.getSession();
-        if (session?.user?.sub) {
+        if (session?.user?.sub && !isGithubRepositoryRequest) {
           composioSession = await getComposioSession(session.user.sub);
           if (composioSession) {
             const nativeTools: any[] = await composioSession.tools();
