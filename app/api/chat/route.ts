@@ -1283,7 +1283,7 @@ async function executeVerifiedGithubRepositories(userId: string, connectedAccoun
     }
     if (!accountId) return NO_GITHUB_ACCOUNT;
 
-    const toolSlugs = ['GITHUB_LIST_REPOSITORIES_FOR_THE_AUTHENTICATED_USER', 'GITHUB_LIST_REPOS', 'GITHUB_LIST_USER_REPOSITORIES', 'COMPOSIO_GET_GITHUB_REPOSITORIES'];
+    const toolSlugs = ['GITHUB_LIST_REPOSITORIES_FOR_THE_AUTHENTICATED_USER'];
     for (const slug of toolSlugs) {
       try {
         const response: any = await composio.tools.execute(slug, {
@@ -1291,7 +1291,7 @@ async function executeVerifiedGithubRepositories(userId: string, connectedAccoun
           connectedAccountId: accountId,
           arguments: slug === 'GITHUB_LIST_REPOSITORIES_FOR_THE_AUTHENTICATED_USER' ? { per_page: 100, sort: 'updated', direction: 'desc' } : {},
           dangerouslySkipVersionCheck: true,
-        }, { signal: AbortSignal.timeout(12000) });
+        }, { signal: AbortSignal.timeout(15000) });
         if (response?.successful === false || response?.error) continue;
         const formatted = formatGithubRepositories(response?.data ?? response);
         if (formatted !== UNVERIFIED_GITHUB_RESULT) return formatted;
