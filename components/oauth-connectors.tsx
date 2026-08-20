@@ -265,6 +265,13 @@ export function OAuthConnectors() {
           {!composio.configured && <a href={composio.setupUrl} target="_blank" rel="noreferrer" className="shrink-0 text-xs font-medium text-violet-300 hover:text-violet-200">Docs</a>}
         </div>
       )}
+      {composio?.configured && accounts.length === 0 && (
+        <div className="rounded-2xl border border-dashed border-white/10 bg-white/[0.025] px-4 py-5 text-center">
+          <div className="mx-auto flex h-10 w-10 items-center justify-center rounded-xl border border-violet-300/15 bg-violet-300/10 text-violet-200"><Network className="h-5 w-5" /></div>
+          <p className="mt-3 text-sm font-medium text-zinc-200">No apps connected yet</p>
+          <p className="mx-auto mt-1 max-w-sm text-xs leading-relaxed text-zinc-500">Choose an app below, finish its secure sign-in once, then use the switch on its card to control whether uncgpt can act through it.</p>
+        </div>
+      )}
       {composio?.configured && accounts.length > 0 && (
         <section className="space-y-3">
           <div className="flex items-center justify-between gap-3 px-1">
@@ -308,7 +315,7 @@ export function OAuthConnectors() {
             {catalog.filter((item) => `${item.name} ${item.slug} ${item.description}`.toLowerCase().includes(catalogQuery.toLowerCase())).map((item) => (
               <button key={item.slug} onClick={() => connectComposio(item.slug)} disabled={composioBusy} className="flex items-center gap-3 rounded-lg border border-white/8 bg-white/[0.025] p-2.5 text-left transition-colors hover:bg-white/[0.07] disabled:opacity-50">
                 {item.logo ? <img src={item.logo} alt="" className="h-7 w-7 rounded-md object-contain" /> : <span className="flex h-7 w-7 items-center justify-center rounded-md bg-violet-500/10 text-xs font-semibold text-violet-300">{String(item.name || item.slug).slice(0, 1).toUpperCase()}</span>}
-                <span className="min-w-0"><span className="block truncate text-xs font-medium text-zinc-200">{item.name}</span><span className="block truncate text-[10px] text-zinc-500">{item.slug}</span></span>
+                <span className="min-w-0 flex-1"><span className="block truncate text-xs font-medium text-zinc-200">{item.name}</span><span className="block truncate text-[10px] text-zinc-500">{item.slug}</span></span><span className="shrink-0 rounded-full border border-violet-300/15 bg-violet-300/10 px-2 py-1 text-[10px] font-medium text-violet-200">Connect</span>
               </button>
             ))}
           </div>
