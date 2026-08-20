@@ -10,7 +10,7 @@ export async function GET(req: NextRequest) {
   const query = (req.nextUrl.searchParams.get("q") || "").trim().toLowerCase();
   try {
     const composio = new Composio({ apiKey: process.env.COMPOSIO_API_KEY });
-    const response: any = await composio.toolkits.getToolkits({});
+    const response: any = await composio.toolkits.get({});
     const raw = Array.isArray(response) ? response : response?.items || response?.data || [];
     const items = raw
       .map((toolkit: any) => ({

@@ -239,8 +239,8 @@ export function ChatInterface({ onSwitchToImagine, onOpenSidebar, isSidebarOpen 
       const stored = localStorage.getItem("mcp-connectors");
       if (stored) {
         const connectors = JSON.parse(stored);
-        const enabled = (connectors || []).filter((c: any) => c.enabled);
-        if (enabled.length > 0) payload.mcpConnectors = enabled;
+        const normalized = Array.isArray(connectors) ? connectors : [];
+        if (normalized.length > 0) payload.mcpConnectors = normalized;
       }
     } catch {}
 

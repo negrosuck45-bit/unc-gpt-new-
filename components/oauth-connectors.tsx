@@ -3,7 +3,7 @@
 import { useEffect, useState } from 'react';
 import { Button } from '@/components/ui/button';
 import { cn } from '@/lib/utils';
-import { Loader2, Network } from 'lucide-react';
+import { Check, Loader2, Network, RefreshCw, Unplug } from 'lucide-react';
 
 // ─── Brand SVG Icons ──────────────────────────────────────────────────────────
 
@@ -81,6 +81,9 @@ const PROVIDERS = [
 interface ProviderStatus { connected: boolean; configured: boolean; }
 interface ComposioStatus { authenticated: boolean; configured: boolean; label: string; description: string; setupUrl: string; }
 interface ComposioCatalogItem { slug: string; name: string; description: string; logo?: string | null; categories?: string[]; }
+interface ComposioAccount { id: string; toolkit: string; status: string; statusReason?: string | null; enabled: boolean; alias?: string | null; updatedAt?: string | null; }
+
+const COMPOSIO_STATE_KEY = 'composio-connector-state';
 
 // ─── Compact pill strip (for sidebar / header) ─────────────────────────────────
 export function OAuthConnectorPills() {
@@ -119,16 +122,42 @@ export function OAuthConnectors() {
   const [composioBusy, setComposioBusy] = useState(false);
   const [catalog, setCatalog] = useState<ComposioCatalogItem[]>([]);
   const [catalogQuery, setCatalogQuery] = useState('');
+  const [accounts, setAccounts] = useState<ComposioAccount[]>([]);
+  const [accountBusy, setAccountBusy] = useState<string | null>(null);
+
+  const syncChatConnectorState = (nextAccounts: ComposioAccount[]) => {
+    try {
+      const state = nextAccounts.map((account) => ({ id: `composio:${account.toolkit}`, provider: account.toolkit, toolkit: account.toolkit, enabled: account.enabled, source: 'composio' }));
+      localStorage.setItem(COMPOSIO_STATE_KEY, JSON.stringify(Object.fromEntries(nextAccounts.map((account) => [account.toolkit, account.enabled]))));
+      localStorage.setItem('mcp-connectors', JSON.stringify(state));
+      window.dispatchEvent(new Event('mcp-connectors-changed'));
+    } catch {}
+  };
 
   const refresh = () =>
     Promise.all([
       fetch('/api/mcp/oauth/status').then(r => r.json()),
       fetch('/api/connectors/composio').then(r => r.json()),
-    ]).then(([oauth, composioStatus]) => { setStatus(oauth); setComposio(composioStatus); }).finally(() => setLoading(false));
+      fetch('/api/connectors/composio/status').then(r => r.json()),
+    ]).then(([oauth, composioStatus, accountStatus]) => {
+      setStatus(oauth);
+      setComposio(composioStatus);
+      let nextAccounts: ComposioAccount[] = accountStatus.accounts || [];
+      try {
+        const saved = JSON.parse(localStorage.getItem(COMPOSIO_STATE_KEY) || '{}');
+        nextAccounts = nextAccounts.map((account) => ({ ...account, enabled: saved[account.toolkit] ?? account.enabled }));
+      } catch {}
+      setAccounts(nextAccounts);
+      syncChatConnectorState(nextAccounts);
+    }).finally(() => setLoading(false));
 
   useEffect(() => {
     refresh();
     fetch('/api/connectors/composio/catalog').then((response) => response.json()).then((data) => setCatalog(data.items || [])).catch(() => setCatalog([]));
+    try {
+      const saved = JSON.parse(localStorage.getItem(COMPOSIO_STATE_KEY) || '{}');
+      if (saved && typeof saved === 'object') setAccounts((current) => current.map((account) => ({ ...account, enabled: saved[account.toolkit] ?? account.enabled })));
+    } catch {}
     const params = new URLSearchParams(window.location.search);
     const error = params.get('mcp_error');
     if (error) {
@@ -161,6 +190,28 @@ export function OAuthConnectors() {
     await fetch('/api/mcp/oauth/disconnect', { method: 'POST', headers: {'Content-Type':'application/json'}, body: JSON.stringify({ provider: name }) });
     await refresh();
     setBusy(null);
+  };
+
+  const manageAccount = async (account: ComposioAccount, action: 'enable' | 'disable' | 'disconnect') => {
+    setAccountBusy(account.toolkit);
+    try {
+      const response = await fetch('/api/connectors/composio/manage', {
+        method: 'POST', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ action, accountId: account.id, toolkit: account.toolkit }),
+      });
+      if (!response.ok) throw new Error((await response.json()).error || 'Unable to update connector');
+      if (action === 'disconnect') {
+        const nextAccounts = accounts.filter((item) => item.id !== account.id);
+        setAccounts(nextAccounts);
+        syncChatConnectorState(nextAccounts);
+      } else {
+        const nextAccounts = accounts.map((item) => item.id === account.id ? { ...item, enabled: action === 'enable' } : item);
+        setAccounts(nextAccounts);
+        syncChatConnectorState(nextAccounts);
+      }
+    } catch (error: any) {
+      setOauthError(error?.message || 'Unable to update connector');
+    } finally { setAccountBusy(null); }
   };
 
   if (loading) return (
@@ -214,8 +265,40 @@ export function OAuthConnectors() {
           {!composio.configured && <a href={composio.setupUrl} target="_blank" rel="noreferrer" className="shrink-0 text-xs font-medium text-violet-300 hover:text-violet-200">Docs</a>}
         </div>
       )}
+      {composio?.configured && accounts.length > 0 && (
+        <section className="space-y-3">
+          <div className="flex items-center justify-between gap-3 px-1">
+            <div><h3 className="text-sm font-medium text-zinc-100">Connected apps</h3><p className="mt-1 text-xs text-zinc-500">Only enabled apps are available to uncgpt.</p></div>
+            <button type="button" onClick={() => refresh()} className="inline-flex h-8 w-8 items-center justify-center rounded-full border border-white/10 bg-white/[0.04] text-zinc-400 transition hover:bg-white/[0.08] hover:text-white" aria-label="Refresh connector status"><RefreshCw className="h-3.5 w-3.5" /></button>
+          </div>
+          <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+            {accounts.map((account) => {
+              const meta = catalog.find((item) => item.slug === account.toolkit);
+              const connected = account.status === 'active' || account.status === 'connected' || account.status === 'success';
+              const busy = accountBusy === account.toolkit;
+              return (
+                <div key={account.id} className="group relative overflow-hidden rounded-2xl border border-white/10 bg-white/[0.035] p-3.5 shadow-[0_12px_40px_rgba(0,0,0,0.18)] backdrop-blur-xl transition hover:border-white/20 hover:bg-white/[0.055]">
+                  <div className="flex items-start gap-3">
+                    <div className="flex h-11 w-11 shrink-0 items-center justify-center overflow-hidden rounded-xl border border-white/10 bg-black/20">
+                      {meta?.logo ? <img src={meta.logo} alt="" className="h-7 w-7 object-contain" /> : <span className="text-sm font-semibold text-violet-200">{String(meta?.name || account.toolkit).slice(0, 1).toUpperCase()}</span>}
+                    </div>
+                    <div className="min-w-0 flex-1">
+                      <div className="flex items-center gap-2"><span className="truncate text-sm font-medium text-zinc-100">{meta?.name || account.toolkit}</span><span className={cn('h-1.5 w-1.5 rounded-full', connected ? 'bg-emerald-400 shadow-[0_0_10px_rgba(52,211,153,.8)]' : 'bg-amber-400')} /></div>
+                      <p className="mt-1 truncate text-[11px] text-zinc-500">{connected ? (account.enabled ? 'Connected · enabled for uncgpt' : 'Connected · paused') : (account.statusReason || 'Needs attention')}</p>
+                    </div>
+                    <button type="button" onClick={() => manageAccount(account, account.enabled ? 'disable' : 'enable')} disabled={busy || !connected} aria-label={`${account.enabled ? 'Disable' : 'Enable'} ${meta?.name || account.toolkit}`} className={cn('relative h-7 w-12 shrink-0 rounded-full p-1 transition', account.enabled && connected ? 'bg-emerald-400/90' : 'bg-white/10', (busy || !connected) && 'opacity-50')}>
+                      <span className={cn('block h-5 w-5 rounded-full bg-white shadow-sm transition-transform', account.enabled && connected ? 'translate-x-5' : 'translate-x-0')} />
+                    </button>
+                  </div>
+                  <div className="mt-3 flex items-center justify-between border-t border-white/[0.07] pt-3"><span className={cn('text-[10px] font-medium', connected ? 'text-emerald-300' : 'text-amber-300')}>{connected ? (account.enabled ? 'Ready to use' : 'Off') : 'Reconnect required'}</span><button type="button" onClick={() => manageAccount(account, 'disconnect')} disabled={busy} className="inline-flex items-center gap-1 rounded-lg px-2 py-1 text-[10px] text-zinc-500 transition hover:bg-red-400/10 hover:text-red-300 disabled:opacity-50"><Unplug className="h-3 w-3" /> Disconnect</button></div>
+                </div>
+              );
+            })}
+          </div>
+        </section>
+      )}
       {composio?.configured && (
-        <div className="rounded-xl border border-violet-400/15 bg-violet-400/[0.04] p-4">
+        <div className="rounded-2xl border border-violet-400/15 bg-violet-400/[0.04] p-4">
           <div className="flex items-center justify-between gap-3">
             <div><h3 className="text-sm font-medium">All Composio apps</h3><p className="mt-1 text-xs text-zinc-500">Search the catalog, choose an app, and connect it through Composio.</p></div>
             <span className="text-[10px] font-semibold uppercase tracking-wider text-violet-300">1000+ toolkits</span>

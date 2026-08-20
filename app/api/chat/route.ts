@@ -1687,7 +1687,9 @@ export async function POST(req: NextRequest) {
       let mcpTools: any[] = [];
       let composioTools: any[] = [];
       let composioSession: any = null;
-      const activeMcpConnectors = Array.isArray(mcpConnectors) ? [...mcpConnectors] : [];
+      const connectorPreferences = Array.isArray(mcpConnectors) ? mcpConnectors : [];
+      const disabledToolkits = new Set(connectorPreferences.filter((connector: any) => connector?.source === 'composio' && connector?.enabled === false).map((connector: any) => String(connector.provider || connector.toolkit || '').toLowerCase()).filter(Boolean));
+      const activeMcpConnectors = connectorPreferences.filter((connector: any) => connector?.enabled !== false);
       try {
         const session = await auth0.getSession();
         if (session?.user?.sub && !isGithubRepositoryRequest) {
@@ -1697,7 +1699,8 @@ export async function POST(req: NextRequest) {
             composioTools = nativeTools
               .filter((tool: any) => {
                 const name = String(tool?.function?.name || "");
-                return tool?.function?.name && tool?.function?.parameters && !/github.*(repo|repos)|(?:repo|repos).*github/i.test(name);
+                const belongsToDisabledToolkit = [...disabledToolkits].some((slug) => name.toLowerCase().includes(slug));
+                return tool?.function?.name && tool?.function?.parameters && !belongsToDisabledToolkit && !/github.*(repo|repos)|(?:repo|repos).*github/i.test(name);
               })
               .map((tool: any) => ({
                 type: "function",
@@ -1714,7 +1717,7 @@ export async function POST(req: NextRequest) {
               }));
 
             // Keep a stable, model-friendly alias for the common GitHub read action.
-            composioTools.push({
+            if (!disabledToolkits.has('github')) composioTools.push({
               type: "function",
               function: {
                 name: "composio_github_list_repositories",
