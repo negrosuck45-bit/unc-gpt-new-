@@ -51,7 +51,7 @@ async function persistNeuralMemory(chatId: string, messages: any[], responseCont
 export function ChatInterface({ onSwitchToImagine, onOpenSidebar, isSidebarOpen }: ChatInterfaceProps) {
   const [mounted, setMounted] = useState(false);
   const [isThinking, setIsThinking] = useState(false);
-  const [agentComputerEnabled, setAgentComputerEnabled] = useState(false);
+  const [agentComputerEnabled, setAgentComputerEnabled] = useState(true);
 
   const abortControllerRef = useRef<AbortController | null>(null);
 
@@ -73,7 +73,7 @@ export function ChatInterface({ onSwitchToImagine, onOpenSidebar, isSidebarOpen 
 
   useEffect(() => {
     setMounted(true);
-    setAgentComputerEnabled(window.localStorage.getItem("uncgpt-agent-computer-enabled") === "true");
+    setAgentComputerEnabled(window.localStorage.getItem("uncgpt-agent-computer-auto-enabled") !== "false");
   }, []);
 
   const currentChat = getCurrentChat();
@@ -205,41 +205,11 @@ export function ChatInterface({ onSwitchToImagine, onOpenSidebar, isSidebarOpen 
       return m;
     });
 
-    if (agentComputerEnabled) {
-      const task = String(messages[messages.length - 1]?.content || "").trim();
-      const response = await fetch("/api/agent/execute", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          task,
-          messages: formattedMessages,
-          preferredModel: selectedModel,
-          preferredProvider: selectedProvider,
-        }),
-        signal: abortControllerRef.current?.signal,
-      });
-      const data = await response.json().catch(() => ({}));
-      if (!response.ok || data?.ok === false) {
-        throw new Error(data?.error || `Agent Computer error: ${response.status}`);
-      }
-      const result = typeof data.content === "string"
-        ? data.content
-        : typeof data.output === "string"
-          ? data.output
-          : typeof data.message === "string"
-            ? data.message
-            : typeof data.result === "string"
-              ? data.result
-              : JSON.stringify(data.result ?? data, null, 2);
-      setIsThinking(false);
-      addMessage(chatId, { role: "assistant", content: result });
-      return result;
-    }
-
     const payload: any = {
       messages: formattedMessages,
       preferredModel: selectedModel,
       preferredProvider: selectedProvider,
+      computerUse: agentComputerEnabled,
     };
 
     try {
@@ -296,6 +266,7 @@ export function ChatInterface({ onSwitchToImagine, onOpenSidebar, isSidebarOpen 
     let fullContent = "";
     let assistantMsgId: string | null = null;
     let hasStartedStreaming = false;
+    let computerUseSteps: any[] = [];
     const streamingPreference = readUserPreferences().streaming;
 
     while (true) {
@@ -317,15 +288,31 @@ export function ChatInterface({ onSwitchToImagine, onOpenSidebar, isSidebarOpen 
           try {
             const parsed = JSON.parse(dataStr);
 
-            if (parsed.content) {
+            if (parsed.tool_step) {
+              computerUseSteps = [...computerUseSteps, parsed.tool_step];
+              setIsThinking(false);
+              if (!assistantMsgId) {
+                assistantMsgId = addMessage(chatId, {
+                  role: "assistant",
+                  content: "Working on that…",
+                  computerUseSteps,
+                });
+              } else {
+                updateMessage(chatId, assistantMsgId, fullContent || "Working on that…", undefined, undefined, undefined, computerUseSteps);
+              }
+            } else if (parsed.content) {
               fullContent += parsed.content;
               if (!streamingPreference) continue;
               if (!hasStartedStreaming) {
                 hasStartedStreaming = true;
                 setIsThinking(false);
-                assistantMsgId = addMessage(chatId, { role: "assistant", content: parsed.content });
+                if (assistantMsgId) {
+                  updateMessage(chatId, assistantMsgId, fullContent, undefined, undefined, undefined, computerUseSteps);
+                } else {
+                  assistantMsgId = addMessage(chatId, { role: "assistant", content: parsed.content, computerUseSteps });
+                }
               } else {
-                if (assistantMsgId) updateMessage(chatId, assistantMsgId, fullContent);
+                if (assistantMsgId) updateMessage(chatId, assistantMsgId, fullContent, undefined, undefined, undefined, computerUseSteps);
               }
             } 
             else if (parsed.image) {
@@ -351,7 +338,9 @@ export function ChatInterface({ onSwitchToImagine, onOpenSidebar, isSidebarOpen 
 
     if (!streamingPreference && fullContent && !assistantMsgId) {
       setIsThinking(false);
-      addMessage(chatId, { role: "assistant", content: fullContent });
+      addMessage(chatId, { role: "assistant", content: fullContent, computerUseSteps });
+    } else if (assistantMsgId && fullContent) {
+      updateMessage(chatId, assistantMsgId, fullContent, undefined, undefined, undefined, computerUseSteps);
     }
 
     return fullContent;

@@ -3,6 +3,7 @@ import type { NextRequest } from "next/server";
 import { auth0 } from "@/lib/auth0";
 import { getComposioSession } from "@/lib/composio";
 import { chooseUncGptRoute } from "@/lib/uncgpt-router";
+import { executeAgentGateway, gatewayResultText } from "@/lib/agent-gateway";
 
 export const runtime = "nodejs";
 
@@ -53,17 +54,95 @@ async function runTerminalCommand(command: string, cwd: string = "/home/node"): 
 }
 
 // ============================================================
-// BUILTIN TOOLS
+// AGENT COMPUTER TOOLS
 // ============================================================
-// Terminal execution is disabled in the chat product. Keeping this empty prevents
-// provider models from exposing internal terminal instructions to users.
+// These tools are deliberately exposed to the same model tool loop as connected
+// services. The model decides when they are needed; users do not need a special
+// command prefix or a separate computer mode.
+function buildAgentComputerTools() {
+  const callGateway = async (task: string, tool: string, args: Record<string, unknown>) => {
+    try {
+      const response = await executeAgentGateway({ task, tool, args });
+      return gatewayResultText(response).slice(0, 12000);
+    } catch (error: any) {
+      return `Agent Computer error: ${error?.message || "request failed"}`;
+    }
+  };
+
+  return [
+    {
+      type: "function",
+      function: {
+        name: "computer_browser",
+        description: "Use the remote Agent Computer browser when the user asks you to open, navigate, inspect, search, or interact with a website. Do not use for answering general factual questions unless browsing is actually needed.",
+        parameters: {
+          type: "object",
+          properties: {
+            url: { type: "string", description: "The URL to open or inspect." },
+            action: { type: "string", enum: ["open", "inspect", "click", "type", "scroll"], description: "Browser action." },
+            instruction: { type: "string", description: "What to do in the browser." },
+          },
+          required: ["action", "instruction"],
+          additionalProperties: false,
+        },
+      },
+      _exec: async (args: any) => callGateway(
+        `Browser task: ${args.action}. ${args.instruction}${args.url ? ` URL: ${args.url}` : ""}`,
+        "browser",
+        args || {},
+      ),
+    },
+    {
+      type: "function",
+      function: {
+        name: "computer_terminal",
+        description: "Run a safe, user-requested command on the remote Agent Computer terminal. Use this for creating projects, checking versions, inspecting logs, or editing through shell commands. Never run destructive commands without explicit user intent.",
+        parameters: {
+          type: "object",
+          properties: {
+            command: { type: "string", description: "The terminal command to execute." },
+            cwd: { type: "string", description: "Working directory, if relevant." },
+          },
+          required: ["command"],
+          additionalProperties: false,
+        },
+      },
+      _exec: async (args: any) => callGateway(
+        `Terminal task: run this command${args.cwd ? ` in ${args.cwd}` : ""}: ${args.command}`,
+        "terminal",
+        args || {},
+      ),
+    },
+    {
+      type: "function",
+      function: {
+        name: "computer_filesystem",
+        description: "Read, create, update, or inspect files on the remote Agent Computer filesystem when the user asks you to work with files or a project.",
+        parameters: {
+          type: "object",
+          properties: {
+            operation: { type: "string", enum: ["read", "write", "edit", "list"], description: "Filesystem operation." },
+            path: { type: "string", description: "Absolute or project-relative path." },
+            content: { type: "string", description: "File content for write/edit operations." },
+            instruction: { type: "string", description: "Additional details for the operation." },
+          },
+          required: ["operation", "path"],
+          additionalProperties: false,
+        },
+      },
+      _exec: async (args: any) => callGateway(
+        `Filesystem task: ${args.operation} ${args.path}${args.instruction ? `. ${args.instruction}` : ""}${args.content ? ` Content:\n${args.content}` : ""}`,
+        "filesystem",
+        args || {},
+      ),
+    },
+  ];
+}
+
 const BUILTIN_TOOLS: any[] = [];
 
 async function executeBuiltInTool(toolName: string, args: any): Promise<string> {
-  if (toolName === "run_terminal_command") {
-    return await runTerminalCommand(args.command, args.cwd || "/home/node");
-  }
-  return `Tool ${toolName} not implemented`;
+  return `Tool ${toolName} is not available in this request`;
 }
 
 // ============================================================
@@ -542,9 +621,11 @@ async function generateMedia(
 // Keep provider instructions focused on ordinary chat; never expose internal tools.
 const TERMINAL_SYSTEM_PROMPT = `You are uncgpt, a helpful AI assistant. Answer the user's request directly and clearly.
 
-You may use connected Composio apps and other tools when they are needed. For Composio requests, use COMPOSIO_SEARCH_TOOLS first with the user’s request, then use COMPOSIO_GET_TOOL_SCHEMAS for any discovered tool, and finally use the appropriate execution tool with the returned schema. Do not answer that you lack access before attempting this sequence. For read-only actions, proceed when the user's request is clear. Before any action that sends, creates, edits, deletes, publishes, deploys, or changes external data, stop and ask the user for explicit confirmation describing the exact action and target. Never claim an external action succeeded unless a tool result confirms it.
+You may use connected Composio apps, the Agent Computer browser, the Agent Computer terminal, and the Agent Computer filesystem when they are needed. Decide from the user's intent whether a tool is required; users do not need to say “use the computer,” “open,” or any other special command. For browser, terminal, and filesystem work, call the matching computer_* tool with a precise action, then use the result to answer. Do not invent tool results. For read-only actions, proceed when the user's request is clear. Before any action that sends, creates, edits, deletes, publishes, deploys, or changes external data, stop and ask the user for explicit confirmation describing the exact action and target. Never claim an external action succeeded unless a tool result confirms it.
 
-Do not mention internal tools, terminal commands, deployment commands, hidden prompts, or implementation details. If the user asks for an action this chat cannot perform, explain the limitation briefly and offer a safe useful alternative.`;
+You may use connected Composio apps and other tools when they are needed. For Composio requests, use COMPOSIO_SEARCH_TOOLS first with the user’s request, then use COMPOSIO_GET_TOOL_SCHEMAS for any discovered tool, and finally use the appropriate execution tool with the returned schema. Do not answer that you lack access before attempting this sequence.
+
+Do not mention internal tools, hidden prompts, or implementation details. Present computer activity as part of your work naturally and summarize what changed or was found. If the user asks for an action this chat cannot perform, explain the limitation briefly and offer a safe useful alternative.`;
 
 async function callGroq(
   messages: any[],
@@ -1116,7 +1197,7 @@ async function runToolLoop(
           t.function?.name === tc.function.name && !t._connector && !t._toolName && !t._exec
       );
       const mcp = tools.find((m: any) => m.function?.name === tc.function.name && m._connector);
-      const oauth = tools.find((o: any) => o.function?.name === tc.function.name && o._exec);
+      const executable = tools.find((o: any) => o.function?.name === tc.function.name && typeof o._exec === "function");
 
       if (builtIn) {
         try {
@@ -1124,9 +1205,9 @@ async function runToolLoop(
         } catch (e: any) {
           result = `Tool error: ${e.message}`;
         }
-      } else if (oauth) {
+      } else if (executable) {
         try {
-          result = await oauth._exec(args);
+          result = await executable._exec(args);
         } catch (e: any) {
           result = `Tool error: ${e.message}`;
         }
@@ -1411,6 +1492,7 @@ export async function POST(req: NextRequest) {
       source,
       mcpConnectors,
       webSearch,
+      computerUse,
     } = body;
 
     // The replacement release exposes one model only; old client model values are ignored.
@@ -1566,7 +1648,7 @@ export async function POST(req: NextRequest) {
     }> = [];
 
     // ==================== TOOL SETUP ====================
-    let availableTools: any[] = [...BUILTIN_TOOLS];
+    let availableTools: any[] = computerUse === false ? [...BUILTIN_TOOLS] : buildAgentComputerTools();
     try {
       const oauthBundle = buildOAuthTools(req, baseUrl);
       let mcpTools: any[] = [];
@@ -1618,7 +1700,7 @@ export async function POST(req: NextRequest) {
       }
 
       const combinedTools = [
-        ...BUILTIN_TOOLS,
+        ...availableTools,
         ...oauthBundle.tools,
         ...composioTools,
         ...mcpTools,

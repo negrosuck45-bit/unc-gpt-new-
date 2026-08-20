@@ -3,7 +3,7 @@
 import { useEffect, useState } from "react"
 import { MonitorUp, Power, RefreshCw } from "lucide-react"
 
-const STORAGE_KEY = "uncgpt-agent-computer-enabled"
+const STORAGE_KEY = "uncgpt-agent-computer-auto-enabled"
 
 type Status = "checking" | "online" | "offline"
 
@@ -42,7 +42,7 @@ export function AgentComputerCard({ onChange }: { onChange?: (enabled: boolean) 
           <MonitorUp className="h-4 w-4" />
         </span>
         <div className="min-w-0">
-          <div className="truncate font-medium">uncgpt computer</div>
+          <div className="truncate font-medium">Agent Computer <span className="font-normal text-muted-foreground">· auto</span></div>
           <div className="flex items-center gap-1.5 text-[11px] text-muted-foreground">
             <span className={`h-1.5 w-1.5 rounded-full ${status === "online" ? "bg-emerald-400" : status === "checking" ? "bg-amber-400" : "bg-red-400"}`} />
             {statusLabel}
@@ -53,7 +53,7 @@ export function AgentComputerCard({ onChange }: { onChange?: (enabled: boolean) 
         <button type="button" onClick={() => void checkStatus()} className="rounded-lg p-2 text-muted-foreground transition hover:bg-white/10 hover:text-foreground" aria-label="Refresh computer status">
           <RefreshCw className={`h-3.5 w-3.5 ${status === "checking" ? "animate-spin" : ""}`} />
         </button>
-        <button type="button" onClick={toggle} disabled={status !== "online"} aria-pressed={enabled} aria-label="Toggle uncgpt computer" className={`relative h-6 w-11 rounded-full p-0.5 transition ${enabled ? "bg-emerald-500" : "bg-white/20"} disabled:cursor-not-allowed disabled:opacity-50`}>
+        <button type="button" onClick={toggle} disabled={status !== "online"} aria-pressed={enabled} aria-label={enabled ? "Turn off automatic computer use" : "Turn on automatic computer use"} className={`relative h-6 w-11 rounded-full p-0.5 transition ${enabled ? "bg-emerald-500" : "bg-white/20"} disabled:cursor-not-allowed disabled:opacity-50`}>
           <span className={`block h-5 w-5 rounded-full bg-white shadow-sm transition-transform ${enabled ? "translate-x-5" : "translate-x-0"}`} />
         </button>
         <Power className={`h-3.5 w-3.5 ${enabled ? "text-emerald-300" : "text-muted-foreground"}`} />
