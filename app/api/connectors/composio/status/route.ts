@@ -1,5 +1,6 @@
 import { auth0 } from "@/lib/auth0";
 import { Composio } from "@composio/core";
+import { getComposioUserId } from "@/lib/composio";
 
 export async function GET() {
   const session = await auth0.getSession();
@@ -12,7 +13,7 @@ export async function GET() {
 
   try {
     const composio = new Composio({ apiKey });
-    const response: any = await composio.connectedAccounts.list({ userIds: [userId], limit: 1000 });
+    const response: any = await composio.connectedAccounts.list({ userIds: [getComposioUserId(userId)], limit: 1000 });
     const accounts = (response?.items || []).map((account: any) => ({
       id: account.id,
       toolkit: account.toolkit?.slug || "",
