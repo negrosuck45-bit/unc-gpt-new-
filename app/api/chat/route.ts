@@ -1276,7 +1276,7 @@ async function executeVerifiedGithubRepositories(userId: string, connectedAccoun
     const composio = new Composio({ apiKey });
     let accountId = connectedAccountId;
     if (!accountId) {
-      const accounts: any = await composio.connectedAccounts.list({ userIds: getComposioUserIds(userId), toolkitSlugs: ['github'], statuses: ['ACTIVE'], limit: 1000 });
+      const accounts: any = await composio.connectedAccounts.list({ userIds: getComposioUserIds(userId), toolkitSlugs: ['github'], limit: 1000 });
       const account = (accounts?.items || []).find((item: any) => !item?.isDisabled && String(item?.status || '').toLowerCase() === 'active');
       accountId = account?.id;
     }
