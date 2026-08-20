@@ -1268,22 +1268,26 @@ function formatGithubRepositories(value: unknown): string {
   return rows.length ? rows.join("\n") : UNVERIFIED_GITHUB_RESULT;
 }
 
-async function executeVerifiedGithubRepositories(userId: string): Promise<string> {
+async function executeVerifiedGithubRepositories(userId: string, connectedAccountId?: string): Promise<string> {
   const apiKey = process.env.COMPOSIO_API_KEY;
   if (!apiKey || !userId) return NO_GITHUB_ACCOUNT;
 
   try {
     const composio = new Composio({ apiKey });
-    const accounts: any = await composio.connectedAccounts.list({ userIds: [userId], toolkitSlugs: ['github'], statuses: ['ACTIVE'], limit: 1000 });
-    const account = (accounts?.items || []).find((item: any) => !item?.isDisabled && String(item?.status || '').toLowerCase() === 'active');
-    if (!account?.id) return NO_GITHUB_ACCOUNT;
+    let accountId = connectedAccountId;
+    if (!accountId) {
+      const accounts: any = await composio.connectedAccounts.list({ userIds: [userId], toolkitSlugs: ['github'], statuses: ['ACTIVE'], limit: 1000 });
+      const account = (accounts?.items || []).find((item: any) => !item?.isDisabled && String(item?.status || '').toLowerCase() === 'active');
+      accountId = account?.id;
+    }
+    if (!accountId) return NO_GITHUB_ACCOUNT;
 
     const toolSlugs = ['GITHUB_LIST_REPOS', 'GITHUB_LIST_USER_REPOSITORIES', 'COMPOSIO_GET_GITHUB_REPOSITORIES'];
     for (const slug of toolSlugs) {
       try {
         const response: any = await composio.tools.execute(slug, {
           userId,
-          connectedAccountId: account.id,
+          connectedAccountId: accountId,
           arguments: {},
           dangerouslySkipVersionCheck: true,
         }, { signal: AbortSignal.timeout(12000) });
@@ -1812,7 +1816,8 @@ export async function POST(req: NextRequest) {
       let reply = "GitHub isn’t connected yet. Open Settings → Connectors and connect GitHub.";
       try {
         const session = await auth0.getSession();
-        const resultText = await executeVerifiedGithubRepositories(session?.user?.sub || "");
+        const githubPreference = Array.isArray(mcpConnectors) ? mcpConnectors.find((connector: any) => connector?.source === 'composio' && String(connector.provider || connector.toolkit || '').toLowerCase() === 'github' && connector?.enabled !== false) : null;
+        const resultText = await executeVerifiedGithubRepositories(session?.user?.sub || "", githubPreference?.accountId);
         if (resultText === NO_GITHUB_ACCOUNT) {
           reply = "GitHub isn’t connected yet. Open Settings → Connectors and connect GitHub.";
         } else if (resultText === UNVERIFIED_GITHUB_RESULT) {

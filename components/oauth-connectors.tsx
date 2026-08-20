@@ -127,7 +127,7 @@ export function OAuthConnectors() {
 
   const syncChatConnectorState = (nextAccounts: ComposioAccount[]) => {
     try {
-      const state = nextAccounts.map((account) => ({ id: `composio:${account.toolkit}`, provider: account.toolkit, toolkit: account.toolkit, enabled: account.enabled, source: 'composio' }));
+      const state = nextAccounts.map((account) => ({ id: `composio:${account.toolkit}`, accountId: account.id, provider: account.toolkit, toolkit: account.toolkit, enabled: account.enabled, source: 'composio' }));
       localStorage.setItem(COMPOSIO_STATE_KEY, JSON.stringify(Object.fromEntries(nextAccounts.map((account) => [account.toolkit, account.enabled]))));
       localStorage.setItem('mcp-connectors', JSON.stringify(state));
       window.dispatchEvent(new Event('mcp-connectors-changed'));
