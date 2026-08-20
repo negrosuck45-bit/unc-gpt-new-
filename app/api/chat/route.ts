@@ -1536,6 +1536,7 @@ export async function POST(req: NextRequest) {
     const baseUrl = `${protocol}://${host}`;
 
     const lastMsg = messages[messages.length - 1];
+    const recentConversationText = messages.slice(-8).map((message: any) => Array.isArray(message?.content) ? message.content.find((content: any) => content.type === "text")?.text || "" : String(message?.content || "")).join("\n");
     const userText = Array.isArray(lastMsg?.content)
       ? lastMsg.content.find((c: any) => c.type === "text")?.text || ""
       : lastMsg?.content || "";
@@ -1680,7 +1681,9 @@ export async function POST(req: NextRequest) {
     }> = [];
 
     // ==================== TOOL SETUP ====================
-    const isGithubRepositoryRequest = /github/i.test(userText) && /\b(repo|repos|repositories)\b/i.test(userText);
+    const explicitGithubRepositoryRequest = /github/i.test(userText) && /\b(repo|repos|repositories)\b/i.test(userText);
+    const contextualGithubFollowUp = /^(it is|yes|yeah|yep|list them|show them|go ahead|do it|okay|ok)$/i.test(String(userText).trim()) && /github/i.test(recentConversationText) && /\b(repo|repos|repositories)\b/i.test(recentConversationText);
+    const isGithubRepositoryRequest = explicitGithubRepositoryRequest || contextualGithubFollowUp;
     let availableTools: any[] = computerUse === false ? [...BUILTIN_TOOLS] : buildAgentComputerTools();
     try {
       const oauthBundle = buildOAuthTools(req, baseUrl);
@@ -1692,7 +1695,7 @@ export async function POST(req: NextRequest) {
       const activeMcpConnectors = connectorPreferences.filter((connector: any) => connector?.enabled !== false);
       try {
         const session = await auth0.getSession();
-        if (session?.user?.sub && !isGithubRepositoryRequest) {
+        if (session?.user?.sub) {
           composioSession = await getComposioSession(session.user.sub);
           if (composioSession) {
             const nativeTools: any[] = await composioSession.tools();
