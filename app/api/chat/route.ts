@@ -1234,6 +1234,35 @@ async function runToolLoop(
   return working;
 }
 
+function formatGithubRepositories(value: unknown): string {
+  let parsed: any = value;
+  if (typeof parsed === "string") {
+    try { parsed = JSON.parse(parsed); } catch { return parsed; }
+  }
+
+  const candidates: any[] = [];
+  const visit = (item: any, depth = 0) => {
+    if (!item || depth > 4) return;
+    if (Array.isArray(item)) {
+      if (item.some((entry) => entry && (entry.name || entry.full_name || entry.html_url))) candidates.push(...item);
+      return;
+    }
+    if (typeof item === "object") Object.values(item).forEach((child) => visit(child, depth + 1));
+  };
+  visit(parsed);
+
+  const rows = candidates
+    .map((repo: any) => {
+      const name = repo.full_name || repo.name;
+      if (!name) return "";
+      const url = repo.html_url || repo.url || "";
+      return `- ${name}${url && !String(url).startsWith("http") ? "" : url ? ` — ${url}` : ""}`;
+    })
+    .filter(Boolean);
+
+  return rows.length ? rows.join("\n") : "GitHub returned no repositories.";
+}
+
 function buildOAuthTools(req: NextRequest, baseUrl: string) {
   const cookieHeader = req.headers.get("cookie") || "";
   const providers = [
@@ -1662,7 +1691,10 @@ export async function POST(req: NextRequest) {
           if (composioSession) {
             const nativeTools: any[] = await composioSession.tools();
             composioTools = nativeTools
-              .filter((tool: any) => tool?.function?.name && tool?.function?.parameters)
+              .filter((tool: any) => {
+                const name = String(tool?.function?.name || "");
+                return tool?.function?.name && tool?.function?.parameters && !/github.*(repo|repos)|(?:repo|repos).*github/i.test(name);
+              })
               .map((tool: any) => ({
                 type: "function",
                 function: {
@@ -1686,8 +1718,13 @@ export async function POST(req: NextRequest) {
                 parameters: { type: "object", properties: {} },
               },
               _exec: async () => {
-                const result = await composioSession.execute("GITHUB_LIST_REPOS", {});
-                return typeof result === "string" ? result : JSON.stringify(result);
+                let result: any;
+                try {
+                  result = await composioSession.execute("GITHUB_LIST_REPOS", {});
+                } catch {
+                  result = await composioSession.execute("COMPOSIO_GET_GITHUB_REPOSITORIES", {});
+                }
+                return formatGithubRepositories(result);
               },
             });
           }
