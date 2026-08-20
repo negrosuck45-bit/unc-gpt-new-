@@ -16,6 +16,21 @@ const OAUTH_CONFIG = {
     clientSecret: process.env.SLACK_CLIENT_SECRET || "",
     tokenUrl: "https://slack.com/api/oauth.v2.access",
   },
+  notion: {
+    clientId: process.env.NOTION_CLIENT_ID || "",
+    clientSecret: process.env.NOTION_CLIENT_SECRET || "",
+    tokenUrl: "https://api.notion.com/v1/oauth/token",
+  },
+  google_drive: {
+    clientId: process.env.GOOGLE_CLIENT_ID || "",
+    clientSecret: process.env.GOOGLE_CLIENT_SECRET || "",
+    tokenUrl: "https://oauth2.googleapis.com/token",
+  },
+  vercel: {
+    clientId: process.env.VERCEL_CLIENT_ID || "",
+    clientSecret: process.env.VERCEL_CLIENT_SECRET || "",
+    tokenUrl: "https://api.vercel.com/v2/oauth/access_token",
+  },
 };
 
 export async function GET(
@@ -85,7 +100,18 @@ export async function GET(
         },
         body: formData,
       });
-    } else if (provider === "linear") {
+    } else if (provider === "notion") {
+      const basic = Buffer.from(`${config.clientId}:${config.clientSecret}`).toString("base64");
+      tokenResponse = await fetch(config.tokenUrl, {
+        method: "POST",
+        headers: {
+          Authorization: `Basic ${basic}`,
+          "Content-Type": "application/json",
+          Accept: "application/json",
+        },
+        body: JSON.stringify({ grant_type: "authorization_code", code, redirect_uri: redirectUri }),
+      });
+    } else {
       const formData = new URLSearchParams({
         grant_type: "authorization_code",
         client_id: config.clientId,
@@ -93,27 +119,13 @@ export async function GET(
         code,
         redirect_uri: redirectUri,
       });
-
       tokenResponse = await fetch(config.tokenUrl, {
         method: "POST",
         headers: {
           "Content-Type": "application/x-www-form-urlencoded",
-        },
-        body: formData,
-      });
-    } else {
-      tokenResponse = await fetch(config.tokenUrl, {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
           Accept: "application/json",
         },
-        body: JSON.stringify({
-          client_id: config.clientId,
-          client_secret: config.clientSecret,
-          code,
-          redirect_uri: redirectUri,
-        }),
+        body: formData,
       });
     }
 

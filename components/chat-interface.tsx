@@ -266,7 +266,6 @@ export function ChatInterface({ onSwitchToImagine, onOpenSidebar, isSidebarOpen 
     let fullContent = "";
     let assistantMsgId: string | null = null;
     let hasStartedStreaming = false;
-    let computerUseSteps: any[] = [];
     const streamingPreference = readUserPreferences().streaming;
 
     while (true) {
@@ -289,17 +288,8 @@ export function ChatInterface({ onSwitchToImagine, onOpenSidebar, isSidebarOpen 
             const parsed = JSON.parse(dataStr);
 
             if (parsed.tool_step) {
-              computerUseSteps = [...computerUseSteps, parsed.tool_step];
-              setIsThinking(false);
-              if (!assistantMsgId) {
-                assistantMsgId = addMessage(chatId, {
-                  role: "assistant",
-                  content: "Working on that…",
-                  computerUseSteps,
-                });
-              } else {
-                updateMessage(chatId, assistantMsgId, fullContent || "Working on that…", undefined, undefined, undefined, computerUseSteps);
-              }
+              // Tool activity stays behind the scenes; only the final answer is shown.
+              continue;
             } else if (parsed.content) {
               fullContent += parsed.content;
               if (!streamingPreference) continue;
@@ -307,12 +297,12 @@ export function ChatInterface({ onSwitchToImagine, onOpenSidebar, isSidebarOpen 
                 hasStartedStreaming = true;
                 setIsThinking(false);
                 if (assistantMsgId) {
-                  updateMessage(chatId, assistantMsgId, fullContent, undefined, undefined, undefined, computerUseSteps);
+                  updateMessage(chatId, assistantMsgId, fullContent);
                 } else {
-                  assistantMsgId = addMessage(chatId, { role: "assistant", content: parsed.content, computerUseSteps });
+                  assistantMsgId = addMessage(chatId, { role: "assistant", content: parsed.content });
                 }
               } else {
-                if (assistantMsgId) updateMessage(chatId, assistantMsgId, fullContent, undefined, undefined, undefined, computerUseSteps);
+                if (assistantMsgId) updateMessage(chatId, assistantMsgId, fullContent);
               }
             } 
             else if (parsed.image) {
@@ -338,9 +328,9 @@ export function ChatInterface({ onSwitchToImagine, onOpenSidebar, isSidebarOpen 
 
     if (!streamingPreference && fullContent && !assistantMsgId) {
       setIsThinking(false);
-      addMessage(chatId, { role: "assistant", content: fullContent, computerUseSteps });
+      addMessage(chatId, { role: "assistant", content: fullContent });
     } else if (assistantMsgId && fullContent) {
-      updateMessage(chatId, assistantMsgId, fullContent, undefined, undefined, undefined, computerUseSteps);
+      updateMessage(chatId, assistantMsgId, fullContent);
     }
 
     return fullContent;
