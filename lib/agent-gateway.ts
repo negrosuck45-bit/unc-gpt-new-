@@ -29,9 +29,10 @@ function gatewayConfig() {
 }
 
 export async function checkAgentGateway() {
-  const { baseUrl, secret } = gatewayConfig()
+  const { baseUrl } = gatewayConfig()
+  // /health is deliberately public on the gateway. Avoid sending sensitive
+  // authorization headers because the temporary relay rejects those requests.
   const response = await fetch(`${baseUrl}/health`, {
-    headers: { Authorization: `Bearer ${secret}`, "x-agent-gateway-secret": secret },
     cache: "no-store",
     signal: AbortSignal.timeout(8000),
   })
