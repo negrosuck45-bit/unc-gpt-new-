@@ -1234,10 +1234,13 @@ async function runToolLoop(
   return working;
 }
 
+const UNVERIFIED_GITHUB_RESULT = "__UNVERIFIED_GITHUB_RESULT__";
+
 function formatGithubRepositories(value: unknown): string {
   let parsed: any = value;
   if (typeof parsed === "string") {
-    try { parsed = JSON.parse(parsed); } catch { return parsed; }
+    if (parsed.trim().startsWith("- ")) return parsed.trim();
+    try { parsed = JSON.parse(parsed); } catch { return UNVERIFIED_GITHUB_RESULT; }
   }
 
   const candidates: any[] = [];
@@ -1260,7 +1263,7 @@ function formatGithubRepositories(value: unknown): string {
     })
     .filter(Boolean);
 
-  return rows.length ? rows.join("\n") : "GitHub returned no repositories.";
+  return rows.length ? rows.join("\n") : UNVERIFIED_GITHUB_RESULT;
 }
 
 function buildOAuthTools(req: NextRequest, baseUrl: string) {
@@ -1677,6 +1680,7 @@ export async function POST(req: NextRequest) {
     }> = [];
 
     // ==================== TOOL SETUP ====================
+    const isGithubRepositoryRequest = /github/i.test(userText) && /\b(repo|repos|repositories)\b/i.test(userText);
     let availableTools: any[] = computerUse === false ? [...BUILTIN_TOOLS] : buildAgentComputerTools();
     try {
       const oauthBundle = buildOAuthTools(req, baseUrl);
@@ -1744,7 +1748,7 @@ export async function POST(req: NextRequest) {
       ];
       availableTools = combinedTools;
 
-      if (combinedTools.length > 0) {
+      if (combinedTools.length > 0 && !isGithubRepositoryRequest) {
         messagesWithSystem = await runDeterministicConnectedAction(
           messagesWithSystem,
           combinedTools,
@@ -1759,6 +1763,50 @@ export async function POST(req: NextRequest) {
       }
     } catch (e: any) {
       console.error("Tool loop error:", e.message);
+    }
+
+    // ==================== VERIFIED GITHUB READS ====================
+    // Repository listing is a read-only connector action. Handle it directly so
+    // an unavailable or malformed connector response can never be turned into
+    // invented repository names by a fallback model.
+    if (isGithubRepositoryRequest) {
+      const githubTool = availableTools.find((tool: any) =>
+        tool?.function?.name === "github_list_repos" ||
+        tool?.function?.name === "composio_github_list_repositories"
+      );
+      let reply = "GitHub isn’t connected yet. Open Settings → Connectors and connect GitHub.";
+
+      if (githubTool?._exec) {
+        try {
+          const raw = await Promise.race([
+            Promise.resolve(githubTool._exec({})),
+            new Promise<string>((resolve) => setTimeout(() => resolve(UNVERIFIED_GITHUB_RESULT), 15000)),
+          ]);
+          const resultText = String(raw || "");
+          if (resultText === UNVERIFIED_GITHUB_RESULT || /unauthori[sz]ed|not connected|connect github|authentication required/i.test(resultText)) {
+            reply = "GitHub isn’t connected yet. Open Settings → Connectors and connect GitHub.";
+          } else if (resultText === "GitHub returned no repositories.") {
+            reply = "I couldn’t find any GitHub repositories on the connected account.";
+          } else if (resultText.startsWith("- ")) {
+            reply = `Here are your GitHub repositories:\n${resultText}`;
+          } else {
+            reply = "I couldn’t verify the GitHub repository data. Please reconnect GitHub in Settings → Connectors and try again.";
+          }
+        } catch {
+          reply = "I couldn’t access GitHub. Reconnect it in Settings → Connectors and try again.";
+        }
+      }
+
+      const encoder = new TextEncoder();
+      const stream = new ReadableStream({
+        start(controller) {
+          controller.enqueue(encoder.encode(`data: ${JSON.stringify({ provider: "GitHub", model: "connected-action" })}\n\n`));
+          controller.enqueue(encoder.encode(`data: ${JSON.stringify({ content: reply })}\n\n`));
+          controller.enqueue(encoder.encode("data: [DONE]\n\n"));
+          controller.close();
+        },
+      });
+      return createStreamResponse(stream, "GitHub", "connected-action", []);
     }
 
     // ==================== CALL MODEL ====================
