@@ -10,6 +10,7 @@ import { playReplySound, unlockReplySound } from "@/lib/notifications";
 import { readUserPreferences } from "@/lib/user-preferences";
 import { triggerHaptic } from "@/lib/haptics";
 import { localVisionSupported, runLocalVision } from "@/lib/local-vision";
+import { AgentComputerCard } from "@/components/agent-computer-card";
 
 interface ChatInterfaceProps {
   onSwitchToImagine?: () => void;
@@ -50,6 +51,7 @@ async function persistNeuralMemory(chatId: string, messages: any[], responseCont
 export function ChatInterface({ onSwitchToImagine, onOpenSidebar, isSidebarOpen }: ChatInterfaceProps) {
   const [mounted, setMounted] = useState(false);
   const [isThinking, setIsThinking] = useState(false);
+  const [agentComputerEnabled, setAgentComputerEnabled] = useState(false);
 
   const abortControllerRef = useRef<AbortController | null>(null);
 
@@ -71,6 +73,7 @@ export function ChatInterface({ onSwitchToImagine, onOpenSidebar, isSidebarOpen 
 
   useEffect(() => {
     setMounted(true);
+    setAgentComputerEnabled(window.localStorage.getItem("uncgpt-agent-computer-enabled") === "true");
   }, []);
 
   const currentChat = getCurrentChat();
@@ -112,7 +115,7 @@ export function ChatInterface({ onSwitchToImagine, onOpenSidebar, isSidebarOpen 
         playReplySound();
       }
     }
-  }, [currentChat, isCurrentChatStreaming, addMessage, deleteMessage, setIsStreaming]);
+  }, [currentChat, isCurrentChatStreaming, addMessage, deleteMessage, setIsStreaming, agentComputerEnabled]);
 
   const handleSend = useCallback(async (content: string, attachments?: Attachment[]) => {
     if (!content?.trim() && (!attachments || attachments.length === 0)) return;
@@ -173,7 +176,7 @@ export function ChatInterface({ onSwitchToImagine, onOpenSidebar, isSidebarOpen 
         playReplySound();
       }
     }
-  }, [currentChatId, createNewChat, addMessage, updateChatTitle, setIsStreaming, settings]);
+  }, [currentChatId, createNewChat, addMessage, updateChatTitle, setIsStreaming, settings, agentComputerEnabled]);
 
   const processAIResponse = async (chatId: string, messages: any[]) => {
     const currentChat = useChatStore.getState().chats.find(c => c.id === chatId);
@@ -201,6 +204,37 @@ export function ChatInterface({ onSwitchToImagine, onOpenSidebar, isSidebarOpen 
       }
       return m;
     });
+
+    if (agentComputerEnabled) {
+      const task = String(messages[messages.length - 1]?.content || "").trim();
+      const response = await fetch("/api/agent/execute", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          task,
+          messages: formattedMessages,
+          preferredModel: selectedModel,
+          preferredProvider: selectedProvider,
+        }),
+        signal: abortControllerRef.current?.signal,
+      });
+      const data = await response.json().catch(() => ({}));
+      if (!response.ok || data?.ok === false) {
+        throw new Error(data?.error || `Agent Computer error: ${response.status}`);
+      }
+      const result = typeof data.content === "string"
+        ? data.content
+        : typeof data.output === "string"
+          ? data.output
+          : typeof data.message === "string"
+            ? data.message
+            : typeof data.result === "string"
+              ? data.result
+              : JSON.stringify(data.result ?? data, null, 2);
+      setIsThinking(false);
+      addMessage(chatId, { role: "assistant", content: result });
+      return result;
+    }
 
     const payload: any = {
       messages: formattedMessages,
@@ -335,6 +369,7 @@ export function ChatInterface({ onSwitchToImagine, onOpenSidebar, isSidebarOpen 
         onOpenSidebar={onOpenSidebar}
         isSidebarOpen={isSidebarOpen}
       />
+      <AgentComputerCard onChange={setAgentComputerEnabled} />
       {hasMessages ? (
         <div className="flex-1 flex flex-col min-h-0 overflow-hidden relative">
           <div 
