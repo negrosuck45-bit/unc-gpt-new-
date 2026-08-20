@@ -48,7 +48,7 @@ export async function executeAgentGateway(payload: AgentGatewayRequest): Promise
     headers: {
       "Content-Type": "application/json",
       Authorization: `Bearer ${secret}`,
-      "x-agent-gateway-secret": secret,
+      "x-uncgpt-agent-secret": secret,
     },
     body: JSON.stringify(payload),
     cache: "no-store",
