@@ -1270,13 +1270,14 @@ function formatGithubRepositories(value: unknown): string {
 
 async function executeVerifiedGithubRepositories(userId: string, connectedAccountId?: string): Promise<string> {
   const apiKey = process.env.COMPOSIO_API_KEY;
-  if (!apiKey || !userId) return NO_GITHUB_ACCOUNT;
+  if (!apiKey) return NO_GITHUB_ACCOUNT;
+  const effectiveUserId = userId || getComposioUserId('');
 
   try {
     const composio = new Composio({ apiKey });
     let accountId = connectedAccountId;
     if (!accountId) {
-      const accounts: any = await composio.connectedAccounts.list({ userIds: getComposioUserIds(userId), toolkitSlugs: ['github'], limit: 1000 });
+      const accounts: any = await composio.connectedAccounts.list({ userIds: getComposioUserIds(effectiveUserId), toolkitSlugs: ['github'], limit: 1000 });
       const account = (accounts?.items || []).find((item: any) => !item?.isDisabled && String(item?.status || '').toLowerCase() === 'active');
       accountId = account?.id;
     }
@@ -1286,7 +1287,7 @@ async function executeVerifiedGithubRepositories(userId: string, connectedAccoun
     for (const slug of toolSlugs) {
       try {
         const response: any = await composio.tools.execute(slug, {
-          userId: getComposioUserId(userId),
+          userId: getComposioUserId(effectiveUserId),
           connectedAccountId: accountId,
           arguments: slug === 'GITHUB_LIST_REPOSITORIES_FOR_THE_AUTHENTICATED_USER' ? { per_page: 100, sort: 'updated', direction: 'desc' } : {},
           dangerouslySkipVersionCheck: true,
