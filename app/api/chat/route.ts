@@ -2,6 +2,7 @@ import type { NextRequest } from "next/server";
 
 import { auth0 } from "@/lib/auth0";
 import { getComposioSession } from "@/lib/composio";
+import { Composio } from "@composio/core";
 import { chooseUncGptRoute } from "@/lib/uncgpt-router";
 import { executeAgentGateway, gatewayResultText } from "@/lib/agent-gateway";
 
@@ -1235,6 +1236,7 @@ async function runToolLoop(
 }
 
 const UNVERIFIED_GITHUB_RESULT = "__UNVERIFIED_GITHUB_RESULT__";
+const NO_GITHUB_ACCOUNT = "__NO_GITHUB_ACCOUNT__";
 
 function formatGithubRepositories(value: unknown): string {
   let parsed: any = value;
@@ -1264,6 +1266,37 @@ function formatGithubRepositories(value: unknown): string {
     .filter(Boolean);
 
   return rows.length ? rows.join("\n") : UNVERIFIED_GITHUB_RESULT;
+}
+
+async function executeVerifiedGithubRepositories(userId: string): Promise<string> {
+  const apiKey = process.env.COMPOSIO_API_KEY;
+  if (!apiKey || !userId) return NO_GITHUB_ACCOUNT;
+
+  try {
+    const composio = new Composio({ apiKey });
+    const accounts: any = await composio.connectedAccounts.list({ userIds: [userId], toolkitSlugs: ['github'], statuses: ['ACTIVE'], limit: 1000 });
+    const account = (accounts?.items || []).find((item: any) => !item?.isDisabled && String(item?.status || '').toLowerCase() === 'active');
+    if (!account?.id) return NO_GITHUB_ACCOUNT;
+
+    const toolSlugs = ['GITHUB_LIST_REPOS', 'GITHUB_LIST_USER_REPOSITORIES', 'COMPOSIO_GET_GITHUB_REPOSITORIES'];
+    for (const slug of toolSlugs) {
+      try {
+        const response: any = await composio.tools.execute(slug, {
+          userId,
+          connectedAccountId: account.id,
+          arguments: {},
+          dangerouslySkipVersionCheck: true,
+        }, { signal: AbortSignal.timeout(12000) });
+        if (response?.successful === false || response?.error) continue;
+        const formatted = formatGithubRepositories(response?.data ?? response);
+        if (formatted !== UNVERIFIED_GITHUB_RESULT) return formatted;
+      } catch {}
+    }
+  } catch (error) {
+    console.error('Verified GitHub execution failed:', error);
+  }
+
+  return UNVERIFIED_GITHUB_RESULT;
 }
 
 function buildOAuthTools(req: NextRequest, baseUrl: string) {
@@ -1776,31 +1809,21 @@ export async function POST(req: NextRequest) {
     // an unavailable or malformed connector response can never be turned into
     // invented repository names by a fallback model.
     if (isGithubRepositoryRequest) {
-      const githubTool = availableTools.find((tool: any) =>
-        tool?.function?.name === "github_list_repos" ||
-        tool?.function?.name === "composio_github_list_repositories"
-      );
       let reply = "GitHub isn’t connected yet. Open Settings → Connectors and connect GitHub.";
-
-      if (githubTool?._exec) {
-        try {
-          const raw = await Promise.race([
-            Promise.resolve(githubTool._exec({})),
-            new Promise<string>((resolve) => setTimeout(() => resolve(UNVERIFIED_GITHUB_RESULT), 15000)),
-          ]);
-          const resultText = String(raw || "");
-          if (resultText === UNVERIFIED_GITHUB_RESULT || /unauthori[sz]ed|not connected|connect github|authentication required/i.test(resultText)) {
-            reply = "GitHub isn’t connected yet. Open Settings → Connectors and connect GitHub.";
-          } else if (resultText === "GitHub returned no repositories.") {
-            reply = "I couldn’t find any GitHub repositories on the connected account.";
-          } else if (resultText.startsWith("- ")) {
-            reply = `Here are your GitHub repositories:\n${resultText}`;
-          } else {
-            reply = "I couldn’t verify the GitHub repository data. Please reconnect GitHub in Settings → Connectors and try again.";
-          }
-        } catch {
-          reply = "I couldn’t access GitHub. Reconnect it in Settings → Connectors and try again.";
+      try {
+        const session = await auth0.getSession();
+        const resultText = await executeVerifiedGithubRepositories(session?.user?.sub || "");
+        if (resultText === NO_GITHUB_ACCOUNT) {
+          reply = "GitHub isn’t connected yet. Open Settings → Connectors and connect GitHub.";
+        } else if (resultText === UNVERIFIED_GITHUB_RESULT) {
+          reply = "GitHub is connected, but it didn’t return verifiable repository data. Reconnect GitHub in Settings → Connectors and try again.";
+        } else if (resultText === "GitHub returned no repositories.") {
+          reply = "I couldn’t find any GitHub repositories on the connected account.";
+        } else if (resultText.startsWith("- ")) {
+          reply = `Here are your GitHub repositories:\n${resultText}`;
         }
+      } catch {
+        reply = "I couldn’t access GitHub. Reconnect it in Settings → Connectors and try again.";
       }
 
       const encoder = new TextEncoder();
