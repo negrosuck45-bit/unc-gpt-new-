@@ -18,6 +18,10 @@ export function getComposioUserId(authenticatedUserId: string) {
   return process.env.COMPOSIO_USER_ID || 'uncgpt_first_call';
 }
 
+export function getComposioUserIds(authenticatedUserId: string) {
+  return [...new Set([getComposioUserId(authenticatedUserId), authenticatedUserId].filter(Boolean))];
+}
+
 export async function getComposioSession(userId: string) {
   const apiKey = process.env.COMPOSIO_API_KEY;
   if (!apiKey || !userId) return null;

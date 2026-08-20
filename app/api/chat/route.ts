@@ -1,7 +1,7 @@
 import type { NextRequest } from "next/server";
 
 import { auth0 } from "@/lib/auth0";
-import { getComposioSession, getComposioUserId } from "@/lib/composio";
+import { getComposioSession, getComposioUserId, getComposioUserIds } from "@/lib/composio";
 import { Composio } from "@composio/core";
 import { chooseUncGptRoute } from "@/lib/uncgpt-router";
 import { executeAgentGateway, gatewayResultText } from "@/lib/agent-gateway";
@@ -1276,7 +1276,7 @@ async function executeVerifiedGithubRepositories(userId: string, connectedAccoun
     const composio = new Composio({ apiKey });
     let accountId = connectedAccountId;
     if (!accountId) {
-      const accounts: any = await composio.connectedAccounts.list({ userIds: [userId], toolkitSlugs: ['github'], statuses: ['ACTIVE'], limit: 1000 });
+      const accounts: any = await composio.connectedAccounts.list({ userIds: getComposioUserIds(userId), toolkitSlugs: ['github'], statuses: ['ACTIVE'], limit: 1000 });
       const account = (accounts?.items || []).find((item: any) => !item?.isDisabled && String(item?.status || '').toLowerCase() === 'active');
       accountId = account?.id;
     }

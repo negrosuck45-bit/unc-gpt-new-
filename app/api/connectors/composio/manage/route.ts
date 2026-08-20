@@ -1,11 +1,11 @@
 import { NextRequest } from "next/server";
 import { auth0 } from "@/lib/auth0";
 import { Composio } from "@composio/core";
-import { getComposioUserId } from "@/lib/composio";
+import { getComposioUserIds } from "@/lib/composio";
 
 async function getAccount(composio: Composio, userId: string, accountId?: string, toolkit?: string) {
   if (accountId) return composio.connectedAccounts.get(accountId);
-  const response: any = await composio.connectedAccounts.list({ userIds: [getComposioUserId(userId)], toolkitSlugs: toolkit ? [toolkit] : undefined, limit: 1000 });
+  const response: any = await composio.connectedAccounts.list({ userIds: getComposioUserIds(userId), toolkitSlugs: toolkit ? [toolkit] : undefined, limit: 1000 });
   return response?.items?.[0] || null;
 }
 
