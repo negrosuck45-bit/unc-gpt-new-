@@ -43,11 +43,11 @@ export async function checkAgentGateway() {
 
 export async function executeAgentGateway(payload: AgentGatewayRequest): Promise<AgentGatewayResponse> {
   const { baseUrl, secret } = gatewayConfig()
-  const response = await fetch(`${baseUrl}/execute`, {
+  const response = await fetch(`${baseUrl}/v1/run`, {
     method: "POST",
     headers: {
       "Content-Type": "application/json",
-      Authorization: `Bearer ${secret}`,
+      Accept: "text/event-stream",
       "x-uncgpt-agent-secret": secret,
     },
     body: JSON.stringify(payload),
@@ -56,16 +56,27 @@ export async function executeAgentGateway(payload: AgentGatewayRequest): Promise
   })
 
   const text = await response.text()
-  let data: AgentGatewayResponse
-  try {
-    data = JSON.parse(text)
-  } catch {
-    data = { content: text }
-  }
   if (!response.ok) {
-    throw new Error(data.error || data.message || `Agent Computer request failed (${response.status})`)
+    let errorData: AgentGatewayResponse = {}
+    try { errorData = JSON.parse(text) } catch {}
+    throw new Error(errorData.error || errorData.message || `Agent Computer request failed (${response.status})`)
   }
-  return data
+
+  const content: string[] = []
+  const steps: unknown[] = []
+  for (const event of text.split(/\n\n+/)) {
+    const line = event.split("\n").find((entry) => entry.startsWith("data: "))
+    if (!line) continue
+    const value = line.slice(6).trim()
+    if (!value || value === "[DONE]") continue
+    try {
+      const parsed = JSON.parse(value)
+      if (typeof parsed.content === "string") content.push(parsed.content)
+      if (parsed.tool_step) steps.push(parsed.tool_step)
+      if (parsed.result && typeof parsed.result === "string") content.push(parsed.result)
+    } catch {}
+  }
+  return { content: content.join("\n"), steps }
 }
 
 export function gatewayResultText(data: AgentGatewayResponse) {
