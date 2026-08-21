@@ -1750,7 +1750,7 @@ export async function POST(req: NextRequest) {
       const requestedConnectorKey = Object.keys(connectorHints).find((key) => {
         const pattern = key.replace('_', '[ _-]?');
         const directMatch = new RegExp(`\\b${pattern}\\b`, 'i').test(userText);
-        const aliasMatch = key === 'gmail' && /\\b(email|emails|mail|inbox)\\b/i.test(userText);
+        const aliasMatch = key === 'gmail' && /\b(email|emails|mail|inbox)\b/i.test(userText);
         return directMatch || aliasMatch;
       });
       const connectorActionIntent = /\b(my|mine|latest|list|show|find|read|send|email|message|calendar|create|update|delete|open|search|manage|deploy|repository|repositories|repo)\b/i.test(userText);
