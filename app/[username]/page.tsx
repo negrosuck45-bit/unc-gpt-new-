@@ -42,6 +42,7 @@ async function getProfile(username: string): Promise<Profile | null> {
   if (!supabase) return null;
   const selectFields = "username,bio,profile_picture,background_media,background_media_type,music_url,music_name,music_thumbnail,profile_views,cursor_image";
   const legacyFields = "username,bio,profile_picture,background_media,background_media_type,music_url,music_name,profile_views";
+  const legacyFieldsNoViews = "username,bio,profile_picture,background_media,background_media_type,music_url,music_name";
   const primary = await supabase.from("user_profiles").select(selectFields).eq("username_lower", normalized.toLowerCase()).maybeSingle();
   if (primary.data) return normalizeProfile(primary.data);
   const fallback = await supabase.from("user_profiles").select(selectFields).eq("username", normalized).maybeSingle();
@@ -49,8 +50,12 @@ async function getProfile(username: string): Promise<Profile | null> {
   const legacyPrimary = await supabase.from("user_profiles").select(legacyFields).eq("username_lower", normalized.toLowerCase()).maybeSingle();
   if (legacyPrimary.data) return normalizeProfile(legacyPrimary.data);
   const legacyFallback = await supabase.from("user_profiles").select(legacyFields).eq("username", normalized).maybeSingle();
-  if (legacyFallback.error || !legacyFallback.data) return null;
-  return normalizeProfile(legacyFallback.data);
+  if (legacyFallback.data) return normalizeProfile(legacyFallback.data);
+  const noViewsPrimary = await supabase.from("user_profiles").select(legacyFieldsNoViews).eq("username_lower", normalized.toLowerCase()).maybeSingle();
+  if (noViewsPrimary.data) return normalizeProfile(noViewsPrimary.data);
+  const noViewsFallback = await supabase.from("user_profiles").select(legacyFieldsNoViews).eq("username", normalized).maybeSingle();
+  if (!noViewsFallback.data) return null;
+  return normalizeProfile(noViewsFallback.data);
 }
 
 export async function generateMetadata({ params }: { params: Promise<{ username: string }> }) {
