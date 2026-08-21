@@ -13,6 +13,7 @@ export interface UserPreferences {
   debugMode: boolean
   experimentalFeatures: boolean
   profileName: string
+  username: string
   profilePicture: string
   bio: string
   backgroundMedia: string
@@ -37,6 +38,7 @@ export const DEFAULT_USER_PREFERENCES: UserPreferences = {
   debugMode: false,
   experimentalFeatures: false,
   profileName: '',
+  username: '',
   profilePicture: '',
   bio: '',
   backgroundMedia: '',

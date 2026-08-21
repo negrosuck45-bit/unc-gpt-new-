@@ -174,6 +174,7 @@ export function SettingsPage({ onClose }: SettingsPageProps) {
     setDebugMode(p.debugMode);
     setExperimentalFeatures(p.experimentalFeatures);
     setProfileName(p.profileName || '');
+    setUsername(p.username || '');
     setProfilePicture(p.profilePicture || '');
     setBio(p.bio || '');
     setBackgroundMedia(p.backgroundMedia || '');
@@ -189,8 +190,13 @@ export function SettingsPage({ onClose }: SettingsPageProps) {
       const response = await fetch('/api/profile', { cache: 'no-store' }).catch(() => null);
       const payload = response?.ok ? await response.json().catch(() => null) : null;
       const profile = payload?.profile;
+      if (!profile && p.username) {
+        setUsername(p.username);
+        const claim = await fetch('/api/profile/username', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ username: p.username }) }).catch(() => null);
+        if (claim?.ok) writeUserPreferences({ username: p.username });
+      }
       if (profile) {
-        if (profile.username) setUsername(profile.username);
+        if (profile.username) { setUsername(profile.username); writeUserPreferences({ username: profile.username }); }
         if (profile.bio != null) { setBio(profile.bio); writeUserPreferences({ bio: profile.bio }); }
         if (profile.profile_picture) { setProfilePicture(profile.profile_picture); writeUserPreferences({ profilePicture: profile.profile_picture }); }
         if (profile.background_media) { setBackgroundMedia(profile.background_media); writeUserPreferences({ backgroundMedia: profile.background_media }); }
@@ -353,7 +359,7 @@ export function SettingsPage({ onClose }: SettingsPageProps) {
                     <input value={profileName} onChange={(event) => setProfileName(event.target.value)} onBlur={() => writeUserPreferences({ profileName: profileName.trim() })} placeholder={authUser?.name || 'Display name'} className="mt-4 w-full bg-transparent text-center text-lg font-medium text-foreground outline-none placeholder:text-foreground/45" />
                     <div className="mx-auto mt-5 max-w-md">
                       <label htmlFor="profile-username" className="mb-2 block text-xs font-medium uppercase tracking-[0.14em] text-foreground/45">Username</label>
-                      <div className="flex items-center gap-2"><div className="flex min-w-0 flex-1 items-center rounded-xl border border-border/15 bg-muted/[0.06] px-3 text-left focus-within:border-emerald-400/45 focus-within:ring-2 focus-within:ring-emerald-400/10"><span className="text-sm text-foreground/45">@</span><input id="profile-username" value={username} onChange={(event) => { setUsername(event.target.value.replace(/^@+/, '').replace(/[^a-zA-Z0-9_]/g, '').slice(0, 24)); setUsernameStatus({ type: 'idle' }) }} placeholder="yourname" className="h-10 min-w-0 flex-1 bg-transparent px-1.5 text-sm text-foreground outline-none placeholder:text-foreground/35" autoComplete="username" /></div><Button size="sm" disabled={usernameStatus.type === 'saving' || username.length < 1} onClick={async () => { setUsernameStatus({ type: 'saving', message: 'Saving…' }); try { const response = await fetch('/api/profile/username', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ username }) }); const payload = await response.json(); if (!response.ok) throw new Error(payload.error || 'Unable to save username.'); setUsername(payload.username); setUsernameStatus({ type: 'saved', message: `Saved as @${payload.username}` }); } catch (error) { setUsernameStatus({ type: 'error', message: error instanceof Error ? error.message : 'Unable to save username.' }); } }}>Save</Button></div>
+                      <div className="flex items-center gap-2"><div className="flex min-w-0 flex-1 items-center rounded-xl border border-border/15 bg-muted/[0.06] px-3 text-left focus-within:border-emerald-400/45 focus-within:ring-2 focus-within:ring-emerald-400/10"><span className="text-sm text-foreground/45">@</span><input id="profile-username" value={username} onChange={(event) => { setUsername(event.target.value.replace(/^@+/, '').replace(/[^a-zA-Z0-9_]/g, '').slice(0, 24)); setUsernameStatus({ type: 'idle' }) }} placeholder="yourname" className="h-10 min-w-0 flex-1 bg-transparent px-1.5 text-sm text-foreground outline-none placeholder:text-foreground/35" autoComplete="username" /></div><Button size="sm" disabled={usernameStatus.type === 'saving' || username.length < 1} onClick={async () => { setUsernameStatus({ type: 'saving', message: 'Saving…' }); try { const response = await fetch('/api/profile/username', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ username }) }); const payload = await response.json(); if (!response.ok) throw new Error(payload.error || 'Unable to save username.'); setUsername(payload.username); writeUserPreferences({ username: payload.username }); setUsernameStatus({ type: 'saved', message: `Saved as @${payload.username}` }); } catch (error) { setUsernameStatus({ type: 'error', message: error instanceof Error ? error.message : 'Unable to save username.' }); } }}>Save</Button></div>
                       <p className={cn('mt-2 text-xs', usernameStatus.type === 'error' ? 'text-red-400' : usernameStatus.type === 'saved' ? 'text-emerald-400' : 'text-muted-foreground')}>{usernameStatus.message || '1–24 letters, numbers, or underscores.'}</p>
                     </div>
                   </div>
