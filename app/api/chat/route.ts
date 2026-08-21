@@ -1496,6 +1496,9 @@ function createStreamResponse(
 
               try {
                 const data = JSON.parse(dataStr);
+                if (data.permission_request) {
+                  controller.enqueue(encoder.encode(`data: ${JSON.stringify({ permission_request: data.permission_request })}\n\n`));
+                }
                 let content =
                   data.choices?.[0]?.delta?.content || "";
                 if (!content && data.response) content = data.response;
@@ -1731,6 +1734,39 @@ export async function POST(req: NextRequest) {
       const connectorPreferences = Array.isArray(mcpConnectors) ? mcpConnectors : [];
       const disabledToolkits = new Set(connectorPreferences.filter((connector: any) => connector?.source === 'composio' && connector?.enabled === false).map((connector: any) => String(connector.provider || connector.toolkit || '').toLowerCase()).filter(Boolean));
       const activeMcpConnectors = connectorPreferences.filter((connector: any) => connector?.enabled !== false);
+
+      // If a user asks for a connector that is absent or explicitly disabled, stop before
+      // the model can hallucinate access and return a structured approval card instead.
+      const connectorHints: Record<string, { label: string; description: string; iconUrl: string }> = {
+        github: { label: 'GitHub', description: 'read your repositories, issues, and pull requests', iconUrl: 'https://cdn.simpleicons.org/github' },
+        gmail: { label: 'Gmail', description: 'read and manage your email', iconUrl: 'https://cdn.simpleicons.org/gmail' },
+        slack: { label: 'Slack', description: 'read channels and send messages', iconUrl: 'https://cdn.simpleicons.org/slack' },
+        notion: { label: 'Notion', description: 'read and update pages and databases', iconUrl: 'https://cdn.simpleicons.org/notion' },
+        linear: { label: 'Linear', description: 'read and manage issues and projects', iconUrl: 'https://cdn.simpleicons.org/linear' },
+        google_drive: { label: 'Google Drive', description: 'find and edit files', iconUrl: 'https://cdn.simpleicons.org/googledrive' },
+        google_calendar: { label: 'Google Calendar', description: 'read and manage calendar events', iconUrl: 'https://cdn.simpleicons.org/googlecalendar' },
+        vercel: { label: 'Vercel', description: 'read and manage deployments', iconUrl: 'https://cdn.simpleicons.org/vercel' },
+      };
+      const requestedConnectorKey = Object.keys(connectorHints).find((key) => {
+        const pattern = key.replace('_', '[ _-]?');
+        return new RegExp(`\\b${pattern}\\b`, 'i').test(userText);
+      });
+      const connectorActionIntent = /\b(my|mine|latest|list|show|find|read|send|email|message|calendar|create|update|delete|open|search|manage|deploy|repository|repositories|repo)\b/i.test(userText);
+      const requestedConnector = requestedConnectorKey ? connectorHints[requestedConnectorKey] : null;
+      const requestedState = requestedConnectorKey ? connectorPreferences.find((connector: any) => connector?.source === 'composio' && String(connector.provider || connector.toolkit || '').toLowerCase().replace(/[- ]/g, '_') === requestedConnectorKey) : null;
+      if (requestedConnector && connectorActionIntent && (!requestedState || requestedState.enabled === false) && !isGithubRepositoryRequest) {
+        const mode = requestedState ? 'enable' : 'connect';
+        const permission = { toolkit: requestedConnectorKey, label: requestedConnector.label, description: requestedConnector.description, iconUrl: requestedConnector.iconUrl, accountId: requestedState?.accountId, mode };
+        const encoder = new TextEncoder();
+        const stream = new ReadableStream({ start(controller) {
+          controller.enqueue(encoder.encode(`data: ${JSON.stringify({ provider: requestedConnector.label, model: 'connector-permission' })}\n\n`));
+          controller.enqueue(encoder.encode(`data: ${JSON.stringify({ permission_request: permission })}\n\n`));
+          controller.enqueue(encoder.encode(`data: ${JSON.stringify({ content: mode === 'connect' ? `Connect ${requestedConnector.label} to continue.` : `Turn on ${requestedConnector.label} to continue.` })}\n\n`));
+          controller.enqueue(encoder.encode('data: [DONE]\n\n'));
+          controller.close();
+        }});
+        return new Response(stream, { headers: { 'Content-Type': 'text/event-stream', 'Cache-Control': 'no-cache' } });
+      }
       try {
         const session = await auth0.getSession();
         if (session?.user?.sub) {
@@ -1836,6 +1872,9 @@ export async function POST(req: NextRequest) {
       const stream = new ReadableStream({
         start(controller) {
           controller.enqueue(encoder.encode(`data: ${JSON.stringify({ provider: "GitHub", model: "connected-action" })}\n\n`));
+          if (reply.includes("isn’t connected") || reply.includes("Reconnect GitHub")) {
+            controller.enqueue(encoder.encode(`data: ${JSON.stringify({ permission_request: { toolkit: "github", label: "GitHub", description: "read your repositories, issues, and pull requests", iconUrl: "https://cdn.simpleicons.org/github", mode: "connect" } })}\n\n`));
+          }
           controller.enqueue(encoder.encode(`data: ${JSON.stringify({ content: reply })}\n\n`));
           controller.enqueue(encoder.encode("data: [DONE]\n\n"));
           controller.close();

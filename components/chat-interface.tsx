@@ -290,7 +290,12 @@ export function ChatInterface({ onSwitchToImagine, onOpenSidebar, isSidebarOpen 
           try {
             const parsed = JSON.parse(dataStr);
 
-            if (parsed.tool_step) {
+            if (parsed.permission_request) {
+              const request = parsed.permission_request;
+              if (!assistantMsgId) {
+                assistantMsgId = addMessage(chatId, { role: "assistant", content: "", connectorPermission: request });
+              }
+            } else if (parsed.tool_step) {
               const toolName = String(parsed.tool_step.tool || parsed.tool_step.name || parsed.tool_step.action || '');
               if (toolName) setActiveConnector(connectorIdentity(toolName));
               // Tool activity stays behind the scenes; only the final answer is shown.

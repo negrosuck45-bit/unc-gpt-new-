@@ -27,6 +27,15 @@ export interface ComputerUseStep {
   reasoning?: string;
 }
 
+export interface ConnectorPermissionRequest {
+  toolkit: string;
+  label: string;
+  description: string;
+  iconUrl: string;
+  accountId?: string;
+  mode: "connect" | "enable";
+}
+
 export interface Message {
   id: string;
   role: "user" | "assistant";
@@ -36,6 +45,7 @@ export interface Message {
   video?: string;   // base64 data URL for generated videos
   modelUsed?: string; // model actually used for this message
   computerUseSteps?: ComputerUseStep[]; // computer use agent steps
+  connectorPermission?: ConnectorPermissionRequest;
   timestamp: Date;
 }
 

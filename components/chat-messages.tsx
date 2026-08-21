@@ -29,6 +29,7 @@ import {
 } from 'lucide-react';
 import { MessageContent } from './message-content';
 import { ComputerUseSteps } from './computer-use-steps';
+import { ConnectorPermissionCard } from './connector-permission-card';
 import { Button } from '@/components/ui/button';
 import { SearchResults, type SearchResult } from './search-results';
 import { MarsAvatar } from './mars-avatar';
@@ -688,6 +689,10 @@ export function ChatMessages({ messages, isStreaming, isThinking, onRegenerate, 
                           <AttachmentPreview key={`img-${i}`} attachment={att} onView={setViewingAttachment} compact />
                         ))}
                       </div>
+                    )}
+
+                    {isAssistant && message.connectorPermission && (
+                      <ConnectorPermissionCard request={message.connectorPermission} />
                     )}
 
                     {/* Assistant stays flat; user messages use a compact Manus-style bubble. */}
