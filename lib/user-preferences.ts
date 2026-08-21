@@ -14,6 +14,11 @@ export interface UserPreferences {
   experimentalFeatures: boolean
   profileName: string
   profilePicture: string
+  bio: string
+  backgroundMedia: string
+  backgroundMediaType: 'image' | 'video' | ''
+  musicUrl: string
+  musicName: string
 }
 
 export const DEFAULT_USER_PREFERENCES: UserPreferences = {
@@ -28,6 +33,11 @@ export const DEFAULT_USER_PREFERENCES: UserPreferences = {
   experimentalFeatures: false,
   profileName: '',
   profilePicture: '',
+  bio: '',
+  backgroundMedia: '',
+  backgroundMediaType: '',
+  musicUrl: '',
+  musicName: '',
 }
 
 const STORAGE_KEY = 'user-preferences'

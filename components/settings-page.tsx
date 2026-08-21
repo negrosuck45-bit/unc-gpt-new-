@@ -13,7 +13,7 @@ import {
 import {
   Settings, Smartphone, Trash2, Sun, Moon, X,
   Palette, Shield, Zap, Key, Download, RefreshCw, Sparkles,
-  Eye, EyeOff, Puzzle, PlugZap, Volume2, UserCircle, LogOut, Database, ChevronRight,
+  Eye, EyeOff, Puzzle, PlugZap, Volume2, UserCircle, LogOut, Database, ChevronRight, Upload, Music2, ImagePlus,
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { cn } from '@/lib/utils';
@@ -49,6 +49,11 @@ export function SettingsPage({ onClose }: SettingsPageProps) {
   const [profilePicture, setProfilePicture] = useState('');
   const [username, setUsername] = useState('');
   const [usernameStatus, setUsernameStatus] = useState<{ type: 'idle' | 'saving' | 'saved' | 'error'; message?: string }>({ type: 'idle' });
+  const [bio, setBio] = useState('');
+  const [backgroundMedia, setBackgroundMedia] = useState('');
+  const [backgroundMediaType, setBackgroundMediaType] = useState<'image' | 'video' | ''>('');
+  const [musicUrl, setMusicUrl] = useState('');
+  const [musicName, setMusicName] = useState('');
   const [language, setLanguage] = useState('system');
 
   const currentChat = getCurrentChat();
@@ -70,6 +75,11 @@ export function SettingsPage({ onClose }: SettingsPageProps) {
     setExperimentalFeatures(p.experimentalFeatures);
     setProfileName(p.profileName || '');
     setProfilePicture(p.profilePicture || '');
+    setBio(p.bio || '');
+    setBackgroundMedia(p.backgroundMedia || '');
+    setBackgroundMediaType(p.backgroundMediaType || '');
+    setMusicUrl(p.musicUrl || '');
+    setMusicName(p.musicName || '');
   }, []);
 
   const handleSave = () => {
@@ -212,16 +222,20 @@ export function SettingsPage({ onClose }: SettingsPageProps) {
                     </div>
                   </div>
                   <div className="rounded-[22px] border border-border bg-card p-4 shadow-sm">
-                    <div className="flex items-center gap-3">
-                      {authUser?.picture ? <img src={authUser.picture} alt="" className="h-10 w-10 rounded-full object-cover" /> : <div className="flex h-10 w-10 items-center justify-center rounded-full bg-muted/10 text-lg font-medium">{(authUser?.name || authUser?.email || 'U').slice(0, 1).toUpperCase()}</div>}
-                      <div className="min-w-0 flex-1"><p className="text-xs font-medium uppercase tracking-[0.14em] text-foreground/45">Connected account</p><p className="truncate text-sm text-foreground/80">{authUser?.email || 'Identity and security'}</p></div>
-                      <GoogleMark />
-                    </div>
+                    <label className="mb-2 block text-xs font-medium uppercase tracking-[0.14em] text-foreground/45">Bio</label>
+                    <textarea value={bio} onChange={(event) => setBio(event.target.value.slice(0, 160))} onBlur={() => writeUserPreferences({ bio: bio.trim() })} placeholder="Tell people a little about you" className="min-h-20 w-full resize-none rounded-xl border border-border/15 bg-muted/[0.06] p-3 text-sm text-foreground outline-none placeholder:text-foreground/35 focus:border-emerald-400/45" />
+                    <p className="mt-2 text-right text-[11px] text-foreground/35">{bio.length}/160</p>
                   </div>
-                  <ProfileRow label="Name" value={authUser?.name || 'Not provided'} />
-                  <ProfileRow label="Email address" value={authUser?.email || 'Hidden'} />
-                  <ProfileRow label="Phone number" value="—" />
-                  <div className="flex items-center justify-between border-t border-border/[0.10] pt-4"><span className="text-sm">Log out of all devices</span><a href="/auth/logout" className="rounded-full border border-red-300/50 px-4 py-2 text-sm text-red-200 transition hover:bg-red-400/10">Log out</a></div>
+                  <div className="rounded-[22px] border border-border bg-card p-4 shadow-sm">
+                    <div className="mb-3 flex items-center justify-between"><div><p className="text-sm font-medium">Profile media</p><p className="mt-1 text-xs text-foreground/50">Add a background image, video, or music file.</p></div><ImagePlus className="h-4 w-4 text-foreground/40" /></div>
+                    <label className="group flex min-h-32 cursor-pointer flex-col items-center justify-center rounded-2xl border border-dashed border-emerald-400/25 bg-emerald-400/[0.035] px-4 text-center transition hover:border-emerald-400/50 hover:bg-emerald-400/[0.07]">
+                      <Upload className="h-5 w-5 text-emerald-300/80 transition group-hover:scale-110" /><span className="mt-2 text-sm text-foreground/75">Drop files here or click to upload</span><span className="mt-1 text-xs text-foreground/40">Background image/video or audio</span>
+                      <input type="file" accept="image/*,video/*,audio/*" className="hidden" onChange={(event) => { const file = event.target.files?.[0]; if (!file) return; const reader = new FileReader(); reader.onload = () => { const value = String(reader.result || ''); if (file.type.startsWith('audio/')) { setMusicUrl(value); setMusicName(file.name); writeUserPreferences({ musicUrl: value, musicName: file.name }); } else { const type = file.type.startsWith('video/') ? 'video' : 'image'; setBackgroundMedia(value); setBackgroundMediaType(type); writeUserPreferences({ backgroundMedia: value, backgroundMediaType: type }); } }; reader.readAsDataURL(file) }} />
+                    </label>
+                    {backgroundMedia && <div className="mt-3 overflow-hidden rounded-xl border border-border/10">{backgroundMediaType === 'video' ? <video src={backgroundMedia} controls className="h-28 w-full object-cover" /> : <img src={backgroundMedia} alt="Profile background" className="h-28 w-full object-cover" />}</div>}
+                    {musicUrl && <div className="mt-3 flex items-center gap-2 rounded-xl border border-border/10 bg-muted/[0.05] p-3"><Music2 className="h-4 w-4 text-emerald-300" /><span className="min-w-0 flex-1 truncate text-xs text-foreground/70">{musicName || 'Uploaded music'}</span><audio src={musicUrl} controls className="h-7 max-w-[45%]" /></div>}
+                  </div>
+                  <div className="flex items-center justify-between border-t border-border/[0.10] pt-4"><span className="text-sm">Account session</span><a href="/auth/logout" className="rounded-full border border-red-300/50 px-4 py-2 text-sm text-red-200 transition hover:bg-red-400/10">Log out</a></div>
                 </div>
               )}
 
