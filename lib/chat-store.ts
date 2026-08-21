@@ -140,7 +140,7 @@ interface ChatStore {
   setCurrentChat: (id: string | null) => void;
   createNewChat: (type?: "text" | "voice", projectId?: string | null, model?: string, provider?: string) => string;
   addMessage: (chatId: string, message: Omit<Message, "id" | "timestamp">) => string;
-  updateMessage: (chatId: string, messageId: string, content: string, image?: string, video?: string, modelUsed?: string, computerUseSteps?: ComputerUseStep[]) => void;
+  updateMessage: (chatId: string, messageId: string, content: string, image?: string, video?: string, modelUsed?: string, computerUseSteps?: ComputerUseStep[], connectorPermission?: ConnectorPermissionRequest) => void;
   deleteMessage: (chatId: string, messageId: string) => void;
   updateChatTitle: (chatId: string, title: string) => void;
   updateChatProject: (chatId: string, projectId: string | null) => void;
@@ -272,7 +272,7 @@ export const useChatStore = create<ChatStore>()(
         offloadMessageMedia(chatId, newMessage.id, set);
         return newMessage.id;
       },
-      updateMessage: (chatId, messageId, content, image, video, modelUsed, computerUseSteps) => {
+      updateMessage: (chatId, messageId, content, image, video, modelUsed, computerUseSteps, connectorPermission) => {
         set((state) => ({
           chats: state.chats.map((chat) =>
             chat.id === chatId
@@ -286,7 +286,8 @@ export const useChatStore = create<ChatStore>()(
                       ...(image && { image }),
                       ...(video && { video }),
                       ...(modelUsed && { modelUsed }),
-                      ...(computerUseSteps && { computerUseSteps })
+                      ...(computerUseSteps && { computerUseSteps }),
+                      ...(connectorPermission && { connectorPermission })
                     }
                     : msg,
                 ),

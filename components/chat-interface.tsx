@@ -11,6 +11,7 @@ import { readUserPreferences } from "@/lib/user-preferences";
 import { triggerHaptic } from "@/lib/haptics";
 import { localVisionSupported, runLocalVision } from "@/lib/local-vision";
 import { AgentComputerCard, connectorIdentity, type ActiveConnector } from "@/components/agent-computer-card";
+import { connectorPermissionIdentity } from "@/components/connector-permission-card";
 
 interface ChatInterfaceProps {
   onSwitchToImagine?: () => void;
@@ -336,7 +337,13 @@ export function ChatInterface({ onSwitchToImagine, onOpenSidebar, isSidebarOpen 
       }
     }
 
-    if (!streamingPreference && fullContent && !assistantMsgId) {
+    const latestUserText = String(messages[messages.length - 1]?.content || '');
+    const genericGmailRefusal = /(?:don't|do not|cannot|can't|no) (?:have )?(?:direct )?access to your (?:personal )?data|text-based AI assistant|external data sources/i.test(fullContent);
+    if (/\b(email|emails|mail|inbox|gmail)\b/i.test(latestUserText) && genericGmailRefusal) {
+      const permission = connectorPermissionIdentity('gmail', 'connect');
+      if (assistantMsgId) updateMessage(chatId, assistantMsgId, 'Connect Gmail to continue.', undefined, undefined, undefined, undefined, permission);
+      else assistantMsgId = addMessage(chatId, { role: 'assistant', content: 'Connect Gmail to continue.', connectorPermission: permission });
+    } else if (!streamingPreference && fullContent && !assistantMsgId) {
       setIsThinking(false);
       addMessage(chatId, { role: "assistant", content: fullContent });
     } else if (assistantMsgId && fullContent) {
