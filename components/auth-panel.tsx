@@ -18,6 +18,14 @@ function GithubIcon() {
   return <svg viewBox="0 0 24 24" className="h-4 w-4" fill="currentColor" aria-hidden="true"><path d="M12 0C5.37 0 0 5.37 0 12c0 5.31 3.44 9.8 8.21 11.39.6.11.82-.26.82-.57 0-.28-.01-1.23-.01-2.24-3.02.66-3.66-1.28-3.66-1.28-.55-1.39-1.33-1.76-1.33-1.76-1.1-.75.08-.73.08-.73 1.21.09 1.85 1.24 1.85 1.24 1.08 1.84 2.82 1.31 3.51 1 .11-.78.42-1.31.76-1.61-2.41-.28-4.95-1.21-4.95-5.4 0-1.19.43-2.16 1.14-2.92-.11-.28-.5-1.46.11-3.04 0 0 .93-.3 3.03 1.12a10.5 10.5 0 0 1 5.52 0c2.1-1.42 3.03-1.12 3.03-1.12.61 1.58.23 2.76.11 3.04.71.76 1.14 1.73 1.14 2.92 0 4.2-2.55 5.12-4.97 5.39.43.37.81 1.1.81 2.22 0 1.61-.01 2.91-.01 3.3 0 .32.22.68.83.57A12.01 12.01 0 0 0 24 12C24 5.37 18.63 0 12 0Z"/></svg>
 }
 
+function AppleIcon() {
+  return <svg viewBox="0 0 24 24" className="h-4 w-4" fill="currentColor" aria-hidden="true"><path d="M17.05 20.28c-.98.95-2.05.8-3.08.35-1.09-.46-2.09-.48-3.24 0-1.44.62-2.2.44-3.06-.35C2.79 15.25 3.51 7.59 9.05 7.31c1.35.07 2.29.74 3.08.8 1.18-.24 2.31-.93 3.57-.84 1.51.12 2.65.72 3.4 1.8-3.12 1.87-2.38 5.98.48 7.13-.57 1.5-1.31 2.99-2.53 4.08ZM12.03 7.25C11.88 5.02 13.69 3.18 15.77 3c.29 2.58-2.34 4.5-3.74 4.25Z"/></svg>
+}
+
+function DiscordIcon() {
+  return <svg viewBox="0 0 24 24" className="h-4 w-4" fill="currentColor" aria-hidden="true"><path d="M19.54 5.18A16.9 16.9 0 0 0 15.4 4l-.5 1.02a15.7 15.7 0 0 0-5.8 0L8.6 4a16.8 16.8 0 0 0-4.14 1.18C1.84 8.68 1.13 12.09 1.49 15.45a16.7 16.7 0 0 0 5.1 2.58l1.23-1.67c-.68-.25-1.33-.56-1.94-.92l.47-.36c3.73 1.72 7.78 1.72 11.47 0l.48.36c-.61.36-1.26.67-1.95.92l1.23 1.67a16.8 16.8 0 0 0 5.1-2.58c.42-3.9-.72-7.28-3.14-10.27ZM8.36 13.9c-1.12 0-2.04-1.03-2.04-2.3s.9-2.3 2.04-2.3 2.05 1.03 2.04 2.3c0 1.27-.9 2.3-2.04 2.3Zm7.28 0c-1.12 0-2.04-1.03-2.04-2.3s.9-2.3 2.04-2.3 2.05 1.03 2.04 2.3c0 1.27-.9 2.3-2.04 2.3Z"/></svg>
+}
+
 function AuthLink({
   href,
   children,
@@ -34,11 +42,11 @@ function AuthLink({
       href={href}
       className={
         primary
-          ? "group flex h-12 items-center justify-center rounded-2xl bg-white px-5 text-sm font-semibold text-black shadow-[0_10px_30px_rgba(255,255,255,0.12)] transition hover:-translate-y-0.5 hover:bg-white/90"
-          : "flex h-12 items-center justify-center rounded-2xl border border-white/12 bg-white/[0.045] px-5 text-sm font-medium text-white/90 backdrop-blur-xl transition hover:-translate-y-0.5 hover:border-white/25 hover:bg-white/[0.09]"
+          ? "group flex h-12 items-center justify-center gap-3 rounded-2xl border border-white/14 bg-white/[0.07] px-5 text-sm font-semibold text-white shadow-[0_10px_30px_rgba(124,58,237,0.12)] backdrop-blur-xl transition hover:-translate-y-0.5 hover:border-violet-300/35 hover:bg-violet-400/[0.14]"
+          : "flex h-12 items-center justify-center gap-3 rounded-2xl border border-white/12 bg-white/[0.045] px-5 text-sm font-medium text-white/90 backdrop-blur-xl transition hover:-translate-y-0.5 hover:border-white/25 hover:bg-white/[0.09]"
       }
     >
-      {icon && <span className="shrink-0">{icon}</span>}
+      {icon && <span className="flex h-5 w-5 shrink-0 items-center justify-center text-white/90">{icon}</span>}
       <span>{children}</span>
     </a>
   )
@@ -103,7 +111,9 @@ export function AuthPanel({ user }: AuthPanelProps) {
           <div className="grid gap-3">
             <AuthLink href={`/auth/login?connection=${AUTH0_CONNECTIONS.google}`} icon={<GoogleIcon />} primary>Continue with Google</AuthLink>
             <AuthLink href={`/auth/login?connection=${AUTH0_CONNECTIONS.github}&returnTo=%2F`} icon={<GithubIcon />}>Continue with GitHub</AuthLink>
-            <div className="my-1 flex items-center gap-3 text-[11px] uppercase tracking-[0.2em] text-white/25"><span className="h-px flex-1 bg-white/10" /> or <span className="h-px flex-1 bg-white/10" /></div>
+            <AuthLink href={`/auth/login?connection=${AUTH0_CONNECTIONS.apple}&returnTo=%2F`} icon={<AppleIcon />}>Continue with Apple</AuthLink>
+            <AuthLink href={`/auth/login?connection=${AUTH0_CONNECTIONS.discord}&returnTo=%2F`} icon={<DiscordIcon />}>Continue with Discord</AuthLink>
+            <div className="my-2 flex items-center gap-3 text-[11px] uppercase tracking-[0.2em] text-white/25"><span className="h-px flex-1 bg-white/10" /> or <span className="h-px flex-1 bg-white/10" /></div>
             <AuthLink href="/auth/login" icon={<Mail className="h-4 w-4" />}>Continue with email</AuthLink>
             <AuthLink href="/auth/login?screen_hint=signup" icon={<UserRoundPlus className="h-4 w-4" />}>Create an account</AuthLink>
           </div>

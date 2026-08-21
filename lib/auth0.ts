@@ -9,6 +9,7 @@ export const AUTH0_CONNECTIONS = {
   google: "google-oauth2",
   github: "github",
   apple: "apple",
+  discord: "discord",
 } as const
 
 export type Auth0Connection = keyof typeof AUTH0_CONNECTIONS
