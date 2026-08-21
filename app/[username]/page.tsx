@@ -73,7 +73,6 @@ export default async function PublicProfilePage({ params }: { params: Promise<{ 
               <audio className="h-9 w-full" src={profile.music_url} controls />
             </div>
           )}
-          <div className="mt-8 text-[11px] uppercase tracking-[0.24em] text-white/30">uncgpt</div>
         </div>
       </section>
     </main>
