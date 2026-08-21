@@ -7,7 +7,25 @@ const STORAGE_KEY = "uncgpt-agent-computer-auto-enabled"
 
 type Status = "checking" | "online" | "offline"
 
-export function AgentComputerCard({ onChange }: { onChange?: (enabled: boolean) => void }) {
+export interface ActiveConnector {
+  slug: string;
+  label: string;
+  iconUrl: string;
+}
+
+export function connectorIdentity(name: string): ActiveConnector {
+  const normalized = name.toLowerCase();
+  const match = normalized.match(/github|gmail|slack|notion|linear|google[_-]?drive|vercel|google[_-]?calendar|discord|dropbox|trello|jira/);
+  const slug = match?.[0]?.replace('_', '-') || 'composio';
+  const labels: Record<string, string> = {
+    github: 'GitHub', gmail: 'Gmail', slack: 'Slack', notion: 'Notion', linear: 'Linear',
+    'google-drive': 'Google Drive', vercel: 'Vercel', 'google-calendar': 'Google Calendar',
+    discord: 'Discord', dropbox: 'Dropbox', trello: 'Trello', jira: 'Jira', composio: 'Connector',
+  };
+  return { slug, label: labels[slug] || 'Connector', iconUrl: `https://cdn.simpleicons.org/${slug}` };
+}
+
+export function AgentComputerCard({ onChange, activeConnector }: { onChange?: (enabled: boolean) => void; activeConnector?: ActiveConnector | null }) {
   const [enabled, setEnabled] = useState(false)
   const [status, setStatus] = useState<Status>("checking")
 
@@ -43,9 +61,14 @@ export function AgentComputerCard({ onChange }: { onChange?: (enabled: boolean) 
         </span>
         <div className="min-w-0">
           <div className="truncate font-medium">Agent Computer <span className="font-normal text-muted-foreground">· auto</span></div>
-          <div className="flex items-center gap-1.5 text-[11px] text-muted-foreground">
-            <span className={`h-1.5 w-1.5 rounded-full ${status === "online" ? "bg-emerald-400" : status === "checking" ? "bg-amber-400" : "bg-red-400"}`} />
-            {statusLabel}
+          <div className="flex min-w-0 items-center gap-1.5 text-[11px] text-muted-foreground">
+            <span className={`h-1.5 w-1.5 shrink-0 rounded-full ${activeConnector ? "bg-sky-300" : status === "online" ? "bg-emerald-400" : status === "checking" ? "bg-amber-400" : "bg-red-400"}`} />
+            {activeConnector ? (
+              <span className="inline-flex min-w-0 items-center gap-1.5 rounded-full border border-white/10 bg-white/[0.05] px-1.5 py-0.5 text-foreground/70 backdrop-blur-md">
+                <img src={activeConnector.iconUrl} alt="" aria-hidden="true" className="h-3 w-3 shrink-0 opacity-60" />
+                <span className="truncate">Using {activeConnector.label}</span>
+              </span>
+            ) : statusLabel}
           </div>
         </div>
       </div>

@@ -10,7 +10,7 @@ import { playReplySound, unlockReplySound } from "@/lib/notifications";
 import { readUserPreferences } from "@/lib/user-preferences";
 import { triggerHaptic } from "@/lib/haptics";
 import { localVisionSupported, runLocalVision } from "@/lib/local-vision";
-import { AgentComputerCard } from "@/components/agent-computer-card";
+import { AgentComputerCard, connectorIdentity, type ActiveConnector } from "@/components/agent-computer-card";
 
 interface ChatInterfaceProps {
   onSwitchToImagine?: () => void;
@@ -52,6 +52,7 @@ export function ChatInterface({ onSwitchToImagine, onOpenSidebar, isSidebarOpen 
   const [mounted, setMounted] = useState(false);
   const [isThinking, setIsThinking] = useState(false);
   const [agentComputerEnabled, setAgentComputerEnabled] = useState(true);
+  const [activeConnector, setActiveConnector] = useState<ActiveConnector | null>(null);
 
   const abortControllerRef = useRef<AbortController | null>(null);
 
@@ -93,6 +94,7 @@ export function ChatInterface({ onSwitchToImagine, onOpenSidebar, isSidebarOpen 
     unlockReplySound();
     setIsStreaming(true, chatId);
     setIsThinking(true);
+    setActiveConnector(null);
     abortControllerRef.current = new AbortController();
 
     let completed = false;
@@ -138,6 +140,7 @@ export function ChatInterface({ onSwitchToImagine, onOpenSidebar, isSidebarOpen 
     unlockReplySound();
     setIsStreaming(true, chatId);
     setIsThinking(true);
+    setActiveConnector(null);
     abortControllerRef.current = new AbortController();
 
     let completed = false;
@@ -288,6 +291,8 @@ export function ChatInterface({ onSwitchToImagine, onOpenSidebar, isSidebarOpen 
             const parsed = JSON.parse(dataStr);
 
             if (parsed.tool_step) {
+              const toolName = String(parsed.tool_step.tool || parsed.tool_step.name || parsed.tool_step.action || '');
+              if (toolName) setActiveConnector(connectorIdentity(toolName));
               // Tool activity stays behind the scenes; only the final answer is shown.
               continue;
             } else if (parsed.content) {
@@ -333,6 +338,7 @@ export function ChatInterface({ onSwitchToImagine, onOpenSidebar, isSidebarOpen 
       updateMessage(chatId, assistantMsgId, fullContent);
     }
 
+    window.setTimeout(() => setActiveConnector(null), 1800);
     return fullContent;
   };
 
@@ -348,7 +354,7 @@ export function ChatInterface({ onSwitchToImagine, onOpenSidebar, isSidebarOpen 
         onOpenSidebar={onOpenSidebar}
         isSidebarOpen={isSidebarOpen}
       />
-      <AgentComputerCard onChange={setAgentComputerEnabled} />
+      <AgentComputerCard onChange={setAgentComputerEnabled} activeConnector={activeConnector} />
       {hasMessages ? (
         <div className="flex-1 flex flex-col min-h-0 overflow-hidden relative">
           <div 
