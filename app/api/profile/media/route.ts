@@ -16,10 +16,12 @@ function safeSegment(value: string) {
   return value.replace(/[^a-zA-Z0-9._-]/g, '_').slice(0, 120)
 }
 
-function mediaKind(type: string) {
-  if (type.startsWith('image/')) return 'image'
-  if (type.startsWith('video/')) return 'video'
-  if (type.startsWith('audio/')) return 'audio'
+function mediaKind(type: string, name = '') {
+  const normalizedType = type.toLowerCase()
+  const extension = name.split('.').pop()?.toLowerCase() || ''
+  if (normalizedType.startsWith('image/') || ['gif', 'png', 'jpg', 'jpeg', 'webp', 'svg'].includes(extension)) return 'image'
+  if (normalizedType.startsWith('video/') || ['mp4', 'mov', 'webm', 'm4v'].includes(extension)) return 'video'
+  if (normalizedType.startsWith('audio/') || ['mp3', 'm4a', 'wav', 'ogg', 'aac', 'flac'].includes(extension)) return 'audio'
   return 'unknown'
 }
 
@@ -61,7 +63,7 @@ export async function POST(request: NextRequest) {
   const formData = await request.formData()
   const file = formData.get('file')
   const purpose = formData.get('purpose') === 'music'
-  const kind = file instanceof File ? mediaKind(file.type) : null
+  const kind = file instanceof File ? mediaKind(file.type, file.name) : null
   if (!(file instanceof File) || !kind) {
     return Response.json({ error: 'Choose a file to upload.' }, { status: 400 })
   }
@@ -86,7 +88,7 @@ export async function POST(request: NextRequest) {
 
   let uploadKind = purpose ? 'audio' : kind
   let extension = file.name.split('.').pop()?.toLowerCase() || 'bin'
-  let contentType = file.type || 'application/octet-stream'
+  let contentType = file.type || (extension === 'gif' ? 'image/gif' : extension === 'webp' ? 'image/webp' : 'application/octet-stream')
   let buffer = Buffer.from(await file.arrayBuffer())
   let extracted = false
   if (purpose || kind === 'audio') {
