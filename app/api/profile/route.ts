@@ -24,12 +24,14 @@ export async function GET() {
   if (!userId) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   const supabase = getAdminClient();
   if (!supabase) return NextResponse.json({ error: "Profile storage is not configured." }, { status: 503 });
-  const { data, error } = await supabase.from("user_profiles").select("username,bio,profile_picture,background_media,background_media_type,music_url,music_name,cursor_image").eq("user_id", userId).maybeSingle();
-  if (error) {
-    console.error("[profile] load failed", { code: error.code, message: error.message });
+  const withCursor = await supabase.from("user_profiles").select("username,bio,profile_picture,background_media,background_media_type,music_url,music_name,cursor_image").eq("user_id", userId).maybeSingle();
+  if (!withCursor.error) return NextResponse.json({ profile: withCursor.data ?? null });
+  const legacy = await supabase.from("user_profiles").select("username,bio,profile_picture,background_media,background_media_type,music_url,music_name").eq("user_id", userId).maybeSingle();
+  if (legacy.error) {
+    console.error("[profile] load failed", { code: legacy.error.code, message: legacy.error.message });
     return NextResponse.json({ error: "Unable to load profile." }, { status: 500 });
   }
-  return NextResponse.json({ profile: data ?? null });
+  return NextResponse.json({ profile: legacy.data ?? null });
 }
 
 export async function PATCH(request: NextRequest) {
@@ -51,9 +53,15 @@ export async function PATCH(request: NextRequest) {
   }
   if (!Object.keys(update).length) return NextResponse.json({ error: "No profile changes provided." }, { status: 400 });
   const { data: current } = await supabase.from("user_profiles").select("user_id").eq("user_id", userId).maybeSingle();
-  const result = current
+  let result = current
     ? await supabase.from("user_profiles").update({ ...update, updated_at: new Date().toISOString() }).eq("user_id", userId).select("username,bio,profile_picture,background_media,background_media_type,music_url,music_name,cursor_image").single()
     : await supabase.from("user_profiles").insert({ user_id: userId, username: `user_${userId.slice(-8)}`, ...update }).select("username,bio,profile_picture,background_media,background_media_type,music_url,music_name,cursor_image").single();
+  if (result.error && "cursor_image" in update) {
+    const { cursor_image: _ignoredCursor, ...legacyUpdate } = update;
+    result = current
+      ? await supabase.from("user_profiles").update({ ...legacyUpdate, updated_at: new Date().toISOString() }).eq("user_id", userId).select("username,bio,profile_picture,background_media,background_media_type,music_url,music_name").single()
+      : await supabase.from("user_profiles").insert({ user_id: userId, username: `user_${userId.slice(-8)}`, ...legacyUpdate }).select("username,bio,profile_picture,background_media,background_media_type,music_url,music_name").single();
+  }
   if (result.error) {
     console.error("[profile] save failed", { code: result.error.code, message: result.error.message });
     return NextResponse.json({ error: "Unable to save profile." }, { status: 500 });

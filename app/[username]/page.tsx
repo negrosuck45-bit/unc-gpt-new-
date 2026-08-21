@@ -29,11 +29,16 @@ async function getProfile(username: string): Promise<Profile | null> {
   const supabase = getAdminClient();
   if (!supabase) return null;
   const selectFields = "username,bio,profile_picture,background_media,background_media_type,music_url,music_name,cursor_image";
+  const legacyFields = "username,bio,profile_picture,background_media,background_media_type,music_url,music_name";
   const primary = await supabase.from("user_profiles").select(selectFields).eq("username_lower", normalized.toLowerCase()).maybeSingle();
   if (primary.data) return primary.data as Profile;
   const fallback = await supabase.from("user_profiles").select(selectFields).eq("username", normalized).maybeSingle();
-  if (fallback.error || !fallback.data) return null;
-  return fallback.data as Profile;
+  if (fallback.data) return fallback.data as Profile;
+  const legacyPrimary = await supabase.from("user_profiles").select(legacyFields).eq("username_lower", normalized.toLowerCase()).maybeSingle();
+  if (legacyPrimary.data) return legacyPrimary.data as Profile;
+  const legacyFallback = await supabase.from("user_profiles").select(legacyFields).eq("username", normalized).maybeSingle();
+  if (legacyFallback.error || !legacyFallback.data) return null;
+  return legacyFallback.data as Profile;
 }
 
 export async function generateMetadata({ params }: { params: Promise<{ username: string }> }) {
