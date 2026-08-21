@@ -1,3 +1,5 @@
+import { NextRequest } from 'next/server'
+import ffmpegPath from 'ffmpeg-static'
 import { auth0 } from '@/lib/auth0'
 import { execFile } from 'node:child_process'
 import { promisify } from 'node:util'
@@ -27,7 +29,7 @@ async function extractAudio(file: File) {
   const output = join(directory, 'profile-music.mp3')
   try {
     await writeFile(input, Buffer.from(await file.arrayBuffer()))
-    await execFileAsync('ffmpeg', ['-y', '-i', input, '-vn', '-map', '0:a:0', '-codec:a', 'libmp3lame', '-b:a', '192k', output], { timeout: 45_000, maxBuffer: 2 * 1024 * 1024 })
+    await execFileAsync(ffmpegPath || process.env.FFMPEG_PATH || 'ffmpeg', ['-y', '-i', input, '-vn', '-map', '0:a:0', '-codec:a', 'libmp3lame', '-b:a', '192k', output], { timeout: 45_000, maxBuffer: 2 * 1024 * 1024 })
     const buffer = await readFile(output)
     return { buffer, contentType: 'audio/mpeg', extension: 'mp3', extracted: true }
   } finally {
@@ -50,6 +52,9 @@ export async function POST(request: NextRequest) {
   if (!(file instanceof File) || !kind) {
     return Response.json({ error: 'Choose a file to upload.' }, { status: 400 })
   }
+  if (purpose && kind === 'image') {
+    return Response.json({ error: 'Images cannot be used as Music. Choose an audio or video file.' }, { status: 415 })
+  }
   const maxSize = kind === 'video' ? 50 : 25
   if (file.size > maxSize * 1024 * 1024) {
     return Response.json({ error: `Files must be ${maxSize} MB or smaller` }, { status: 413 })
@@ -71,7 +76,7 @@ export async function POST(request: NextRequest) {
   let contentType = file.type || 'application/octet-stream'
   let buffer = Buffer.from(await file.arrayBuffer())
   let extracted = false
-  if (purpose || kind === 'audio' || kind === 'video' || kind === 'unknown') {
+  if (purpose || kind === 'audio') {
     try {
       const result = await extractAudio(file)
       buffer = result.buffer
@@ -80,9 +85,10 @@ export async function POST(request: NextRequest) {
       uploadKind = 'audio'
       extracted = result.extracted
     } catch {
-      // Any file is still accepted for Music. If extraction is unavailable or
-      // the file has no audio stream, retain the original so the user can
-      // replace it later instead of rejecting the upload at the picker stage.
+      if (purpose && (kind === 'video' || kind === 'unknown')) {
+        return Response.json({ error: 'The video was received, but no playable audio track could be extracted. Please try another video.' }, { status: 422 })
+      }
+      // Direct audio files remain uploadable if conversion is unavailable.
     }
   }
   const path = `users/${safeSegment(userId)}/profile/${uploadKind}/${Date.now()}-${crypto.randomUUID()}.${extension}`
