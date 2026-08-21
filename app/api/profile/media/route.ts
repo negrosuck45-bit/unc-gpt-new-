@@ -1,4 +1,11 @@
 import { auth0 } from '@/lib/auth0'
+import { execFile } from 'node:child_process'
+import { promisify } from 'node:util'
+import { mkdtemp, readFile, rm, writeFile } from 'node:fs/promises'
+import { tmpdir } from 'node:os'
+import { join } from 'node:path'
+
+const execFileAsync = promisify(execFile)
 import { CHAT_UPLOAD_BUCKET, getSupabaseAdmin } from '@/lib/supabase/admin'
 
 export const runtime = 'nodejs'
@@ -11,7 +18,21 @@ function mediaKind(type: string) {
   if (type.startsWith('image/')) return 'image'
   if (type.startsWith('video/')) return 'video'
   if (type.startsWith('audio/')) return 'audio'
-  return null
+  return 'unknown'
+}
+
+async function extractAudio(file: File) {
+  const directory = await mkdtemp(join(tmpdir(), 'uncgpt-audio-'))
+  const input = join(directory, safeSegment(file.name || 'upload.bin'))
+  const output = join(directory, 'profile-music.mp3')
+  try {
+    await writeFile(input, Buffer.from(await file.arrayBuffer()))
+    await execFileAsync('ffmpeg', ['-y', '-i', input, '-vn', '-map', '0:a:0', '-codec:a', 'libmp3lame', '-b:a', '192k', output], { timeout: 45_000, maxBuffer: 2 * 1024 * 1024 })
+    const buffer = await readFile(output)
+    return { buffer, contentType: 'audio/mpeg', extension: 'mp3', extracted: true }
+  } finally {
+    await rm(directory, { recursive: true, force: true }).catch(() => {})
+  }
 }
 
 export async function POST(request: NextRequest) {
@@ -26,11 +47,11 @@ export async function POST(request: NextRequest) {
   const file = formData.get('file')
   const kind = file instanceof File ? mediaKind(file.type) : null
   if (!(file instanceof File) || !kind) {
-    return Response.json({ error: 'Upload an image, video, or audio file' }, { status: 400 })
+    return Response.json({ error: 'Choose a file to upload.' }, { status: 400 })
   }
   const maxSize = kind === 'video' ? 50 : 25
   if (file.size > maxSize * 1024 * 1024) {
-    return Response.json({ error: `${kind} must be ${maxSize} MB or smaller` }, { status: 413 })
+    return Response.json({ error: `Files must be ${maxSize} MB or smaller` }, { status: 413 })
   }
 
   const { data: bucket } = await supabase.storage.getBucket(CHAT_UPLOAD_BUCKET)
@@ -44,12 +65,27 @@ export async function POST(request: NextRequest) {
     }
   }
 
-  const extension = file.name.split('.').pop()?.toLowerCase() || 'bin'
-  const path = `users/${safeSegment(userId)}/profile/${kind}/${Date.now()}-${crypto.randomUUID()}.${extension}`
-  const buffer = Buffer.from(await file.arrayBuffer())
+  let uploadKind = kind
+  let extension = file.name.split('.').pop()?.toLowerCase() || 'bin'
+  let contentType = file.type || 'application/octet-stream'
+  let buffer = Buffer.from(await file.arrayBuffer())
+  let extracted = false
+  if (kind === 'audio' || kind === 'video' || kind === 'unknown') {
+    try {
+      const result = await extractAudio(file)
+      buffer = result.buffer
+      contentType = result.contentType
+      extension = result.extension
+      uploadKind = 'audio'
+      extracted = result.extracted
+    } catch (error) {
+      if (kind !== 'audio') return Response.json({ error: 'This file does not contain an extractable audio track.' }, { status: 415 })
+    }
+  }
+  const path = `users/${safeSegment(userId)}/profile/${uploadKind}/${Date.now()}-${crypto.randomUUID()}.${extension}`
   const storage = supabase.storage.from(CHAT_UPLOAD_BUCKET)
   const { error: uploadError } = await storage.upload(path, buffer, {
-    contentType: file.type,
+    contentType,
     cacheControl: '31536000',
     upsert: false,
   })
@@ -61,5 +97,5 @@ export async function POST(request: NextRequest) {
     return Response.json({ error: 'Storage did not return a public URL' }, { status: 502 })
   }
 
-  return Response.json({ url: data.publicUrl, kind, path })
+  return Response.json({ url: data.publicUrl, kind: uploadKind, path, extracted })
 }
