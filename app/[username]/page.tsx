@@ -5,6 +5,8 @@ import { PublicProfileCard, PublicProfileCursor } from "@/components/public-prof
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 
+const THUMBNAIL_MARKER = "__uncgpt_thumbnail__:";
+
 type Profile = {
   username: string;
   bio: string | null;
@@ -16,6 +18,14 @@ type Profile = {
   music_thumbnail: string | null;
   cursor_image: string | null;
 };
+
+function normalizeProfile(profile: any): Profile {
+  if (!profile || typeof profile.music_name !== "string") return profile as Profile;
+  const markerIndex = profile.music_name.indexOf(THUMBNAIL_MARKER);
+  if (markerIndex < 0) return profile as Profile;
+  const encodedThumbnail = profile.music_name.slice(markerIndex + THUMBNAIL_MARKER.length).trim();
+  return { ...profile, music_name: profile.music_name.slice(0, markerIndex).trim() || null, music_thumbnail: profile.music_thumbnail || encodedThumbnail || null } as Profile;
+}
 
 function getAdminClient() {
   const url = process.env.NEXT_PUBLIC_SUPABASE_URL;
@@ -32,14 +42,14 @@ async function getProfile(username: string): Promise<Profile | null> {
   const selectFields = "username,bio,profile_picture,background_media,background_media_type,music_url,music_name,music_thumbnail,cursor_image";
   const legacyFields = "username,bio,profile_picture,background_media,background_media_type,music_url,music_name";
   const primary = await supabase.from("user_profiles").select(selectFields).eq("username_lower", normalized.toLowerCase()).maybeSingle();
-  if (primary.data) return primary.data as Profile;
+  if (primary.data) return normalizeProfile(primary.data);
   const fallback = await supabase.from("user_profiles").select(selectFields).eq("username", normalized).maybeSingle();
-  if (fallback.data) return fallback.data as Profile;
+  if (fallback.data) return normalizeProfile(fallback.data);
   const legacyPrimary = await supabase.from("user_profiles").select(legacyFields).eq("username_lower", normalized.toLowerCase()).maybeSingle();
-  if (legacyPrimary.data) return legacyPrimary.data as Profile;
+  if (legacyPrimary.data) return normalizeProfile(legacyPrimary.data);
   const legacyFallback = await supabase.from("user_profiles").select(legacyFields).eq("username", normalized).maybeSingle();
   if (legacyFallback.error || !legacyFallback.data) return null;
-  return legacyFallback.data as Profile;
+  return normalizeProfile(legacyFallback.data);
 }
 
 export async function generateMetadata({ params }: { params: Promise<{ username: string }> }) {

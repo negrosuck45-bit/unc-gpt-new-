@@ -6,6 +6,15 @@ export const runtime = "nodejs";
 
 const PROFILE_FIELDS = ["username", "bio", "profile_picture", "background_media", "background_media_type", "music_url", "music_name", "music_thumbnail", "cursor_image"] as const;
 type ProfileField = (typeof PROFILE_FIELDS)[number];
+const THUMBNAIL_MARKER = "__uncgpt_thumbnail__:";
+
+function normalizeProfile<T extends Record<string, any> | null>(profile: T): T {
+  if (!profile || typeof profile.music_name !== "string") return profile;
+  const markerIndex = profile.music_name.indexOf(THUMBNAIL_MARKER);
+  if (markerIndex < 0) return profile;
+  const encodedThumbnail = profile.music_name.slice(markerIndex + THUMBNAIL_MARKER.length).trim();
+  return { ...profile, music_name: profile.music_name.slice(0, markerIndex).trim() || null, music_thumbnail: profile.music_thumbnail || encodedThumbnail || null } as T;
+}
 
 function getAdminClient() {
   const url = process.env.NEXT_PUBLIC_SUPABASE_URL;
@@ -25,13 +34,13 @@ export async function GET() {
   const supabase = getAdminClient();
   if (!supabase) return NextResponse.json({ error: "Profile storage is not configured." }, { status: 503 });
   const withCursor = await supabase.from("user_profiles").select("username,bio,profile_picture,background_media,background_media_type,music_url,music_name,music_thumbnail,cursor_image").eq("user_id", userId).maybeSingle();
-  if (!withCursor.error) return NextResponse.json({ profile: withCursor.data ?? null });
+  if (!withCursor.error) return NextResponse.json({ profile: normalizeProfile(withCursor.data ?? null) });
   const legacy = await supabase.from("user_profiles").select("username,bio,profile_picture,background_media,background_media_type,music_url,music_name").eq("user_id", userId).maybeSingle();
   if (legacy.error) {
     console.error("[profile] load failed", { code: legacy.error.code, message: legacy.error.message });
     return NextResponse.json({ error: "Unable to load profile." }, { status: 500 });
   }
-  return NextResponse.json({ profile: legacy.data ?? null });
+  return NextResponse.json({ profile: normalizeProfile(legacy.data ?? null) });
 }
 
 export async function PATCH(request: NextRequest) {
@@ -60,12 +69,13 @@ export async function PATCH(request: NextRequest) {
   const cursorWasRequested = Object.prototype.hasOwnProperty.call(update, "cursor_image");
   const { cursor_image: cursorImage, ...coreUpdate } = update;
   const profileSelect = "username,bio,profile_picture,background_media,background_media_type,music_url,music_name,music_thumbnail";
-  const { data: current } = await supabase.from("user_profiles").select("user_id").eq("user_id", userId).maybeSingle();
+  const { data: current } = await supabase.from("user_profiles").select("user_id,music_name").eq("user_id", userId).maybeSingle();
   let result = current
     ? await supabase.from("user_profiles").update({ ...coreUpdate, updated_at: new Date().toISOString() }).eq("user_id", userId).select(profileSelect).single()
     : await supabase.from("user_profiles").insert({ user_id: userId, username: `user_${userId.slice(-8)}`, ...coreUpdate }).select(profileSelect).single();
   if (result.error && Object.prototype.hasOwnProperty.call(coreUpdate, "music_thumbnail")) {
     const { music_thumbnail: _thumbnail, ...legacyUpdate } = coreUpdate;
+    if (typeof _thumbnail === "string" && _thumbnail) legacyUpdate.music_name = `${String(legacyUpdate.music_name ?? current?.music_name ?? "").split(THUMBNAIL_MARKER)[0].trim()}\n${THUMBNAIL_MARKER}${_thumbnail}`;
     result = current
       ? await supabase.from("user_profiles").update({ ...legacyUpdate, updated_at: new Date().toISOString() }).eq("user_id", userId).select("username,bio,profile_picture,background_media,background_media_type,music_url,music_name").single()
       : await supabase.from("user_profiles").insert({ user_id: userId, username: `user_${userId.slice(-8)}`, ...legacyUpdate }).select("username,bio,profile_picture,background_media,background_media_type,music_url,music_name").single();
@@ -78,5 +88,5 @@ export async function PATCH(request: NextRequest) {
     console.error("[profile] save failed", { code: result.error.code, message: result.error.message });
     return NextResponse.json({ error: "Unable to save profile." }, { status: 500 });
   }
-  return NextResponse.json({ profile: result.data });
+  return NextResponse.json({ profile: normalizeProfile(result.data) });
 }
