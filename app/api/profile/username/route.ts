@@ -51,7 +51,8 @@ export async function POST(request: NextRequest) {
 
   if (error) {
     if (error.code === "23505") return NextResponse.json({ error: "Username already claimed. Choose another one." }, { status: 409 });
-    return NextResponse.json({ error: "Unable to save username." }, { status: 500 });
+    console.error("[profile/username] save failed", { code: error.code, message: error.message });
+    return NextResponse.json({ error: "Unable to save username. Check the Supabase profile table configuration." }, { status: 500 });
   }
   return NextResponse.json({ username: data.username });
 }
