@@ -9,5 +9,5 @@ export default async function Home() {
     return <AuthPanel />
   }
 
-  return <ChatWorkspace />
+  return <ChatWorkspace accountScope={session.user.sub} />
 }

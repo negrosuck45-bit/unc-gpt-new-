@@ -429,6 +429,7 @@ export const useChatStore = create<ChatStore>()(
       storage: createJSONStorage(() => scopedStorage("chat-store")),
       // Don't persist volatile UI state (otherwise every token of a stream
       // triggers a localStorage write).
+      skipHydration: true,
       partialize: (state) => ({
         chats: state.chats,
         projects: state.projects,

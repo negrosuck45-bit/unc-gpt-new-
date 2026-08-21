@@ -1,5 +1,7 @@
 "use client"
 import { useState, useEffect, useCallback, useRef } from "react"
+import { useChatStore } from "@/lib/chat-store"
+import { dispatchAccountScopeChanged, setActiveAccountScope } from "@/lib/account-scope"
 import { ChatSidebar } from "@/components/chat-sidebar"
 import { SettingsPage } from "@/components/settings-page"
 import { ChatInterface } from "@/components/chat-interface"
@@ -88,8 +90,14 @@ function useSidebarSwipe({
   }, [isMobile, isOpen, onOpen, onClose])
 }
 
-export default function Home() {
+export default function Home({ accountScope }: { accountScope: string }) {
+  setActiveAccountScope(accountScope)
   const isMobile = useIsMobile()
+  useEffect(() => {
+    setActiveAccountScope(accountScope)
+    dispatchAccountScopeChanged()
+    void useChatStore.persist.rehydrate()
+  }, [accountScope])
   const [isSidebarOpen, setIsSidebarOpen] = useState(false)
   const [currentMode, setCurrentMode] = useState<"text" | "voice" | "imagine">("text")
   const [settingsOpen, setSettingsOpen] = useState(false)

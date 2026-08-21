@@ -28,13 +28,12 @@ async function getProfile(username: string): Promise<Profile | null> {
   if (!/^[A-Za-z0-9_]{1,24}$/.test(normalized)) return null;
   const supabase = getAdminClient();
   if (!supabase) return null;
-  const { data, error } = await supabase
-    .from("user_profiles")
-    .select("username,bio,profile_picture,background_media,background_media_type,music_url,music_name,cursor_image")
-    .eq("username_lower", normalized.toLowerCase())
-    .maybeSingle();
-  if (error || !data) return null;
-  return data as Profile;
+  const selectFields = "username,bio,profile_picture,background_media,background_media_type,music_url,music_name,cursor_image";
+  const primary = await supabase.from("user_profiles").select(selectFields).eq("username_lower", normalized.toLowerCase()).maybeSingle();
+  if (primary.data) return primary.data as Profile;
+  const fallback = await supabase.from("user_profiles").select(selectFields).eq("username", normalized).maybeSingle();
+  if (fallback.error || !fallback.data) return null;
+  return fallback.data as Profile;
 }
 
 export async function generateMetadata({ params }: { params: Promise<{ username: string }> }) {
