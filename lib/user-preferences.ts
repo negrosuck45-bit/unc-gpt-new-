@@ -1,5 +1,7 @@
 export type MessageDensity = 'compact' | 'normal' | 'comfortable'
 
+import { accountStorageKey, claimLegacyStorage } from './account-scope'
+
 export interface UserPreferences {
   streaming: boolean
   autoScroll: boolean
@@ -33,7 +35,8 @@ const STORAGE_KEY = 'user-preferences'
 export function readUserPreferences(): UserPreferences {
   if (typeof window === 'undefined') return DEFAULT_USER_PREFERENCES
   try {
-    const raw = window.localStorage.getItem(STORAGE_KEY)
+    const scopedKey = accountStorageKey(STORAGE_KEY)
+    const raw = window.localStorage.getItem(scopedKey) ?? claimLegacyStorage(STORAGE_KEY, scopedKey)
     if (!raw) return DEFAULT_USER_PREFERENCES
     return { ...DEFAULT_USER_PREFERENCES, ...JSON.parse(raw) }
   } catch {
@@ -44,7 +47,7 @@ export function readUserPreferences(): UserPreferences {
 export function writeUserPreferences(partial: Partial<UserPreferences>): UserPreferences {
   const next = { ...readUserPreferences(), ...partial }
   if (typeof window !== 'undefined') {
-    window.localStorage.setItem(STORAGE_KEY, JSON.stringify(next))
+    window.localStorage.setItem(accountStorageKey(STORAGE_KEY), JSON.stringify(next))
     window.dispatchEvent(new CustomEvent('user-preferences-changed', { detail: next }))
   }
   return next

@@ -1,5 +1,6 @@
 import type { Metadata, Viewport } from "next"
 import { Analytics } from "@vercel/analytics/next"
+import { auth0 } from "@/lib/auth0"
 import { Toaster } from "sonner"
 import { ThemeProvider } from "@/components/theme-provider"
 import "./globals.css"
@@ -27,14 +28,18 @@ export const viewport: Viewport = {
   viewportFit: "cover",
 }
 
-export default function RootLayout({
+export default async function RootLayout({
   children,
 }: Readonly<{
   children: React.ReactNode
 }>) {
+  const session = await auth0.getSession()
+  const accountScope = session?.user?.sub ?? "guest"
+
   return (
     <html lang="en" suppressHydrationWarning>
       <body className="font-sans antialiased">
+        <script dangerouslySetInnerHTML={{ __html: `window.__UNCGPT_ACCOUNT_SCOPE__ = ${JSON.stringify(accountScope)};` }} />
         <ThemeProvider attribute="class" defaultTheme="dark" enableSystem disableTransitionOnChange>
           {children}
           <Toaster position="bottom-center" theme="system" />

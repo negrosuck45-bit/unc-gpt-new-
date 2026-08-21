@@ -2,6 +2,7 @@ import { create } from "zustand";
 import { persist, createJSONStorage } from "zustand/middleware";
 import { createSafeStorage, isBigDataUrl } from "./storage-offload";
 import { uploadDataUrl } from "./upload";
+import { scopedStorage } from "./account-scope";
 
 // ---------------------------------------------------------------------------
 // Types
@@ -425,7 +426,7 @@ export const useChatStore = create<ChatStore>()(
       version: 1,
       // Throttled, quota-aware storage. Auto-offloads big data: URLs to Supabase
       // when localStorage is about to overflow — keeps iOS smooth.
-      storage: createJSONStorage(() => createSafeStorage()),
+      storage: createJSONStorage(() => scopedStorage("chat-store")),
       // Don't persist volatile UI state (otherwise every token of a stream
       // triggers a localStorage write).
       partialize: (state) => ({
