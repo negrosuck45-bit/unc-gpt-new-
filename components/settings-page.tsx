@@ -81,9 +81,10 @@ export function SettingsPage({ onClose }: SettingsPageProps) {
     }
   };
 
-  const uploadProfileMedia = async (file: File) => {
+  const uploadProfileMedia = async (file: File, purpose?: 'music') => {
     const formData = new FormData();
     formData.set('file', file);
+    if (purpose) formData.set('purpose', purpose);
     const response = await fetch('/api/profile/media', { method: 'POST', body: formData });
     const payload = await response.json().catch(() => null);
     if (!response.ok || !payload?.url) throw new Error(payload?.error || 'Profile upload failed.');
@@ -149,7 +150,7 @@ export function SettingsPage({ onClose }: SettingsPageProps) {
       let music = musicUrl;
       if (picture.startsWith('data:')) { const file = dataUrlToFile(picture, 'profile-picture.jpg'); if (file) picture = (await uploadProfileMedia(file)).url; }
       if (background.startsWith('data:')) { const extension = backgroundType === 'video' ? 'mp4' : 'jpg'; const file = dataUrlToFile(background, `profile-background.${extension}`); if (file) { const uploaded = await uploadProfileMedia(file); background = uploaded.url; backgroundType = uploaded.kind as 'image' | 'video'; } }
-      if (music.startsWith('data:')) { const file = dataUrlToFile(music, musicName || 'profile-music.mp3'); if (file) music = (await uploadProfileMedia(file)).url; }
+      if (music.startsWith('data:')) { const file = dataUrlToFile(music, musicName || 'profile-music.mp3'); if (file) music = (await uploadProfileMedia(file, 'music')).url; }
       const saved = await syncProfile({ profile_picture: picture || null, bio: bio.trim() || null, background_media: background || null, background_media_type: backgroundType || null, music_url: music || null, music_name: musicName || null, cursor_image: customCursorImage || null });
       if (!saved) throw new Error('Profile storage is not configured in production.');
       setProfilePicture(picture); setBackgroundMedia(background); setBackgroundMediaType(backgroundType); setMusicUrl(music);
@@ -381,7 +382,7 @@ export function SettingsPage({ onClose }: SettingsPageProps) {
                     <div className="mb-3 flex items-center justify-between"><div><p className="text-sm font-medium">Music</p><p className="mt-1 text-xs text-foreground/50">Upload any file; the audio track will be extracted automatically.</p></div><Music2 className="h-4 w-4 text-foreground/40" /></div>
                     <label className="group flex min-h-24 cursor-pointer flex-col items-center justify-center rounded-2xl border border-dashed border-violet-400/25 bg-violet-400/[0.035] px-4 text-center transition hover:border-violet-400/50 hover:bg-violet-400/[0.07]">
                       <Upload className="h-5 w-5 text-violet-300/80 transition group-hover:scale-110" /><span className="mt-2 text-sm text-foreground/75">Upload music</span><span className="mt-1 text-xs text-foreground/40">Any file with an audio track</span>
-                      <input type="file" accept="*/*" className="hidden" onChange={async (event) => { const file = event.target.files?.[0]; if (!file) return; try { const uploaded = await uploadProfileMedia(file); setMusicUrl(uploaded.url); setMusicName(file.name); writeUserPreferences({ musicUrl: uploaded.url, musicName: file.name }); await syncProfile({ music_url: uploaded.url, music_name: file.name }); } catch (error) { setProfileStatus({ type: 'error', message: error instanceof Error ? error.message : 'Music upload failed.' }); } }} />
+                      <input type="file" accept="*/*" className="hidden" onChange={async (event) => { const file = event.target.files?.[0]; if (!file) return; try { const uploaded = await uploadProfileMedia(file, 'music'); setMusicUrl(uploaded.url); setMusicName(file.name); writeUserPreferences({ musicUrl: uploaded.url, musicName: file.name }); await syncProfile({ music_url: uploaded.url, music_name: file.name }); } catch (error) { setProfileStatus({ type: 'error', message: error instanceof Error ? error.message : 'Music upload failed.' }); } }} />
                     </label>
                     {musicUrl && <div className="mt-3 flex items-center gap-2 rounded-xl border border-border/10 bg-muted/[0.05] p-3"><Music2 className="h-4 w-4 text-violet-300" /><span className="min-w-0 flex-1 truncate text-xs text-foreground/70">{musicName || 'Uploaded music'}</span><audio src={musicUrl} controls className="h-7 max-w-[55%]" /></div>}
                   </div>

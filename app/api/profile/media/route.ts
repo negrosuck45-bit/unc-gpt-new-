@@ -45,6 +45,7 @@ export async function POST(request: NextRequest) {
 
   const formData = await request.formData()
   const file = formData.get('file')
+  const purpose = formData.get('purpose') === 'music'
   const kind = file instanceof File ? mediaKind(file.type) : null
   if (!(file instanceof File) || !kind) {
     return Response.json({ error: 'Choose a file to upload.' }, { status: 400 })
@@ -65,12 +66,12 @@ export async function POST(request: NextRequest) {
     }
   }
 
-  let uploadKind = kind
+  let uploadKind = purpose ? 'audio' : kind
   let extension = file.name.split('.').pop()?.toLowerCase() || 'bin'
   let contentType = file.type || 'application/octet-stream'
   let buffer = Buffer.from(await file.arrayBuffer())
   let extracted = false
-  if (kind === 'audio' || kind === 'video' || kind === 'unknown') {
+  if (purpose || kind === 'audio' || kind === 'video' || kind === 'unknown') {
     try {
       const result = await extractAudio(file)
       buffer = result.buffer
@@ -78,8 +79,10 @@ export async function POST(request: NextRequest) {
       extension = result.extension
       uploadKind = 'audio'
       extracted = result.extracted
-    } catch (error) {
-      if (kind !== 'audio') return Response.json({ error: 'This file does not contain an extractable audio track.' }, { status: 415 })
+    } catch {
+      // Any file is still accepted for Music. If extraction is unavailable or
+      // the file has no audio stream, retain the original so the user can
+      // replace it later instead of rejecting the upload at the picker stage.
     }
   }
   const path = `users/${safeSegment(userId)}/profile/${uploadKind}/${Date.now()}-${crypto.randomUUID()}.${extension}`
