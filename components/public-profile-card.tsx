@@ -117,7 +117,7 @@ export function PublicProfileCard({ username, bio, profilePicture, musicUrl, mus
   useFizTilt(cardRef)
   return (
     <div className="relative flex min-h-[calc(100vh-5rem)] w-full items-center justify-center [perspective:1000px]">
-      <div ref={cardRef} className="w-full max-w-[650px] select-none rounded-[15px] border border-white/20 bg-black/70 p-5 text-white shadow-2xl shadow-black/40 backdrop-blur-xl sm:p-[30px]" style={{ transformStyle: 'preserve-3d', touchAction: 'pan-y' }}>
+      <div ref={cardRef} className="w-full max-w-[650px] select-none rounded-[15px] border border-white/20 bg-black/70 px-5 pb-10 pt-5 text-white shadow-2xl shadow-black/40 backdrop-blur-xl sm:px-[30px] sm:pb-[58px] sm:pt-[30px]" style={{ transformStyle: 'preserve-3d', touchAction: 'pan-y' }}>
         <div className="flex items-start gap-3">
           <div className="pointer-events-none flex h-[120px] w-[120px] shrink-0 items-center justify-center overflow-hidden rounded-full bg-emerald-500/80 text-4xl font-medium">
             {profilePicture ? <img src={profilePicture} alt={`@${username}`} className="h-full w-full object-cover" /> : initial}
