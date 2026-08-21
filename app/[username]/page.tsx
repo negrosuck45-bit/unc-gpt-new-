@@ -30,7 +30,7 @@ async function getProfile(username: string): Promise<Profile | null> {
   const supabase = getAdminClient();
   if (!supabase) return null;
   const selectFields = "username,bio,profile_picture,background_media,background_media_type,music_url,music_name,music_thumbnail,cursor_image";
-  const legacyFields = "username,bio,profile_picture,background_media,background_media_type,music_url,music_name,music_thumbnail";
+  const legacyFields = "username,bio,profile_picture,background_media,background_media_type,music_url,music_name";
   const primary = await supabase.from("user_profiles").select(selectFields).eq("username_lower", normalized.toLowerCase()).maybeSingle();
   if (primary.data) return primary.data as Profile;
   const fallback = await supabase.from("user_profiles").select(selectFields).eq("username", normalized).maybeSingle();

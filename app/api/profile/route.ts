@@ -26,7 +26,7 @@ export async function GET() {
   if (!supabase) return NextResponse.json({ error: "Profile storage is not configured." }, { status: 503 });
   const withCursor = await supabase.from("user_profiles").select("username,bio,profile_picture,background_media,background_media_type,music_url,music_name,music_thumbnail,cursor_image").eq("user_id", userId).maybeSingle();
   if (!withCursor.error) return NextResponse.json({ profile: withCursor.data ?? null });
-  const legacy = await supabase.from("user_profiles").select("username,bio,profile_picture,background_media,background_media_type,music_url,music_name,music_thumbnail").eq("user_id", userId).maybeSingle();
+  const legacy = await supabase.from("user_profiles").select("username,bio,profile_picture,background_media,background_media_type,music_url,music_name").eq("user_id", userId).maybeSingle();
   if (legacy.error) {
     console.error("[profile] load failed", { code: legacy.error.code, message: legacy.error.message });
     return NextResponse.json({ error: "Unable to load profile." }, { status: 500 });
@@ -61,9 +61,15 @@ export async function PATCH(request: NextRequest) {
   const { cursor_image: cursorImage, ...coreUpdate } = update;
   const profileSelect = "username,bio,profile_picture,background_media,background_media_type,music_url,music_name,music_thumbnail";
   const { data: current } = await supabase.from("user_profiles").select("user_id").eq("user_id", userId).maybeSingle();
-  const result = current
+  let result = current
     ? await supabase.from("user_profiles").update({ ...coreUpdate, updated_at: new Date().toISOString() }).eq("user_id", userId).select(profileSelect).single()
     : await supabase.from("user_profiles").insert({ user_id: userId, username: `user_${userId.slice(-8)}`, ...coreUpdate }).select(profileSelect).single();
+  if (result.error && Object.prototype.hasOwnProperty.call(coreUpdate, "music_thumbnail")) {
+    const { music_thumbnail: _thumbnail, ...legacyUpdate } = coreUpdate;
+    result = current
+      ? await supabase.from("user_profiles").update({ ...legacyUpdate, updated_at: new Date().toISOString() }).eq("user_id", userId).select("username,bio,profile_picture,background_media,background_media_type,music_url,music_name").single()
+      : await supabase.from("user_profiles").insert({ user_id: userId, username: `user_${userId.slice(-8)}`, ...legacyUpdate }).select("username,bio,profile_picture,background_media,background_media_type,music_url,music_name").single();
+  }
   if (!result.error && cursorWasRequested && cursorImage !== undefined) {
     await supabase.from("user_profiles").update({ cursor_image: cursorImage, updated_at: new Date().toISOString() }).eq("user_id", userId);
   }
