@@ -82,11 +82,20 @@ export function SettingsPage({ onClose }: SettingsPageProps) {
     return payload as { url: string; kind: 'image' | 'video' | 'audio' };
   };
 
+  const dataUrlToFile = (value: string, name: string) => {
+    const match = value.match(/^data:([^;,]+)?(?:;base64)?,(.*)$/);
+    if (!match) return null;
+    const mime = match[1] || 'application/octet-stream';
+    const binary = atob(match[2]);
+    const bytes = new Uint8Array(binary.length);
+    for (let index = 0; index < binary.length; index += 1) bytes[index] = binary.charCodeAt(index);
+    return new File([bytes], name, { type: mime });
+  };
+
   useEffect(() => {
     try { setLanguage(localStorage.getItem('uncgpt-language') || 'system') } catch {}
     fetch('/api/auth/me', { cache: 'no-store' }).then((response) => response.ok ? response.json() : null).then((payload) => setAuthUser(payload?.user ?? null)).catch(() => setAuthUser(null));
     const p = readUserPreferences();
-    fetch('/api/profile', { cache: 'no-store' }).then((response) => response.ok ? response.json() : null).then((payload) => { const profile = payload?.profile; if (!profile) return; if (profile.username) setUsername(profile.username); if (profile.bio != null) setBio(profile.bio); if (profile.profile_picture) setProfilePicture(profile.profile_picture); if (profile.background_media) setBackgroundMedia(profile.background_media); if (profile.background_media_type) setBackgroundMediaType(profile.background_media_type); if (profile.music_url) setMusicUrl(profile.music_url); if (profile.music_name) setMusicName(profile.music_name); }).catch(() => {});
     setStreamingEnabled(p.streaming);
     setAutoScroll(p.autoScroll);
     setSendOnEnter(p.sendOnEnter);
@@ -103,16 +112,36 @@ export function SettingsPage({ onClose }: SettingsPageProps) {
     setBackgroundMediaType(p.backgroundMediaType || '');
     setMusicUrl(p.musicUrl || '');
     setMusicName(p.musicName || '');
-    if (p.profilePicture || p.bio || p.backgroundMedia || p.musicUrl) {
-      void syncProfile({
-        profile_picture: p.profilePicture || null,
-        bio: p.bio || null,
-        background_media: p.backgroundMedia || null,
-        background_media_type: p.backgroundMediaType || null,
-        music_url: p.musicUrl || null,
-        music_name: p.musicName || null,
-      });
-    }
+    void (async () => {
+      const response = await fetch('/api/profile', { cache: 'no-store' }).catch(() => null);
+      const payload = response?.ok ? await response.json().catch(() => null) : null;
+      const profile = payload?.profile;
+      if (profile) {
+        if (profile.username) setUsername(profile.username);
+        if (profile.bio != null) { setBio(profile.bio); writeUserPreferences({ bio: profile.bio }); }
+        if (profile.profile_picture) { setProfilePicture(profile.profile_picture); writeUserPreferences({ profilePicture: profile.profile_picture }); }
+        if (profile.background_media) { setBackgroundMedia(profile.background_media); writeUserPreferences({ backgroundMedia: profile.background_media }); }
+        if (profile.background_media_type) { setBackgroundMediaType(profile.background_media_type); writeUserPreferences({ backgroundMediaType: profile.background_media_type }); }
+        if (profile.music_url) { setMusicUrl(profile.music_url); writeUserPreferences({ musicUrl: profile.music_url }); }
+        if (profile.music_name) { setMusicName(profile.music_name); writeUserPreferences({ musicName: profile.music_name }); }
+      }
+      const patch: Record<string, string | null> = {};
+      if (!profile?.bio && p.bio) patch.bio = p.bio;
+      if (!profile?.profile_picture && p.profilePicture?.startsWith('data:')) {
+        const file = dataUrlToFile(p.profilePicture, 'profile-picture.jpg');
+        if (file) { const uploaded = await uploadProfileMedia(file); setProfilePicture(uploaded.url); writeUserPreferences({ profilePicture: uploaded.url }); patch.profile_picture = uploaded.url; }
+      } else if (!profile?.profile_picture && p.profilePicture) patch.profile_picture = p.profilePicture;
+      if (!profile?.background_media && p.backgroundMedia?.startsWith('data:')) {
+        const extension = p.backgroundMediaType === 'video' ? 'mp4' : 'jpg';
+        const file = dataUrlToFile(p.backgroundMedia, `profile-background.${extension}`);
+        if (file) { const uploaded = await uploadProfileMedia(file); setBackgroundMedia(uploaded.url); writeUserPreferences({ backgroundMedia: uploaded.url }); patch.background_media = uploaded.url; patch.background_media_type = p.backgroundMediaType || 'image'; }
+      } else if (!profile?.background_media && p.backgroundMedia) { patch.background_media = p.backgroundMedia; patch.background_media_type = p.backgroundMediaType || 'image'; }
+      if (!profile?.music_url && p.musicUrl?.startsWith('data:')) {
+        const file = dataUrlToFile(p.musicUrl, p.musicName || 'profile-music.mp3');
+        if (file) { const uploaded = await uploadProfileMedia(file); setMusicUrl(uploaded.url); writeUserPreferences({ musicUrl: uploaded.url }); patch.music_url = uploaded.url; patch.music_name = p.musicName || file.name; }
+      } else if (!profile?.music_url && p.musicUrl) { patch.music_url = p.musicUrl; patch.music_name = p.musicName || null; }
+      if (Object.keys(patch).length) await syncProfile(patch);
+    })().catch((error) => console.warn('[profile] migration failed', error));
   }, []);
 
   const handleSave = () => {
