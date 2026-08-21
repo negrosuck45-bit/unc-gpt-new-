@@ -92,15 +92,15 @@ function ProfileMusicPlayer({ url, name, thumbnail }: { url: string; name: strin
     audio.currentTime = Math.max(0, Math.min(1, (event.clientX - rect.left) / rect.width)) * audio.duration
   }
   return (
-    <div className="mt-8 flex w-full max-w-md items-center gap-4 rounded-[20px] border border-white/10 bg-white/[0.06] p-4 shadow-lg shadow-black/10 backdrop-blur-md">
+    <div className="mt-10 flex w-full max-w-md items-center gap-4 rounded-[20px] border border-white/10 bg-white/[0.06] p-4 shadow-lg shadow-black/10 backdrop-blur-md">
       <div className="flex h-16 w-16 shrink-0 items-center justify-center overflow-hidden rounded-[15px] border border-white/10 bg-white/[0.08] text-xl font-semibold text-white/70">
         {thumbnail ? <img src={thumbnail} alt="Music thumbnail" className="h-full w-full object-cover" /> : <span>♪</span>}
       </div>
       <div className="min-w-0 flex-1">
         <div className="mb-3 truncate text-sm font-medium text-white/85">{title}</div>
-        <div role="progressbar" aria-label="Music progress" aria-valuemin={0} aria-valuemax={100} aria-valuenow={Math.round(progress * 100)} onClick={seek} className="group relative h-2.5 cursor-pointer rounded-full bg-white/15">
-          <div className="absolute inset-y-0 left-0 rounded-full bg-white/85 transition-[width] duration-150" style={{ width: `${progress * 100}%` }} />
-          <div className="absolute top-1/2 h-3 w-3 -translate-x-1/2 -translate-y-1/2 rounded-full bg-white opacity-0 shadow-md transition-opacity group-hover:opacity-100" style={{ left: `${progress * 100}%` }} />
+        <div role="progressbar" aria-label="Music progress" aria-valuemin={0} aria-valuemax={100} aria-valuenow={Math.round(progress * 100)} onClick={seek} className="group relative h-3 w-full min-w-[150px] cursor-pointer rounded-full bg-white/30 shadow-inner shadow-black/30">
+          <div className="absolute inset-y-0 left-0 min-w-[3px] rounded-full bg-white transition-[width] duration-150" style={{ width: `${progress * 100}%` }} />
+          <div className="absolute top-1/2 h-4 w-4 -translate-x-1/2 -translate-y-1/2 rounded-full bg-white opacity-0 shadow-md transition-opacity group-hover:opacity-100" style={{ left: `${progress * 100}%` }} />
         </div>
       </div>
       <button type="button" aria-label={playing ? 'Pause music' : 'Play music'} onClick={toggle} className="flex h-12 w-12 shrink-0 items-center justify-center rounded-[13px] bg-white/[0.10] text-white transition hover:bg-white/[0.18] active:scale-95">
