@@ -43,16 +43,15 @@ export async function POST(request: NextRequest) {
   const { data: current } = await supabase.from("user_profiles").select("username").eq("user_id", userId).maybeSingle();
   if (current?.username?.toLowerCase() === username.toLowerCase()) return NextResponse.json({ username: current.username });
 
-  const { data, error } = await supabase
-    .from("user_profiles")
-    .upsert({ user_id: userId, username, updated_at: new Date().toISOString() }, { onConflict: "user_id" })
-    .select("username")
-    .single();
+  const payload = { username, updated_at: new Date().toISOString() };
+  const result = current
+    ? await supabase.from("user_profiles").update(payload).eq("user_id", userId).select("username").single()
+    : await supabase.from("user_profiles").insert({ user_id: userId, ...payload }).select("username").single();
 
-  if (error) {
-    if (error.code === "23505") return NextResponse.json({ error: "Username already claimed. Choose another one." }, { status: 409 });
-    console.error("[profile/username] save failed", { code: error.code, message: error.message });
+  if (result.error) {
+    if (result.error.code === "23505") return NextResponse.json({ error: "Username already claimed. Choose another one." }, { status: 409 });
+    console.error("[profile/username] save failed", { code: result.error.code, message: result.error.message });
     return NextResponse.json({ error: "Unable to save username. Check the Supabase profile table configuration." }, { status: 500 });
   }
-  return NextResponse.json({ username: data.username });
+  return NextResponse.json({ username: result.data.username });
 }
