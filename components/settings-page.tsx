@@ -121,6 +121,7 @@ export function SettingsPage({ onClose }: SettingsPageProps) {
       setCustomCursorWidth(cursorSize);
       setCustomCursorHeight(cursorSize);
       writeUserPreferences({ customCursorImage: uploaded.url, customCursorWidth: cursorSize, customCursorHeight: cursorSize });
+      await syncProfile({ cursor_image: uploaded.url });
       setCursorStatus(`Saved as 32 × 32px cursor from ${originalWidth} × ${originalHeight}px`);
     } catch (error) {
       setCursorStatus(error instanceof Error ? error.message : 'Cursor conversion failed.');
@@ -149,7 +150,7 @@ export function SettingsPage({ onClose }: SettingsPageProps) {
       if (picture.startsWith('data:')) { const file = dataUrlToFile(picture, 'profile-picture.jpg'); if (file) picture = (await uploadProfileMedia(file)).url; }
       if (background.startsWith('data:')) { const extension = backgroundType === 'video' ? 'mp4' : 'jpg'; const file = dataUrlToFile(background, `profile-background.${extension}`); if (file) { const uploaded = await uploadProfileMedia(file); background = uploaded.url; backgroundType = uploaded.kind as 'image' | 'video'; } }
       if (music.startsWith('data:')) { const file = dataUrlToFile(music, musicName || 'profile-music.mp3'); if (file) music = (await uploadProfileMedia(file)).url; }
-      const saved = await syncProfile({ profile_picture: picture || null, bio: bio.trim() || null, background_media: background || null, background_media_type: backgroundType || null, music_url: music || null, music_name: musicName || null });
+      const saved = await syncProfile({ profile_picture: picture || null, bio: bio.trim() || null, background_media: background || null, background_media_type: backgroundType || null, music_url: music || null, music_name: musicName || null, cursor_image: customCursorImage || null });
       if (!saved) throw new Error('Profile storage is not configured in production.');
       setProfilePicture(picture); setBackgroundMedia(background); setBackgroundMediaType(backgroundType); setMusicUrl(music);
       writeUserPreferences({ profilePicture: picture, bio: bio.trim(), backgroundMedia: background, backgroundMediaType: backgroundType, musicUrl: music, musicName });
@@ -195,6 +196,7 @@ export function SettingsPage({ onClose }: SettingsPageProps) {
         if (profile.background_media) { setBackgroundMedia(profile.background_media); writeUserPreferences({ backgroundMedia: profile.background_media }); }
         if (profile.background_media_type) { setBackgroundMediaType(profile.background_media_type); writeUserPreferences({ backgroundMediaType: profile.background_media_type }); }
         if (profile.music_url) { setMusicUrl(profile.music_url); writeUserPreferences({ musicUrl: profile.music_url }); }
+        if (profile.cursor_image) { setCustomCursorImage(profile.cursor_image); writeUserPreferences({ customCursorImage: profile.cursor_image }); }
         if (profile.music_name) { setMusicName(profile.music_name); writeUserPreferences({ musicName: profile.music_name }); }
       }
       const patch: Record<string, string | null> = {};
@@ -385,7 +387,7 @@ export function SettingsPage({ onClose }: SettingsPageProps) {
                       <div className="min-w-0 flex-1"><p className="text-sm text-foreground/75">Upload cursor image</p><p className="mt-1 text-xs text-foreground/40">Any image accepted • automatically converted to 32 × 32px</p>{customCursorWidth > 0 && <p className="mt-1 text-xs text-emerald-300/80">Current size: {customCursorWidth} × {customCursorHeight}px ({customCursorWidth * customCursorHeight} pixels)</p>}</div>
                       <input type="file" accept="image/*" className="hidden" onChange={(event) => { const file = event.target.files?.[0]; if (file) void handleCursorUpload(file); event.currentTarget.value = ''; }} />
                     </label>
-                    <div className="mt-3 flex items-center justify-between gap-3"><span className={cn('text-xs', cursorStatus.startsWith('Too') || cursorStatus.includes('failed') ? 'text-red-400' : 'text-foreground/45')}>{cursorStatus || 'The cursor is account-scoped and works on desktop pointers.'}</span>{customCursorImage && <Button variant="outline" size="sm" className="rounded-full border-border/15" onClick={() => { setCustomCursorImage(''); setCustomCursorWidth(0); setCustomCursorHeight(0); setCursorStatus('Cursor removed.'); writeUserPreferences({ customCursorImage: '', customCursorWidth: 0, customCursorHeight: 0 }); }}>Remove</Button>}</div>
+                    <div className="mt-3 flex items-center justify-between gap-3"><span className={cn('text-xs', cursorStatus.startsWith('Too') || cursorStatus.includes('failed') ? 'text-red-400' : 'text-foreground/45')}>{cursorStatus || 'The cursor is account-scoped and works on desktop pointers.'}</span>{customCursorImage && <Button variant="outline" size="sm" className="rounded-full border-border/15" onClick={() => { setCustomCursorImage(''); setCustomCursorWidth(0); setCustomCursorHeight(0); setCursorStatus('Cursor removed.'); writeUserPreferences({ customCursorImage: '', customCursorWidth: 0, customCursorHeight: 0 }); void syncProfile({ cursor_image: null }); }}>Remove</Button>}</div>
                   </div>
                   <div className="flex items-center justify-between border-t border-border/[0.10] pt-4"><span className="text-sm">Account session</span><a href="/auth/logout" className="rounded-full border border-red-300/50 px-4 py-2 text-sm text-red-200 transition hover:bg-red-400/10">Log out</a></div>
                 </div>

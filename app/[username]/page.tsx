@@ -1,6 +1,6 @@
 import { notFound } from "next/navigation";
 import { createClient } from "@supabase/supabase-js";
-import { PublicProfileCard } from "@/components/public-profile-card";
+import { PublicProfileCard, PublicProfileCursor } from "@/components/public-profile-card";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -13,6 +13,7 @@ type Profile = {
   background_media_type: "image" | "video" | null;
   music_url: string | null;
   music_name: string | null;
+  cursor_image: string | null;
 };
 
 function getAdminClient() {
@@ -29,7 +30,7 @@ async function getProfile(username: string): Promise<Profile | null> {
   if (!supabase) return null;
   const { data, error } = await supabase
     .from("user_profiles")
-    .select("username,bio,profile_picture,background_media,background_media_type,music_url,music_name")
+    .select("username,bio,profile_picture,background_media,background_media_type,music_url,music_name,cursor_image")
     .eq("username_lower", normalized.toLowerCase())
     .maybeSingle();
   if (error || !data) return null;
@@ -53,6 +54,7 @@ export default async function PublicProfilePage({ params }: { params: Promise<{ 
 
   return (
     <main className="relative min-h-screen overflow-hidden bg-[#050505] px-5 py-10 text-white">
+      <PublicProfileCursor image={profile.cursor_image} />
       {profile.background_media && profile.background_media_type === "image" && (
         <div className="pointer-events-none fixed inset-0 bg-cover bg-center opacity-35" style={{ backgroundImage: `url(${profile.background_media})` }} />
       )}

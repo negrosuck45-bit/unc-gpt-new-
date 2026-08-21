@@ -46,6 +46,19 @@ function useFizTilt(ref: RefObject<HTMLDivElement | null>) {
   }, [ref])
 }
 
+export function PublicProfileCursor({ image }: { image: string | null }) {
+  useEffect(() => {
+    if (!image) return
+    document.documentElement.style.setProperty('--uncgpt-custom-cursor', `url("${image}")`)
+    document.documentElement.classList.add('has-custom-cursor')
+    return () => {
+      document.documentElement.style.removeProperty('--uncgpt-custom-cursor')
+      document.documentElement.classList.remove('has-custom-cursor')
+    }
+  }, [image])
+  return null
+}
+
 export function PublicProfileCard({ username, bio, profilePicture, musicUrl, musicName }: ProfileCardProps) {
   const initial = username.slice(0, 1).toUpperCase()
   const cardRef = useRef<HTMLDivElement>(null)
@@ -59,7 +72,7 @@ export function PublicProfileCard({ username, bio, profilePicture, musicUrl, mus
         style={{ transformStyle: 'preserve-3d', touchAction: 'pan-y' }}
       >
         <div className="flex items-start gap-3">
-          <div className="pointer-events-none flex h-[120px] w-[120px] shrink-0 items-center justify-center overflow-hidden rounded-full border border-white/20 bg-emerald-500/80 text-4xl font-medium shadow-xl shadow-black/30">
+          <div className="pointer-events-none flex h-[120px] w-[120px] shrink-0 items-center justify-center overflow-hidden rounded-full bg-emerald-500/80 text-4xl font-medium">
             {profilePicture ? <img src={profilePicture} alt={`@${username}`} className="h-full w-full object-cover" /> : initial}
           </div>
           <div className="min-w-0 flex-1 pt-1 text-left">
