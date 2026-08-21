@@ -91,26 +91,41 @@ export function SettingsPage({ onClose }: SettingsPageProps) {
   };
 
   const handleCursorUpload = async (file: File) => {
-    setCursorStatus('Measuring image…');
-    const dimensions = await new Promise<{ width: number; height: number }>((resolve, reject) => {
-      const image = new Image();
-      image.onload = () => resolve({ width: image.naturalWidth, height: image.naturalHeight });
-      image.onerror = () => reject(new Error('This image could not be read.'));
-      image.src = URL.createObjectURL(file);
-    });
-    if (dimensions.width > 64 || dimensions.height > 64) {
-      setCursorStatus(`Too large: ${dimensions.width} × ${dimensions.height}px. Use 64 × 64px or smaller.`);
-      return;
-    }
+    setCursorStatus('Turning image into a cursor…');
+    const sourceUrl = URL.createObjectURL(file);
     try {
-      const uploaded = await uploadProfileMedia(file);
+      const image = await new Promise<HTMLImageElement>((resolve, reject) => {
+        const element = new Image();
+        element.onload = () => resolve(element);
+        element.onerror = () => reject(new Error('This image could not be read.'));
+        element.src = sourceUrl;
+      });
+      const originalWidth = image.naturalWidth;
+      const originalHeight = image.naturalHeight;
+      const canvas = document.createElement('canvas');
+      const cursorSize = 32;
+      canvas.width = cursorSize;
+      canvas.height = cursorSize;
+      const context = canvas.getContext('2d');
+      if (!context) throw new Error('Your browser cannot convert this image.');
+      context.clearRect(0, 0, cursorSize, cursorSize);
+      const scale = Math.min(26 / originalWidth, 26 / originalHeight);
+      const width = Math.max(1, Math.round(originalWidth * scale));
+      const height = Math.max(1, Math.round(originalHeight * scale));
+      context.imageSmoothingEnabled = true;
+      context.imageSmoothingQuality = 'high';
+      context.drawImage(image, Math.round((cursorSize - width) / 2), Math.round((cursorSize - height) / 2), width, height);
+      const convertedFile = await new Promise<File>((resolve, reject) => canvas.toBlob((blob) => blob ? resolve(new File([blob], 'custom-cursor.png', { type: 'image/png' })) : reject(new Error('The cursor conversion failed.')), 'image/png'));
+      const uploaded = await uploadProfileMedia(convertedFile);
       setCustomCursorImage(uploaded.url);
-      setCustomCursorWidth(dimensions.width);
-      setCustomCursorHeight(dimensions.height);
-      writeUserPreferences({ customCursorImage: uploaded.url, customCursorWidth: dimensions.width, customCursorHeight: dimensions.height });
-      setCursorStatus(`Saved • ${dimensions.width} × ${dimensions.height}px`);
+      setCustomCursorWidth(cursorSize);
+      setCustomCursorHeight(cursorSize);
+      writeUserPreferences({ customCursorImage: uploaded.url, customCursorWidth: cursorSize, customCursorHeight: cursorSize });
+      setCursorStatus(`Saved as 32 × 32px cursor from ${originalWidth} × ${originalHeight}px`);
     } catch (error) {
-      setCursorStatus(error instanceof Error ? error.message : 'Cursor upload failed.');
+      setCursorStatus(error instanceof Error ? error.message : 'Cursor conversion failed.');
+    } finally {
+      URL.revokeObjectURL(sourceUrl);
     }
   };
 
@@ -364,11 +379,11 @@ export function SettingsPage({ onClose }: SettingsPageProps) {
                   </div>
                   <div className="flex items-center justify-end gap-3"><span className={cn('text-xs', profileStatus.type === 'error' ? 'text-red-400' : profileStatus.type === 'saved' ? 'text-emerald-400' : 'text-muted-foreground')}>{profileStatus.message}</span><Button size="sm" onClick={saveProfile} disabled={profileStatus.type === 'saving'}>{profileStatus.type === 'saving' ? 'Saving…' : 'Save profile'}</Button></div>
                   <div className="rounded-[22px] border border-border bg-card p-4 shadow-sm">
-                    <div className="mb-3 flex items-center justify-between"><div><p className="text-sm font-medium">Custom cursor</p><p className="mt-1 text-xs text-foreground/50">Choose a small PNG, GIF, or SVG cursor image for this account.</p></div><MousePointer2 className="h-4 w-4 text-foreground/40" /></div>
+                    <div className="mb-3 flex items-center justify-between"><div><p className="text-sm font-medium">Custom cursor</p><p className="mt-1 text-xs text-foreground/50">Choose any image. It will be automatically shortened into a 32 × 32px cursor.</p></div><MousePointer2 className="h-4 w-4 text-foreground/40" /></div>
                     <label className="group flex min-h-24 cursor-pointer items-center gap-4 rounded-2xl border border-dashed border-emerald-400/25 bg-emerald-400/[0.035] px-4 transition hover:border-emerald-400/50 hover:bg-emerald-400/[0.07]">
                       <div className="flex h-14 w-14 shrink-0 items-center justify-center rounded-xl border border-border/15 bg-black/10 p-2">{customCursorImage ? <img src={customCursorImage} alt="Custom cursor preview" className="max-h-10 max-w-10 object-contain" /> : <MousePointer2 className="h-6 w-6 text-foreground/45" />}</div>
-                      <div className="min-w-0 flex-1"><p className="text-sm text-foreground/75">Upload cursor image</p><p className="mt-1 text-xs text-foreground/40">Recommended: 32 × 32px • maximum: 64 × 64px</p>{customCursorWidth > 0 && <p className="mt-1 text-xs text-emerald-300/80">Current size: {customCursorWidth} × {customCursorHeight}px ({customCursorWidth * customCursorHeight} pixels)</p>}</div>
-                      <input type="file" accept="image/png,image/gif,image/svg+xml,image/webp" className="hidden" onChange={(event) => { const file = event.target.files?.[0]; if (file) void handleCursorUpload(file); event.currentTarget.value = ''; }} />
+                      <div className="min-w-0 flex-1"><p className="text-sm text-foreground/75">Upload cursor image</p><p className="mt-1 text-xs text-foreground/40">Any image accepted • automatically converted to 32 × 32px</p>{customCursorWidth > 0 && <p className="mt-1 text-xs text-emerald-300/80">Current size: {customCursorWidth} × {customCursorHeight}px ({customCursorWidth * customCursorHeight} pixels)</p>}</div>
+                      <input type="file" accept="image/*" className="hidden" onChange={(event) => { const file = event.target.files?.[0]; if (file) void handleCursorUpload(file); event.currentTarget.value = ''; }} />
                     </label>
                     <div className="mt-3 flex items-center justify-between gap-3"><span className={cn('text-xs', cursorStatus.startsWith('Too') || cursorStatus.includes('failed') ? 'text-red-400' : 'text-foreground/45')}>{cursorStatus || 'The cursor is account-scoped and works on desktop pointers.'}</span>{customCursorImage && <Button variant="outline" size="sm" className="rounded-full border-border/15" onClick={() => { setCustomCursorImage(''); setCustomCursorWidth(0); setCustomCursorHeight(0); setCursorStatus('Cursor removed.'); writeUserPreferences({ customCursorImage: '', customCursorWidth: 0, customCursorHeight: 0 }); }}>Remove</Button>}</div>
                   </div>
