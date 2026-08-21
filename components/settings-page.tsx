@@ -180,8 +180,10 @@ export function SettingsPage({ onClose }: SettingsPageProps) {
     setBio(p.bio || '');
     setBackgroundMedia(p.backgroundMedia || '');
     setBackgroundMediaType(p.backgroundMediaType || '');
-    setMusicUrl(p.musicUrl || '');
-    setMusicName(p.musicName || '');
+    const storedMusicLooksInvalid = /\.(png|jpe?g|gif|webp|svg)(?:\?|$)/i.test(`${p.musicName || ''} ${p.musicUrl || ''}`);
+    setMusicUrl(storedMusicLooksInvalid ? '' : (p.musicUrl || ''));
+    setMusicName(storedMusicLooksInvalid ? '' : (p.musicName || ''));
+    if (storedMusicLooksInvalid) writeUserPreferences({ musicUrl: '', musicName: '' });
     setCustomCursorImage(p.customCursorImage || '');
     setCustomCursorWidth(p.customCursorWidth || 0);
     setCustomCursorHeight(p.customCursorHeight || 0);
@@ -217,10 +219,10 @@ export function SettingsPage({ onClose }: SettingsPageProps) {
         const file = dataUrlToFile(p.backgroundMedia, `profile-background.${extension}`);
         if (file) { const uploaded = await uploadProfileMedia(file); setBackgroundMedia(uploaded.url); writeUserPreferences({ backgroundMedia: uploaded.url }); patch.background_media = uploaded.url; patch.background_media_type = p.backgroundMediaType || 'image'; }
       } else if (!profile?.background_media && p.backgroundMedia) { patch.background_media = p.backgroundMedia; patch.background_media_type = p.backgroundMediaType || 'image'; }
-      if (!profile?.music_url && p.musicUrl?.startsWith('data:')) {
+      if (!storedMusicLooksInvalid && !profile?.music_url && p.musicUrl?.startsWith('data:')) {
         const file = dataUrlToFile(p.musicUrl, p.musicName || 'profile-music.mp3');
         if (file) { const uploaded = await uploadProfileMedia(file); setMusicUrl(uploaded.url); writeUserPreferences({ musicUrl: uploaded.url }); patch.music_url = uploaded.url; patch.music_name = p.musicName || file.name; }
-      } else if (!profile?.music_url && p.musicUrl) { patch.music_url = p.musicUrl; patch.music_name = p.musicName || null; }
+      } else if (!storedMusicLooksInvalid && !profile?.music_url && p.musicUrl) { patch.music_url = p.musicUrl; patch.music_name = p.musicName || null; }
       if (Object.keys(patch).length) await syncProfile(patch);
     })().catch((error) => console.warn('[profile] migration failed', error));
   }, []);
@@ -384,7 +386,7 @@ export function SettingsPage({ onClose }: SettingsPageProps) {
                       <Upload className="h-5 w-5 text-violet-300/80 transition group-hover:scale-110" /><span className="mt-2 text-sm text-foreground/75">Upload music</span><span className="mt-1 text-xs text-foreground/40">Any file with an audio track</span>
                       <input type="file" accept="*/*" className="hidden" onChange={async (event) => { const file = event.target.files?.[0]; event.currentTarget.value = ''; if (!file) return; if (file.type.startsWith('image/')) { setProfileStatus({ type: 'error', message: 'That is an image. Choose Background for images or select the video file for Music.' }); return; } setProfileStatus({ type: 'saving', message: 'Uploading music…' }); try { const uploaded = await uploadProfileMedia(file, 'music'); setMusicUrl(uploaded.url); setMusicName(file.name); writeUserPreferences({ musicUrl: uploaded.url, musicName: file.name }); await syncProfile({ music_url: uploaded.url, music_name: file.name }); setProfileStatus({ type: 'saved', message: uploaded.extracted ? 'Audio extracted and uploaded.' : 'File uploaded.' }); } catch (error) { setProfileStatus({ type: 'error', message: error instanceof Error ? error.message : 'Music upload failed.' }); } }} />
                     </label>
-                    {musicUrl && <div className="mt-3 flex items-center gap-2 rounded-xl border border-border/10 bg-muted/[0.05] p-3"><Music2 className="h-4 w-4 text-violet-300" /><span className="min-w-0 flex-1 truncate text-xs text-foreground/70">{musicName || 'Uploaded music'}</span><audio src={musicUrl} controls className="h-7 max-w-[55%]" /></div>}
+                    {musicUrl && <div className="mt-3 flex items-center gap-2 rounded-xl border border-border/10 bg-muted/[0.05] p-3"><Music2 className="h-4 w-4 text-violet-300" /><span className="min-w-0 flex-1 truncate text-xs text-foreground/70">{musicName || 'Uploaded music'}</span><audio src={musicUrl} controls className="h-7 max-w-[55%]" /><button type="button" className="text-xs text-red-300/80 hover:text-red-200" onClick={() => { setMusicUrl(''); setMusicName(''); writeUserPreferences({ musicUrl: '', musicName: '' }); void syncProfile({ music_url: null, music_name: null }); setProfileStatus({ type: 'saved', message: 'Music removed.' }); }}>Remove</button></div>}
                   </div>
                   <div className="flex items-center justify-end gap-3"><span className={cn('text-xs', profileStatus.type === 'error' ? 'text-red-400' : profileStatus.type === 'saved' ? 'text-emerald-400' : 'text-muted-foreground')}>{profileStatus.message}</span><Button size="sm" onClick={saveProfile} disabled={profileStatus.type === 'saving'}>{profileStatus.type === 'saving' ? 'Saving…' : 'Save profile'}</Button></div>
                   <div className="rounded-[22px] border border-border bg-card p-4 shadow-sm">
