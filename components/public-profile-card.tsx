@@ -92,8 +92,8 @@ function ProfileMusicPlayer({ url, name, thumbnail }: { url: string; name: strin
     audio.currentTime = Math.max(0, Math.min(1, (event.clientX - rect.left) / rect.width)) * audio.duration
   }
   return (
-    <div className="mt-12 flex min-h-[148px] w-full max-w-[520px] items-center gap-5 rounded-[24px] border border-white/10 bg-white/[0.06] p-5 shadow-lg shadow-black/10 backdrop-blur-md">
-      <div className="flex h-20 w-20 shrink-0 items-center justify-center overflow-hidden rounded-[15px] border border-white/10 bg-white/[0.08] text-xl font-semibold text-white/70">
+    <div className="mt-8 flex min-h-[116px] w-full items-center gap-4 rounded-[22px] border border-white/10 bg-white/[0.06] p-4 shadow-lg shadow-black/10 backdrop-blur-md sm:gap-5 sm:p-5">
+      <div className="flex h-16 w-16 shrink-0 items-center justify-center overflow-hidden rounded-[15px] border border-white/10 bg-white/[0.08] text-xl font-semibold text-white/70">
         {thumbnail ? <img src={thumbnail} alt="Music thumbnail" className="h-full w-full object-cover" /> : <span>♪</span>}
       </div>
       <div className="min-w-0 flex-1">
@@ -103,7 +103,7 @@ function ProfileMusicPlayer({ url, name, thumbnail }: { url: string; name: strin
           <div className="absolute top-1/2 h-4 w-4 -translate-x-1/2 -translate-y-1/2 rounded-full bg-white opacity-0 shadow-md transition-opacity group-hover:opacity-100" style={{ left: `${progress * 100}%` }} />
         </div>
       </div>
-      <button type="button" aria-label={playing ? 'Pause music' : 'Play music'} onClick={toggle} className="flex h-14 w-14 shrink-0 items-center justify-center rounded-[13px] bg-white/[0.10] text-white transition hover:bg-white/[0.18] active:scale-95">
+      <button type="button" aria-label={playing ? 'Pause music' : 'Play music'} onClick={toggle} className="flex h-12 w-12 shrink-0 items-center justify-center rounded-[13px] bg-white/[0.10] text-white transition hover:bg-white/[0.18] active:scale-95">
         {playing ? <Pause className="h-5 w-5 fill-current" /> : <Play className="ml-0.5 h-5 w-5 fill-current" />}
       </button>
       <audio ref={audioRef} src={url} preload="metadata" onPlay={() => setPlaying(true)} onPause={() => setPlaying(false)} onEnded={() => { setPlaying(false); setProgress(0) }} onTimeUpdate={(event) => { const audio = event.currentTarget; setProgress(audio.duration ? audio.currentTime / audio.duration : 0) }} className="hidden" />
@@ -125,9 +125,9 @@ export function PublicProfileCard({ username, bio, profilePicture, musicUrl, mus
           <div className="min-w-0 flex-1 pt-1 text-left">
             <h1 className="text-2xl font-bold tracking-wide">@{username}</h1>
             {bio && <p className="mt-2 whitespace-pre-wrap text-sm leading-6 text-white/70">{bio}</p>}
-            {musicUrl && <ProfileMusicPlayer url={musicUrl} name={musicName} thumbnail={musicThumbnail} />}
           </div>
         </div>
+        {musicUrl && <ProfileMusicPlayer url={musicUrl} name={musicName} thumbnail={musicThumbnail} />}
       </div>
     </div>
   )
