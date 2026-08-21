@@ -1,6 +1,7 @@
 "use client"
 import { useState, useEffect, useCallback, useRef } from "react"
 import { ChatSidebar } from "@/components/chat-sidebar"
+import { SettingsPage } from "@/components/settings-page"
 import { ChatInterface } from "@/components/chat-interface"
 import VoiceChat from "@/components/voice-chat"
 import Imagine from "@/components/imagine"
@@ -91,6 +92,7 @@ export default function Home() {
   const isMobile = useIsMobile()
   const [isSidebarOpen, setIsSidebarOpen] = useState(false)
   const [currentMode, setCurrentMode] = useState<"text" | "voice" | "imagine">("text")
+  const [settingsOpen, setSettingsOpen] = useState(false)
 
   // Set correct initial sidebar state once we know the screen size
   useEffect(() => {
@@ -189,6 +191,7 @@ export default function Home() {
             if (isMobile) setIsSidebarOpen(false)
           }}
           isMobile={isMobile}
+          onOpenSettings={() => setSettingsOpen(true)}
         />
       </div>
 
@@ -196,6 +199,22 @@ export default function Home() {
       <main className="flex-1 flex flex-col overflow-hidden min-w-0">
         {renderMainContent()}
       </main>
+
+      {settingsOpen && (
+        <div
+          className="fixed inset-0 z-[200] flex items-start justify-center overflow-y-auto bg-black/45 p-0 backdrop-blur-md sm:items-center sm:p-6 lg:p-8"
+          role="dialog"
+          aria-modal="true"
+          aria-label="Settings"
+          onMouseDown={(event) => {
+            if (event.target === event.currentTarget) setSettingsOpen(false)
+          }}
+        >
+          <div className="w-full max-w-5xl sm:max-h-[calc(100dvh-48px)]">
+            <SettingsPage onClose={() => setSettingsOpen(false)} />
+          </div>
+        </div>
+      )}
     </div>
   )
 }

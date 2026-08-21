@@ -62,6 +62,7 @@ interface ChatSidebarProps {
   onChatSelect: (chatId: string, type: "text" | "voice") => void
   onModeChange: (mode: "text" | "voice" | "imagine") => void
   isMobile?: boolean
+  onOpenSettings?: () => void
 }
 
 export function ChatSidebar({
@@ -70,6 +71,7 @@ export function ChatSidebar({
   onChatSelect,
   onModeChange,
   isMobile = false,
+  onOpenSettings,
 }: ChatSidebarProps) {
   const {
     chats,
@@ -97,7 +99,6 @@ export function ChatSidebar({
   const [memoryExportOpen, setMemoryExportOpen] = useState(false)
   const [imageEditOpen, setImageEditOpen] = useState(false)
   const [historyOpen, setHistoryOpen] = useState(false)
-  const [settingsPageOpen, setSettingsPageOpen] = useState(false)
   const [accountOpen, setAccountOpen] = useState(false)
   const [authUser, setAuthUser] = useState<{ name?: string | null; email?: string | null; picture?: string | null } | null>(null)
   const [profilePreferences, setProfilePreferences] = useState<UserPreferences>(readUserPreferences())
@@ -207,7 +208,7 @@ export function ChatSidebar({
   }
 
   const openSettings = () => {
-    setSettingsPageOpen(true)
+    onOpenSettings?.()
     if (isOpen) onToggle()
   }
 
@@ -274,13 +275,6 @@ export function ChatSidebar({
           <SettingsIcon className="h-5 w-5" />
         </RailButton>
 
-        {settingsPageOpen && (
-          <div className="fixed inset-0 z-50 flex items-start sm:items-center justify-center bg-foreground/20 sm:bg-foreground/15 sm:backdrop-blur-sm overflow-y-auto p-0 sm:p-6 lg:p-8">
-            <div className="w-full max-w-none sm:max-w-5xl sm:max-h-[calc(100dvh-48px)] sm:my-6">
-              <SettingsPage onClose={() => setSettingsPageOpen(false)} />
-            </div>
-          </div>
-        )}
         <MemoryImportDialog
           open={memoryOpen}
           onOpenChange={setMemoryOpen}
@@ -496,13 +490,6 @@ export function ChatSidebar({
         )}
       </AnimatePresence>
 
-      {settingsPageOpen && (
-        <div className="fixed inset-0 z-50 flex items-start sm:items-center justify-center bg-foreground/20 sm:bg-foreground/15 sm:backdrop-blur-sm overflow-y-auto p-0 sm:p-6 lg:p-8">
-          <div className="w-full max-w-none sm:max-w-5xl sm:max-h-[calc(100dvh-48px)] sm:my-6">
-            <SettingsPage onClose={() => setSettingsPageOpen(false)} />
-          </div>
-        </div>
-      )}
       <ProjectsDialog open={projectsOpen} onOpenChange={setProjectsOpen} />
       <MemoryImportDialog
         open={memoryOpen}
