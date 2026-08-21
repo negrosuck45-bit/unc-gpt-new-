@@ -151,10 +151,10 @@ export function SettingsPage({ onClose }: SettingsPageProps) {
       if (picture.startsWith('data:')) { const file = dataUrlToFile(picture, 'profile-picture.jpg'); if (file) picture = (await uploadProfileMedia(file)).url; }
       if (background.startsWith('data:')) { const extension = backgroundType === 'video' ? 'mp4' : 'jpg'; const file = dataUrlToFile(background, `profile-background.${extension}`); if (file) { const uploaded = await uploadProfileMedia(file); background = uploaded.url; backgroundType = uploaded.kind as 'image' | 'video'; } }
       if (music.startsWith('data:')) { const file = dataUrlToFile(music, musicName || 'profile-music.mp3'); if (file) music = (await uploadProfileMedia(file, 'music')).url; }
-      const saved = await syncProfile({ profile_picture: picture || null, bio: bio.trim() || null, background_media: background || null, background_media_type: backgroundType || null, music_url: music || null, music_name: musicName || null, cursor_image: customCursorImage || null });
+      const saved = await syncProfile({ username: username.trim() || null, profile_picture: picture || null, bio: bio.trim() || null, background_media: background || null, background_media_type: backgroundType || null, music_url: music || null, music_name: musicName || null, cursor_image: customCursorImage || null });
       if (!saved) throw new Error('Profile storage is not configured in production.');
       setProfilePicture(picture); setBackgroundMedia(background); setBackgroundMediaType(backgroundType); setMusicUrl(music);
-      writeUserPreferences({ profilePicture: picture, bio: bio.trim(), backgroundMedia: background, backgroundMediaType: backgroundType, musicUrl: music, musicName });
+      writeUserPreferences({ username: username.trim(), profilePicture: picture, bio: bio.trim(), backgroundMedia: background, backgroundMediaType: backgroundType, musicUrl: music, musicName });
       setProfileStatus({ type: 'saved', message: 'Profile saved.' });
     } catch (error) {
       setProfileStatus({ type: 'error', message: error instanceof Error ? error.message : 'Unable to save profile.' });

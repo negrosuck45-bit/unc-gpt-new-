@@ -4,7 +4,7 @@ import { auth0 } from "@/lib/auth0";
 
 export const runtime = "nodejs";
 
-const PROFILE_FIELDS = ["bio", "profile_picture", "background_media", "background_media_type", "music_url", "music_name", "cursor_image"] as const;
+const PROFILE_FIELDS = ["username", "bio", "profile_picture", "background_media", "background_media_type", "music_url", "music_name", "cursor_image"] as const;
 type ProfileField = (typeof PROFILE_FIELDS)[number];
 
 function getAdminClient() {
@@ -47,6 +47,10 @@ export async function PATCH(request: NextRequest) {
       update[field] = value == null ? null : String(value);
     }
   }
+  if (typeof update.username === "string") {
+    update.username = update.username.trim().replace(/^@+/, "");
+    if (!/^[A-Za-z0-9_]{1,24}$/.test(update.username)) return NextResponse.json({ error: "Use 1–24 letters, numbers, or underscores." }, { status: 400 });
+  }
   if (typeof update.bio === "string") update.bio = update.bio.slice(0, 160);
   if (update.background_media_type && !["image", "video"].includes(update.background_media_type)) {
     return NextResponse.json({ error: "Invalid background media type." }, { status: 400 });
@@ -63,6 +67,7 @@ export async function PATCH(request: NextRequest) {
       : await supabase.from("user_profiles").insert({ user_id: userId, username: `user_${userId.slice(-8)}`, ...legacyUpdate }).select("username,bio,profile_picture,background_media,background_media_type,music_url,music_name").single();
   }
   if (result.error) {
+    if (result.error.code === "23505" && "username" in update) return NextResponse.json({ error: "Username already claimed. Choose another one." }, { status: 409 });
     console.error("[profile] save failed", { code: result.error.code, message: result.error.message });
     return NextResponse.json({ error: "Unable to save profile." }, { status: 500 });
   }
