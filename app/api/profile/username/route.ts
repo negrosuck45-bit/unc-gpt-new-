@@ -4,7 +4,7 @@ import { auth0 } from "@/lib/auth0";
 
 export const runtime = "nodejs";
 
-const USERNAME_PATTERN = /^[a-zA-Z0-9_]{3,24}$/;
+const USERNAME_PATTERN = /^[a-zA-Z0-9_]{1,24}$/;
 
 function getAdminClient() {
   const url = process.env.NEXT_PUBLIC_SUPABASE_URL;
@@ -34,7 +34,7 @@ export async function POST(request: NextRequest) {
   const body = await request.json().catch(() => null);
   const username = String(body?.username ?? "").trim().replace(/^@+/, "");
   if (!USERNAME_PATTERN.test(username)) {
-    return NextResponse.json({ error: "Use 3–24 letters, numbers, or underscores." }, { status: 400 });
+    return NextResponse.json({ error: "Use 1–24 letters, numbers, or underscores." }, { status: 400 });
   }
 
   const supabase = getAdminClient();
