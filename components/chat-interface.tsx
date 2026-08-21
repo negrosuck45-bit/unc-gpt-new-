@@ -269,6 +269,7 @@ export function ChatInterface({ onSwitchToImagine, onOpenSidebar, isSidebarOpen 
     let sseBuffer = "";
     let fullContent = "";
     let assistantMsgId: string | null = null;
+    let permissionRequest: any = null;
     let hasStartedStreaming = false;
     const streamingPreference = readUserPreferences().streaming;
 
@@ -293,6 +294,7 @@ export function ChatInterface({ onSwitchToImagine, onOpenSidebar, isSidebarOpen 
 
             if (parsed.permission_request) {
               const request = parsed.permission_request;
+              permissionRequest = request;
               if (!assistantMsgId) {
                 assistantMsgId = addMessage(chatId, { role: "assistant", content: "", connectorPermission: request });
               }
@@ -339,7 +341,12 @@ export function ChatInterface({ onSwitchToImagine, onOpenSidebar, isSidebarOpen 
 
     const latestUserText = String(messages[messages.length - 1]?.content || '');
     const genericGmailRefusal = /(?:don't|do not|cannot|can't|no) (?:have )?(?:direct )?access to your (?:personal )?data|text-based AI assistant|external data sources/i.test(fullContent);
-    if (/\b(email|emails|mail|inbox|gmail)\b/i.test(latestUserText) && genericGmailRefusal) {
+    if (permissionRequest) {
+      const permission = permissionRequest;
+      const cleanContent = permission.mode === 'enable' ? `Turn on ${permission.label} to continue.` : `Connect ${permission.label} to continue.`;
+      if (assistantMsgId) updateMessage(chatId, assistantMsgId, cleanContent, undefined, undefined, undefined, undefined, permission);
+      else assistantMsgId = addMessage(chatId, { role: 'assistant', content: cleanContent, connectorPermission: permission });
+    } else if (/\b(email|emails|mail|inbox|gmail)\b/i.test(latestUserText) && genericGmailRefusal) {
       const permission = connectorPermissionIdentity('gmail', 'connect');
       if (assistantMsgId) updateMessage(chatId, assistantMsgId, 'Connect Gmail to continue.', undefined, undefined, undefined, undefined, permission);
       else assistantMsgId = addMessage(chatId, { role: 'assistant', content: 'Connect Gmail to continue.', connectorPermission: permission });

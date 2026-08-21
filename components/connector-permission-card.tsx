@@ -15,6 +15,7 @@ export interface ConnectorPermissionRequest {
 export function ConnectorPermissionCard({ request }: { request: ConnectorPermissionRequest }) {
   const [busy, setBusy] = useState(false);
   const [complete, setComplete] = useState(false);
+  const [iconFailed, setIconFailed] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
   const act = async () => {
@@ -55,7 +56,7 @@ export function ConnectorPermissionCard({ request }: { request: ConnectorPermiss
     <div className="mt-3 w-full max-w-md overflow-hidden rounded-[22px] border border-white/10 bg-white/[0.045] p-3.5 shadow-[0_12px_45px_rgba(0,0,0,0.16)] backdrop-blur-2xl dark:border-white/10 dark:bg-white/[0.045]">
       <div className="flex items-start gap-3">
         <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-2xl border border-white/10 bg-white/[0.07] p-2.5 shadow-inner">
-          <img src={request.iconUrl} alt="" aria-hidden="true" className="h-full w-full object-contain opacity-75" />
+          {!iconFailed ? <img src={request.iconUrl} alt="" aria-hidden="true" className="h-full w-full object-contain opacity-75" onError={() => setIconFailed(true)} /> : <span className="text-sm font-semibold text-white/70" aria-hidden="true">{request.label.slice(0, 1)}</span>}
         </div>
         <div className="min-w-0 flex-1">
           <div className="flex items-center gap-2">

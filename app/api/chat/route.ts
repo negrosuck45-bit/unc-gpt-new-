@@ -1722,7 +1722,7 @@ export async function POST(req: NextRequest) {
     }> = [];
 
     // ==================== TOOL SETUP ====================
-    const explicitGithubRepositoryRequest = /github/i.test(userText) && /\b(repo|repos|repositories)\b/i.test(userText);
+    const explicitGithubRepositoryRequest = /github/i.test(userText) && /\b(repo|repos|repositories)\b/i.test(userText) && !/\b(create|new|make|delete|remove|update|edit|push|commit|change)\b/i.test(userText);
     const contextualGithubFollowUp = /^(it is|yes|yeah|yep|list them|show them|go ahead|do it|okay|ok)$/i.test(String(userText).trim()) && /github/i.test(recentConversationText) && /\b(repo|repos|repositories)\b/i.test(recentConversationText);
     const isGithubRepositoryRequest = explicitGithubRepositoryRequest || contextualGithubFollowUp;
     let availableTools: any[] = computerUse === false ? [...BUILTIN_TOOLS] : buildAgentComputerTools();
@@ -1755,7 +1755,24 @@ export async function POST(req: NextRequest) {
       });
       const connectorActionIntent = /\b(my|mine|latest|list|show|find|read|send|email|message|calendar|create|update|delete|open|search|manage|deploy|repository|repositories|repo)\b/i.test(userText);
       const requestedConnector = requestedConnectorKey ? connectorHints[requestedConnectorKey] : null;
-      const requestedState = requestedConnectorKey ? connectorPreferences.find((connector: any) => connector?.source === 'composio' && String(connector.provider || connector.toolkit || '').toLowerCase().replace(/[- ]/g, '_') === requestedConnectorKey) : null;
+      let requestedState = requestedConnectorKey ? connectorPreferences.find((connector: any) => connector?.source === 'composio' && String(connector.provider || connector.toolkit || '').toLowerCase().replace(/[- ]/g, '_') === requestedConnectorKey) : null;
+      // Client storage can be stale or empty. Resolve the live Composio account before deciding
+      // whether to ask for authorization, so the AI and connector panel see the same state.
+      if (requestedConnectorKey && process.env.COMPOSIO_API_KEY && (!requestedState || requestedState.enabled === false)) {
+        try {
+          const liveSession = await auth0.getSession();
+          const liveUserId = liveSession?.user?.sub;
+          const composio = new Composio({ apiKey: process.env.COMPOSIO_API_KEY });
+          const liveAccounts: any = liveUserId ? await composio.connectedAccounts.list({ userIds: getComposioUserIds(liveUserId), limit: 1000 }) : null;
+          const liveAccount = (liveAccounts?.items || []).find((account: any) => {
+            const toolkit = String(account?.toolkit?.slug || '').toLowerCase().replace(/[- ]/g, '_');
+            return toolkit === requestedConnectorKey;
+          });
+          if (liveAccount) requestedState = { source: 'composio', provider: requestedConnectorKey, toolkit: requestedConnectorKey, accountId: liveAccount.id, enabled: !Boolean(liveAccount.isDisabled) };
+        } catch (error) {
+          console.warn('Live connector state lookup failed:', error);
+        }
+      }
       if (requestedConnector && connectorActionIntent && (!requestedState || requestedState.enabled === false) && !isGithubRepositoryRequest) {
         const mode = requestedState ? 'enable' : 'connect';
         const permission = { toolkit: requestedConnectorKey, label: requestedConnector.label, description: requestedConnector.description, iconUrl: requestedConnector.iconUrl, accountId: requestedState?.accountId, mode };
