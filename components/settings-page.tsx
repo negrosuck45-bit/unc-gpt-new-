@@ -49,6 +49,7 @@ export function SettingsPage({ onClose }: SettingsPageProps) {
   const [profilePicture, setProfilePicture] = useState('');
   const [username, setUsername] = useState('');
   const [usernameStatus, setUsernameStatus] = useState<{ type: 'idle' | 'saving' | 'saved' | 'error'; message?: string }>({ type: 'idle' });
+  const [profileStatus, setProfileStatus] = useState<{ type: 'idle' | 'saving' | 'saved' | 'error'; message?: string }>({ type: 'idle' });
   const [bio, setBio] = useState('');
   const [backgroundMedia, setBackgroundMedia] = useState('');
   const [backgroundMediaType, setBackgroundMediaType] = useState<'image' | 'video' | ''>('');
@@ -90,6 +91,26 @@ export function SettingsPage({ onClose }: SettingsPageProps) {
     const bytes = new Uint8Array(binary.length);
     for (let index = 0; index < binary.length; index += 1) bytes[index] = binary.charCodeAt(index);
     return new File([bytes], name, { type: mime });
+  };
+
+  const saveProfile = async () => {
+    setProfileStatus({ type: 'saving', message: 'Saving profile…' });
+    try {
+      let picture = profilePicture;
+      let background = backgroundMedia;
+      let backgroundType = backgroundMediaType;
+      let music = musicUrl;
+      if (picture.startsWith('data:')) { const file = dataUrlToFile(picture, 'profile-picture.jpg'); if (file) picture = (await uploadProfileMedia(file)).url; }
+      if (background.startsWith('data:')) { const extension = backgroundType === 'video' ? 'mp4' : 'jpg'; const file = dataUrlToFile(background, `profile-background.${extension}`); if (file) { const uploaded = await uploadProfileMedia(file); background = uploaded.url; backgroundType = uploaded.kind as 'image' | 'video'; } }
+      if (music.startsWith('data:')) { const file = dataUrlToFile(music, musicName || 'profile-music.mp3'); if (file) music = (await uploadProfileMedia(file)).url; }
+      const saved = await syncProfile({ profile_picture: picture || null, bio: bio.trim() || null, background_media: background || null, background_media_type: backgroundType || null, music_url: music || null, music_name: musicName || null });
+      if (!saved) throw new Error('Profile storage is not configured in production.');
+      setProfilePicture(picture); setBackgroundMedia(background); setBackgroundMediaType(backgroundType); setMusicUrl(music);
+      writeUserPreferences({ profilePicture: picture, bio: bio.trim(), backgroundMedia: background, backgroundMediaType: backgroundType, musicUrl: music, musicName });
+      setProfileStatus({ type: 'saved', message: 'Profile saved.' });
+    } catch (error) {
+      setProfileStatus({ type: 'error', message: error instanceof Error ? error.message : 'Unable to save profile.' });
+    }
   };
 
   useEffect(() => {
@@ -296,6 +317,7 @@ export function SettingsPage({ onClose }: SettingsPageProps) {
                     </label>
                     {backgroundMedia && <div className="mt-3 overflow-hidden rounded-xl border border-border/10">{backgroundMediaType === 'video' ? <video src={backgroundMedia} controls className="h-28 w-full object-cover" /> : <img src={backgroundMedia} alt="Profile background" className="h-28 w-full object-cover" />}</div>}
                     {musicUrl && <div className="mt-3 flex items-center gap-2 rounded-xl border border-border/10 bg-muted/[0.05] p-3"><Music2 className="h-4 w-4 text-emerald-300" /><span className="min-w-0 flex-1 truncate text-xs text-foreground/70">{musicName || 'Uploaded music'}</span><audio src={musicUrl} controls className="h-7 max-w-[45%]" /></div>}
+                    <div className="mt-4 flex items-center justify-end gap-3"><span className={cn('text-xs', profileStatus.type === 'error' ? 'text-red-400' : profileStatus.type === 'saved' ? 'text-emerald-400' : 'text-muted-foreground')}>{profileStatus.message}</span><Button size="sm" onClick={saveProfile} disabled={profileStatus.type === 'saving'}>{profileStatus.type === 'saving' ? 'Saving…' : 'Save profile'}</Button></div>
                   </div>
                   <div className="flex items-center justify-between border-t border-border/[0.10] pt-4"><span className="text-sm">Account session</span><a href="/auth/logout" className="rounded-full border border-red-300/50 px-4 py-2 text-sm text-red-200 transition hover:bg-red-400/10">Log out</a></div>
                 </div>
