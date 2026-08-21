@@ -62,10 +62,24 @@ export function SettingsPage({ onClose }: SettingsPageProps) {
   const syncProfile = async (patch: Record<string, string | null>) => {
     try {
       const response = await fetch('/api/profile', { method: 'PATCH', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(patch) });
-      if (!response.ok) console.warn('[profile] sync failed', response.status);
+      if (!response.ok) {
+        const payload = await response.json().catch(() => null);
+        throw new Error(payload?.error || 'Profile sync failed.');
+      }
+      return true;
     } catch (error) {
       console.warn('[profile] sync unavailable', error);
+      return false;
     }
+  };
+
+  const uploadProfileMedia = async (file: File) => {
+    const formData = new FormData();
+    formData.set('file', file);
+    const response = await fetch('/api/profile/media', { method: 'POST', body: formData });
+    const payload = await response.json().catch(() => null);
+    if (!response.ok || !payload?.url) throw new Error(payload?.error || 'Profile upload failed.');
+    return payload as { url: string; kind: 'image' | 'video' | 'audio' };
   };
 
   useEffect(() => {
@@ -230,7 +244,7 @@ export function SettingsPage({ onClose }: SettingsPageProps) {
                   <div className="rounded-[24px] border border-border bg-card px-5 py-7 text-center shadow-sm sm:px-8">
                     <label className="group mx-auto block w-fit cursor-pointer" title="Change profile photo">
                       {profilePicture ? <img src={profilePicture} alt="Your profile" className="h-20 w-20 rounded-full object-cover ring-4 ring-emerald-400/10 transition group-hover:ring-emerald-400/25" /> : <div className="flex h-20 w-20 items-center justify-center rounded-full bg-emerald-500/80 text-3xl font-medium ring-4 ring-emerald-400/10 transition group-hover:ring-emerald-400/25">{(profileName || authUser?.name || 'U').slice(0, 1).toUpperCase()}</div>}
-                      <input type="file" accept="image/*" className="hidden" onChange={(event) => { const file = event.target.files?.[0]; if (!file) return; const reader = new FileReader(); reader.onload = () => { const value = String(reader.result || ''); setProfilePicture(value); writeUserPreferences({ profilePicture: value }); void syncProfile({ profile_picture: value }) }; reader.readAsDataURL(file) }} />
+                      <input type="file" accept="image/*" className="hidden" onChange={async (event) => { const file = event.target.files?.[0]; if (!file) return; try { const uploaded = await uploadProfileMedia(file); setProfilePicture(uploaded.url); writeUserPreferences({ profilePicture: uploaded.url }); await syncProfile({ profile_picture: uploaded.url }); } catch (error) { setUsernameStatus({ type: 'error', message: error instanceof Error ? error.message : 'Profile photo upload failed.' }); } }} />
                     </label>
                     <p className="mt-3 text-xs text-foreground/45">Click photo to change</p>
                     <input value={profileName} onChange={(event) => setProfileName(event.target.value)} onBlur={() => writeUserPreferences({ profileName: profileName.trim() })} placeholder={authUser?.name || 'Display name'} className="mt-4 w-full bg-transparent text-center text-lg font-medium text-foreground outline-none placeholder:text-foreground/45" />
@@ -249,7 +263,7 @@ export function SettingsPage({ onClose }: SettingsPageProps) {
                     <div className="mb-3 flex items-center justify-between"><div><p className="text-sm font-medium">Profile media</p><p className="mt-1 text-xs text-foreground/50">Add a background image, video, or music file.</p></div><ImagePlus className="h-4 w-4 text-foreground/40" /></div>
                     <label className="group flex min-h-32 cursor-pointer flex-col items-center justify-center rounded-2xl border border-dashed border-emerald-400/25 bg-emerald-400/[0.035] px-4 text-center transition hover:border-emerald-400/50 hover:bg-emerald-400/[0.07]">
                       <Upload className="h-5 w-5 text-emerald-300/80 transition group-hover:scale-110" /><span className="mt-2 text-sm text-foreground/75">Drop files here or click to upload</span><span className="mt-1 text-xs text-foreground/40">Background image/video or audio</span>
-                      <input type="file" accept="image/*,video/*,audio/*" className="hidden" onChange={(event) => { const file = event.target.files?.[0]; if (!file) return; const reader = new FileReader(); reader.onload = () => { const value = String(reader.result || ''); if (file.type.startsWith('audio/')) { setMusicUrl(value); setMusicName(file.name); writeUserPreferences({ musicUrl: value, musicName: file.name }); void syncProfile({ music_url: value, music_name: file.name }); } else { const type = file.type.startsWith('video/') ? 'video' : 'image'; setBackgroundMedia(value); setBackgroundMediaType(type); writeUserPreferences({ backgroundMedia: value, backgroundMediaType: type }); void syncProfile({ background_media: value, background_media_type: type }); } }; reader.readAsDataURL(file) }} />
+                      <input type="file" accept="image/*,video/*,audio/*" className="hidden" onChange={async (event) => { const file = event.target.files?.[0]; if (!file) return; try { const uploaded = await uploadProfileMedia(file); if (uploaded.kind === 'audio') { setMusicUrl(uploaded.url); setMusicName(file.name); writeUserPreferences({ musicUrl: uploaded.url, musicName: file.name }); await syncProfile({ music_url: uploaded.url, music_name: file.name }); } else { setBackgroundMedia(uploaded.url); setBackgroundMediaType(uploaded.kind); writeUserPreferences({ backgroundMedia: uploaded.url, backgroundMediaType: uploaded.kind }); await syncProfile({ background_media: uploaded.url, background_media_type: uploaded.kind }); } } catch (error) { setUsernameStatus({ type: 'error', message: error instanceof Error ? error.message : 'Profile media upload failed.' }); } }} />
                     </label>
                     {backgroundMedia && <div className="mt-3 overflow-hidden rounded-xl border border-border/10">{backgroundMediaType === 'video' ? <video src={backgroundMedia} controls className="h-28 w-full object-cover" /> : <img src={backgroundMedia} alt="Profile background" className="h-28 w-full object-cover" />}</div>}
                     {musicUrl && <div className="mt-3 flex items-center gap-2 rounded-xl border border-border/10 bg-muted/[0.05] p-3"><Music2 className="h-4 w-4 text-emerald-300" /><span className="min-w-0 flex-1 truncate text-xs text-foreground/70">{musicName || 'Uploaded music'}</span><audio src={musicUrl} controls className="h-7 max-w-[45%]" /></div>}
