@@ -275,8 +275,8 @@ export function ChatSidebar({
         </RailButton>
 
         {settingsPageOpen && (
-          <div className="fixed inset-0 z-50 flex items-start sm:items-center justify-center bg-foreground/20 sm:bg-foreground/15 sm:backdrop-blur-sm overflow-y-auto p-0 sm:p-4">
-            <div className="w-full max-w-none sm:max-w-5xl lg:max-w-6xl min-h-[calc(100dvh-env(safe-area-inset-top))] sm:min-h-0 sm:my-8">
+          <div className="fixed inset-0 z-50 flex items-start sm:items-center justify-center bg-foreground/20 sm:bg-foreground/15 sm:backdrop-blur-sm overflow-y-auto p-0 sm:p-6 lg:p-8">
+            <div className="w-full max-w-none sm:max-w-5xl sm:max-h-[calc(100dvh-48px)] sm:my-6">
               <SettingsPage onClose={() => setSettingsPageOpen(false)} />
             </div>
           </div>
@@ -295,11 +295,11 @@ export function ChatSidebar({
       <AnimatePresence mode="wait">
         {isOpen && (
           <motion.aside
-            initial={{ x: -280, opacity: 0 }}
+            initial={{ x: -264, opacity: 0 }}
             animate={{ x: 0, opacity: 1 }}
-            exit={{ x: -280, opacity: 0 }}
+            exit={{ x: -264, opacity: 0 }}
             transition={{ duration: 0.22, ease: [0.4, 0, 0.2, 1] }}
-            style={{ width: 280, minWidth: 280, height: '100dvh', maxHeight: '100dvh' }}
+            style={{ width: 264, minWidth: 264, height: '100dvh', maxHeight: '100dvh' }}
             className={cn("bg-sidebar supports-[backdrop-filter]:backdrop-blur-3xl text-sidebar-foreground shadow-[18px_0_60px_rgba(0,0,0,0.22)] flex flex-col overflow-hidden transition-colors duration-200", isMobile ? "fixed inset-y-0 left-0 z-[100] shadow-2xl" : "relative")}
           >
             {/* Borderless sidebar identity row with the Mars logo restored. */}
@@ -497,8 +497,8 @@ export function ChatSidebar({
       </AnimatePresence>
 
       {settingsPageOpen && (
-        <div className="fixed inset-0 z-50 flex items-start sm:items-center justify-center bg-foreground/20 sm:bg-foreground/15 sm:backdrop-blur-sm overflow-y-auto p-0 sm:p-4">
-          <div className="w-full max-w-none sm:max-w-5xl lg:max-w-6xl min-h-[calc(100dvh-env(safe-area-inset-top))] sm:min-h-0 sm:my-8">
+        <div className="fixed inset-0 z-50 flex items-start sm:items-center justify-center bg-foreground/20 sm:bg-foreground/15 sm:backdrop-blur-sm overflow-y-auto p-0 sm:p-6 lg:p-8">
+          <div className="w-full max-w-none sm:max-w-5xl sm:max-h-[calc(100dvh-48px)] sm:my-6">
             <SettingsPage onClose={() => setSettingsPageOpen(false)} />
           </div>
         </div>

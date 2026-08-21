@@ -45,7 +45,7 @@ export function ChatHeader({ project, chat, activeModelInfo, onOpenSidebar, isSi
   return (
     <>
       <div className="flex flex-col flex-shrink-0 border-b border-border bg-background/75 backdrop-blur-2xl transition-colors duration-200">
-      <header className="flex min-h-[58px] items-center gap-2 px-3 py-2.5 sm:px-5">
+      <header className="mx-auto flex min-h-[64px] w-full max-w-[1480px] items-center gap-2.5 px-4 py-2.5 sm:px-7 lg:px-9">
         {/* Sidebar trigger — always visible so the sidebar can be opened or collapsed on any screen size */}
         {onOpenSidebar && (
           <Button
@@ -68,9 +68,9 @@ export function ChatHeader({ project, chat, activeModelInfo, onOpenSidebar, isSi
         {/* Project selector */}
         <DropdownMenu>
           <DropdownMenuTrigger asChild>
-            <Button variant="ghost" size="sm" className="gap-1.5 rounded-full px-3 font-medium text-muted-foreground transition hover:bg-accent hover:text-foreground">
+            <Button variant="ghost" size="sm" className="gap-2 rounded-full px-3.5 font-medium text-muted-foreground transition hover:bg-accent hover:text-foreground">
               <FolderOpen className="h-4 w-4 opacity-60" />
-              <span className="hidden sm:inline truncate max-w-[120px]">
+              <span className="hidden max-w-[220px] truncate sm:inline">
                 {project?.name ?? "No project"}
               </span>
               <ChevronDown className="h-3.5 w-3.5 opacity-60" />
