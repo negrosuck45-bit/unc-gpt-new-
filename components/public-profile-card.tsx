@@ -47,16 +47,33 @@ function useFizTilt(ref: RefObject<HTMLDivElement | null>) {
 }
 
 export function PublicProfileCursor({ image }: { image: string | null }) {
+  const cursorRef = useRef<HTMLDivElement>(null)
   useEffect(() => {
-    if (!image) return
-    document.documentElement.style.setProperty('--uncgpt-custom-cursor', `url("${image}")`)
+    const cursor = cursorRef.current
+    if (!cursor || !image) return
     document.documentElement.classList.add('has-custom-cursor')
+    const move = (event: MouseEvent | TouchEvent) => {
+      const point = 'touches' in event ? event.touches[0] : event
+      if (!point) return
+      cursor.style.left = `${point.clientX}px`
+      cursor.style.top = `${point.clientY}px`
+      cursor.style.display = 'block'
+    }
+    const hide = () => { cursor.style.display = 'none' }
+    document.addEventListener('mousemove', move)
+    document.addEventListener('touchstart', move, { passive: true })
+    document.addEventListener('touchmove', move, { passive: true })
+    document.addEventListener('touchend', hide, { passive: true })
     return () => {
-      document.documentElement.style.removeProperty('--uncgpt-custom-cursor')
       document.documentElement.classList.remove('has-custom-cursor')
+      document.removeEventListener('mousemove', move)
+      document.removeEventListener('touchstart', move)
+      document.removeEventListener('touchmove', move)
+      document.removeEventListener('touchend', hide)
     }
   }, [image])
-  return null
+  if (!image) return null
+  return <div ref={cursorRef} aria-hidden="true" className="pointer-events-none fixed z-[10000] hidden h-12 w-12 -translate-x-1/2 -translate-y-1/2 bg-contain bg-center bg-no-repeat" style={{ backgroundImage: `url("${image}")` }} />
 }
 
 export function PublicProfileCard({ username, bio, profilePicture, musicUrl, musicName }: ProfileCardProps) {
