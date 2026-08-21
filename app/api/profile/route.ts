@@ -44,6 +44,7 @@ export async function PATCH(request: NextRequest) {
   for (const field of PROFILE_FIELDS) {
     if (Object.prototype.hasOwnProperty.call(body ?? {}, field)) {
       const value = body?.[field];
+      if (field === "username" && (value == null || String(value).trim() === "")) continue;
       update[field] = value == null ? null : String(value);
     }
   }
