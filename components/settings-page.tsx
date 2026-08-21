@@ -60,6 +60,8 @@ export function SettingsPage({ onClose }: SettingsPageProps) {
   const [customCursorWidth, setCustomCursorWidth] = useState(0);
   const [customCursorHeight, setCustomCursorHeight] = useState(0);
   const [cursorStatus, setCursorStatus] = useState('');
+  const [profileCardOffsetX, setProfileCardOffsetX] = useState(0);
+  const [profileCardOffsetY, setProfileCardOffsetY] = useState(0);
   const [language, setLanguage] = useState('system');
 
   const currentChat = getCurrentChat();
@@ -165,6 +167,8 @@ export function SettingsPage({ onClose }: SettingsPageProps) {
     setCustomCursorImage(p.customCursorImage || '');
     setCustomCursorWidth(p.customCursorWidth || 0);
     setCustomCursorHeight(p.customCursorHeight || 0);
+    setProfileCardOffsetX(p.profileCardOffsetX || 0);
+    setProfileCardOffsetY(p.profileCardOffsetY || 0);
     void (async () => {
       const response = await fetch('/api/profile', { cache: 'no-store' }).catch(() => null);
       const payload = response?.ok ? await response.json().catch(() => null) : null;
@@ -336,21 +340,29 @@ export function SettingsPage({ onClose }: SettingsPageProps) {
                       <p className={cn('mt-2 text-xs', usernameStatus.type === 'error' ? 'text-red-400' : usernameStatus.type === 'saved' ? 'text-emerald-400' : 'text-muted-foreground')}>{usernameStatus.message || '1–24 letters, numbers, or underscores.'}</p>
                     </div>
                   </div>
+                  <ProfileCardEditorPreview username={username || 'yourname'} bio={bio} profilePicture={profilePicture} offsetX={profileCardOffsetX} offsetY={profileCardOffsetY} onOffsetChange={(x, y) => { setProfileCardOffsetX(x); setProfileCardOffsetY(y); writeUserPreferences({ profileCardOffsetX: x, profileCardOffsetY: y }); }} />
                   <div className="rounded-[22px] border border-border bg-card p-4 shadow-sm">
                     <label className="mb-2 block text-xs font-medium uppercase tracking-[0.14em] text-foreground/45">Bio</label>
                     <textarea value={bio} onChange={(event) => setBio(event.target.value.slice(0, 160))} onBlur={() => { const value = bio.trim(); writeUserPreferences({ bio: value }); void syncProfile({ bio: value }) }} placeholder="Tell people a little about you" className="min-h-20 w-full resize-none rounded-xl border border-border/15 bg-muted/[0.06] p-3 text-sm text-foreground outline-none placeholder:text-foreground/35 focus:border-emerald-400/45" />
                     <p className="mt-2 text-right text-[11px] text-foreground/35">{bio.length}/160</p>
                   </div>
                   <div className="rounded-[22px] border border-border bg-card p-4 shadow-sm">
-                    <div className="mb-3 flex items-center justify-between"><div><p className="text-sm font-medium">Profile media</p><p className="mt-1 text-xs text-foreground/50">Add a background image, video, or music file.</p></div><ImagePlus className="h-4 w-4 text-foreground/40" /></div>
-                    <label className="group flex min-h-32 cursor-pointer flex-col items-center justify-center rounded-2xl border border-dashed border-emerald-400/25 bg-emerald-400/[0.035] px-4 text-center transition hover:border-emerald-400/50 hover:bg-emerald-400/[0.07]">
-                      <Upload className="h-5 w-5 text-emerald-300/80 transition group-hover:scale-110" /><span className="mt-2 text-sm text-foreground/75">Drop files here or click to upload</span><span className="mt-1 text-xs text-foreground/40">Background image/video or audio</span>
-                      <input type="file" accept="image/*,video/*,audio/*" className="hidden" onChange={async (event) => { const file = event.target.files?.[0]; if (!file) return; try { const uploaded = await uploadProfileMedia(file); if (uploaded.kind === 'audio') { setMusicUrl(uploaded.url); setMusicName(file.name); writeUserPreferences({ musicUrl: uploaded.url, musicName: file.name }); await syncProfile({ music_url: uploaded.url, music_name: file.name }); } else { setBackgroundMedia(uploaded.url); setBackgroundMediaType(uploaded.kind); writeUserPreferences({ backgroundMedia: uploaded.url, backgroundMediaType: uploaded.kind }); await syncProfile({ background_media: uploaded.url, background_media_type: uploaded.kind }); } } catch (error) { setUsernameStatus({ type: 'error', message: error instanceof Error ? error.message : 'Profile media upload failed.' }); } }} />
+                    <div className="mb-3 flex items-center justify-between"><div><p className="text-sm font-medium">Background</p><p className="mt-1 text-xs text-foreground/50">Upload an image or video behind the public profile card.</p></div><ImagePlus className="h-4 w-4 text-foreground/40" /></div>
+                    <label className="group flex min-h-24 cursor-pointer flex-col items-center justify-center rounded-2xl border border-dashed border-emerald-400/25 bg-emerald-400/[0.035] px-4 text-center transition hover:border-emerald-400/50 hover:bg-emerald-400/[0.07]">
+                      <Upload className="h-5 w-5 text-emerald-300/80 transition group-hover:scale-110" /><span className="mt-2 text-sm text-foreground/75">Upload background</span><span className="mt-1 text-xs text-foreground/40">Image or video only</span>
+                      <input type="file" accept="image/*,video/*" className="hidden" onChange={async (event) => { const file = event.target.files?.[0]; if (!file) return; try { const uploaded = await uploadProfileMedia(file); setBackgroundMedia(uploaded.url); setBackgroundMediaType(uploaded.kind as 'image' | 'video'); writeUserPreferences({ backgroundMedia: uploaded.url, backgroundMediaType: uploaded.kind as 'image' | 'video' }); await syncProfile({ background_media: uploaded.url, background_media_type: uploaded.kind as 'image' | 'video' }); } catch (error) { setProfileStatus({ type: 'error', message: error instanceof Error ? error.message : 'Background upload failed.' }); } }} />
                     </label>
                     {backgroundMedia && <div className="mt-3 overflow-hidden rounded-xl border border-border/10">{backgroundMediaType === 'video' ? <video src={backgroundMedia} controls className="h-28 w-full object-cover" /> : <img src={backgroundMedia} alt="Profile background" className="h-28 w-full object-cover" />}</div>}
-                    {musicUrl && <div className="mt-3 flex items-center gap-2 rounded-xl border border-border/10 bg-muted/[0.05] p-3"><Music2 className="h-4 w-4 text-emerald-300" /><span className="min-w-0 flex-1 truncate text-xs text-foreground/70">{musicName || 'Uploaded music'}</span><audio src={musicUrl} controls className="h-7 max-w-[45%]" /></div>}
-                    <div className="mt-4 flex items-center justify-end gap-3"><span className={cn('text-xs', profileStatus.type === 'error' ? 'text-red-400' : profileStatus.type === 'saved' ? 'text-emerald-400' : 'text-muted-foreground')}>{profileStatus.message}</span><Button size="sm" onClick={saveProfile} disabled={profileStatus.type === 'saving'}>{profileStatus.type === 'saving' ? 'Saving…' : 'Save profile'}</Button></div>
                   </div>
+                  <div className="rounded-[22px] border border-border bg-card p-4 shadow-sm">
+                    <div className="mb-3 flex items-center justify-between"><div><p className="text-sm font-medium">Music</p><p className="mt-1 text-xs text-foreground/50">Upload profile music separately from the background.</p></div><Music2 className="h-4 w-4 text-foreground/40" /></div>
+                    <label className="group flex min-h-24 cursor-pointer flex-col items-center justify-center rounded-2xl border border-dashed border-violet-400/25 bg-violet-400/[0.035] px-4 text-center transition hover:border-violet-400/50 hover:bg-violet-400/[0.07]">
+                      <Upload className="h-5 w-5 text-violet-300/80 transition group-hover:scale-110" /><span className="mt-2 text-sm text-foreground/75">Upload music</span><span className="mt-1 text-xs text-foreground/40">Audio file only</span>
+                      <input type="file" accept="audio/*" className="hidden" onChange={async (event) => { const file = event.target.files?.[0]; if (!file) return; try { const uploaded = await uploadProfileMedia(file); setMusicUrl(uploaded.url); setMusicName(file.name); writeUserPreferences({ musicUrl: uploaded.url, musicName: file.name }); await syncProfile({ music_url: uploaded.url, music_name: file.name }); } catch (error) { setProfileStatus({ type: 'error', message: error instanceof Error ? error.message : 'Music upload failed.' }); } }} />
+                    </label>
+                    {musicUrl && <div className="mt-3 flex items-center gap-2 rounded-xl border border-border/10 bg-muted/[0.05] p-3"><Music2 className="h-4 w-4 text-violet-300" /><span className="min-w-0 flex-1 truncate text-xs text-foreground/70">{musicName || 'Uploaded music'}</span><audio src={musicUrl} controls className="h-7 max-w-[55%]" /></div>}
+                  </div>
+                  <div className="flex items-center justify-end gap-3"><span className={cn('text-xs', profileStatus.type === 'error' ? 'text-red-400' : profileStatus.type === 'saved' ? 'text-emerald-400' : 'text-muted-foreground')}>{profileStatus.message}</span><Button size="sm" onClick={saveProfile} disabled={profileStatus.type === 'saving'}>{profileStatus.type === 'saving' ? 'Saving…' : 'Save profile'}</Button></div>
                   <div className="rounded-[22px] border border-border bg-card p-4 shadow-sm">
                     <div className="mb-3 flex items-center justify-between"><div><p className="text-sm font-medium">Custom cursor</p><p className="mt-1 text-xs text-foreground/50">Choose a small PNG, GIF, or SVG cursor image for this account.</p></div><MousePointer2 className="h-4 w-4 text-foreground/40" /></div>
                     <label className="group flex min-h-24 cursor-pointer items-center gap-4 rounded-2xl border border-dashed border-emerald-400/25 bg-emerald-400/[0.035] px-4 transition hover:border-emerald-400/50 hover:bg-emerald-400/[0.07]">
@@ -613,6 +625,30 @@ function GoogleMark() {
         <path fill="#EA4335" d="M12 6.14c1.43 0 2.71.49 3.72 1.45l2.79-2.79C16.84 3.24 14.63 2.25 12 2.25a9.75 9.75 0 0 0-8.7 5.39l3.24 2.53C7.31 7.86 9.46 6.14 12 6.14Z" />
       </svg>
     </span>
+  )
+}
+
+function ProfileCardEditorPreview({ username, bio, profilePicture, offsetX, offsetY, onOffsetChange }: { username: string; bio: string; profilePicture: string; offsetX: number; offsetY: number; onOffsetChange: (x: number, y: number) => void }) {
+  const drag = React.useRef<{ x: number; y: number; startX: number; startY: number } | null>(null)
+  const start = (event: React.PointerEvent<HTMLDivElement>) => {
+    drag.current = { x: event.clientX, y: event.clientY, startX: offsetX, startY: offsetY }
+    event.currentTarget.setPointerCapture(event.pointerId)
+  }
+  const move = (event: React.PointerEvent<HTMLDivElement>) => {
+    if (!drag.current) return
+    onOffsetChange(Math.max(-120, Math.min(120, drag.current.startX + event.clientX - drag.current.x)), Math.max(-70, Math.min(70, drag.current.startY + event.clientY - drag.current.y)))
+  }
+  const stop = () => { drag.current = null }
+  return (
+    <div className="rounded-[22px] border border-border bg-card p-4 shadow-sm">
+      <div className="mb-3 flex items-center justify-between"><div><p className="text-sm font-medium">Profile card preview</p><p className="mt-1 text-xs text-foreground/50">Drag the rectangle to set its position. The card stays centered on your public profile.</p></div><span className="text-[11px] text-foreground/35">{offsetX}px, {offsetY}px</span></div>
+      <div className="relative h-52 overflow-hidden rounded-[18px] border border-border/10 bg-gradient-to-br from-emerald-400/10 via-muted/10 to-violet-400/10 [perspective:800px]">
+        <div onPointerDown={start} onPointerMove={move} onPointerUp={stop} onPointerCancel={stop} className="absolute left-1/2 top-1/2 w-[min(92%,520px)] -translate-x-1/2 -translate-y-1/2 cursor-grab rounded-[15px] border border-white/20 bg-black/70 p-4 text-white shadow-xl active:cursor-grabbing" style={{ transform: `translate(calc(-50% + ${offsetX}px), calc(-50% + ${offsetY}px))`, touchAction: 'none' }}>
+          <div className="flex items-center gap-3 text-left"><div className="flex h-14 w-14 shrink-0 items-center justify-center overflow-hidden rounded-full bg-emerald-500/80 text-xl font-medium">{profilePicture ? <img src={profilePicture} alt="Profile thumbnail" className="h-full w-full object-cover" /> : username.slice(0, 1).toUpperCase()}</div><div className="min-w-0"><p className="font-medium">@{username}</p><p className="mt-1 line-clamp-2 text-xs text-white/60">{bio || 'Your bio will appear here.'}</p></div></div>
+        </div>
+      </div>
+      <div className="mt-3 flex items-center justify-between"><span className="text-xs text-foreground/45">Live preview of username, bio, thumbnail, and card placement.</span><Button variant="outline" size="sm" className="rounded-full border-border/15" onClick={() => onOffsetChange(0, 0)}>Center</Button></div>
+    </div>
   )
 }
 

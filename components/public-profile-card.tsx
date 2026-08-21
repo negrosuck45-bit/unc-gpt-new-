@@ -73,7 +73,6 @@ export function PublicProfileCard({ username, bio, profilePicture, musicUrl, mus
             )}
           </div>
         </div>
-        <p className="mt-4 text-[10px] uppercase tracking-[0.18em] text-white/30">Move your pointer over the card</p>
       </div>
     </div>
   )

@@ -22,6 +22,8 @@ export interface UserPreferences {
   customCursorImage: string
   customCursorWidth: number
   customCursorHeight: number
+  profileCardOffsetX: number
+  profileCardOffsetY: number
 }
 
 export const DEFAULT_USER_PREFERENCES: UserPreferences = {
@@ -44,6 +46,8 @@ export const DEFAULT_USER_PREFERENCES: UserPreferences = {
   customCursorImage: '',
   customCursorWidth: 0,
   customCursorHeight: 0,
+  profileCardOffsetX: 0,
+  profileCardOffsetY: 0,
 }
 
 const STORAGE_KEY = 'user-preferences'
