@@ -132,17 +132,17 @@ export function PublicProfileCard({ username, bio, profilePicture, musicUrl, mus
   return (
     <div className="relative flex min-h-[calc(100vh-5rem)] w-full items-center justify-center [perspective:1000px]">
       <div ref={cardRef} className="relative w-full max-w-[650px] select-none rounded-[15px] border border-white/20 bg-black/70 px-5 pb-10 pt-5 text-white shadow-2xl shadow-black/40 backdrop-blur-xl sm:px-[30px] sm:pb-[58px] sm:pt-[30px]" style={{ transformStyle: 'preserve-3d', touchAction: 'pan-y' }}>
-        <div className="flex items-start gap-3">
-          <div className="pointer-events-none flex h-[120px] w-[120px] shrink-0 items-center justify-center overflow-hidden rounded-full bg-emerald-500/80 text-4xl font-medium">
+        <div className="flex items-start justify-center gap-5 text-center">
+          <div className="pointer-events-none flex h-[120px] w-[120px] shrink-0 items-center justify-center overflow-hidden rounded-full bg-transparent text-4xl font-medium">
             {profilePicture ? <img src={profilePicture} alt={`@${username}`} className="h-full w-full object-cover" /> : initial}
           </div>
-          <div className="min-w-0 flex-1 pt-1 text-left">
-            <div className="flex items-center gap-3"><h1 className="text-2xl font-bold tracking-wide">@{username}</h1>{isVerified && <BadgeCheck aria-label="Verified official profile" className="h-5 w-5 shrink-0 fill-sky-500 text-white" />}<button type="button" onClick={() => setAdded((value) => !value)} aria-label={added ? `Remove @${username}` : `Add @${username}`} className="inline-flex h-8 items-center gap-1.5 rounded-full border border-white/15 bg-white/[0.08] px-3 text-xs font-medium text-white/80 transition hover:bg-white/[0.16] active:scale-95"><UserPlus className="h-3.5 w-3.5" />{added ? 'Added' : 'Add'}</button></div>
+          <div className="min-w-0 flex-1 pt-1 text-center">
+            <div className="flex items-center justify-center gap-3"><h1 className="text-2xl font-bold tracking-wide">@{username}</h1>{isVerified && <BadgeCheck aria-label="Verified official profile" className="h-5 w-5 shrink-0 fill-sky-500 text-white" />}<button type="button" onClick={() => setAdded((value) => !value)} aria-label={added ? `Remove @${username}` : `Add @${username}`} className="inline-flex h-8 items-center gap-1.5 rounded-full border border-white/15 bg-white/[0.08] px-3 text-xs font-medium text-white/80 transition hover:bg-white/[0.16] active:scale-95"><UserPlus className="h-3.5 w-3.5" />{added ? 'Added' : 'Add'}</button></div>
             {bio && <p className="mt-2 whitespace-pre-wrap text-sm leading-6 text-white/70">{bio}</p>}
           </div>
         </div>
         {musicUrl && <ProfileMusicPlayer url={musicUrl} name={musicName} thumbnail={musicThumbnail} />}
-        <div className="mt-5 flex items-center gap-1.5 text-xs text-white/45"><Eye className="h-3.5 w-3.5" /><span>{views.toLocaleString()} {views === 1 ? 'view' : 'views'}</span></div>
+        <div className="mt-5 flex items-center justify-center gap-1.5 text-xs text-white/45"><Eye className="h-3.5 w-3.5" /><span>{views.toLocaleString()} {views === 1 ? 'view' : 'views'}</span></div>
       </div>
     </div>
   )
