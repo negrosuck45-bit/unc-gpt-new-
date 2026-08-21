@@ -56,6 +56,7 @@ export function SettingsPage({ onClose }: SettingsPageProps) {
   const [backgroundMediaType, setBackgroundMediaType] = useState<'image' | 'video' | ''>('');
   const [musicUrl, setMusicUrl] = useState('');
   const [musicName, setMusicName] = useState('');
+  const [musicThumbnail, setMusicThumbnail] = useState('');
   const [customCursorImage, setCustomCursorImage] = useState('');
   const [customCursorWidth, setCustomCursorWidth] = useState(0);
   const [customCursorHeight, setCustomCursorHeight] = useState(0);
@@ -151,10 +152,10 @@ export function SettingsPage({ onClose }: SettingsPageProps) {
       if (picture.startsWith('data:')) { const file = dataUrlToFile(picture, 'profile-picture.jpg'); if (file) picture = (await uploadProfileMedia(file)).url; }
       if (background.startsWith('data:')) { const extension = backgroundType === 'video' ? 'mp4' : 'jpg'; const file = dataUrlToFile(background, `profile-background.${extension}`); if (file) { const uploaded = await uploadProfileMedia(file); background = uploaded.url; backgroundType = uploaded.kind as 'image' | 'video'; } }
       if (music.startsWith('data:')) { const file = dataUrlToFile(music, musicName || 'profile-music.mp3'); if (file) music = (await uploadProfileMedia(file, 'music')).url; }
-      const saved = await syncProfile({ username: username.trim() || null, profile_picture: picture || null, bio: bio.trim() || null, background_media: background || null, background_media_type: backgroundType || null, music_url: music || null, music_name: musicName || null, cursor_image: customCursorImage || null });
+      const saved = await syncProfile({ username: username.trim() || null, profile_picture: picture || null, bio: bio.trim() || null, background_media: background || null, background_media_type: backgroundType || null, music_url: music || null, music_name: musicName.trim() || null, music_thumbnail: musicThumbnail || null, cursor_image: customCursorImage || null });
       if (!saved) throw new Error('Profile storage is not configured in production.');
       setProfilePicture(picture); setBackgroundMedia(background); setBackgroundMediaType(backgroundType); setMusicUrl(music);
-      writeUserPreferences({ username: username.trim(), profilePicture: picture, bio: bio.trim(), backgroundMedia: background, backgroundMediaType: backgroundType, musicUrl: music, musicName });
+      writeUserPreferences({ username: username.trim(), profilePicture: picture, bio: bio.trim(), backgroundMedia: background, backgroundMediaType: backgroundType, musicUrl: music, musicName: musicName.trim(), musicThumbnail });
       setProfileStatus({ type: 'saved', message: 'Profile saved.' });
     } catch (error) {
       setProfileStatus({ type: 'error', message: error instanceof Error ? error.message : 'Unable to save profile.' });
@@ -183,7 +184,8 @@ export function SettingsPage({ onClose }: SettingsPageProps) {
     const storedMusicLooksInvalid = /\.(png|jpe?g|gif|webp|svg)(?:\?|$)/i.test(`${p.musicName || ''} ${p.musicUrl || ''}`);
     setMusicUrl(storedMusicLooksInvalid ? '' : (p.musicUrl || ''));
     setMusicName(storedMusicLooksInvalid ? '' : (p.musicName || ''));
-    if (storedMusicLooksInvalid) writeUserPreferences({ musicUrl: '', musicName: '' });
+    setMusicThumbnail(storedMusicLooksInvalid ? '' : (p.musicThumbnail || ''));
+    if (storedMusicLooksInvalid) writeUserPreferences({ musicUrl: '', musicName: '', musicThumbnail: '' });
     setCustomCursorImage(p.customCursorImage || '');
     setCustomCursorWidth(p.customCursorWidth || 0);
     setCustomCursorHeight(p.customCursorHeight || 0);
@@ -207,6 +209,7 @@ export function SettingsPage({ onClose }: SettingsPageProps) {
         if (profile.music_url) { setMusicUrl(profile.music_url); writeUserPreferences({ musicUrl: profile.music_url }); }
         if (profile.cursor_image) { setCustomCursorImage(profile.cursor_image); writeUserPreferences({ customCursorImage: profile.cursor_image }); }
         if (profile.music_name) { setMusicName(profile.music_name); writeUserPreferences({ musicName: profile.music_name }); }
+        if (profile.music_thumbnail) { setMusicThumbnail(profile.music_thumbnail); writeUserPreferences({ musicThumbnail: profile.music_thumbnail }); }
       }
       const patch: Record<string, string | null> = {};
       if (!profile?.bio && p.bio) patch.bio = p.bio;
@@ -222,7 +225,7 @@ export function SettingsPage({ onClose }: SettingsPageProps) {
       if (!storedMusicLooksInvalid && !profile?.music_url && p.musicUrl?.startsWith('data:')) {
         const file = dataUrlToFile(p.musicUrl, p.musicName || 'profile-music.mp3');
         if (file) { const uploaded = await uploadProfileMedia(file); setMusicUrl(uploaded.url); writeUserPreferences({ musicUrl: uploaded.url }); patch.music_url = uploaded.url; patch.music_name = p.musicName || file.name; }
-      } else if (!storedMusicLooksInvalid && !profile?.music_url && p.musicUrl) { patch.music_url = p.musicUrl; patch.music_name = p.musicName || null; }
+      } else if (!storedMusicLooksInvalid && !profile?.music_url && p.musicUrl) { patch.music_url = p.musicUrl; patch.music_name = p.musicName || null; patch.music_thumbnail = p.musicThumbnail || null; }
       if (Object.keys(patch).length) await syncProfile(patch);
     })().catch((error) => console.warn('[profile] migration failed', error));
   }, []);
@@ -382,11 +385,15 @@ export function SettingsPage({ onClose }: SettingsPageProps) {
                   </div>
                   <div className="rounded-[22px] border border-border bg-card p-4 shadow-sm">
                     <div className="mb-3 flex items-center justify-between"><div><p className="text-sm font-medium">Music</p><p className="mt-1 text-xs text-foreground/50">Upload any file; audio is extracted automatically when the file contains a sound track.</p></div><Music2 className="h-4 w-4 text-foreground/40" /></div>
+                    <div className="mb-3 grid gap-3 sm:grid-cols-[1fr_auto]">
+                      <div><label className="mb-1.5 block text-xs text-foreground/50">Display name</label><input value={musicName} onChange={(event) => setMusicName(event.target.value.slice(0, 80))} onBlur={() => { const value = musicName.trim(); setMusicName(value); writeUserPreferences({ musicName: value }); void syncProfile({ music_name: value || null }); }} placeholder="Track name" className="h-10 w-full rounded-xl border border-border/15 bg-muted/[0.06] px-3 text-sm text-foreground outline-none placeholder:text-foreground/35 focus:border-violet-400/45" /></div>
+                      <div><label className="mb-1.5 block text-xs text-foreground/50">Thumbnail</label><label className="flex h-10 cursor-pointer items-center gap-2 rounded-xl border border-border/15 bg-muted/[0.06] px-3 text-xs text-foreground/65 transition hover:border-violet-400/45"><ImagePlus className="h-4 w-4 text-violet-300/80" />{musicThumbnail ? 'Change image' : 'Choose image'}<input type="file" accept="image/*" className="hidden" onChange={async (event) => { const file = event.target.files?.[0]; event.currentTarget.value = ''; if (!file) return; setProfileStatus({ type: 'saving', message: 'Uploading thumbnail…' }); try { const uploaded = await uploadProfileMedia(file); setMusicThumbnail(uploaded.url); writeUserPreferences({ musicThumbnail: uploaded.url }); const saved = await syncProfile({ music_thumbnail: uploaded.url }); if (!saved) throw new Error('Thumbnail uploaded, but profile sync failed.'); setProfileStatus({ type: 'saved', message: 'Music thumbnail updated.' }); } catch (error) { setProfileStatus({ type: 'error', message: error instanceof Error ? error.message : 'Thumbnail upload failed.' }); } }} /></label></div>
+                    </div>
                     <label className="group flex min-h-24 cursor-pointer flex-col items-center justify-center rounded-2xl border border-dashed border-violet-400/25 bg-violet-400/[0.035] px-4 text-center transition hover:border-violet-400/50 hover:bg-violet-400/[0.07]">
                       <Upload className="h-5 w-5 text-violet-300/80 transition group-hover:scale-110" /><span className="mt-2 text-sm text-foreground/75">Upload music</span><span className="mt-1 text-xs text-foreground/40">Any file with an audio track</span><span className="mt-2 max-w-sm text-[11px] leading-4 text-foreground/35">A video exported without sound cannot be converted. Use the original video or upload MP3, M4A, or WAV.</span>
-                      <input type="file" accept="*/*" className="hidden" onChange={async (event) => { const file = event.target.files?.[0]; event.currentTarget.value = ''; if (!file) return; if (file.type.startsWith('image/')) { setProfileStatus({ type: 'error', message: 'That is an image. Choose Background for images or select the video file for Music.' }); return; } setProfileStatus({ type: 'saving', message: 'Uploading music…' }); try { const uploaded = await uploadProfileMedia(file, 'music'); setMusicUrl(uploaded.url); setMusicName(file.name); writeUserPreferences({ musicUrl: uploaded.url, musicName: file.name }); await syncProfile({ music_url: uploaded.url, music_name: file.name }); setProfileStatus({ type: 'saved', message: uploaded.extracted ? 'Audio extracted and uploaded.' : 'File uploaded.' }); } catch (error) { setProfileStatus({ type: 'error', message: error instanceof Error ? error.message : 'Music upload failed.' }); } }} />
+                      <input type="file" accept="*/*" className="hidden" onChange={async (event) => { const file = event.target.files?.[0]; event.currentTarget.value = ''; if (!file) return; if (file.type.startsWith('image/')) { setProfileStatus({ type: 'error', message: 'That is an image. Choose Background for images or select the video file for Music.' }); return; } setProfileStatus({ type: 'saving', message: 'Uploading music…' }); try { const uploaded = await uploadProfileMedia(file, 'music'); setMusicUrl(uploaded.url); setMusicName((current) => current.trim() || file.name); writeUserPreferences({ musicUrl: uploaded.url, musicName: musicName.trim() || file.name }); await syncProfile({ music_url: uploaded.url, music_name: musicName.trim() || file.name, music_thumbnail: musicThumbnail || null }); setProfileStatus({ type: 'saved', message: uploaded.extracted ? 'Audio extracted and uploaded.' : 'File uploaded.' }); } catch (error) { setProfileStatus({ type: 'error', message: error instanceof Error ? error.message : 'Music upload failed.' }); } }} />
                     </label>
-                    {musicUrl && <div className="mt-3 flex items-center gap-2 rounded-xl border border-border/10 bg-muted/[0.05] p-3"><Music2 className="h-4 w-4 text-violet-300" /><span className="min-w-0 flex-1 truncate text-xs text-foreground/70">{musicName || 'Uploaded music'}</span><audio src={musicUrl} controls className="h-7 max-w-[55%]" /><button type="button" className="text-xs text-red-300/80 hover:text-red-200" onClick={() => { setMusicUrl(''); setMusicName(''); writeUserPreferences({ musicUrl: '', musicName: '' }); void syncProfile({ music_url: null, music_name: null }); setProfileStatus({ type: 'saved', message: 'Music removed.' }); }}>Remove</button></div>}
+                    {musicUrl && <div className="mt-3 flex items-center gap-2 rounded-xl border border-border/10 bg-muted/[0.05] p-3"><Music2 className="h-4 w-4 text-violet-300" /><span className="min-w-0 flex-1 truncate text-xs text-foreground/70">{musicName || 'Uploaded music'}</span><audio src={musicUrl} controls className="h-7 max-w-[55%]" /><button type="button" className="text-xs text-red-300/80 hover:text-red-200" onClick={() => { setMusicUrl(''); setMusicName(''); setMusicThumbnail(''); writeUserPreferences({ musicUrl: '', musicName: '', musicThumbnail: '' }); void syncProfile({ music_url: null, music_name: null, music_thumbnail: null }); setProfileStatus({ type: 'saved', message: 'Music removed.' }); }}>Remove</button></div>}
                   </div>
                   <div className="flex items-center justify-end gap-3"><span className={cn('text-xs', profileStatus.type === 'error' ? 'text-red-400' : profileStatus.type === 'saved' ? 'text-emerald-400' : 'text-muted-foreground')}>{profileStatus.message}</span><Button size="sm" onClick={saveProfile} disabled={profileStatus.type === 'saving'}>{profileStatus.type === 'saving' ? 'Saving…' : 'Save profile'}</Button></div>
                   <div className="rounded-[22px] border border-border bg-card p-4 shadow-sm">

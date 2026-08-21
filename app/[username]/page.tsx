@@ -13,6 +13,7 @@ type Profile = {
   background_media_type: "image" | "video" | null;
   music_url: string | null;
   music_name: string | null;
+  music_thumbnail: string | null;
   cursor_image: string | null;
 };
 
@@ -28,8 +29,8 @@ async function getProfile(username: string): Promise<Profile | null> {
   if (!/^[A-Za-z0-9_]{1,24}$/.test(normalized)) return null;
   const supabase = getAdminClient();
   if (!supabase) return null;
-  const selectFields = "username,bio,profile_picture,background_media,background_media_type,music_url,music_name,cursor_image";
-  const legacyFields = "username,bio,profile_picture,background_media,background_media_type,music_url,music_name";
+  const selectFields = "username,bio,profile_picture,background_media,background_media_type,music_url,music_name,music_thumbnail,cursor_image";
+  const legacyFields = "username,bio,profile_picture,background_media,background_media_type,music_url,music_name,music_thumbnail";
   const primary = await supabase.from("user_profiles").select(selectFields).eq("username_lower", normalized.toLowerCase()).maybeSingle();
   if (primary.data) return primary.data as Profile;
   const fallback = await supabase.from("user_profiles").select(selectFields).eq("username", normalized).maybeSingle();
@@ -73,6 +74,7 @@ export default async function PublicProfilePage({ params }: { params: Promise<{ 
           profilePicture={profile.profile_picture}
           musicUrl={profile.music_url}
           musicName={profile.music_name}
+          musicThumbnail={profile.music_thumbnail}
         />
       </section>
     </main>

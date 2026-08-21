@@ -4,7 +4,7 @@ import { auth0 } from "@/lib/auth0";
 
 export const runtime = "nodejs";
 
-const PROFILE_FIELDS = ["username", "bio", "profile_picture", "background_media", "background_media_type", "music_url", "music_name", "cursor_image"] as const;
+const PROFILE_FIELDS = ["username", "bio", "profile_picture", "background_media", "background_media_type", "music_url", "music_name", "music_thumbnail", "cursor_image"] as const;
 type ProfileField = (typeof PROFILE_FIELDS)[number];
 
 function getAdminClient() {
@@ -24,9 +24,9 @@ export async function GET() {
   if (!userId) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   const supabase = getAdminClient();
   if (!supabase) return NextResponse.json({ error: "Profile storage is not configured." }, { status: 503 });
-  const withCursor = await supabase.from("user_profiles").select("username,bio,profile_picture,background_media,background_media_type,music_url,music_name,cursor_image").eq("user_id", userId).maybeSingle();
+  const withCursor = await supabase.from("user_profiles").select("username,bio,profile_picture,background_media,background_media_type,music_url,music_name,music_thumbnail,cursor_image").eq("user_id", userId).maybeSingle();
   if (!withCursor.error) return NextResponse.json({ profile: withCursor.data ?? null });
-  const legacy = await supabase.from("user_profiles").select("username,bio,profile_picture,background_media,background_media_type,music_url,music_name").eq("user_id", userId).maybeSingle();
+  const legacy = await supabase.from("user_profiles").select("username,bio,profile_picture,background_media,background_media_type,music_url,music_name,music_thumbnail").eq("user_id", userId).maybeSingle();
   if (legacy.error) {
     console.error("[profile] load failed", { code: legacy.error.code, message: legacy.error.message });
     return NextResponse.json({ error: "Unable to load profile." }, { status: 500 });
@@ -59,7 +59,7 @@ export async function PATCH(request: NextRequest) {
   if (!Object.keys(update).length) return NextResponse.json({ error: "No profile changes provided." }, { status: 400 });
   const cursorWasRequested = Object.prototype.hasOwnProperty.call(update, "cursor_image");
   const { cursor_image: cursorImage, ...coreUpdate } = update;
-  const profileSelect = "username,bio,profile_picture,background_media,background_media_type,music_url,music_name";
+  const profileSelect = "username,bio,profile_picture,background_media,background_media_type,music_url,music_name,music_thumbnail";
   const { data: current } = await supabase.from("user_profiles").select("user_id").eq("user_id", userId).maybeSingle();
   const result = current
     ? await supabase.from("user_profiles").update({ ...coreUpdate, updated_at: new Date().toISOString() }).eq("user_id", userId).select(profileSelect).single()

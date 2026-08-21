@@ -20,6 +20,7 @@ export interface UserPreferences {
   backgroundMediaType: 'image' | 'video' | ''
   musicUrl: string
   musicName: string
+  musicThumbnail: string
   customCursorImage: string
   customCursorWidth: number
   customCursorHeight: number
@@ -45,6 +46,7 @@ export const DEFAULT_USER_PREFERENCES: UserPreferences = {
   backgroundMediaType: '',
   musicUrl: '',
   musicName: '',
+  musicThumbnail: '',
   customCursorImage: '',
   customCursorWidth: 0,
   customCursorHeight: 0,
