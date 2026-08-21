@@ -27,9 +27,22 @@ async function extractAudio(file: File) {
   const directory = await mkdtemp(join(tmpdir(), 'uncgpt-audio-'))
   const input = join(directory, safeSegment(file.name || 'upload.bin'))
   const output = join(directory, 'profile-music.mp3')
+  const binary = ffmpegPath || process.env.FFMPEG_PATH || 'ffmpeg'
   try {
     await writeFile(input, Buffer.from(await file.arrayBuffer()))
-    await execFileAsync(ffmpegPath || process.env.FFMPEG_PATH || 'ffmpeg', ['-y', '-i', input, '-vn', '-map', '0:a:0', '-codec:a', 'libmp3lame', '-b:a', '192k', output], { timeout: 45_000, maxBuffer: 2 * 1024 * 1024 })
+    let probeStderr = ''
+    try {
+      await execFileAsync(binary, ['-hide_banner', '-i', input], { timeout: 15_000, maxBuffer: 2 * 1024 * 1024 })
+    } catch (error: any) {
+      probeStderr = String(error?.stderr || '')
+    }
+    const hasAudioStream = /Stream #[^\n]*Audio:/i.test(probeStderr)
+    if (!hasAudioStream) {
+      const mediaError = new Error('This file contains no audio track. Choose the original video with sound, or upload an audio file.')
+      ;(mediaError as Error & { code?: string }).code = 'NO_AUDIO_STREAM'
+      throw mediaError
+    }
+    await execFileAsync(binary, ['-hide_banner', '-loglevel', 'error', '-y', '-i', input, '-vn', '-map', '0:a:0', '-codec:a', 'libmp3lame', '-b:a', '192k', output], { timeout: 45_000, maxBuffer: 2 * 1024 * 1024 })
     const buffer = await readFile(output)
     return { buffer, contentType: 'audio/mpeg', extension: 'mp3', extracted: true }
   } finally {
@@ -84,9 +97,15 @@ export async function POST(request: NextRequest) {
       extension = result.extension
       uploadKind = 'audio'
       extracted = result.extracted
-    } catch {
+    } catch (error: any) {
       if (purpose && (kind === 'video' || kind === 'unknown')) {
-        return Response.json({ error: 'The video was received, but no playable audio track could be extracted. Please try another video.' }, { status: 422 })
+        const noAudio = error?.code === 'NO_AUDIO_STREAM'
+        return Response.json({
+          error: noAudio
+            ? 'This video contains no audio track. Upload the original video with sound, or choose an audio file.'
+            : 'This video has audio, but extraction failed on the server. Try MP4/MOV again or upload an MP3/M4A file.',
+          code: noAudio ? 'NO_AUDIO_STREAM' : 'AUDIO_EXTRACTION_FAILED',
+        }, { status: 422 })
       }
       // Direct audio files remain uploadable if conversion is unavailable.
     }
