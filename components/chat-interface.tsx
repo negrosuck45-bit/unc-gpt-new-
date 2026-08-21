@@ -12,6 +12,7 @@ import { triggerHaptic } from "@/lib/haptics";
 import { localVisionSupported, runLocalVision } from "@/lib/local-vision";
 import { AgentComputerCard, connectorIdentity, type ActiveConnector } from "@/components/agent-computer-card";
 import { connectorPermissionIdentity } from "@/components/connector-permission-card";
+import { accountStorageKey } from "@/lib/account-scope";
 
 interface ChatInterfaceProps {
   onSwitchToImagine?: () => void;
@@ -240,7 +241,7 @@ export function ChatInterface({ onSwitchToImagine, onOpenSidebar, isSidebarOpen 
     }
 
     try {
-      const stored = localStorage.getItem("mcp-connectors");
+      const stored = localStorage.getItem(accountStorageKey("mcp-connectors"));
       if (stored) {
         const connectors = JSON.parse(stored);
         const normalized = Array.isArray(connectors) ? connectors : [];

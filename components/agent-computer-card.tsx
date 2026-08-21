@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from "react"
 import { MonitorUp, Power, RefreshCw } from "lucide-react"
+import { accountStorageKey } from "@/lib/account-scope"
 
 const STORAGE_KEY = "uncgpt-agent-computer-auto-enabled"
 
@@ -16,10 +17,11 @@ export interface ActiveConnector {
 export function connectorIdentity(name: string): ActiveConnector {
   const normalized = name.toLowerCase();
   const match = normalized.match(/github|gmail|slack|notion|linear|google[_-]?drive|vercel|google[_-]?calendar|discord|dropbox|trello|jira/);
-  const slug = match?.[0]?.replace('_', '-') || 'composio';
+  const rawSlug = match?.[0]?.replace('_', '-') || 'composio';
+  const slug = rawSlug === 'google-drive' ? 'googledrive' : rawSlug === 'google-calendar' ? 'googlecalendar' : rawSlug;
   const labels: Record<string, string> = {
     github: 'GitHub', gmail: 'Gmail', slack: 'Slack', notion: 'Notion', linear: 'Linear',
-    'google-drive': 'Google Drive', vercel: 'Vercel', 'google-calendar': 'Google Calendar',
+    googledrive: 'Google Drive', vercel: 'Vercel', googlecalendar: 'Google Calendar',
     discord: 'Discord', dropbox: 'Dropbox', trello: 'Trello', jira: 'Jira', composio: 'Connector',
   };
   return { slug, label: labels[slug] || 'Connector', iconUrl: `https://cdn.simpleicons.org/${slug}` };
@@ -28,6 +30,7 @@ export function connectorIdentity(name: string): ActiveConnector {
 export function AgentComputerCard({ onChange, activeConnector }: { onChange?: (enabled: boolean) => void; activeConnector?: ActiveConnector | null }) {
   const [enabled, setEnabled] = useState(false)
   const [status, setStatus] = useState<Status>("checking")
+  const [connectorIconFailed, setConnectorIconFailed] = useState(false)
 
   const checkStatus = async () => {
     setStatus("checking")
@@ -40,14 +43,18 @@ export function AgentComputerCard({ onChange, activeConnector }: { onChange?: (e
   }
 
   useEffect(() => {
-    setEnabled(window.localStorage.getItem(STORAGE_KEY) === "true")
+    setEnabled(window.localStorage.getItem(accountStorageKey(STORAGE_KEY)) === "true")
     void checkStatus()
   }, [])
+
+  useEffect(() => {
+    setConnectorIconFailed(false)
+  }, [activeConnector?.slug])
 
   const toggle = () => {
     const next = !enabled
     setEnabled(next)
-    window.localStorage.setItem(STORAGE_KEY, String(next))
+    window.localStorage.setItem(accountStorageKey(STORAGE_KEY), String(next))
     onChange?.(next)
   }
 
@@ -65,7 +72,7 @@ export function AgentComputerCard({ onChange, activeConnector }: { onChange?: (e
             <span className={`h-1.5 w-1.5 shrink-0 rounded-full ${activeConnector ? "bg-sky-300" : status === "online" ? "bg-emerald-400" : status === "checking" ? "bg-amber-400" : "bg-red-400"}`} />
             {activeConnector ? (
               <span className="inline-flex min-w-0 items-center gap-1.5 rounded-full border border-white/10 bg-white/[0.05] px-1.5 py-0.5 text-foreground/70 backdrop-blur-md">
-                <img src={activeConnector.iconUrl} alt="" aria-hidden="true" className="h-3 w-3 shrink-0 opacity-60" />
+                {!connectorIconFailed ? <img src={activeConnector.iconUrl} alt="" aria-hidden="true" className="h-3 w-3 shrink-0 opacity-70" onError={() => setConnectorIconFailed(true)} /> : <span className="flex h-3 w-3 shrink-0 items-center justify-center text-[8px] font-bold text-sky-300" aria-hidden="true">{activeConnector.label.slice(0, 1)}</span>}
                 <span className="truncate">Using {activeConnector.label}</span>
               </span>
             ) : statusLabel}

@@ -4,6 +4,7 @@ import { useEffect, useState } from 'react';
 import { Button } from '@/components/ui/button';
 import { cn } from '@/lib/utils';
 import { Check, Loader2, Network, RefreshCw, Unplug } from 'lucide-react';
+import { accountStorageKey } from '@/lib/account-scope';
 
 // ─── Brand SVG Icons ──────────────────────────────────────────────────────────
 
@@ -128,8 +129,8 @@ export function OAuthConnectors() {
   const syncChatConnectorState = (nextAccounts: ComposioAccount[]) => {
     try {
       const state = nextAccounts.map((account) => ({ id: `composio:${account.toolkit}`, accountId: account.id, provider: account.toolkit, toolkit: account.toolkit, enabled: account.enabled, source: 'composio' }));
-      localStorage.setItem(COMPOSIO_STATE_KEY, JSON.stringify(Object.fromEntries(nextAccounts.map((account) => [account.toolkit, account.enabled]))));
-      localStorage.setItem('mcp-connectors', JSON.stringify(state));
+      localStorage.setItem(accountStorageKey(COMPOSIO_STATE_KEY), JSON.stringify(Object.fromEntries(nextAccounts.map((account) => [account.toolkit, account.enabled]))));
+      localStorage.setItem(accountStorageKey('mcp-connectors'), JSON.stringify(state));
       window.dispatchEvent(new Event('mcp-connectors-changed'));
     } catch {}
   };
@@ -144,7 +145,7 @@ export function OAuthConnectors() {
       setComposio(composioStatus);
       let nextAccounts: ComposioAccount[] = accountStatus.accounts || [];
       try {
-        const saved = JSON.parse(localStorage.getItem(COMPOSIO_STATE_KEY) || '{}');
+        const saved = JSON.parse(localStorage.getItem(accountStorageKey(COMPOSIO_STATE_KEY)) || '{}');
         nextAccounts = nextAccounts.map((account) => ({ ...account, enabled: saved[account.toolkit] ?? account.enabled }));
       } catch {}
       setAccounts(nextAccounts);
@@ -155,7 +156,7 @@ export function OAuthConnectors() {
     refresh();
     fetch('/api/connectors/composio/catalog').then((response) => response.json()).then((data) => setCatalog(data.items || [])).catch(() => setCatalog([]));
     try {
-      const saved = JSON.parse(localStorage.getItem(COMPOSIO_STATE_KEY) || '{}');
+      const saved = JSON.parse(localStorage.getItem(accountStorageKey(COMPOSIO_STATE_KEY)) || '{}');
       if (saved && typeof saved === 'object') setAccounts((current) => current.map((account) => ({ ...account, enabled: saved[account.toolkit] ?? account.enabled })));
     } catch {}
     const params = new URLSearchParams(window.location.search);
