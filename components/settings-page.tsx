@@ -103,14 +103,14 @@ export function SettingsPage({ onClose }: SettingsPageProps) {
 
       <div className="flex h-[calc(100dvh-72px)] sm:h-[calc(100%-65px)] min-h-0 flex-col sm:flex-row">
         {/* Sidebar */}
-        <div className="w-full sm:w-[208px] shrink-0 border-b sm:border-b-0 sm:border-r border-border bg-muted/30 p-2.5 sm:p-3 overflow-x-auto">
-            <nav className="flex gap-1 min-w-max sm:min-w-0">
+        <div className="w-full sm:w-[208px] shrink-0 border-b sm:border-b-0 sm:border-r border-border bg-muted/30 p-2.5 sm:p-3 overflow-visible">
+            <nav className="grid grid-cols-2 gap-1 sm:flex sm:flex-col">
             {tabs.map(tab => (
               <button
                 key={tab.id}
                 onClick={() => setActiveTab(tab.id)}
                 className={cn(
-                  'flex items-center gap-2 px-4 py-3 rounded-[18px] text-[14px] lg:text-[15px] transition-all whitespace-nowrap',
+                  'flex min-w-0 items-center justify-center gap-2 rounded-[16px] px-2.5 py-2.5 text-[13px] transition-all sm:justify-start sm:px-3 sm:py-3 sm:text-[14px] lg:text-[15px]',
                   activeTab === tab.id
                     ? 'bg-muted/[0.18] text-foreground shadow-[inset_0_1px_0_rgba(255,255,255,0.10)]'
                     : 'text-muted-foreground hover:text-foreground hover:bg-accent/50'
