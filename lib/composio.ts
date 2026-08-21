@@ -15,7 +15,9 @@ export interface ComposioConnector {
  * the chat route to discover and execute tools.
  */
 export function getComposioUserId(authenticatedUserId: string) {
-  return process.env.COMPOSIO_USER_ID || 'uncgpt_first_call';
+  // Never use a deployment-wide fallback: it would mix connector accounts
+  // between Auth0 users. Composio must receive a stable per-user identifier.
+  return authenticatedUserId;
 }
 
 export function getComposioUserIds(authenticatedUserId: string) {
