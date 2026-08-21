@@ -89,6 +89,16 @@ export function SettingsPage({ onClose }: SettingsPageProps) {
     setBackgroundMediaType(p.backgroundMediaType || '');
     setMusicUrl(p.musicUrl || '');
     setMusicName(p.musicName || '');
+    if (p.profilePicture || p.bio || p.backgroundMedia || p.musicUrl) {
+      void syncProfile({
+        profile_picture: p.profilePicture || null,
+        bio: p.bio || null,
+        background_media: p.backgroundMedia || null,
+        background_media_type: p.backgroundMediaType || null,
+        music_url: p.musicUrl || null,
+        music_name: p.musicName || null,
+      });
+    }
   }, []);
 
   const handleSave = () => {
