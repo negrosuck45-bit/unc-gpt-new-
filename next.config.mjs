@@ -13,6 +13,9 @@ const nextConfig = {
     ],
   },
   productionBrowserSourceMaps: false,
+  outputFileTracingIncludes: {
+    '/*': ['./node_modules/ffmpeg-static/ffmpeg'],
+  },
   reactStrictMode: true,
   headers: async () => {
     return [
