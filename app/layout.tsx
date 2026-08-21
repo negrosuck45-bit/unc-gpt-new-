@@ -3,6 +3,7 @@ import { Analytics } from "@vercel/analytics/next"
 import { auth0 } from "@/lib/auth0"
 import { Toaster } from "sonner"
 import { ThemeProvider } from "@/components/theme-provider"
+import { CustomCursor } from "@/components/custom-cursor"
 import "./globals.css"
 
 // Google Fonts disabled for build compatibility
@@ -42,6 +43,7 @@ export default async function RootLayout({
         <script dangerouslySetInnerHTML={{ __html: `window.__UNCGPT_ACCOUNT_SCOPE__ = ${JSON.stringify(accountScope)};` }} />
         <ThemeProvider attribute="class" defaultTheme="dark" enableSystem disableTransitionOnChange>
           {children}
+          <CustomCursor />
           <Toaster position="bottom-center" theme="system" />
           {process.env.NODE_ENV === "production" && <Analytics />}
         </ThemeProvider>

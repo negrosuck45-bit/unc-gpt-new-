@@ -13,7 +13,8 @@ import {
 import {
   Settings, Smartphone, Trash2, Sun, Moon, X,
   Palette, Shield, Zap, Key, Download, RefreshCw, Sparkles,
-  Eye, EyeOff, Puzzle, PlugZap, Volume2, UserCircle, LogOut, Database, ChevronRight, Upload, Music2, ImagePlus,
+  Eye, EyeOff, Puzzle, PlugZap,   Volume2, UserCircle, LogOut, Database, ChevronRight, Upload, Music2, ImagePlus, MousePointer2,
+
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { cn } from '@/lib/utils';
@@ -55,6 +56,10 @@ export function SettingsPage({ onClose }: SettingsPageProps) {
   const [backgroundMediaType, setBackgroundMediaType] = useState<'image' | 'video' | ''>('');
   const [musicUrl, setMusicUrl] = useState('');
   const [musicName, setMusicName] = useState('');
+  const [customCursorImage, setCustomCursorImage] = useState('');
+  const [customCursorWidth, setCustomCursorWidth] = useState(0);
+  const [customCursorHeight, setCustomCursorHeight] = useState(0);
+  const [cursorStatus, setCursorStatus] = useState('');
   const [language, setLanguage] = useState('system');
 
   const currentChat = getCurrentChat();
@@ -81,6 +86,30 @@ export function SettingsPage({ onClose }: SettingsPageProps) {
     const payload = await response.json().catch(() => null);
     if (!response.ok || !payload?.url) throw new Error(payload?.error || 'Profile upload failed.');
     return payload as { url: string; kind: 'image' | 'video' | 'audio' };
+  };
+
+  const handleCursorUpload = async (file: File) => {
+    setCursorStatus('Measuring image…');
+    const dimensions = await new Promise<{ width: number; height: number }>((resolve, reject) => {
+      const image = new Image();
+      image.onload = () => resolve({ width: image.naturalWidth, height: image.naturalHeight });
+      image.onerror = () => reject(new Error('This image could not be read.'));
+      image.src = URL.createObjectURL(file);
+    });
+    if (dimensions.width > 64 || dimensions.height > 64) {
+      setCursorStatus(`Too large: ${dimensions.width} × ${dimensions.height}px. Use 64 × 64px or smaller.`);
+      return;
+    }
+    try {
+      const uploaded = await uploadProfileMedia(file);
+      setCustomCursorImage(uploaded.url);
+      setCustomCursorWidth(dimensions.width);
+      setCustomCursorHeight(dimensions.height);
+      writeUserPreferences({ customCursorImage: uploaded.url, customCursorWidth: dimensions.width, customCursorHeight: dimensions.height });
+      setCursorStatus(`Saved • ${dimensions.width} × ${dimensions.height}px`);
+    } catch (error) {
+      setCursorStatus(error instanceof Error ? error.message : 'Cursor upload failed.');
+    }
   };
 
   const dataUrlToFile = (value: string, name: string) => {
@@ -133,6 +162,9 @@ export function SettingsPage({ onClose }: SettingsPageProps) {
     setBackgroundMediaType(p.backgroundMediaType || '');
     setMusicUrl(p.musicUrl || '');
     setMusicName(p.musicName || '');
+    setCustomCursorImage(p.customCursorImage || '');
+    setCustomCursorWidth(p.customCursorWidth || 0);
+    setCustomCursorHeight(p.customCursorHeight || 0);
     void (async () => {
       const response = await fetch('/api/profile', { cache: 'no-store' }).catch(() => null);
       const payload = response?.ok ? await response.json().catch(() => null) : null;
@@ -318,6 +350,15 @@ export function SettingsPage({ onClose }: SettingsPageProps) {
                     {backgroundMedia && <div className="mt-3 overflow-hidden rounded-xl border border-border/10">{backgroundMediaType === 'video' ? <video src={backgroundMedia} controls className="h-28 w-full object-cover" /> : <img src={backgroundMedia} alt="Profile background" className="h-28 w-full object-cover" />}</div>}
                     {musicUrl && <div className="mt-3 flex items-center gap-2 rounded-xl border border-border/10 bg-muted/[0.05] p-3"><Music2 className="h-4 w-4 text-emerald-300" /><span className="min-w-0 flex-1 truncate text-xs text-foreground/70">{musicName || 'Uploaded music'}</span><audio src={musicUrl} controls className="h-7 max-w-[45%]" /></div>}
                     <div className="mt-4 flex items-center justify-end gap-3"><span className={cn('text-xs', profileStatus.type === 'error' ? 'text-red-400' : profileStatus.type === 'saved' ? 'text-emerald-400' : 'text-muted-foreground')}>{profileStatus.message}</span><Button size="sm" onClick={saveProfile} disabled={profileStatus.type === 'saving'}>{profileStatus.type === 'saving' ? 'Saving…' : 'Save profile'}</Button></div>
+                  </div>
+                  <div className="rounded-[22px] border border-border bg-card p-4 shadow-sm">
+                    <div className="mb-3 flex items-center justify-between"><div><p className="text-sm font-medium">Custom cursor</p><p className="mt-1 text-xs text-foreground/50">Choose a small PNG, GIF, or SVG cursor image for this account.</p></div><MousePointer2 className="h-4 w-4 text-foreground/40" /></div>
+                    <label className="group flex min-h-24 cursor-pointer items-center gap-4 rounded-2xl border border-dashed border-emerald-400/25 bg-emerald-400/[0.035] px-4 transition hover:border-emerald-400/50 hover:bg-emerald-400/[0.07]">
+                      <div className="flex h-14 w-14 shrink-0 items-center justify-center rounded-xl border border-border/15 bg-black/10 p-2">{customCursorImage ? <img src={customCursorImage} alt="Custom cursor preview" className="max-h-10 max-w-10 object-contain" /> : <MousePointer2 className="h-6 w-6 text-foreground/45" />}</div>
+                      <div className="min-w-0 flex-1"><p className="text-sm text-foreground/75">Upload cursor image</p><p className="mt-1 text-xs text-foreground/40">Recommended: 32 × 32px • maximum: 64 × 64px</p>{customCursorWidth > 0 && <p className="mt-1 text-xs text-emerald-300/80">Current size: {customCursorWidth} × {customCursorHeight}px ({customCursorWidth * customCursorHeight} pixels)</p>}</div>
+                      <input type="file" accept="image/png,image/gif,image/svg+xml,image/webp" className="hidden" onChange={(event) => { const file = event.target.files?.[0]; if (file) void handleCursorUpload(file); event.currentTarget.value = ''; }} />
+                    </label>
+                    <div className="mt-3 flex items-center justify-between gap-3"><span className={cn('text-xs', cursorStatus.startsWith('Too') || cursorStatus.includes('failed') ? 'text-red-400' : 'text-foreground/45')}>{cursorStatus || 'The cursor is account-scoped and works on desktop pointers.'}</span>{customCursorImage && <Button variant="outline" size="sm" className="rounded-full border-border/15" onClick={() => { setCustomCursorImage(''); setCustomCursorWidth(0); setCustomCursorHeight(0); setCursorStatus('Cursor removed.'); writeUserPreferences({ customCursorImage: '', customCursorWidth: 0, customCursorHeight: 0 }); }}>Remove</Button>}</div>
                   </div>
                   <div className="flex items-center justify-between border-t border-border/[0.10] pt-4"><span className="text-sm">Account session</span><a href="/auth/logout" className="rounded-full border border-red-300/50 px-4 py-2 text-sm text-red-200 transition hover:bg-red-400/10">Log out</a></div>
                 </div>

@@ -339,3 +339,12 @@ textarea {
     scroll-behavior: auto !important;
   }
 }
+
+/* Account-scoped custom cursor selected in Settings > Profile. */
+@media (pointer: fine) {
+  html.has-custom-cursor,
+  html.has-custom-cursor body,
+  html.has-custom-cursor * {
+    cursor: var(--uncgpt-custom-cursor) 16 16, auto;
+  }
+}
