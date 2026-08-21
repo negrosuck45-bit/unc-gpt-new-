@@ -47,7 +47,13 @@ export function claimLegacyStorage(baseKey: string, scopedKey: string) {
 export function scopedStorage(baseKey: string): Storage {
   return {
     get length() { return typeof window === "undefined" ? 0 : window.localStorage.length; },
-    clear() { if (typeof window !== "undefined") window.localStorage.clear(); },
+    clear() {
+      if (typeof window === "undefined") return;
+      const prefix = `${baseKey}:`;
+      Object.keys(window.localStorage)
+        .filter((key) => key === accountStorageKey(baseKey) || key.startsWith(prefix))
+        .forEach((key) => window.localStorage.removeItem(key));
+    },
     getItem(key: string) {
       if (typeof window === "undefined") return null;
       const scopedKey = accountStorageKey(key || baseKey);
