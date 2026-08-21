@@ -94,7 +94,7 @@ export function SettingsPage({ onClose }: SettingsPageProps) {
   ];
 
   return (
-    <div className="w-full max-w-none sm:max-w-5xl mx-auto h-[100dvh] sm:h-[min(820px,calc(100dvh-48px))] min-h-0 bg-background text-foreground supports-[backdrop-filter]:backdrop-blur-[30px] rounded-t-[30px] rounded-b-none sm:rounded-[28px] border border-border shadow-[0_24px_90px_rgba(0,0,0,0.28)] overflow-hidden pb-[env(safe-area-inset-bottom)] transition-colors duration-200">
+    <div className="w-full max-w-none sm:max-w-5xl mx-auto h-[100dvh] sm:h-[min(720px,calc(100dvh-96px))] min-h-0 bg-background text-foreground supports-[backdrop-filter]:backdrop-blur-[30px] rounded-t-[30px] rounded-b-none sm:rounded-[28px] border border-border shadow-[0_24px_90px_rgba(0,0,0,0.28)] overflow-hidden pb-[env(safe-area-inset-bottom)] transition-colors duration-200">
       {/* Header */}
       <div className="flex items-center justify-between px-5 sm:px-6 py-4 bg-transparent">
         <h1 className="text-[19px] font-medium tracking-tight">Settings</h1>
