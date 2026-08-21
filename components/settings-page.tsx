@@ -199,23 +199,18 @@ export function SettingsPage({ onClose }: SettingsPageProps) {
                 <div className="space-y-5">
                   <SectionTitle title="Profile" description="Your signed-in identity" />
                   <div className="rounded-[22px] border border-border bg-card p-4 shadow-sm">
-                    <div className="flex items-end gap-3">
-                      <div className="min-w-0 flex-1">
-                        <label htmlFor="profile-username" className="mb-2 block text-xs font-medium uppercase tracking-[0.14em] text-foreground/45">Username</label>
-                        <div className="flex items-center rounded-xl border border-border/15 bg-muted/[0.06] px-3 focus-within:border-emerald-400/45 focus-within:ring-2 focus-within:ring-emerald-400/10">
-                          <span className="text-sm text-foreground/45">@</span>
-                          <input id="profile-username" value={username} onChange={(event) => { setUsername(event.target.value.replace(/^@+/, '').replace(/[^a-zA-Z0-9_]/g, '').slice(0, 24)); setUsernameStatus({ type: 'idle' }) }} placeholder="yourname" className="h-10 min-w-0 flex-1 bg-transparent px-1.5 text-sm text-foreground outline-none placeholder:text-foreground/35" autoComplete="username" />
-                        </div>
-                        <p className={cn('mt-2 text-xs', usernameStatus.type === 'error' ? 'text-red-400' : usernameStatus.type === 'saved' ? 'text-emerald-400' : 'text-muted-foreground')}>{usernameStatus.message || '3–24 letters, numbers, or underscores.'}</p>
-                      </div>
-                      <Button size="sm" disabled={usernameStatus.type === 'saving' || username.length < 3} onClick={async () => { setUsernameStatus({ type: 'saving', message: 'Saving…' }); try { const response = await fetch('/api/profile/username', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ username }) }); const payload = await response.json(); if (!response.ok) throw new Error(payload.error || 'Unable to save username.'); setUsername(payload.username); setUsernameStatus({ type: 'saved', message: `Saved as @${payload.username}` }); } catch (error) { setUsernameStatus({ type: 'error', message: error instanceof Error ? error.message : 'Unable to save username.' }); } }}>Save</Button>
-                    </div>
-                  </div>
-                  <div className="rounded-[22px] border border-border bg-card p-4 shadow-sm">
                     <div className="flex items-center gap-3">
                       {profilePicture ? <img src={profilePicture} alt="Your profile" className="h-12 w-12 rounded-full object-cover" /> : <div className="flex h-12 w-12 items-center justify-center rounded-full bg-emerald-500/80 text-xl font-medium">{(profileName || authUser?.name || authUser?.email || 'U').slice(0, 1).toUpperCase()}</div>}
                       <div className="min-w-0 flex-1"><p className="mb-2 text-xs font-medium uppercase tracking-[0.14em] text-foreground/45">Your profile</p><input value={profileName} onChange={(event) => setProfileName(event.target.value)} onBlur={() => writeUserPreferences({ profileName: profileName.trim() })} placeholder={authUser?.name || 'Display name'} className="w-full bg-transparent text-base font-medium text-foreground outline-none placeholder:text-foreground/45" /></div>
                       <label className="cursor-pointer rounded-full border border-border/15 bg-muted/[0.06] px-3 py-1.5 text-xs text-foreground/70 transition hover:bg-muted/[0.12]">Change photo<input type="file" accept="image/*" className="hidden" onChange={(event) => { const file = event.target.files?.[0]; if (!file) return; const reader = new FileReader(); reader.onload = () => { const value = String(reader.result || ''); setProfilePicture(value); writeUserPreferences({ profilePicture: value }) }; reader.readAsDataURL(file) }} /></label>
+                    </div>
+                    <div className="mt-4 border-t border-border/10 pt-4">
+                      <label htmlFor="profile-username" className="mb-2 block text-xs font-medium uppercase tracking-[0.14em] text-foreground/45">Username</label>
+                      <div className="flex items-center gap-2">
+                        <div className="flex min-w-0 flex-1 items-center rounded-xl border border-border/15 bg-muted/[0.06] px-3 focus-within:border-emerald-400/45 focus-within:ring-2 focus-within:ring-emerald-400/10"><span className="text-sm text-foreground/45">@</span><input id="profile-username" value={username} onChange={(event) => { setUsername(event.target.value.replace(/^@+/, '').replace(/[^a-zA-Z0-9_]/g, '').slice(0, 24)); setUsernameStatus({ type: 'idle' }) }} placeholder="yourname" className="h-10 min-w-0 flex-1 bg-transparent px-1.5 text-sm text-foreground outline-none placeholder:text-foreground/35" autoComplete="username" /></div>
+                        <Button size="sm" disabled={usernameStatus.type === 'saving' || username.length < 3} onClick={async () => { setUsernameStatus({ type: 'saving', message: 'Saving…' }); try { const response = await fetch('/api/profile/username', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ username }) }); const payload = await response.json(); if (!response.ok) throw new Error(payload.error || 'Unable to save username.'); setUsername(payload.username); setUsernameStatus({ type: 'saved', message: `Saved as @${payload.username}` }); } catch (error) { setUsernameStatus({ type: 'error', message: error instanceof Error ? error.message : 'Unable to save username.' }); } }}>Save</Button>
+                      </div>
+                      <p className={cn('mt-2 text-xs', usernameStatus.type === 'error' ? 'text-red-400' : usernameStatus.type === 'saved' ? 'text-emerald-400' : 'text-muted-foreground')}>{usernameStatus.message || '3–24 letters, numbers, or underscores.'}</p>
                     </div>
                   </div>
                   <div className="rounded-[22px] border border-border bg-card p-4 shadow-sm">
