@@ -1,0 +1,16 @@
+'use client'
+
+import { FormEvent, useEffect, useState } from 'react'
+import Link from 'next/link'
+import { ArrowLeft, Send } from 'lucide-react'
+
+type Message = { id: string; from: 'them' | 'me'; text: string; time: string }
+
+export function MessageThreadPage({ username }: { username: string }) {
+  const [messages, setMessages] = useState<Message[]>([{ id: 'welcome', from: 'them', text: 'Welcome to uncgpt. You can message people from their profiles.', time: 'now' }])
+  const [draft, setDraft] = useState('')
+  const storageKey = `uncgpt-messages:${username.toLowerCase()}`
+  useEffect(() => { try { const saved = localStorage.getItem(storageKey); if (saved) setMessages(JSON.parse(saved)) } catch {} }, [storageKey])
+  const send = (event: FormEvent) => { event.preventDefault(); const text = draft.trim(); if (!text) return; const next = [...messages, { id: `${Date.now()}`, from: 'me' as const, text, time: 'now' }]; setMessages(next); setDraft(''); try { localStorage.setItem(storageKey, JSON.stringify(next)) } catch {} }
+  return <main className="min-h-screen bg-[#050505] px-5 py-8 text-white sm:px-10"><div className="mx-auto flex min-h-[calc(100vh-64px)] max-w-2xl flex-col"><div className="mb-6 flex items-center gap-4"><Link href="/messages" aria-label="Back to messages" className="rounded-full p-2 text-white/55 transition hover:bg-white/10 hover:text-white"><ArrowLeft className="h-5 w-5" /></Link><div><p className="text-xs uppercase tracking-[0.22em] text-white/35">Conversation</p><h1 className="mt-1 text-2xl font-semibold">{username}</h1></div></div><section className="flex flex-1 flex-col justify-end gap-3 rounded-[26px] border border-white/10 bg-white/[0.035] p-5 shadow-2xl shadow-black/30 sm:p-7">{messages.map((message) => <div key={message.id} className={`max-w-[85%] rounded-[20px] px-4 py-3 text-sm leading-6 ${message.from === 'me' ? 'self-end bg-indigo-500 text-white' : 'self-start bg-white/[0.09] text-white/85'}`}><p>{message.text}</p><span className="mt-1 block text-[11px] opacity-55">{message.time}</span></div>)}<form onSubmit={send} className="mt-4 flex items-center gap-2 border-t border-white/10 pt-4"><input value={draft} onChange={(event) => setDraft(event.target.value)} placeholder="Write a message…" className="min-w-0 flex-1 rounded-full border border-white/10 bg-white/[0.06] px-4 py-3 text-sm text-white outline-none placeholder:text-white/35 focus:border-indigo-400/60" /><button type="submit" aria-label="Send message" className="flex h-11 w-11 shrink-0 items-center justify-center rounded-full bg-indigo-500 transition hover:bg-indigo-400"><Send className="h-4 w-4" /></button></form></section></div></main>
+}

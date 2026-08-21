@@ -25,7 +25,7 @@ import {
 import { SettingsDialog } from "./settings-dialog"
 import { ProjectsDialog } from "./projects-dialog"
 import { ImageEditDialog } from "./image-edit-dialog"
-import { NotificationsPanel } from "./notifications-panel"
+
 
 import Image from "next/image"
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip"
@@ -43,7 +43,6 @@ export function ChatHeader({ project, chat, activeModelInfo, onOpenSidebar, isSi
   const [settingsOpen, setSettingsOpen] = useState(false)
   const [projectsOpen, setProjectsOpen] = useState(false)
   const [imageEditOpen, setImageEditOpen] = useState(false)
-  const [notificationsOpen, setNotificationsOpen] = useState(false)
 
   return (
     <>
@@ -69,7 +68,7 @@ export function ChatHeader({ project, chat, activeModelInfo, onOpenSidebar, isSi
         )}
 
         {/* Notifications */}
-        <Button variant="ghost" size="icon" onClick={() => setNotificationsOpen(true)} aria-label="Open notifications" title="Notifications" className="relative h-9 w-9 rounded-full text-muted-foreground transition hover:bg-accent hover:text-foreground">
+        <Button variant="ghost" size="icon" onClick={() => { window.location.href = '/notifications' }} aria-label="Open notifications" title="Notifications" className="relative h-9 w-9 rounded-full text-muted-foreground transition hover:bg-accent hover:text-foreground">
           <Bell className="h-[18px] w-[18px]" />
         </Button>
 
@@ -82,7 +81,6 @@ export function ChatHeader({ project, chat, activeModelInfo, onOpenSidebar, isSi
       <SettingsDialog open={settingsOpen} onOpenChange={setSettingsOpen} />
       <ProjectsDialog open={projectsOpen} onOpenChange={setProjectsOpen} />
       <ImageEditDialog open={imageEditOpen} onOpenChange={setImageEditOpen} />
-      <NotificationsPanel open={notificationsOpen} onClose={() => setNotificationsOpen(false)} />
     </>
   )
 }
