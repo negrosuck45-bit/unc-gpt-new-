@@ -1105,40 +1105,8 @@ async function executeMcpTool(
 // ============================================================
 // TOOL LOOP WITH BUILTIN TOOLS
 // ============================================================
-async function runDeterministicConnectedAction(
-  messages: any[],
-  tools: any[],
-  onStep: (step: { iteration: number; action: "tool_use"; tool: string; input: any; result: string }) => void,
-): Promise<any[]> {
-  const latestUser = [...messages].reverse().find((message) => message.role === "user");
-  const requestText = typeof latestUser?.content === "string"
-    ? latestUser.content.toLowerCase()
-    : JSON.stringify(latestUser?.content || "").toLowerCase();
-
-  const wantsRepositories = /\b(list|show|fetch|get)\b[\s\w]*(github|my)[\s\w]*(repositories|repos)\b|\b(repositories|repos)\b[\s\w]*(github|my)\b/.test(requestText);
-  if (!wantsRepositories) return messages;
-
-  const repoTool = tools.find((tool: any) =>
-    tool?.function?.name === "github_list_repos" ||
-    tool?.function?.name === "composio_github_list_repositories"
-  );
-  if (!repoTool?._exec) return messages;
-
-  try {
-    const result = await repoTool._exec({});
-    onStep({ iteration: 0, action: "tool_use", tool: repoTool.function.name, input: {}, result: String(result) });
-    return [
-      ...messages,
-      {
-        role: "assistant",
-        content: `Connected GitHub tool result for the user's request:\n${String(result).slice(0, 12000)}`,
-      },
-    ];
-  } catch (error: any) {
-    onStep({ iteration: 0, action: "tool_use", tool: repoTool.function.name, input: {}, result: `Tool error: ${error?.message || "GitHub action failed"}` });
-  }
-  return messages;
-}
+// Connector actions are executed only by the verified tool loop below. No synthetic
+// assistant messages are injected into model context.
 
 async function runToolLoop(
   messages: any[],
@@ -1812,24 +1780,6 @@ export async function POST(req: NextRequest) {
                 },
               }));
 
-            // Keep a stable, model-friendly alias for the common GitHub read action.
-            if (!disabledToolkits.has('github')) composioTools.push({
-              type: "function",
-              function: {
-                name: "composio_github_list_repositories",
-                description: "List the authenticated user's GitHub repositories using the connected GitHub account.",
-                parameters: { type: "object", properties: {} },
-              },
-              _exec: async () => {
-                let result: any;
-                try {
-                  result = await composioSession.execute("GITHUB_LIST_REPOS", {});
-                } catch {
-                  result = await composioSession.execute("COMPOSIO_GET_GITHUB_REPOSITORIES", {});
-                }
-                return formatGithubRepositories(result);
-              },
-            });
           }
         }
       } catch (error) {
@@ -1848,11 +1798,6 @@ export async function POST(req: NextRequest) {
       availableTools = combinedTools;
 
       if (combinedTools.length > 0 && !isGithubRepositoryRequest) {
-        messagesWithSystem = await runDeterministicConnectedAction(
-          messagesWithSystem,
-          combinedTools,
-          (s) => toolSteps.push(s),
-        );
         messagesWithSystem = await runToolLoop(
           messagesWithSystem,
           combinedTools,
