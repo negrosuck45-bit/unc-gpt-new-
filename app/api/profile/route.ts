@@ -57,15 +57,15 @@ export async function PATCH(request: NextRequest) {
     return NextResponse.json({ error: "Invalid background media type." }, { status: 400 });
   }
   if (!Object.keys(update).length) return NextResponse.json({ error: "No profile changes provided." }, { status: 400 });
+  const cursorWasRequested = Object.prototype.hasOwnProperty.call(update, "cursor_image");
+  const { cursor_image: cursorImage, ...coreUpdate } = update;
+  const profileSelect = "username,bio,profile_picture,background_media,background_media_type,music_url,music_name";
   const { data: current } = await supabase.from("user_profiles").select("user_id").eq("user_id", userId).maybeSingle();
-  let result = current
-    ? await supabase.from("user_profiles").update({ ...update, updated_at: new Date().toISOString() }).eq("user_id", userId).select("username,bio,profile_picture,background_media,background_media_type,music_url,music_name,cursor_image").single()
-    : await supabase.from("user_profiles").insert({ user_id: userId, username: `user_${userId.slice(-8)}`, ...update }).select("username,bio,profile_picture,background_media,background_media_type,music_url,music_name,cursor_image").single();
-  if (result.error && "cursor_image" in update) {
-    const { cursor_image: _ignoredCursor, ...legacyUpdate } = update;
-    result = current
-      ? await supabase.from("user_profiles").update({ ...legacyUpdate, updated_at: new Date().toISOString() }).eq("user_id", userId).select("username,bio,profile_picture,background_media,background_media_type,music_url,music_name").single()
-      : await supabase.from("user_profiles").insert({ user_id: userId, username: `user_${userId.slice(-8)}`, ...legacyUpdate }).select("username,bio,profile_picture,background_media,background_media_type,music_url,music_name").single();
+  const result = current
+    ? await supabase.from("user_profiles").update({ ...coreUpdate, updated_at: new Date().toISOString() }).eq("user_id", userId).select(profileSelect).single()
+    : await supabase.from("user_profiles").insert({ user_id: userId, username: `user_${userId.slice(-8)}`, ...coreUpdate }).select(profileSelect).single();
+  if (!result.error && cursorWasRequested && cursorImage !== undefined) {
+    await supabase.from("user_profiles").update({ cursor_image: cursorImage, updated_at: new Date().toISOString() }).eq("user_id", userId);
   }
   if (result.error) {
     if (result.error.code === "23505" && "username" in update) return NextResponse.json({ error: "Username already claimed. Choose another one." }, { status: 409 });
