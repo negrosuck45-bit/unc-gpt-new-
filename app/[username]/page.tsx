@@ -60,7 +60,7 @@ export default async function PublicProfilePage({ params }: { params: Promise<{ 
         <video className="pointer-events-none fixed inset-0 h-full w-full object-cover opacity-35" src={profile.background_media} autoPlay muted loop playsInline />
       )}
       <div className="pointer-events-none fixed inset-0 bg-black/55" />
-      <section className="relative mx-auto w-full max-w-xl">
+      <section className="relative mx-auto w-full max-w-[650px]">
         <PublicProfileCard
           username={profile.username}
           bio={profile.bio}
