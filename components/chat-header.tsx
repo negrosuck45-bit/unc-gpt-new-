@@ -20,10 +20,12 @@ import {
   Lock,
   PanelLeftClose,
   Menu,
+  Bell,
 } from "lucide-react"
 import { SettingsDialog } from "./settings-dialog"
 import { ProjectsDialog } from "./projects-dialog"
 import { ImageEditDialog } from "./image-edit-dialog"
+import { NotificationsPanel } from "./notifications-panel"
 
 import Image from "next/image"
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip"
@@ -41,6 +43,7 @@ export function ChatHeader({ project, chat, activeModelInfo, onOpenSidebar, isSi
   const [settingsOpen, setSettingsOpen] = useState(false)
   const [projectsOpen, setProjectsOpen] = useState(false)
   const [imageEditOpen, setImageEditOpen] = useState(false)
+  const [notificationsOpen, setNotificationsOpen] = useState(false)
 
   return (
     <>
@@ -65,23 +68,10 @@ export function ChatHeader({ project, chat, activeModelInfo, onOpenSidebar, isSi
           </Button>
         )}
 
-        {/* Project selector */}
-        <DropdownMenu>
-          <DropdownMenuTrigger asChild>
-            <Button variant="ghost" size="sm" className="gap-2 rounded-full px-3.5 font-medium text-muted-foreground transition hover:bg-accent hover:text-foreground">
-              <FolderOpen className="h-4 w-4 opacity-60" />
-              <span className="hidden max-w-[220px] truncate sm:inline">
-                {project?.name ?? "No project"}
-              </span>
-              <ChevronDown className="h-3.5 w-3.5 opacity-60" />
-            </Button>
-          </DropdownMenuTrigger>
-          <DropdownMenuContent align="start">
-            <DropdownMenuItem onClick={() => { }}>
-              Manage Projects
-            </DropdownMenuItem>
-          </DropdownMenuContent>
-        </DropdownMenu>
+        {/* Notifications */}
+        <Button variant="ghost" size="icon" onClick={() => setNotificationsOpen(true)} aria-label="Open notifications" title="Notifications" className="relative h-9 w-9 rounded-full text-muted-foreground transition hover:bg-accent hover:text-foreground">
+          <Bell className="h-[18px] w-[18px]" />
+        </Button>
 
         {/* Spacer */}
         <div className="flex-1" />
@@ -92,6 +82,7 @@ export function ChatHeader({ project, chat, activeModelInfo, onOpenSidebar, isSi
       <SettingsDialog open={settingsOpen} onOpenChange={setSettingsOpen} />
       <ProjectsDialog open={projectsOpen} onOpenChange={setProjectsOpen} />
       <ImageEditDialog open={imageEditOpen} onOpenChange={setImageEditOpen} />
+      <NotificationsPanel open={notificationsOpen} onClose={() => setNotificationsOpen(false)} />
     </>
   )
 }
