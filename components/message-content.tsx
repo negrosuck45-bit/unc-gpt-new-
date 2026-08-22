@@ -215,13 +215,18 @@ export function MessageContent({ content }: MessageContentProps) {
     <div className="space-y-2">
       {images.length > 0 && (
         <div className="flex flex-wrap gap-2 pb-2" style={{ willChange: 'transform' }}>
-          {images.map((part, index) => (
-            <div key={`img-${index}`} className="flex-shrink-0">
-              <div className="relative group w-24 h-24 rounded-lg overflow-hidden border border-border shadow-sm hover:shadow-md transition-shadow">
+          {images.map((part, index) => {
+            const isBanner = /banner|cover/i.test(part.alt || '');
+            return (
+            <div key={`img-${index}`} className={isBanner ? 'w-full min-w-0' : 'flex-shrink-0'}>
+              <div className={cn(
+                'relative group overflow-hidden rounded-lg border border-border shadow-sm transition-shadow hover:shadow-md',
+                isBanner ? 'w-full aspect-[3/1] max-h-56' : 'h-24 w-24'
+              )}>
                 <img
                   src={part.content}
                   alt={part.alt || 'Image'}
-                  className="w-full h-full object-cover"
+                  className="h-full w-full object-cover"
                   loading="lazy"
                 />
                 <div className="absolute inset-0 opacity-0 group-hover:opacity-100 transition-opacity bg-black/20 flex items-center justify-center">
@@ -237,7 +242,8 @@ export function MessageContent({ content }: MessageContentProps) {
                 </div>
               </div>
             </div>
-          ))}
+            );
+          })}
         </div>
       )}
 
@@ -266,7 +272,7 @@ export function MessageContent({ content }: MessageContentProps) {
         return (
           <p
             key={`text-${index}`}
-            className="text-sm leading-relaxed whitespace-pre-wrap"
+            className="min-w-0 max-w-full overflow-wrap-anywhere text-sm leading-relaxed whitespace-pre-wrap break-words"
             dangerouslySetInnerHTML={{ __html: formatText(part.content) }}
           />
         );

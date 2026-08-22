@@ -643,9 +643,9 @@ export function ChatMessages({ messages, isStreaming, isThinking, onRegenerate, 
           />
         )}
       </AnimatePresence>
-      <div className="flex-1 overflow-y-auto scroll-smooth">
+      <div className="min-w-0 flex-1 overflow-x-hidden overflow-y-auto scroll-smooth">
         <div className={cn(
-          "max-w-4xl mx-auto px-4 sm:px-6 md:px-8 py-5",
+          "mx-auto min-w-0 max-w-4xl overflow-x-hidden px-4 py-5 sm:px-6 md:px-8",
           preferences.messageDensity === 'compact' ? 'space-y-3' : preferences.messageDensity === 'comfortable' ? 'space-y-8' : 'space-y-6'
         )} style={{ fontSize: `${preferences.fontSize}px` }}>
           {processedMessages.map((message, index) => {
@@ -677,7 +677,7 @@ export function ChatMessages({ messages, isStreaming, isThinking, onRegenerate, 
 
                   {/* Message Content - No bubble styling */}
                   <div className={cn(
-                    'flex flex-col max-w-[92%] sm:max-w-[85%] md:max-w-[78%] lg:max-w-[72%]',
+                    'min-w-0 max-w-[92%] overflow-x-hidden sm:max-w-[85%] md:max-w-[78%] lg:max-w-[72%]',
                     'leading-relaxed',
                     isAssistant ? 'items-start' : 'items-end'
                   )}>

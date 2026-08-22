@@ -1403,7 +1403,7 @@ async function executeVerifiedDiscordRead(
           ? hash
           : `https://cdn.discordapp.com/${requestedIntent === "avatar" ? "avatars" : "banners"}/${profileId}/${hash}.${hash.startsWith("a_") ? "gif" : "png"}?size=1024`;
         const label = requestedIntent === "avatar" ? "avatar" : "banner";
-        return `![Discord ${label}](${imageUrl})\n\n${label[0].toUpperCase() + label.slice(1)} URL: ${imageUrl}`;
+        return `![Discord ${label}](${imageUrl})`;
       }
 
       const lines: string[] = [];
