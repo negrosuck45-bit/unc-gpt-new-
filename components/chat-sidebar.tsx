@@ -33,6 +33,7 @@ import { MemoryImportDialog } from "./memory-import-dialog"
 import { MemoryExportDialog } from "./memory-export-dialog"
 import { ImageEditDialog } from "./image-edit-dialog"
 import { ChatHistoryPanel } from "./chat-history-panel"
+import { SignOutButton } from "./sign-out-button"
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -476,7 +477,7 @@ export function ChatSidebar({
                     className="absolute bottom-[calc(100%-0.2rem)] left-2 right-2 z-20 overflow-hidden rounded-[18px] border border-border bg-popover p-1 text-popover-foreground shadow-[0_16px_42px_rgba(0,0,0,0.22)] backdrop-blur-2xl"
                   >
                     <button onClick={openSettings} className="flex w-full items-center gap-3 rounded-[14px] px-3 py-2.5 text-left text-[14px] text-sidebar-foreground/90 transition hover:bg-sidebar-accent/[0.10]"><SettingsIcon className="h-[18px] w-[18px] text-sidebar-foreground/75" /> Settings</button>
-                    <a href="/auth/logout" className="flex w-full items-center gap-3 rounded-[14px] px-3 py-2.5 text-left text-[14px] text-destructive transition hover:bg-destructive/[0.10]"><LogOut className="h-[18px] w-[18px] text-destructive/80" /> Log out</a>
+                    <SignOutButton className="flex w-full items-center gap-3 rounded-[14px] px-3 py-2.5 text-left text-[14px] text-destructive transition hover:bg-destructive/[0.10]" />
                   </motion.div>
                 )}
               </AnimatePresence>

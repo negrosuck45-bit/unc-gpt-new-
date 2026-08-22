@@ -23,6 +23,7 @@ import { OAuthConnectors } from './oauth-connectors';
 import { SkillsPanel } from './skills-panel';
 import { DEFAULT_USER_PREFERENCES, readUserPreferences, writeUserPreferences, type MessageDensity } from '@/lib/user-preferences';
 import { playReplySound, unlockReplySound } from '@/lib/notifications';
+import { SignOutButton } from './sign-out-button';
 
 interface SettingsPageProps { onClose?: () => void; }
 
@@ -405,7 +406,7 @@ export function SettingsPage({ onClose }: SettingsPageProps) {
                     </label>
                     <div className="mt-3 flex items-center justify-between gap-3"><span className={cn('text-xs', cursorStatus.startsWith('Too') || cursorStatus.includes('failed') ? 'text-red-400' : 'text-foreground/45')}>{cursorStatus || 'The cursor is account-scoped and works on desktop pointers.'}</span>{customCursorImage && <Button variant="outline" size="sm" className="rounded-full border-border/15" onClick={() => { setCustomCursorImage(''); setCustomCursorWidth(0); setCustomCursorHeight(0); setCursorStatus('Cursor removed.'); writeUserPreferences({ customCursorImage: '', customCursorWidth: 0, customCursorHeight: 0 }); void syncProfile({ cursor_image: null }); }}>Remove</Button>}</div>
                   </div>
-                  <div className="flex items-center justify-between border-t border-border/[0.10] pt-4"><span className="text-sm">Account session</span><a href="/auth/logout" className="rounded-full border border-red-300/50 px-4 py-2 text-sm text-red-200 transition hover:bg-red-400/10">Log out</a></div>
+                  <div className="flex items-center justify-between border-t border-border/[0.10] pt-4"><span className="text-sm">Account session</span><SignOutButton className="rounded-full border border-red-300/50 px-4 py-2 text-sm text-red-200 transition hover:bg-red-400/10" /></div>
                 </div>
               )}
 
@@ -605,9 +606,7 @@ export function SettingsPage({ onClose }: SettingsPageProps) {
                       </div>
                     </div>
                   </div>
-                  <a href="/auth/logout" className="flex min-h-11 w-full items-center justify-center gap-2 rounded-xl border border-red-400/20 bg-red-500/10 px-4 text-sm font-medium text-red-200 transition hover:bg-red-500/20">
-                    <LogOut className="h-4 w-4" /> Log out
-                  </a>
+                  <SignOutButton className="flex min-h-11 w-full items-center justify-center gap-2 rounded-xl border border-red-400/20 bg-red-500/10 px-4 text-sm font-medium text-red-200 transition hover:bg-red-500/20" />
                 </div>
               )}
 
