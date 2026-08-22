@@ -36,8 +36,8 @@ function formatText(text: string | undefined | null): string {
     .replace(/`([^`]+)`/g, '<code class="px-1.5 py-0.5 rounded bg-accent text-sm font-mono border border-border/50">$1</code>')
     .replace(/\n/g, '<br />');
 
-  // Add the GitHub mark only to repository bullets, leaving ordinary hyphenated text untouched.
-  formatted = formatted.replace(/(^|<br \/>)(- )([A-Za-z0-9_.-]+\/[A-Za-z0-9_.-]+)(?=\s[—–-])/g, `$1${githubIcon}$2$3`);
+  // Format repository rows with only the subtle GitHub mark and repository name—no decorative dash separators.
+  formatted = formatted.replace(/(^|<br \/>)- ([A-Za-z0-9_.-]+\/[A-Za-z0-9_.-]+)(?:\s+[—–-])?/g, `$1${githubIcon}$2`);
 
   return formatted;
 }
