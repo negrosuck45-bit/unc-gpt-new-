@@ -348,3 +348,18 @@ textarea {
     cursor: var(--uncgpt-custom-cursor) 16 16, auto;
   }
 }
+
+/* Full-page social screens must scroll independently from the fixed workspace shell. */
+.social-scroll-page {
+  position: fixed !important;
+  inset: 0 !important;
+  width: 100% !important;
+  height: 100dvh !important;
+  max-height: 100dvh !important;
+  overflow-y: auto !important;
+  overflow-x: hidden !important;
+  display: block !important;
+  -webkit-overflow-scrolling: touch;
+  overscroll-behavior-y: auto;
+  touch-action: pan-y;
+}
