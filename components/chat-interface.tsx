@@ -54,7 +54,7 @@ async function persistNeuralMemory(chatId: string, messages: any[], responseCont
 export function ChatInterface({ onSwitchToImagine, onOpenSidebar, isSidebarOpen }: ChatInterfaceProps) {
   const [mounted, setMounted] = useState(false);
   const [isThinking, setIsThinking] = useState(false);
-  const [agentComputerEnabled, setAgentComputerEnabled] = useState(true);
+  const [agentComputerEnabled, setAgentComputerEnabled] = useState(false);
   const [activeConnector, setActiveConnector] = useState<ActiveConnector | null>(null);
   const [connectionIssue, setConnectionIssue] = useState<ConnectionIssue>(null);
 
@@ -78,7 +78,7 @@ export function ChatInterface({ onSwitchToImagine, onOpenSidebar, isSidebarOpen 
 
   useEffect(() => {
     setMounted(true);
-    setAgentComputerEnabled(window.localStorage.getItem("uncgpt-agent-computer-auto-enabled") !== "false");
+    setAgentComputerEnabled(window.localStorage.getItem(accountStorageKey("uncgpt-agent-computer-auto-enabled")) === "true");
   }, []);
 
   const currentChat = getCurrentChat();
