@@ -136,18 +136,22 @@ export function PublicProfileCard({ username, bio, profilePicture, musicUrl, mus
   return (
     <div className="relative flex min-h-[calc(100vh-5rem)] w-full items-center justify-center [perspective:1000px]">
       <div ref={cardRef} className="relative w-full max-w-[650px] select-none rounded-[15px] border border-white/20 bg-black/70 px-5 pb-10 pt-5 text-white shadow-2xl shadow-black/40 backdrop-blur-xl sm:px-[30px] sm:pb-[58px] sm:pt-[30px]" style={{ transformStyle: 'preserve-3d', touchAction: 'pan-y' }}>
-        <div className="flex flex-col items-center justify-center gap-4 text-center sm:flex-row sm:items-start sm:gap-5 sm:text-left">
+        <div className="flex flex-col items-center justify-center gap-4 text-center">
           <div className="pointer-events-none flex h-[120px] w-[120px] shrink-0 items-center justify-center overflow-hidden rounded-full bg-transparent text-4xl font-medium">
             {profilePicture ? <img src={profilePicture} alt={`@${username}`} className="h-full w-full object-cover" /> : initial}
           </div>
-          <div className="min-w-0 flex-1 pt-0 text-center sm:pt-1 sm:text-left">
-            <div className="flex w-full flex-wrap items-center justify-center gap-2 sm:justify-start">
+          <div className="w-full min-w-0 text-center">
+            <div className="flex w-full flex-wrap items-center justify-center gap-2">
               <h1 className="max-w-full break-all text-2xl font-bold tracking-wide">@{username}</h1>
               {isVerified && <BadgeCheck aria-label="Verified official profile" className="h-5 w-5 shrink-0 fill-sky-500 text-white" />}
-              {!isVerified && !added && <button type="button" onClick={() => void addPerson()} aria-label={`Add @${username}`} className="relative inline-flex h-9 shrink-0 items-center gap-1.5 rounded-full border border-white/15 bg-white/[0.08] px-3 text-xs font-medium text-white/80 transition hover:bg-white/[0.16] active:scale-95 disabled:cursor-wait disabled:opacity-60" disabled={addBusy}><UserPlus className="h-3.5 w-3.5" />{addBusy ? 'Sending…' : 'Add'}</button>}
-              {!isVerified && <a href={`/messages/${encodeURIComponent(username)}`} aria-label={`Message @${username}`} title={added ? `Message @${username}` : undefined} className={`inline-flex h-9 shrink-0 items-center justify-center rounded-full border border-white/15 bg-white/[0.08] text-xs font-medium text-white/80 transition hover:bg-white/[0.16] ${added ? 'w-9 p-0' : 'gap-1.5 px-3'}`}><MessageCircle className="h-4 w-4" /><span className={added ? 'sr-only' : ''}>Message</span></a>}
-              {addError && <span className="basis-full mt-1 w-full text-center text-[11px] text-red-200 sm:text-left">{addError}</span>}
             </div>
+            {!isVerified && (
+              <div className="mt-3 flex items-center justify-center gap-2">
+                {!added && <button type="button" onClick={() => void addPerson()} aria-label={`Add @${username}`} className="relative inline-flex h-9 shrink-0 items-center gap-1.5 rounded-full border border-white/15 bg-white/[0.08] px-3 text-xs font-medium text-white/80 transition hover:bg-white/[0.16] active:scale-95 disabled:cursor-wait disabled:opacity-60" disabled={addBusy}><UserPlus className="h-3.5 w-3.5" />{addBusy ? 'Sending…' : 'Add'}</button>}
+                {added && <a href={`/messages/${encodeURIComponent(username)}`} aria-label={`Message @${username}`} title={`Message @${username}`} className="inline-flex h-9 w-9 shrink-0 items-center justify-center rounded-full border border-white/15 bg-white/[0.08] text-white/80 transition hover:bg-white/[0.16]"><MessageCircle className="h-4 w-4" /></a>}
+              </div>
+            )}
+            {addError && <p className="mt-2 text-center text-[11px] text-red-200">{addError}</p>}
             {bio && <p className="mt-2 whitespace-pre-wrap text-sm leading-6 text-white/70">{bio}</p>}
           </div>
         </div>
