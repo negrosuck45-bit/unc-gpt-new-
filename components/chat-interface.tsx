@@ -13,6 +13,7 @@ import { localVisionSupported, runLocalVision } from "@/lib/local-vision";
 import { AgentComputerCard, connectorIdentity, type ActiveConnector } from "@/components/agent-computer-card";
 import { connectorPermissionIdentity } from "@/components/connector-permission-card";
 import { accountStorageKey } from "@/lib/account-scope";
+import { ConnectionStatusBanner, type ConnectionIssue } from "@/components/connection-status-banner";
 
 interface ChatInterfaceProps {
   onSwitchToImagine?: () => void;
@@ -55,6 +56,7 @@ export function ChatInterface({ onSwitchToImagine, onOpenSidebar, isSidebarOpen 
   const [isThinking, setIsThinking] = useState(false);
   const [agentComputerEnabled, setAgentComputerEnabled] = useState(true);
   const [activeConnector, setActiveConnector] = useState<ActiveConnector | null>(null);
+  const [connectionIssue, setConnectionIssue] = useState<ConnectionIssue>(null);
 
   const abortControllerRef = useRef<AbortController | null>(null);
 
@@ -107,6 +109,7 @@ export function ChatInterface({ onSwitchToImagine, onOpenSidebar, isSidebarOpen 
       completed = true;
     } catch (error: any) {
       if (error.name !== "AbortError") {
+        setConnectionIssue(typeof navigator !== "undefined" && !navigator.onLine ? "offline" : "server");
         triggerHaptic("error");
         addMessage(chatId, { role: "assistant", content: `❌ ${error?.message || "Sorry, something went wrong."}` });
       }
@@ -158,6 +161,7 @@ export function ChatInterface({ onSwitchToImagine, onOpenSidebar, isSidebarOpen 
             addMessage(chatId, { role: "assistant", content: responseContent });
             void persistNeuralMemory(chatId, messagesToSend, responseContent);
             completed = true;
+            setConnectionIssue(null);
             return;
           } catch (localError) {
             console.warn("[uncgpt] Local vision unavailable; falling back to hosted vision.", localError);
@@ -169,6 +173,7 @@ export function ChatInterface({ onSwitchToImagine, onOpenSidebar, isSidebarOpen 
       completed = true;
     } catch (error: any) {
       if (error.name !== "AbortError") {
+        setConnectionIssue(typeof navigator !== "undefined" && !navigator.onLine ? "offline" : "server");
         triggerHaptic("error");
         addMessage(chatId, { role: "assistant", content: `❌ ${error?.message || "Sorry, something went wrong."}` });
       }
@@ -249,7 +254,11 @@ export function ChatInterface({ onSwitchToImagine, onOpenSidebar, isSidebarOpen 
       }
     } catch {}
 
-    const response = await fetch("/api/chat", {
+      if (typeof navigator !== "undefined" && !navigator.onLine) {
+        throw new Error("Connection lost. Please check your network.");
+      }
+
+      const response = await fetch("/api/chat", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify(payload),
@@ -257,7 +266,8 @@ export function ChatInterface({ onSwitchToImagine, onOpenSidebar, isSidebarOpen 
     });
 
     if (!response.ok) {
-      let msg = `API error: ${response.status}`;
+      setConnectionIssue("server");
+      let msg = `The assistant is temporarily unreachable (${response.status}).`;
       try {
         const err = await response.json();
         if (err?.error) msg = err.error;
@@ -265,6 +275,7 @@ export function ChatInterface({ onSwitchToImagine, onOpenSidebar, isSidebarOpen 
       throw new Error(msg);
     }
 
+    setConnectionIssue(null);
     const reader = response.body!.getReader();
     const decoder = new TextDecoder();
     let sseBuffer = "";
@@ -374,6 +385,7 @@ export function ChatInterface({ onSwitchToImagine, onOpenSidebar, isSidebarOpen 
         onOpenSidebar={onOpenSidebar}
         isSidebarOpen={isSidebarOpen}
       />
+      <ConnectionStatusBanner issue={connectionIssue} />
       <AgentComputerCard onChange={setAgentComputerEnabled} activeConnector={activeConnector} />
       {hasMessages ? (
         <div className="flex-1 flex flex-col min-h-0 overflow-hidden relative">
