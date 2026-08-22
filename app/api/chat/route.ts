@@ -1648,6 +1648,44 @@ export async function POST(req: NextRequest) {
       ? lastMsg.content.find((c: any) => c.type === "text")?.text || ""
       : lastMsg?.content || "";
 
+    // ==================== FAST CONNECTOR READS ====================
+    // Handle direct Discord reads before memory/search/tool discovery. Those steps can
+    // be slow and must never prevent a connected-account request from replying.
+    const earlyDiscordReadIntent = detectDiscordReadIntent(userText);
+    if (earlyDiscordReadIntent) {
+      let reply = "Discord isn’t connected yet. Open Settings → Connectors and connect Discord.";
+      let shouldShowPermission = true;
+      try {
+        const session = await getSession();
+        const resultText = await executeVerifiedDiscordRead(session?.user?.sub || "", earlyDiscordReadIntent);
+        if (resultText !== NO_GITHUB_ACCOUNT && resultText !== UNVERIFIED_GITHUB_RESULT) {
+          const heading = earlyDiscordReadIntent === "user" ? "Here is your verified Discord account information:" : earlyDiscordReadIntent === "servers" ? "Here are your verified Discord servers:" : "Here are your verified Discord channels:";
+          reply = `${heading}\n\n${resultText}`;
+          shouldShowPermission = false;
+        } else if (resultText === UNVERIFIED_GITHUB_RESULT) {
+          reply = "Discord is connected, but it did not return verifiable data for that request.";
+          shouldShowPermission = false;
+        }
+      } catch {
+        reply = "I couldn’t access the connected Discord account right now. Please try again.";
+        shouldShowPermission = false;
+      }
+
+      const encoder = new TextEncoder();
+      const stream = new ReadableStream({
+        start(controller) {
+          controller.enqueue(encoder.encode(`data: ${JSON.stringify({ provider: "Discord", model: "connected-action" })}\n\n`));
+          if (shouldShowPermission) {
+            controller.enqueue(encoder.encode(`data: ${JSON.stringify({ permission_request: { toolkit: "discord", label: "Discord", description: "read your profile, servers, and permitted Discord data", iconUrl: "https://cdn.simpleicons.org/discord", mode: "connect" } })}\n\n`));
+          }
+          controller.enqueue(encoder.encode(`data: ${JSON.stringify({ content: reply })}\n\n`));
+          controller.enqueue(encoder.encode("data: [DONE]\n\n"));
+          controller.close();
+        },
+      });
+      return createStreamResponse(stream, "Discord", "connected-action", []);
+    }
+
     // ==================== SILENT WEB SEARCH ====================
     let searchContext = "";
     const needsSearch =
