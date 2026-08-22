@@ -117,6 +117,8 @@ export function PublicProfileCard({ username, bio, profilePicture, musicUrl, mus
   const initial = username.slice(0, 1).toUpperCase()
   const [views, setViews] = useState(profileViews)
   const [added, setAdded] = useState(false)
+  const [addBusy, setAddBusy] = useState(false)
+  const [addError, setAddError] = useState('')
   useEffect(() => {
     setViews(profileViews)
     const key = `uncgpt-profile-viewed:${username.toLowerCase()}`
@@ -128,7 +130,7 @@ export function PublicProfileCard({ username, bio, profilePicture, musicUrl, mus
       .catch(() => {})
   }, [username, profileViews])
   useEffect(() => { if (isVerified) return; fetch(`/api/social?type=relationship&username=${encodeURIComponent(username)}`).then((response) => response.ok ? response.json() : null).then((data) => { if (data?.following) setAdded(true) }).catch(() => {}) }, [username, isVerified])
-  const addPerson = async () => { if (added) return; const response = await fetch('/api/social', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ action: 'follow', username }) }); if (response.ok) setAdded(true) }
+  const addPerson = async () => { if (added || addBusy) return; setAddBusy(true); setAddError(''); try { const response = await fetch('/api/social', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ action: 'follow', username }) }); const data = await response.json().catch(() => ({})); if (response.status === 401) { window.location.href = `/login?returnTo=${encodeURIComponent(window.location.pathname)}`; return } if (!response.ok) { setAddError(data.error || 'Could not send request'); return } setAdded(true) } catch { setAddError('Network error — try again') } finally { setAddBusy(false) } }
   const cardRef = useRef<HTMLDivElement>(null)
   useFizTilt(cardRef)
   return (
@@ -139,7 +141,7 @@ export function PublicProfileCard({ username, bio, profilePicture, musicUrl, mus
             {profilePicture ? <img src={profilePicture} alt={`@${username}`} className="h-full w-full object-cover" /> : initial}
           </div>
           <div className="min-w-0 flex-1 pt-1 text-center">
-            <div className="flex items-center justify-center gap-3"><h1 className="text-2xl font-bold tracking-wide">@{username}</h1>{isVerified && <BadgeCheck aria-label="Verified official profile" className="h-5 w-5 shrink-0 fill-sky-500 text-white" />}{!isVerified && <><button type="button" onClick={() => void addPerson() } aria-label={added ? `Remove @${username}` : `Add @${username}`} className="inline-flex h-8 items-center gap-1.5 rounded-full border border-white/15 bg-white/[0.08] px-3 text-xs font-medium text-white/80 transition hover:bg-white/[0.16] active:scale-95"><UserPlus className="h-3.5 w-3.5" />{added ? 'Added' : 'Add'}</button><a href={`/messages/${encodeURIComponent(username)}`} aria-label={`Message @${username}`} className="inline-flex h-8 items-center gap-1.5 rounded-full border border-white/15 bg-white/[0.08] px-3 text-xs font-medium text-white/80 transition hover:bg-white/[0.16]"><MessageCircle className="h-3.5 w-3.5" />Message</a></>}</div>
+            <div className="flex items-center justify-center gap-3"><h1 className="text-2xl font-bold tracking-wide">@{username}</h1>{isVerified && <BadgeCheck aria-label="Verified official profile" className="h-5 w-5 shrink-0 fill-sky-500 text-white" />}{!isVerified && <><button type="button" onClick={() => void addPerson() } aria-label={added ? `Remove @${username}` : `Add @${username}`} className="relative inline-flex h-8 items-center gap-1.5 rounded-full border border-white/15 bg-white/[0.08] px-3 text-xs font-medium text-white/80 transition hover:bg-white/[0.16] active:scale-95 disabled:cursor-wait disabled:opacity-60" disabled={addBusy || added}><UserPlus className="h-3.5 w-3.5" />{addBusy ? 'Sending…' : added ? 'Requested' : 'Add'}</button>{addError && <span className="absolute left-1/2 top-full mt-2 w-max max-w-[220px] -translate-x-1/2 rounded-lg border border-red-400/20 bg-black/90 px-2 py-1 text-[11px] text-red-200">{addError}</span>}<a href={`/messages/${encodeURIComponent(username)}`} aria-label={`Message @${username}`} className="inline-flex h-8 items-center gap-1.5 rounded-full border border-white/15 bg-white/[0.08] px-3 text-xs font-medium text-white/80 transition hover:bg-white/[0.16]"><MessageCircle className="h-3.5 w-3.5" />Message</a></>}</div>
             {bio && <p className="mt-2 whitespace-pre-wrap text-sm leading-6 text-white/70">{bio}</p>}
           </div>
         </div>
