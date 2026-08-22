@@ -1275,11 +1275,13 @@ async function executeVerifiedGithubRepositories(userId: string, connectedAccoun
   return UNVERIFIED_GITHUB_RESULT;
 }
 
-type DiscordReadIntent = "user" | "servers" | "channels";
+type DiscordReadIntent = "user" | "servers" | "channels" | "avatar" | "banner";
 
 function detectDiscordReadIntent(text: string): DiscordReadIntent | null {
   const value = text.toLowerCase();
   if (!/\bdiscord\b/.test(value)) return null;
+  if (/\b(banner|cover photo|cover image)\b/.test(value)) return "banner";
+  if (/\b(avatar|profile photo|profile picture|pfp|photo)\b/.test(value)) return "avatar";
   if (/\b(channel|channels)\b/.test(value)) return "channels";
   if (/\b(server|servers|guild|guilds|membership|memberships)\b/.test(value)) return "servers";
   if (/\b(my|mine|user|username|profile|account|who am i|user id|userid)\b/.test(value)) return "user";
@@ -1333,7 +1335,8 @@ async function executeVerifiedDiscordRead(
       { signal: AbortSignal.timeout(10000) }
     );
 
-    const intentPatterns: Record<DiscordReadIntent, RegExp[]> = {
+    const toolIntent: "user" | "servers" | "channels" = intent === "avatar" || intent === "banner" ? "user" : intent;
+    const intentPatterns: Record<"user" | "servers" | "channels", RegExp[]> = {
       user: [/(current|authenticated|my).*user/i, /user.*(info|profile|details)/i, /get.*user/i, /who.*am.*i/i],
       servers: [/(list|show|get|fetch).*?(server|guild)/i, /(server|guild).*(list|membership)/i, /my.*(server|guild)/i],
       channels: [/(list|show|get|fetch).*channel/i, /channel.*(list|info)/i],
@@ -1341,24 +1344,24 @@ async function executeVerifiedDiscordRead(
     const candidates = rawTools
       .filter((tool: any) => {
         const descriptor = `${tool?.slug || ""} ${tool?.name || ""} ${tool?.description || ""}`;
-        return intentPatterns[intent].some((pattern) => pattern.test(descriptor));
+        return intentPatterns[toolIntent].some((pattern) => pattern.test(descriptor));
       })
       .sort((left: any, right: any) => {
         const score = (tool: any) => {
           const descriptor = `${tool?.slug || ""} ${tool?.name || ""} ${tool?.description || ""}`.toLowerCase();
           let value = 0;
-          if (intent === "user" && /(?:current|authenticated|self|me).*user|user.*(?:current|authenticated|self|me)/.test(descriptor)) value += 100;
-          if (intent === "user" && /profile|identity|account/.test(descriptor)) value += 40;
+          if (toolIntent === "user" && /(?:current|authenticated|self|me).*user|user.*(?:current|authenticated|self|me)/.test(descriptor)) value += 100;
+          if (toolIntent === "user" && /profile|identity|account/.test(descriptor)) value += 40;
           if (/application|oauth|connection|integration/.test(descriptor)) value -= 120;
-          if (intent === "user" && /bot/.test(descriptor)) value -= 100;
-          if (intent === "servers" && /server|guild/.test(descriptor)) value += 40;
-          if (intent === "channels" && /channel/.test(descriptor)) value += 40;
+          if (toolIntent === "user" && /bot/.test(descriptor)) value -= 100;
+          if (toolIntent === "servers" && /server|guild/.test(descriptor)) value += 40;
+          if (toolIntent === "channels" && /channel/.test(descriptor)) value += 40;
           return value;
         };
         return score(right) - score(left);
       });
 
-    const formatDiscordProfile = (value: unknown): string | null => {
+    const formatDiscordProfile = (value: unknown, requestedIntent: DiscordReadIntent = "user"): string | null => {
       const seen = new Set<any>();
       const visit = (item: any, depth = 0): any => {
         if (!item || depth > 6 || typeof item !== "object" || seen.has(item)) return null;
@@ -1391,6 +1394,18 @@ async function executeVerifiedDiscordRead(
 
       const profile = visit(value);
       if (!profile) return null;
+      const imageHash = requestedIntent === "avatar" ? profile.avatar : requestedIntent === "banner" ? profile.banner : null;
+      if (requestedIntent === "avatar" || requestedIntent === "banner") {
+        const profileId = profile.id || profile.user_id || profile.userId;
+        if (!profileId || !imageHash) return null;
+        const hash = String(imageHash);
+        const imageUrl = /^https?:\/\//i.test(hash)
+          ? hash
+          : `https://cdn.discordapp.com/${requestedIntent === "avatar" ? "avatars" : "banners"}/${profileId}/${hash}.${hash.startsWith("a_") ? "gif" : "png"}?size=1024`;
+        const label = requestedIntent === "avatar" ? "avatar" : "banner";
+        return `![Discord ${label}](${imageUrl})\n\n${label[0].toUpperCase() + label.slice(1)} URL: ${imageUrl}`;
+      }
+
       const lines: string[] = [];
       const add = (label: string, field: unknown, format?: (value: any) => string) => {
         if (field === undefined || field === null || field === "") return;
@@ -1437,8 +1452,8 @@ async function executeVerifiedDiscordRead(
         );
         if (response?.successful === false || response?.error) continue;
         const rawResult = response?.data ?? response;
-        if (intent === "user") {
-          const identity = formatDiscordProfile(rawResult);
+        if (intent === "user" || intent === "avatar" || intent === "banner") {
+          const identity = formatDiscordProfile(rawResult, intent);
           if (identity) return identity;
           continue;
         }
@@ -1742,7 +1757,7 @@ export async function POST(req: NextRequest) {
         const session = await getSession();
         const resultText = await executeVerifiedDiscordRead(session?.user?.sub || "", earlyDiscordReadIntent);
         if (resultText !== NO_GITHUB_ACCOUNT && resultText !== UNVERIFIED_GITHUB_RESULT) {
-          const heading = earlyDiscordReadIntent === "user" ? "Here is your verified Discord account information:" : earlyDiscordReadIntent === "servers" ? "Here are your verified Discord servers:" : "Here are your verified Discord channels:";
+          const heading = earlyDiscordReadIntent === "avatar" ? "Here is your Discord avatar:" : earlyDiscordReadIntent === "banner" ? "Here is your Discord banner:" : earlyDiscordReadIntent === "user" ? "Here is your verified Discord account information:" : earlyDiscordReadIntent === "servers" ? "Here are your verified Discord servers:" : "Here are your verified Discord channels:";
           reply = `${heading}\n\n${resultText}`;
           shouldShowPermission = false;
         } else if (resultText === UNVERIFIED_GITHUB_RESULT) {
