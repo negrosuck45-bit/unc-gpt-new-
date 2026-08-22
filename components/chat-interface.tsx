@@ -224,7 +224,13 @@ export function ChatInterface({ onSwitchToImagine, onOpenSidebar, isSidebarOpen 
 
     try {
       const query = String(messages[messages.length - 1]?.content || '').slice(0, 160);
-      const memoryResponse = await fetch(`/api/memory?query=${encodeURIComponent(query)}`);
+      const memoryController = new AbortController();
+      const memoryTimeout = window.setTimeout(() => memoryController.abort(), 3000);
+      const memoryResponse = await fetch(`/api/memory?query=${encodeURIComponent(query)}`, {
+        signal: memoryController.signal,
+        cache: "no-store",
+      });
+      window.clearTimeout(memoryTimeout);
       const memoryJson = await memoryResponse.json().catch(() => ({}));
       if (Array.isArray(memoryJson.memories) && memoryJson.memories.length > 0) {
         payload.neuralMemory = memoryJson.memories
@@ -258,12 +264,31 @@ export function ChatInterface({ onSwitchToImagine, onOpenSidebar, isSidebarOpen 
         throw new Error("Connection lost. Please check your network.");
       }
 
-      const response = await fetch("/api/chat", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify(payload),
-      signal: abortControllerRef.current?.signal,
-    });
+      const requestController = new AbortController();
+    const userAbortSignal = abortControllerRef.current?.signal;
+    let timedOut = false;
+    const forwardAbort = () => requestController.abort();
+    userAbortSignal?.addEventListener("abort", forwardAbort, { once: true });
+    const requestTimeout = window.setTimeout(() => {
+      timedOut = true;
+      requestController.abort();
+    }, 45000);
+
+    let response: Response;
+    try {
+      response = await fetch("/api/chat", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(payload),
+        signal: requestController.signal,
+      });
+    } catch (error) {
+      if (timedOut) throw new Error("The assistant took too long to respond. Please try again.");
+      throw error;
+    } finally {
+      window.clearTimeout(requestTimeout);
+      userAbortSignal?.removeEventListener("abort", forwardAbort);
+    }
 
     if (!response.ok) {
       setConnectionIssue("server");
@@ -307,6 +332,10 @@ export function ChatInterface({ onSwitchToImagine, onOpenSidebar, isSidebarOpen 
 
           try {
             const parsed = JSON.parse(dataStr);
+
+            if (parsed.error) {
+              throw new Error(String(parsed.error));
+            }
 
             if (parsed.permission_request) {
               const request = parsed.permission_request;

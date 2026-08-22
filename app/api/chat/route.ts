@@ -1005,6 +1005,7 @@ async function fallbackChat(
 async function callMcpJsonRpc(connector: any, method: string, params: any = {}) {
   const response = await fetch(connector.url, {
     method: "POST",
+    signal: AbortSignal.timeout(10000),
     headers: {
       ...connector.headers,
       "Content-Type": "application/json",
@@ -1501,7 +1502,8 @@ function createStreamResponse(
             }
           }
         }
-      } catch (err) {
+      } catch (err: any) {
+        controller.enqueue(encoder.encode(`data: ${JSON.stringify({ error: err?.message || "The response stream ended unexpectedly." })}\n\n`));
       } finally {
         controller.enqueue(encoder.encode("data: [DONE]\n\n"));
         controller.close();
@@ -1757,9 +1759,15 @@ export async function POST(req: NextRequest) {
         return new Response(stream, { headers: { 'Content-Type': 'text/event-stream', 'Cache-Control': 'no-cache' } });
       }
       try {
-        const session = await getSession();
-        if (session?.user?.sub) {
-          composioSession = await getComposioSession(session.user.sub);
+        const shouldLoadConnectedTools = Boolean(requestedConnectorKey && connectorActionIntent);
+        if (shouldLoadConnectedTools) {
+          const session = await getSession();
+          if (session?.user?.sub) {
+            composioSession = await Promise.race([
+              getComposioSession(session.user.sub),
+              new Promise((_, reject) => setTimeout(() => reject(new Error('Connector lookup timed out')), 10000)),
+            ]);
+          }
           if (composioSession) {
             const nativeTools: any[] = await composioSession.tools();
             composioTools = nativeTools
@@ -1787,7 +1795,7 @@ export async function POST(req: NextRequest) {
       } catch (error) {
         console.error("Composio session unavailable:", error);
       }
-      if (activeMcpConnectors.length > 0) {
+      if (requestedConnectorKey && connectorActionIntent && activeMcpConnectors.length > 0) {
         mcpTools = await fetchMcpTools(activeMcpConnectors, baseUrl);
       }
 
