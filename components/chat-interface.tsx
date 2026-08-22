@@ -276,7 +276,11 @@ export function ChatInterface({ onSwitchToImagine, onOpenSidebar, isSidebarOpen 
     }
 
     setConnectionIssue(null);
-    const reader = response.body!.getReader();
+    if (!response.body) {
+      throw new Error("The assistant returned an empty response. Please try again.");
+    }
+
+    const reader = response.body.getReader();
     const decoder = new TextDecoder();
     let sseBuffer = "";
     let fullContent = "";
@@ -367,6 +371,13 @@ export function ChatInterface({ onSwitchToImagine, onOpenSidebar, isSidebarOpen 
       addMessage(chatId, { role: "assistant", content: fullContent });
     } else if (assistantMsgId && fullContent) {
       updateMessage(chatId, assistantMsgId, fullContent);
+    }
+
+    if (!fullContent.trim() && !permissionRequest) {
+      setIsThinking(false);
+      const fallback = "I’m sorry, I couldn’t complete that response. Please try again.";
+      addMessage(chatId, { role: "assistant", content: fallback });
+      return fallback;
     }
 
     window.setTimeout(() => setActiveConnector(null), 1800);
