@@ -1279,9 +1279,11 @@ type DiscordReadIntent = "user" | "servers" | "channels" | "avatar" | "banner";
 
 function detectDiscordReadIntent(text: string): DiscordReadIntent | null {
   const value = text.toLowerCase();
-  if (!/\bdiscord\b/.test(value)) return null;
+  const mentionsDiscord = /\bdiscord\b/.test(value);
+  const asksForImage = /\b(banner|cover photo|cover image|avatar|profile photo|profile picture|profile pic|pfp|photo|picture|puxture)\b/.test(value);
+  if (!mentionsDiscord && !asksForImage) return null;
   if (/\b(banner|cover photo|cover image)\b/.test(value)) return "banner";
-  if (/\b(avatar|profile photo|profile picture|pfp|photo)\b/.test(value)) return "avatar";
+  if (/\b(avatar|profile photo|profile picture|profile pic|pfp|photo|picture|puxture)\b/.test(value)) return "avatar";
   if (/\b(channel|channels)\b/.test(value)) return "channels";
   if (/\b(server|servers|guild|guilds|membership|memberships)\b/.test(value)) return "servers";
   if (/\b(my|mine|user|username|profile|account|who am i|user id|userid)\b/.test(value)) return "user";
