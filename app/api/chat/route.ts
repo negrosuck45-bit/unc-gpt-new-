@@ -1338,31 +1338,88 @@ async function executeVerifiedDiscordRead(
       servers: [/(list|show|get|fetch).*?(server|guild)/i, /(server|guild).*(list|membership)/i, /my.*(server|guild)/i],
       channels: [/(list|show|get|fetch).*channel/i, /channel.*(list|info)/i],
     };
-    const candidates = rawTools.filter((tool: any) => {
-      const descriptor = `${tool?.slug || ""} ${tool?.name || ""} ${tool?.description || ""}`;
-      return intentPatterns[intent].some((pattern) => pattern.test(descriptor));
-    });
-    const tool = candidates.find((candidate: any) => {
-      const required = candidate?.inputParameters?.required || candidate?.input_parameters?.required || [];
-      return Array.isArray(required) && required.length === 0;
-    }) || candidates[0];
-    if (!tool?.slug) return UNVERIFIED_GITHUB_RESULT;
+    const candidates = rawTools
+      .filter((tool: any) => {
+        const descriptor = `${tool?.slug || ""} ${tool?.name || ""} ${tool?.description || ""}`;
+        return intentPatterns[intent].some((pattern) => pattern.test(descriptor));
+      })
+      .sort((left: any, right: any) => {
+        const score = (tool: any) => {
+          const descriptor = `${tool?.slug || ""} ${tool?.name || ""} ${tool?.description || ""}`.toLowerCase();
+          let value = 0;
+          if (intent === "user" && /(?:current|authenticated|self|me).*user|user.*(?:current|authenticated|self|me)/.test(descriptor)) value += 100;
+          if (intent === "user" && /profile|identity|account/.test(descriptor)) value += 40;
+          if (/application|oauth|connection|integration/.test(descriptor)) value -= 120;
+          if (intent === "user" && /bot/.test(descriptor)) value -= 100;
+          if (intent === "servers" && /server|guild/.test(descriptor)) value += 40;
+          if (intent === "channels" && /channel/.test(descriptor)) value += 40;
+          return value;
+        };
+        return score(right) - score(left);
+      });
 
-    const required = tool?.inputParameters?.required || tool?.input_parameters?.required || [];
-    if (Array.isArray(required) && required.length > 0) return UNVERIFIED_GITHUB_RESULT;
+    const formatDiscordIdentity = (value: unknown): string | null => {
+      const seen = new Set<any>();
+      const visit = (item: any, depth = 0): any => {
+        if (!item || depth > 5 || typeof item !== "object" || seen.has(item)) return null;
+        seen.add(item);
+        if (Array.isArray(item)) {
+          for (const entry of item) {
+            const match = visit(entry, depth + 1);
+            if (match) return match;
+          }
+          return null;
+        }
+        const username = item.username || item.user_name || item.display_name || item.global_name;
+        const id = item.id || item.user_id || item.userId;
+        const looksLikeBotApplication = Boolean(item.application || item.oauth2_install_params || item.integration_types_config || item.storefront_available !== undefined);
+        if (username && id && !looksLikeBotApplication) {
+          return {
+            username: String(username),
+            id: String(id),
+            displayName: item.global_name || item.display_name || null,
+            discriminator: item.discriminator && String(item.discriminator) !== "0" ? String(item.discriminator) : null,
+          };
+        }
+        for (const child of Object.values(item)) {
+          const match = visit(child, depth + 1);
+          if (match) return match;
+        }
+        return null;
+      };
+      const identity = visit(value);
+      if (!identity) return null;
+      const lines = [`Username: ${identity.username}`, `User ID: ${identity.id}`];
+      if (identity.displayName && identity.displayName !== identity.username) lines.push(`Display name: ${identity.displayName}`);
+      if (identity.discriminator) lines.push(`Tag: ${identity.username}#${identity.discriminator}`);
+      return lines.join("\\n");
+    };
 
-    const response: any = await composio.tools.execute(
-      tool.slug,
-      {
-        userId: getComposioUserId(userId),
-        connectedAccountId: account.id,
-        arguments: {},
-        dangerouslySkipVersionCheck: true,
-      },
-      { signal: AbortSignal.timeout(15000) }
-    );
-    if (response?.successful === false || response?.error) return UNVERIFIED_GITHUB_RESULT;
-    return formatVerifiedConnectorData(response?.data ?? response);
+    for (const tool of candidates.slice(0, 8)) {
+      const required = tool?.inputParameters?.required || tool?.input_parameters?.required || [];
+      if (Array.isArray(required) && required.length > 0) continue;
+      try {
+        const response: any = await composio.tools.execute(
+          tool.slug,
+          {
+            userId: getComposioUserId(userId),
+            connectedAccountId: account.id,
+            arguments: {},
+            dangerouslySkipVersionCheck: true,
+          },
+          { signal: AbortSignal.timeout(15000) }
+        );
+        if (response?.successful === false || response?.error) continue;
+        const rawResult = response?.data ?? response;
+        if (intent === "user") {
+          const identity = formatDiscordIdentity(rawResult);
+          if (identity) return identity;
+          continue;
+        }
+        return formatVerifiedConnectorData(rawResult);
+      } catch {}
+    }
+    return UNVERIFIED_GITHUB_RESULT;
   } catch (error) {
     console.error("Verified Discord execution failed:", error);
     return UNVERIFIED_GITHUB_RESULT;
