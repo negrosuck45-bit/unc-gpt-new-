@@ -127,6 +127,8 @@ export function PublicProfileCard({ username, bio, profilePicture, musicUrl, mus
       .then((data) => { if (typeof data.views === 'number' && data.views > 0) setViews(data.views) })
       .catch(() => {})
   }, [username, profileViews])
+  useEffect(() => { if (isVerified) return; fetch(`/api/social?type=relationship&username=${encodeURIComponent(username)}`).then((response) => response.ok ? response.json() : null).then((data) => { if (data?.following) setAdded(true) }).catch(() => {}) }, [username, isVerified])
+  const addPerson = async () => { if (added) return; const response = await fetch('/api/social', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ action: 'follow', username }) }); if (response.ok) setAdded(true) }
   const cardRef = useRef<HTMLDivElement>(null)
   useFizTilt(cardRef)
   return (
@@ -137,7 +139,7 @@ export function PublicProfileCard({ username, bio, profilePicture, musicUrl, mus
             {profilePicture ? <img src={profilePicture} alt={`@${username}`} className="h-full w-full object-cover" /> : initial}
           </div>
           <div className="min-w-0 flex-1 pt-1 text-center">
-            <div className="flex items-center justify-center gap-3"><h1 className="text-2xl font-bold tracking-wide">@{username}</h1>{isVerified && <BadgeCheck aria-label="Verified official profile" className="h-5 w-5 shrink-0 fill-sky-500 text-white" />}{!isVerified && <><button type="button" onClick={() => setAdded((value) => !value)} aria-label={added ? `Remove @${username}` : `Add @${username}`} className="inline-flex h-8 items-center gap-1.5 rounded-full border border-white/15 bg-white/[0.08] px-3 text-xs font-medium text-white/80 transition hover:bg-white/[0.16] active:scale-95"><UserPlus className="h-3.5 w-3.5" />{added ? 'Added' : 'Add'}</button><a href={`/messages/${encodeURIComponent(username)}`} aria-label={`Message @${username}`} className="inline-flex h-8 items-center gap-1.5 rounded-full border border-white/15 bg-white/[0.08] px-3 text-xs font-medium text-white/80 transition hover:bg-white/[0.16]"><MessageCircle className="h-3.5 w-3.5" />Message</a></>}</div>
+            <div className="flex items-center justify-center gap-3"><h1 className="text-2xl font-bold tracking-wide">@{username}</h1>{isVerified && <BadgeCheck aria-label="Verified official profile" className="h-5 w-5 shrink-0 fill-sky-500 text-white" />}{!isVerified && <><button type="button" onClick={() => void addPerson() } aria-label={added ? `Remove @${username}` : `Add @${username}`} className="inline-flex h-8 items-center gap-1.5 rounded-full border border-white/15 bg-white/[0.08] px-3 text-xs font-medium text-white/80 transition hover:bg-white/[0.16] active:scale-95"><UserPlus className="h-3.5 w-3.5" />{added ? 'Added' : 'Add'}</button><a href={`/messages/${encodeURIComponent(username)}`} aria-label={`Message @${username}`} className="inline-flex h-8 items-center gap-1.5 rounded-full border border-white/15 bg-white/[0.08] px-3 text-xs font-medium text-white/80 transition hover:bg-white/[0.16]"><MessageCircle className="h-3.5 w-3.5" />Message</a></>}</div>
             {bio && <p className="mt-2 whitespace-pre-wrap text-sm leading-6 text-white/70">{bio}</p>}
           </div>
         </div>
