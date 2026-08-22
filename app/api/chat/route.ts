@@ -1401,7 +1401,9 @@ async function executeVerifiedDiscordRead(
       const username = profile.username || profile.user_name;
       const discriminator = profile.discriminator && String(profile.discriminator) !== "0" ? String(profile.discriminator) : "";
       if (requestedIntent === "tag") {
-        const tag = profile.tag || (username ? `${username}${discriminator ? `#${discriminator}` : ""}` : "");
+        const explicitTag = profile.tag || profile.user_tag || profile.userTag || profile.discord_tag || profile.discordTag;
+        const legacyTag = username && discriminator ? `${username}#${discriminator}` : "";
+        const tag = explicitTag || legacyTag;
         return tag ? `[[DISCORD_TAG:${encodeURIComponent(String(tag))}]]` : "[[DISCORD_NO_TAG]]";
       }
       const imageHash = requestedIntent === "avatar" ? profile.avatar : requestedIntent === "banner" ? profile.banner : null;

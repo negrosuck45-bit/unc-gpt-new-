@@ -3,7 +3,7 @@ import { useMemo, useState, useCallback } from 'react';
 import { cn } from '@/lib/utils';
 import { CodeBlock } from './code-block';
 import { TerminalBlock } from './terminal-block';
-import { Download, ExternalLink, Gamepad2, Loader2 } from 'lucide-react';
+import { Download, ExternalLink, Loader2, Tag } from 'lucide-react';
 import { toast } from 'sonner';
 
 interface MessageContentProps {
@@ -283,12 +283,12 @@ export function MessageContent({ content }: MessageContentProps) {
         if (part.type === 'discord-tag') {
           const hasTag = Boolean(part.content?.trim());
           return (
-            <div key={`discord-tag-${index}`} className="my-3 inline-flex max-w-full items-center gap-3 rounded-2xl border border-white/10 bg-white/[0.045] px-3.5 py-2.5 shadow-sm">
+            <div key={`discord-tag-${index}`} role="status" aria-label="Discord tag" className="my-3 inline-flex max-w-full items-center gap-3 rounded-2xl border border-white/10 bg-white/[0.045] px-3.5 py-2.5 shadow-sm">
               <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-indigo-500/15 text-indigo-200 ring-1 ring-indigo-300/15">
-                <Gamepad2 className="h-4.5 w-4.5 opacity-80" aria-hidden="true" />
+                <Tag className="h-4 w-4 opacity-90" aria-hidden="true" />
               </div>
               <div className="min-w-0">
-                <div className="text-[10px] font-semibold uppercase tracking-[0.18em] text-white/45">Tag</div>
+                <div className="text-[10px] font-semibold uppercase tracking-[0.18em] text-white/45">Discord tag</div>
                 <div className="truncate text-sm font-medium text-white/90">{hasTag ? part.content : "You don’t have a tag"}</div>
               </div>
             </div>
