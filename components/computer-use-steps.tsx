@@ -21,12 +21,15 @@ interface Props {
 // Map tool name → icon + accent color
 function toolMeta(name: string): { icon: any; label: string; accent: string; bg: string } {
   const n = (name || '').toLowerCase();
-  if (n.includes('terminal') || n === 'bash' || n === 'shell') return { icon: Terminal, label: 'terminal', accent: 'text-emerald-400', bg: 'bg-emerald-500/10 border-emerald-500/30' };
-  if (n.includes('file_read') || n.includes('file_write') || n.includes('file_edit')) return { icon: FileText, label: 'file', accent: 'text-amber-400', bg: 'bg-amber-500/10 border-amber-500/30' };
-  if (n.includes('browser') || n.includes('fetch_page')) return { icon: Globe, label: 'browser', accent: 'text-sky-400', bg: 'bg-sky-500/10 border-sky-500/30' };
-  if (n.includes('web_search') || n.includes('search')) return { icon: Search, label: 'search', accent: 'text-violet-400', bg: 'bg-violet-500/10 border-violet-500/30' };
-  if (n.includes('github')) return { icon: Github, label: 'github', accent: 'text-zinc-200', bg: 'bg-zinc-700/30 border-zinc-600/40' };
-  return { icon: Wrench, label: 'tool', accent: 'text-blue-400', bg: 'bg-blue-500/10 border-blue-500/30' };
+  if (n.includes('terminal') || n === 'bash' || n === 'shell') return { icon: Terminal, label: 'Working on your computer', accent: 'text-emerald-400', bg: 'bg-emerald-500/10 border-emerald-500/30' };
+  if (n.includes('file_read') || n.includes('file_write') || n.includes('file_edit') || n.includes('filesystem')) return { icon: FileText, label: 'Working with files', accent: 'text-amber-400', bg: 'bg-amber-500/10 border-amber-500/30' };
+  if (n.includes('browser') || n.includes('fetch_page')) return { icon: Globe, label: 'Browsing the web', accent: 'text-sky-400', bg: 'bg-sky-500/10 border-sky-500/30' };
+  if (n.includes('web_search') || n.includes('search')) return { icon: Search, label: 'Searching the web', accent: 'text-violet-400', bg: 'bg-violet-500/10 border-violet-500/30' };
+  if (n.includes('github')) return { icon: Github, label: 'Working in GitHub', accent: 'text-zinc-200', bg: 'bg-zinc-700/30 border-zinc-600/40' };
+  if (n.includes('slack')) return { icon: Wrench, label: 'Working in Slack', accent: 'text-blue-300', bg: 'bg-blue-500/10 border-blue-500/30' };
+  if (n.includes('notion')) return { icon: Wrench, label: 'Working in Notion', accent: 'text-zinc-200', bg: 'bg-zinc-700/30 border-zinc-600/40' };
+  if (n.includes('gmail') || n.includes('email')) return { icon: Wrench, label: 'Working in Gmail', accent: 'text-red-300', bg: 'bg-red-500/10 border-red-500/30' };
+  return { icon: Wrench, label: 'Working on it', accent: 'text-blue-400', bg: 'bg-blue-500/10 border-blue-500/30' };
 }
 
 function CopyButton({ text }: { text: string }) {
@@ -49,7 +52,7 @@ function CopyButton({ text }: { text: string }) {
 }
 
 function ToolBlock({ step, isRunning }: { step: ComputerUseStep; isRunning: boolean }) {
-  const [open, setOpen] = useState(true);
+  const [open, setOpen] = useState(false);
   const meta = toolMeta(step.tool || step.action || '');
   const Icon = meta.icon;
   const command = step.input?.command || step.input?.path || step.input?.url || step.input?.query || step.input?.name || '';
@@ -66,7 +69,7 @@ function ToolBlock({ step, isRunning }: { step: ComputerUseStep; isRunning: bool
       >
         {open ? <ChevronDown className="w-3.5 h-3.5 text-zinc-400 shrink-0" /> : <ChevronRight className="w-3.5 h-3.5 text-zinc-400 shrink-0" />}
         <Icon className={`w-3.5 h-3.5 shrink-0 ${meta.accent}`} />
-        <span className={`text-xs font-mono font-medium ${meta.accent}`}>{step.tool || meta.label}</span>
+        <span className={`text-xs font-medium ${meta.accent}`}>{meta.label}</span>
         {command && (
           <span className="text-xs font-mono text-zinc-400 truncate flex-1">
             {typeof command === 'string' ? command : JSON.stringify(command)}
@@ -84,7 +87,7 @@ function ToolBlock({ step, isRunning }: { step: ComputerUseStep; isRunning: bool
           {/* Input args (skip if just one trivial arg already shown in header) */}
           {step.input && Object.keys(step.input).length > 1 && (
             <div className="px-3 py-2 border-b border-white/5">
-              <div className="text-[10px] uppercase tracking-wider text-zinc-500 mb-1">args</div>
+              <div className="text-[10px] uppercase tracking-wider text-zinc-500 mb-1">Details</div>
               <pre className="text-[11px] font-mono text-zinc-300 whitespace-pre-wrap break-words leading-relaxed">
 {JSON.stringify(step.input, null, 2)}
               </pre>
@@ -96,7 +99,7 @@ function ToolBlock({ step, isRunning }: { step: ComputerUseStep; isRunning: bool
             <div className={isTerminal ? 'bg-black' : 'bg-zinc-950'}>
               <div className="flex items-center justify-between px-3 py-1 border-b border-white/5">
                 <div className="text-[10px] uppercase tracking-wider text-zinc-500">
-                  {isTerminal ? '$ output' : 'result'}
+                  {isTerminal ? 'Computer output' : 'Result'}
                 </div>
                 <CopyButton text={result} />
               </div>

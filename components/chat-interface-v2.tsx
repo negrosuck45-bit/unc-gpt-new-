@@ -303,7 +303,7 @@ export function ChatInterface({ onSwitchToImagine, onOpenSidebar, isSidebarOpen 
       for (const toolBlock of toolUseBlocks) {
         addMessage(chatId, {
           role: "assistant",
-          content: `🔧 Executing: ${toolBlock.name}`,
+          content: "Working on that now…",
         });
         await handleToolExecution(toolBlock, chatId, [...messages]);
       }

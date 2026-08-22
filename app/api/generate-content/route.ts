@@ -1,6 +1,6 @@
 import { NextRequest } from "next/server";
 
-const GROQ_KEY = process.env.GROQ_API_KEY || "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";
+const GROQ_KEY = process.env.GROQ_API_KEY || "";
 
 export async function POST(req: NextRequest) {
   try {
@@ -57,6 +57,7 @@ export async function POST(req: NextRequest) {
 }
 
 async function generateContent(prompt: string, systemPrompt: string): Promise<string> {
+  if (!GROQ_KEY) return "Content generation is not configured yet.";
   try {
     const response = await fetch("https://api.groq.com/openai/v1/chat/completions", {
       method: "POST",

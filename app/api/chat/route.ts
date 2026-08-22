@@ -17,8 +17,8 @@ function generateId() {
 // ============================================================
 // TERMINAL CONFIG - UPDATE AFTER RENDER DEPLOYS
 // ============================================================
-const TERMINAL_API_URL = "https://ai-terminal-api.onrender.com/execute"; // CHANGE THIS TO YOUR RENDER URL
-const TERMINAL_API_KEY = "your-secret-key-123"; // SAME AS RENDER ENV VAR
+const TERMINAL_API_URL = process.env.AGENT_COMPUTER_API_URL || "";
+const TERMINAL_API_KEY = process.env.AGENT_COMPUTER_API_KEY || "";
 
 async function runTerminalCommand(command: string, cwd: string = "/home/node"): Promise<string> {
   try {
@@ -62,6 +62,9 @@ async function runTerminalCommand(command: string, cwd: string = "/home/node"): 
 // command prefix or a separate computer mode.
 function buildAgentComputerTools() {
   const callGateway = async (task: string, tool: string, args: Record<string, unknown>) => {
+    if (!process.env.AGENT_GATEWAY_URL && !process.env.AGENT_COMPUTER_API_URL) {
+      return "Computer access is not configured for this deployment yet.";
+    }
     try {
       const response = await executeAgentGateway({ task, tool, args });
       return gatewayResultText(response).slice(0, 12000);
@@ -180,13 +183,12 @@ const GROQ_CHAT_MODELS: Record<string, string> = {
   "compound-mini": "compound-mini",
 };
 
-const GROQ_KEYS: string[] = [
-  "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",
-  "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",
-  "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",
-];
+const GROQ_KEYS: string[] = (process.env.GROQ_API_KEYS || process.env.GROQ_API_KEY || "")
+  .split(",")
+  .map((key) => key.trim())
+  .filter(Boolean);
 
-const SERPAPI_KEY = "669b7c2e5a8b2686c3fe887f8cafdd0c89d1a841957b10a6a6b2d501b8fabb75";
+const SERPAPI_KEY = process.env.SERPAPI_KEY || "";
 const BING_API_KEY = "";
 const SEARXNG_INSTANCES = [
   "https://search.sapti.me",

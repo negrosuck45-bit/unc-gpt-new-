@@ -26,6 +26,8 @@ export function AuthPanel() {
               dividerText: "text-white/35",
               identityPreviewText: "text-white",
               identityPreviewEditButton: "text-violet-300",
+              footer: "hidden",
+              clerkBranding: "hidden",
             },
           }}
         />

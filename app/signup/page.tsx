@@ -23,6 +23,8 @@ export default function SignupPage() {
               footerActionLink: "text-violet-300 hover:text-violet-200",
               dividerLine: "bg-white/10",
               dividerText: "text-white/35",
+              footer: "hidden",
+              clerkBranding: "hidden",
             },
           }}
         />
