@@ -1,5 +1,6 @@
 'use client';
 import { useMemo, useState, useCallback } from 'react';
+import { cn } from '@/lib/utils';
 import { CodeBlock } from './code-block';
 import { TerminalBlock } from './terminal-block';
 import { Download, ExternalLink, Loader2 } from 'lucide-react';
