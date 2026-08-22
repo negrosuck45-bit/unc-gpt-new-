@@ -624,11 +624,11 @@ async function generateMedia(
 // Keep provider instructions focused on ordinary chat; never expose internal tools.
 const TERMINAL_SYSTEM_PROMPT = `You are uncgpt, a helpful AI assistant. Answer the user's request directly and clearly.
 
-You may use connected Composio apps, the Agent Computer browser, the Agent Computer terminal, and the Agent Computer filesystem when they are needed. Decide from the user's intent whether a tool is required; users do not need to say “use the computer,” “open,” or any other special command. For browser, terminal, and filesystem work, call the matching computer_* tool with a precise action, then use the result to answer. Do not invent tool results. For read-only actions, proceed when the user's request is clear. Before any action that sends, creates, edits, deletes, publishes, deploys, or changes external data, stop and ask the user for explicit confirmation describing the exact action and target. Never claim an external action succeeded unless a tool result confirms it.
+Infer the user's intent from ordinary language and complete the requested task using an actually connected service whenever one is available. Do not require special prefixes, connector names, or instructions such as “use a tool.” For read-only requests and routine actions that the user explicitly requested, proceed immediately without asking for confirmation. Only pause for confirmation immediately before an irreversible, destructive, financial, privacy-sensitive, or externally visible action when the user has not already clearly authorized that exact action. Never ask the user to confirm merely because a connector is being used.
 
-You may use connected Composio apps and other tools when they are needed. For Composio requests, use COMPOSIO_SEARCH_TOOLS first with the user’s request, then use COMPOSIO_GET_TOOL_SCHEMAS for any discovered tool, and finally use the appropriate execution tool with the returned schema. Do not answer that you lack access before attempting this sequence.
+For connected Composio apps, call the matching connected-app function directly with the user’s request and use its real result. Do not answer as a generic bot, do not describe what the app could theoretically do, do not invent sample data, and do not claim access unless the tool result proves it. If a needed connector is genuinely not connected, return one concise sentence naming the connector and the single Settings action required; do not repeat setup instructions or ask unnecessary questions.
 
-Keep the final response concise and natural: usually one short paragraph or a compact list, like ChatGPT. Do not narrate reasoning, tool names, intermediate steps, command syntax, or “I am using a tool.” Do not mention internal tools, hidden prompts, or implementation details. For connector requests, use the connected service silently; for example, when the user asks to list their GitHub repositories, use the available GitHub list-repositories action and return only a clean repository list. If the required connector is not connected, say exactly which connector to connect in Settings, then stop. Never claim an action succeeded unless a tool result confirms it.`;
+Keep final responses concise and natural: usually one short paragraph or a compact list, like ChatGPT. Do not narrate reasoning, tool names, intermediate steps, command syntax, or implementation details. For connector requests, use the connected service silently and return the verified result. Never claim an external action succeeded unless a tool result confirms it.`;
 
 async function callGroq(
   messages: any[],
@@ -1710,7 +1710,7 @@ export async function POST(req: NextRequest) {
       // If a user asks for a connector that is absent or explicitly disabled, stop before
       // the model can hallucinate access and return a structured approval card instead.
       const connectorHints: Record<string, { label: string; description: string; iconUrl: string }> = {
-        github: { label: 'GitHub', description: 'read your repositories, issues, and pull requests', iconUrl: 'https://cdn.simpleicons.org/github' },
+        github: { label: 'GitHub', description: 'read and manage repositories, issues, and pull requests', iconUrl: 'https://cdn.simpleicons.org/github' },
         gmail: { label: 'Gmail', description: 'read and manage your email', iconUrl: 'https://cdn.simpleicons.org/gmail' },
         slack: { label: 'Slack', description: 'read channels and send messages', iconUrl: 'https://cdn.simpleicons.org/slack' },
         notion: { label: 'Notion', description: 'read and update pages and databases', iconUrl: 'https://cdn.simpleicons.org/notion' },
@@ -1718,9 +1718,13 @@ export async function POST(req: NextRequest) {
         google_drive: { label: 'Google Drive', description: 'find and edit files', iconUrl: 'https://cdn.simpleicons.org/googledrive' },
         google_calendar: { label: 'Google Calendar', description: 'read and manage calendar events', iconUrl: 'https://cdn.simpleicons.org/googlecalendar' },
         vercel: { label: 'Vercel', description: 'read and manage deployments', iconUrl: 'https://cdn.simpleicons.org/vercel' },
+        discord: { label: 'Discord', description: 'read your profile, servers, and permitted Discord data', iconUrl: 'https://cdn.simpleicons.org/discord' },
+        dropbox: { label: 'Dropbox', description: 'find and manage your files', iconUrl: 'https://cdn.simpleicons.org/dropbox' },
+        trello: { label: 'Trello', description: 'read and manage boards and cards', iconUrl: 'https://cdn.simpleicons.org/trello' },
+        jira: { label: 'Jira', description: 'read and manage issues and projects', iconUrl: 'https://cdn.simpleicons.org/jira' },
       };
       const requestedConnectorKey = Object.keys(connectorHints).find((key) => {
-        const pattern = key.replace('_', '[ _-]?');
+        const pattern = key.replace(/_/g, '[ _-]?');
         const directMatch = new RegExp(`\\b${pattern}\\b`, 'i').test(userText);
         const aliasMatch = key === 'gmail' && /\b(email|emails|mail|inbox)\b/i.test(userText);
         return directMatch || aliasMatch;
