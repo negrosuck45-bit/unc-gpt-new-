@@ -1,6 +1,6 @@
 import { NextRequest } from 'next/server'
 import ffmpegPath from 'ffmpeg-static'
-import { auth0 } from '@/lib/auth0'
+import { getSession } from '@/lib/auth'
 import { execFile } from 'node:child_process'
 import { promisify } from 'node:util'
 import { mkdtemp, readFile, rm, writeFile } from 'node:fs/promises'
@@ -53,7 +53,7 @@ async function extractAudio(file: File) {
 }
 
 export async function POST(request: NextRequest) {
-  const session = await auth0.getSession().catch(() => null)
+  const session = await getSession().catch(() => null)
   const userId = session?.user?.sub
   if (!userId) return Response.json({ error: 'Unauthorized' }, { status: 401 })
 

@@ -1,8 +1,8 @@
-import { auth0 } from "@/lib/auth0";
+import { getSession } from "@/lib/auth";
 import { isComposioConfigured } from "@/lib/composio";
 
 export async function GET() {
-  const session = await auth0.getSession();
+  const session = await getSession();
   return Response.json({
     authenticated: Boolean(session?.user?.sub),
     configured: isComposioConfigured(),

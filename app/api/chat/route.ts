@@ -1,6 +1,6 @@
 import type { NextRequest } from "next/server";
 
-import { auth0 } from "@/lib/auth0";
+import { getSession } from "@/lib/auth";
 import { getComposioSession, getComposioUserId, getComposioUserIds } from "@/lib/composio";
 import { Composio } from "@composio/core";
 import { chooseUncGptRoute } from "@/lib/uncgpt-router";
@@ -1728,7 +1728,7 @@ export async function POST(req: NextRequest) {
       // whether to ask for authorization, so the AI and connector panel see the same state.
       if (requestedConnectorKey && process.env.COMPOSIO_API_KEY && (!requestedState || requestedState.enabled === false)) {
         try {
-          const liveSession = await auth0.getSession();
+          const liveSession = await getSession();
           const liveUserId = liveSession?.user?.sub;
           const composio = new Composio({ apiKey: process.env.COMPOSIO_API_KEY });
           const liveAccounts: any = liveUserId ? await composio.connectedAccounts.list({ userIds: getComposioUserIds(liveUserId), limit: 1000 }) : null;
@@ -1755,7 +1755,7 @@ export async function POST(req: NextRequest) {
         return new Response(stream, { headers: { 'Content-Type': 'text/event-stream', 'Cache-Control': 'no-cache' } });
       }
       try {
-        const session = await auth0.getSession();
+        const session = await getSession();
         if (session?.user?.sub) {
           composioSession = await getComposioSession(session.user.sub);
           if (composioSession) {
@@ -1816,7 +1816,7 @@ export async function POST(req: NextRequest) {
     if (isGithubRepositoryRequest) {
       let reply = "GitHub isn’t connected yet. Open Settings → Connectors and connect GitHub.";
       try {
-        const session = await auth0.getSession();
+        const session = await getSession();
         const githubPreference = Array.isArray(mcpConnectors) ? mcpConnectors.find((connector: any) => connector?.source === 'composio' && String(connector.provider || connector.toolkit || '').toLowerCase() === 'github' && connector?.enabled !== false) : null;
         const resultText = await executeVerifiedGithubRepositories(session?.user?.sub || "", githubPreference?.accountId);
         if (resultText === NO_GITHUB_ACCOUNT) {

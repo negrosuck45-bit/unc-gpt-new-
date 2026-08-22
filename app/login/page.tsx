@@ -1,9 +1,9 @@
 import { redirect } from "next/navigation"
 import { AuthPanel } from "@/components/auth-panel"
-import { auth0 } from "@/lib/auth0"
+import { getSession } from "@/lib/auth"
 
 export default async function LoginPage() {
-  const session = await auth0.getSession()
+  const session = await getSession()
   if (session) redirect("/")
   return <AuthPanel />
 }

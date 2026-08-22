@@ -1,9 +1,9 @@
 import { NextRequest } from "next/server";
-import { auth0 } from "@/lib/auth0";
+import { getSession } from "@/lib/auth";
 import { getComposioSession } from "@/lib/composio";
 
 export async function POST(req: NextRequest) {
-  const session = await auth0.getSession();
+  const session = await getSession();
   const userId = session?.user?.sub;
   if (!userId) return Response.json({ error: "Sign in before connecting an app." }, { status: 401 });
 

@@ -1,15 +1,14 @@
-"use client"
+import { SignUp } from "@clerk/nextjs"
 
-import { SignIn } from "@clerk/nextjs"
-
-export function AuthPanel() {
+export default function SignupPage() {
   return (
     <main className="relative flex min-h-screen items-center justify-center overflow-hidden bg-[#070709] px-5 py-10 text-white">
       <div className="pointer-events-none fixed inset-0 bg-[radial-gradient(circle_at_50%_12%,rgba(124,58,237,0.22),transparent_38%),radial-gradient(circle_at_85%_85%,rgba(37,99,235,0.14),transparent_32%)]" />
       <section className="relative w-full max-w-md">
-        <SignIn
-          routing="hash"
-          signUpUrl="/signup"
+        <SignUp
+          routing="path"
+          path="/signup"
+          signInUrl="/login"
           fallbackRedirectUrl="/"
           appearance={{
             elements: {
@@ -24,8 +23,6 @@ export function AuthPanel() {
               footerActionLink: "text-violet-300 hover:text-violet-200",
               dividerLine: "bg-white/10",
               dividerText: "text-white/35",
-              identityPreviewText: "text-white",
-              identityPreviewEditButton: "text-violet-300",
             },
           }}
         />

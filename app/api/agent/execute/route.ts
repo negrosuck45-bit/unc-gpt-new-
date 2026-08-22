@@ -1,11 +1,11 @@
 import { NextRequest } from "next/server"
-import { auth0 } from "@/lib/auth0"
+import { getSession } from "@/lib/auth"
 import { checkAgentGateway, executeAgentGateway } from "@/lib/agent-gateway"
 
 export const runtime = "nodejs"
 
 export async function GET() {
-  const session = await auth0.getSession()
+  const session = await getSession()
   if (!session?.user?.sub) return Response.json({ ok: false, error: "Unauthorized" }, { status: 401 })
 
   try {
@@ -17,7 +17,7 @@ export async function GET() {
 }
 
 export async function POST(request: NextRequest) {
-  const session = await auth0.getSession()
+  const session = await getSession()
   if (!session?.user?.sub) return Response.json({ error: "Unauthorized" }, { status: 401 })
 
   const body = await request.json().catch(() => null)

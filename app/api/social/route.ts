@@ -1,13 +1,13 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createClient } from "@supabase/supabase-js";
-import { auth0 } from "@/lib/auth0";
+import { getSession } from "@/lib/auth";
 
 export const runtime = "nodejs";
 
 function db() { const url = process.env.NEXT_PUBLIC_SUPABASE_URL; const key = process.env.SUPABASE_SERVICE_ROLE_KEY; return url && key ? createClient(url, key, { auth: { autoRefreshToken: false, persistSession: false } }) : null; }
 
 export async function GET(request: NextRequest) {
-  const session = await auth0.getSession();
+  const session = await getSession();
   const userId = session?.user?.sub;
   if (!userId) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   const client = db();
@@ -22,7 +22,7 @@ export async function GET(request: NextRequest) {
 }
 
 export async function POST(request: NextRequest) {
-  const session = await auth0.getSession(); const senderId = session?.user?.sub;
+  const session = await getSession(); const senderId = session?.user?.sub;
   if (!senderId) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   const body = await request.json(); const username = typeof body?.username === "string" ? body.username.trim().replace(/^@+/, "") : ""; const action = body?.action; const client = db();
   if (!client || !/^[A-Za-z0-9_]{1,24}$/.test(username)) return NextResponse.json({ error: "Invalid request." }, { status: 400 });

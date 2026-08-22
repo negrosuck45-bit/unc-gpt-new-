@@ -1,5 +1,5 @@
 import { NextRequest } from 'next/server'
-import { auth0 } from '@/lib/auth0'
+import { getSession } from '@/lib/auth'
 import { CHAT_UPLOAD_BUCKET, getSupabaseAdmin } from '@/lib/supabase/admin'
 
 export const runtime = 'nodejs'
@@ -9,7 +9,7 @@ function safeSegment(value: string) {
 }
 
 export async function POST(request: NextRequest) {
-  const session = await auth0.getSession().catch(() => null)
+  const session = await getSession().catch(() => null)
 
   const supabase = getSupabaseAdmin()
   if (!supabase) return Response.json({ error: 'Supabase storage is not configured' }, { status: 503 })
@@ -70,7 +70,7 @@ export async function POST(request: NextRequest) {
   }
 
   // Storage is the source of truth for chat media. If the optional metadata
-  // table is unavailable—or this is a Safari session without Auth0 cookies—
+  // table is unavailable—or this is a Safari session without Clerk cookies—
   // keep the uploaded object and return its public URL.
   if (metadataError) console.warn('[storage/upload] metadata insert skipped:', metadataError.message)
 

@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createClient } from "@supabase/supabase-js";
-import { auth0 } from "@/lib/auth0";
+import { getSession } from "@/lib/auth";
 
 export const runtime = "nodejs";
 
@@ -14,7 +14,7 @@ function getAdminClient() {
 }
 
 export async function GET() {
-  const session = await auth0.getSession();
+  const session = await getSession();
   const userId = session?.user?.sub;
   if (!userId) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
 
@@ -27,7 +27,7 @@ export async function GET() {
 }
 
 export async function POST(request: NextRequest) {
-  const session = await auth0.getSession();
+  const session = await getSession();
   const userId = session?.user?.sub;
   if (!userId) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
 

@@ -1,9 +1,9 @@
 import { AuthPanel } from "@/components/auth-panel"
-import { auth0 } from "@/lib/auth0"
+import { getSession } from "@/lib/auth"
 import ChatWorkspace from "./chat-workspace"
 
 export default async function Home() {
-  const session = await auth0.getSession()
+  const session = await getSession()
 
   if (!session) {
     return <AuthPanel />

@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createClient } from "@supabase/supabase-js";
-import { auth0 } from "@/lib/auth0";
+import { getSession } from "@/lib/auth";
 
 export const runtime = "nodejs";
 
@@ -24,7 +24,7 @@ function getAdminClient() {
 }
 
 async function getUserId() {
-  const session = await auth0.getSession();
+  const session = await getSession();
   return session?.user?.sub ?? null;
 }
 

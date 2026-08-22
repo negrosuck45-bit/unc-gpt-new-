@@ -1,11 +1,11 @@
 import { NextRequest } from 'next/server'
-import { auth0 } from '@/lib/auth0'
+import { getSession } from '@/lib/auth'
 import { getSupabaseAdmin } from '@/lib/supabase/admin'
 
 export const runtime = 'nodejs'
 
 export async function GET(request: NextRequest) {
-  const session = await auth0.getSession()
+  const session = await getSession()
   if (!session?.user?.sub) return Response.json({ memories: [] }, { status: 401 })
   const supabase = getSupabaseAdmin()
   if (!supabase) return Response.json({ memories: [], configured: false })
@@ -26,7 +26,7 @@ export async function GET(request: NextRequest) {
 }
 
 export async function POST(request: NextRequest) {
-  const session = await auth0.getSession()
+  const session = await getSession()
   if (!session?.user?.sub) return Response.json({ error: 'Unauthorized' }, { status: 401 })
   const supabase = getSupabaseAdmin()
   if (!supabase) return Response.json({ stored: false, configured: false })

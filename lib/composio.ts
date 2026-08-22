@@ -16,7 +16,7 @@ export interface ComposioConnector {
  */
 export function getComposioUserId(authenticatedUserId: string) {
   // Never use a deployment-wide fallback: it would mix connector accounts
-  // between Auth0 users. Composio must receive a stable per-user identifier.
+  // between Clerk users. Composio must receive a stable per-user identifier.
   return authenticatedUserId;
 }
 

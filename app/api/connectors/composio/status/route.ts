@@ -1,9 +1,9 @@
-import { auth0 } from "@/lib/auth0";
+import { getSession } from "@/lib/auth";
 import { Composio } from "@composio/core";
 import { getComposioUserIds } from "@/lib/composio";
 
 export async function GET() {
-  const session = await auth0.getSession();
+  const session = await getSession();
   const userId = session?.user?.sub;
   const apiKey = process.env.COMPOSIO_API_KEY;
 

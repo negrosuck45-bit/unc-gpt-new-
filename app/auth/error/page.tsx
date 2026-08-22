@@ -1,7 +1,7 @@
 import Link from "next/link"
 
 const reasonCopy: Record<string, string> = {
-  "the connection is not enabled": "This social connection exists in Auth0 but is not enabled for the uncgpt application yet.",
+  "the connection is not enabled": "This social connection is not enabled for the uncgpt Clerk application yet.",
   "unauthorized": "This sign-in provider is not authorized for the current application.",
 }
 

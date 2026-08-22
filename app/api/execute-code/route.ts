@@ -1,5 +1,5 @@
 import { NextRequest } from "next/server";
-import { auth0 } from "@/lib/auth0";
+import { getSession } from "@/lib/auth";
 import { exec } from "child_process";
 import { promisify } from "util";
 
@@ -8,7 +8,7 @@ const execAsync = promisify(exec);
 export const runtime = "nodejs";
 
 export async function POST(req: NextRequest) {
-  const session = await auth0.getSession();
+  const session = await getSession();
   if (!session?.user?.sub) return Response.json({ error: "Unauthorized" }, { status: 401 });
   try {
     const { code, language } = await req.json();

@@ -1,6 +1,7 @@
 import type { Metadata, Viewport } from "next"
 import { Analytics } from "@vercel/analytics/next"
-import { auth0 } from "@/lib/auth0"
+import { ClerkProvider } from "@clerk/nextjs"
+import { getSession } from "@/lib/auth"
 import { Toaster } from "sonner"
 import { ThemeProvider } from "@/components/theme-provider"
 import { CustomCursor } from "@/components/custom-cursor"
@@ -34,12 +35,13 @@ export default async function RootLayout({
 }: Readonly<{
   children: React.ReactNode
 }>) {
-  const session = await auth0.getSession()
+  const session = await getSession()
   const accountScope = session?.user?.sub ?? "guest"
 
   return (
-    <html lang="en" suppressHydrationWarning>
-      <body className="font-sans antialiased">
+    <ClerkProvider>
+      <html lang="en" suppressHydrationWarning>
+        <body className="font-sans antialiased">
         <script dangerouslySetInnerHTML={{ __html: `window.__UNCGPT_ACCOUNT_SCOPE__ = ${JSON.stringify(accountScope)};` }} />
         <ThemeProvider attribute="class" defaultTheme="dark" enableSystem disableTransitionOnChange>
           {children}
@@ -47,8 +49,9 @@ export default async function RootLayout({
           <Toaster position="bottom-center" theme="system" />
           {process.env.NODE_ENV === "production" && <Analytics />}
         </ThemeProvider>
-        <script src="https://js.puter.com/v2/"></script>
-      </body>
-    </html>
+          <script src="https://js.puter.com/v2/"></script>
+        </body>
+      </html>
+    </ClerkProvider>
   )
 }

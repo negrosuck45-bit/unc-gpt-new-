@@ -175,7 +175,7 @@ async function compressImage(file: File): Promise<File> {
   })
 }
 
-// Upload through the Auth0-protected server route. If Supabase is not configured,
+// Upload through the Clerk-protected server route. If Supabase is not configured,
 // preserve the local data-URL fallback so image sending remains usable.
 async function uploadToSupabase(file: File, fileName: string): Promise<string> {
   const formData = new FormData()
