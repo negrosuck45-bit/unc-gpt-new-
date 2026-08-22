@@ -18,6 +18,9 @@ interface ContentPart {
   command?: string;
   output?: string;
   error?: string | null;
+  badge?: string;
+  kind?: 'account' | 'server';
+  guildId?: string;
 }
 
 function formatText(text: string | undefined | null): string {
@@ -111,13 +114,29 @@ function parseContent(content: string | undefined | null): ContentPart[] {
         content: match[2].trim(),
       });
     } else if (match[0].startsWith('[[DISCORD_TAG:')) {
-      let tag = match[5] || '';
+      let decoded = match[5] || '';
       try {
-        tag = decodeURIComponent(tag);
+        decoded = decodeURIComponent(decoded);
       } catch {
         // Keep the raw value if an older response contains malformed encoding.
       }
-      parts.push({ type: 'discord-tag', content: tag });
+      try {
+        const payload = JSON.parse(decoded);
+        if (payload && typeof payload === 'object' && typeof payload.tag === 'string') {
+          parts.push({
+            type: 'discord-tag',
+            content: payload.tag,
+            badge: typeof payload.badge === 'string' ? payload.badge : undefined,
+            kind: payload.kind === 'server' ? 'server' : 'account',
+            guildId: typeof payload.guildId === 'string' ? payload.guildId : undefined,
+          });
+        } else {
+          parts.push({ type: 'discord-tag', content: decoded });
+        }
+      } catch {
+        // Support the original plain-string marker format.
+        parts.push({ type: 'discord-tag', content: decoded });
+      }
     } else if (match[0] === '[[DISCORD_NO_TAG]]') {
       parts.push({ type: 'discord-tag', content: '' });
     } else {
@@ -288,8 +307,16 @@ export function MessageContent({ content }: MessageContentProps) {
                 <Tag className="h-4 w-4 opacity-90" aria-hidden="true" />
               </div>
               <div className="min-w-0">
-                <div className="text-[10px] font-semibold uppercase tracking-[0.18em] text-white/45">Discord tag</div>
+                <div className="text-[10px] font-semibold uppercase tracking-[0.18em] text-white/45">{part.kind === 'server' ? 'Discord server tag' : 'Discord tag'}</div>
                 <div className="truncate text-sm font-medium text-white/90">{hasTag ? part.content : "You don’t have a tag"}</div>
+                {part.kind === 'server' && part.badge && part.guildId && (
+                  <img
+                    src={`https://cdn.discordapp.com/clan-badges/${encodeURIComponent(part.guildId)}/${encodeURIComponent(part.badge)}.png?size=64`}
+                    alt="Discord server tag badge"
+                    className="mt-1 h-4 w-4 rounded object-contain opacity-80"
+                    loading="lazy"
+                  />
+                )}
               </div>
             </div>
           );

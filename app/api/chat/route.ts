@@ -1398,13 +1398,50 @@ async function executeVerifiedDiscordRead(
 
       const profile = visit(value);
       if (!profile) return null;
-      const username = profile.username || profile.user_name;
-      const discriminator = profile.discriminator && String(profile.discriminator) !== "0" ? String(profile.discriminator) : "";
+
+      const findField = (item: any, keys: string[], depth = 0, seenFields = new Set<any>()): unknown => {
+        if (!item || depth > 8 || typeof item !== "object" || seenFields.has(item)) return undefined;
+        seenFields.add(item);
+        if (Array.isArray(item)) {
+          for (const entry of item) {
+            const found = findField(entry, keys, depth + 1, seenFields);
+            if (found !== undefined && found !== null && String(found).trim() !== "") return found;
+          }
+          return undefined;
+        }
+        for (const key of keys) {
+          const found = item[key];
+          if (found !== undefined && found !== null && String(found).trim() !== "") return found;
+        }
+        for (const child of Object.values(item)) {
+          const found = findField(child, keys, depth + 1, seenFields);
+          if (found !== undefined && found !== null && String(found).trim() !== "") return found;
+        }
+        return undefined;
+      };
+
+      const username = profile.username || profile.user_name || findField(value, ["username", "user_name"]);
+      const rawDiscriminator = profile.discriminator ?? findField(value, ["discriminator", "user_discriminator", "userDiscriminator"]);
+      const discriminator = rawDiscriminator && String(rawDiscriminator) !== "0" ? String(rawDiscriminator) : "";
+      const primaryGuild = profile.primary_guild || profile.primaryGuild || findField(value, ["primary_guild", "primaryGuild"]);
+      const primaryGuildTag = primaryGuild && typeof primaryGuild === "object"
+        ? (primaryGuild as any).tag || (primaryGuild as any).server_tag || (primaryGuild as any).serverTag
+        : undefined;
+      const primaryGuildBadge = primaryGuild && typeof primaryGuild === "object"
+        ? (primaryGuild as any).badge || (primaryGuild as any).badge_hash || (primaryGuild as any).badgeHash
+        : undefined;
       if (requestedIntent === "tag") {
-        const explicitTag = profile.tag || profile.user_tag || profile.userTag || profile.discord_tag || profile.discordTag;
+        const explicitTag = primaryGuildTag || profile.tag || profile.user_tag || profile.userTag || profile.discord_tag || profile.discordTag || findField(value, ["tag", "user_tag", "userTag", "discord_tag", "discordTag"]);
         const legacyTag = username && discriminator ? `${username}#${discriminator}` : "";
         const tag = explicitTag || legacyTag;
-        return tag ? `[[DISCORD_TAG:${encodeURIComponent(String(tag))}]]` : "[[DISCORD_NO_TAG]]";
+        if (!tag) return "[[DISCORD_NO_TAG]]";
+        const payload = JSON.stringify({
+          tag: String(tag),
+          kind: primaryGuildTag ? "server" : "account",
+          badge: primaryGuildBadge ? String(primaryGuildBadge) : "",
+          guildId: primaryGuild && typeof primaryGuild === "object" ? String((primaryGuild as any).identity_guild_id || (primaryGuild as any).identityGuildId || "") : "",
+        });
+        return `[[DISCORD_TAG:${encodeURIComponent(payload)}]]`;
       }
       const imageHash = requestedIntent === "avatar" ? profile.avatar : requestedIntent === "banner" ? profile.banner : null;
       if (requestedIntent === "avatar" || requestedIntent === "banner") {
