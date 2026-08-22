@@ -1402,7 +1402,7 @@ async function executeVerifiedDiscordRead(
       const discriminator = profile.discriminator && String(profile.discriminator) !== "0" ? String(profile.discriminator) : "";
       if (requestedIntent === "tag") {
         const tag = profile.tag || (username ? `${username}${discriminator ? `#${discriminator}` : ""}` : "");
-        return tag ? `Tag: ${tag}` : null;
+        return tag ? `[[DISCORD_TAG:${encodeURIComponent(String(tag))}]]` : "[[DISCORD_NO_TAG]]";
       }
       const imageHash = requestedIntent === "avatar" ? profile.avatar : requestedIntent === "banner" ? profile.banner : null;
       if (requestedIntent === "avatar" || requestedIntent === "banner") {

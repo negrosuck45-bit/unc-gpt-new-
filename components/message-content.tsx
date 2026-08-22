@@ -3,7 +3,7 @@ import { useMemo, useState, useCallback } from 'react';
 import { cn } from '@/lib/utils';
 import { CodeBlock } from './code-block';
 import { TerminalBlock } from './terminal-block';
-import { Download, ExternalLink, Loader2 } from 'lucide-react';
+import { Download, ExternalLink, Gamepad2, Loader2 } from 'lucide-react';
 import { toast } from 'sonner';
 
 interface MessageContentProps {
@@ -11,7 +11,7 @@ interface MessageContentProps {
 }
 
 interface ContentPart {
-  type: 'text' | 'code' | 'image' | 'terminal';
+  type: 'text' | 'code' | 'image' | 'terminal' | 'discord-tag';
   content: string;
   language?: string;
   alt?: string;
@@ -82,7 +82,7 @@ function parseContent(content: string | undefined | null): ContentPart[] {
   const { text: cleanedContent, terminals } = parseTerminalBlocks(content);
 
   const parts: ContentPart[] = [];
-  const regex = /```(\w+)?\n([\s\S]*?)```|!\[([^\]]*)\]\((https?:\/\/[^\)]+)\)|__TERMINAL_(\d+)__/g;
+  const regex = /```(\w+)?\n([\s\S]*?)```|!\[([^\]]*)\]\((https?:\/\/[^\)]+)\)|\[\[DISCORD_TAG:([^\]]+)\]\]|\[\[DISCORD_NO_TAG\]\]|__TERMINAL_(\d+)__/g;
 
   let lastIndex = 0;
   let match;
@@ -94,7 +94,7 @@ function parseContent(content: string | undefined | null): ContentPart[] {
     }
 
     if (match[0].startsWith('__TERMINAL_')) {
-      const idx = parseInt(match[5], 10);
+      const idx = parseInt(match[6], 10);
       const term = terminals[idx];
       if (term) {
         parts.push({
@@ -110,6 +110,16 @@ function parseContent(content: string | undefined | null): ContentPart[] {
         language: match[1] || 'text',
         content: match[2].trim(),
       });
+    } else if (match[0].startsWith('[[DISCORD_TAG:')) {
+      let tag = match[5] || '';
+      try {
+        tag = decodeURIComponent(tag);
+      } catch {
+        // Keep the raw value if an older response contains malformed encoding.
+      }
+      parts.push({ type: 'discord-tag', content: tag });
+    } else if (match[0] === '[[DISCORD_NO_TAG]]') {
+      parts.push({ type: 'discord-tag', content: '' });
     } else {
       parts.push({
         type: 'image',
@@ -267,6 +277,21 @@ export function MessageContent({ content }: MessageContentProps) {
               output={part.output}
               error={part.error}
             />
+          );
+        }
+
+        if (part.type === 'discord-tag') {
+          const hasTag = Boolean(part.content?.trim());
+          return (
+            <div key={`discord-tag-${index}`} className="my-3 inline-flex max-w-full items-center gap-3 rounded-2xl border border-white/10 bg-white/[0.045] px-3.5 py-2.5 shadow-sm">
+              <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-indigo-500/15 text-indigo-200 ring-1 ring-indigo-300/15">
+                <Gamepad2 className="h-4.5 w-4.5 opacity-80" aria-hidden="true" />
+              </div>
+              <div className="min-w-0">
+                <div className="text-[10px] font-semibold uppercase tracking-[0.18em] text-white/45">Tag</div>
+                <div className="truncate text-sm font-medium text-white/90">{hasTag ? part.content : "You don’t have a tag"}</div>
+              </div>
+            </div>
           );
         }
 
