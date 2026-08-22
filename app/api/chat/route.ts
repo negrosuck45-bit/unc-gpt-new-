@@ -1281,7 +1281,8 @@ function detectDiscordReadIntent(text: string): DiscordReadIntent | null {
   const value = text.toLowerCase();
   const mentionsDiscord = /\bdiscord\b/.test(value);
   const asksForImage = /\b(banner|cover photo|cover image|avatar|profile photo|profile picture|profile pic|pfp|photo|picture|puxture)\b/.test(value);
-  if (!mentionsDiscord && !asksForImage) return null;
+  const asksForProfileField = /\b(my|mine|your)\s+(tag|username|user id|userid|display name|discord tag|account|email)\b|\b(tag|discriminator)\b/.test(value);
+  if (!mentionsDiscord && !asksForImage && !asksForProfileField) return null;
   if (/\b(banner|cover photo|cover image)\b/.test(value)) return "banner";
   if (/\b(avatar|profile photo|profile picture|profile pic|pfp|photo|picture|puxture)\b/.test(value)) return "avatar";
   if (/\b(channel|channels)\b/.test(value)) return "channels";
@@ -1339,7 +1340,7 @@ async function executeVerifiedDiscordRead(
 
     const toolIntent: "user" | "servers" | "channels" = intent === "avatar" || intent === "banner" ? "user" : intent;
     const intentPatterns: Record<"user" | "servers" | "channels", RegExp[]> = {
-      user: [/(current|authenticated|my).*user/i, /user.*(info|profile|details)/i, /get.*user/i, /who.*am.*i/i],
+      user: [/(current|authenticated|my).*user/i, /user.*(info|profile|details)/i, /get.*user/i, /who.*am.*i/i, /(?:my|your).*?(tag|username|discriminator)/i, /tag|discriminator|username/i],
       servers: [/(list|show|get|fetch).*?(server|guild)/i, /(server|guild).*(list|membership)/i, /my.*(server|guild)/i],
       channels: [/(list|show|get|fetch).*channel/i, /channel.*(list|info)/i],
     };
@@ -1419,7 +1420,9 @@ async function executeVerifiedDiscordRead(
       add("Username", profile.username || profile.user_name);
       add("Display name", profile.global_name || profile.display_name);
       add("User ID", profile.id || profile.user_id || profile.userId);
-      if (profile.discriminator && String(profile.discriminator) !== "0") {
+      if (profile.tag) {
+        add("Tag", profile.tag);
+      } else if (profile.discriminator && String(profile.discriminator) !== "0") {
         add("Tag", `${profile.username || profile.user_name}#${profile.discriminator}`);
       }
       add("Email", profile.email);
