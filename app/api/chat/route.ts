@@ -1392,7 +1392,7 @@ async function executeVerifiedDiscordRead(
       const lines = [`Username: ${identity.username}`, `User ID: ${identity.id}`];
       if (identity.displayName && identity.displayName !== identity.username) lines.push(`Display name: ${identity.displayName}`);
       if (identity.discriminator) lines.push(`Tag: ${identity.username}#${identity.discriminator}`);
-      return lines.join("\\n");
+      return lines.join("\n");
     };
 
     for (const tool of candidates.slice(0, 8)) {
