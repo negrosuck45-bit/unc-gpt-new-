@@ -167,32 +167,12 @@ const SKILL_CATEGORIES = [
         alwaysOn: false,
         requiresConnector: 'notion',
       },
-      {
-        id: 'osint',
-        name: 'OSINT Toolkit',
-        description: 'Open-source intelligence tools for research and investigation.',
-        icon: Globe,
-        iconBg: 'bg-yellow-500/15',
-        iconColor: 'text-yellow-500',
-        enabled: true,
-        alwaysOn: false,
-      },
     ],
   },
   {
     id: 'dev',
     label: 'Developer Tools',
     skills: [
-      {
-        id: 'website_builder',
-        name: 'Website Builder',
-        description: 'Generate full HTML/CSS/JS websites from a text prompt.',
-        icon: Globe,
-        iconBg: 'bg-lime-500/15',
-        iconColor: 'text-lime-500',
-        enabled: true,
-        alwaysOn: false,
-      },
       {
         id: 'terminal',
         name: 'Terminal / Shell',

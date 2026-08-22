@@ -5,7 +5,6 @@ import { dispatchAccountScopeChanged, setActiveAccountScope } from "@/lib/accoun
 import { ChatSidebar } from "@/components/chat-sidebar"
 import { SettingsPage } from "@/components/settings-page"
 import { ChatInterface } from "@/components/chat-interface"
-import VoiceChat from "@/components/voice-chat"
 import Imagine from "@/components/imagine"
 
 function useIsMobile() {
@@ -99,7 +98,7 @@ export default function Home({ accountScope }: { accountScope: string }) {
     void useChatStore.persist.rehydrate()
   }, [accountScope])
   const [isSidebarOpen, setIsSidebarOpen] = useState(false)
-  const [currentMode, setCurrentMode] = useState<"text" | "voice" | "imagine">("text")
+  const [currentMode, setCurrentMode] = useState<"text" | "imagine">("text")
   const [settingsOpen, setSettingsOpen] = useState(false)
 
   // Set correct initial sidebar state once we know the screen size
@@ -142,13 +141,6 @@ export default function Home({ accountScope }: { accountScope: string }) {
 
   const renderMainContent = () => {
     switch (currentMode) {
-      case "voice":
-        return (
-          <VoiceChat
-            onOpenSidebar={toggleSidebar}
-            isSidebarOpen={isSidebarOpen}
-          />
-        )
       case "imagine":
         return (
           <Imagine

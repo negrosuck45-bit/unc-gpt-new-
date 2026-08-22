@@ -201,7 +201,7 @@ const OPENROUTER_KEY = process.env.OPENROUTER_API_KEY || process.env.OPENROUTER_
 const HF_URL = "https://router.huggingface.co/v1/chat/completions";
 const HF_TOKEN = process.env.HF_TOKEN || process.env.HUGGINGFACE_API_KEY || "";
 const CEREBRAS_URL = "https://api.cerebras.ai/v1/chat/completions";
-const CEREBRAS_KEY = "csk-tt4rvyyfwr5ytrm9vn33nhv5myc6p3thynkcv2j9cdtce62d";
+const CEREBRAS_KEY = process.env.CEREBRAS_API_KEY || process.env.CEREBRAS_KEY || "";
 
 let currentGroqKeyIndex = 0;
 let currentChatIndex = 0;
