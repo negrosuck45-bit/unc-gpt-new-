@@ -1799,12 +1799,16 @@ export async function POST(req: NextRequest) {
         mcpTools = await fetchMcpTools(activeMcpConnectors, baseUrl);
       }
 
-      const combinedTools = [
-        ...availableTools,
-        ...oauthBundle.tools,
-        ...composioTools,
-        ...mcpTools,
-      ];
+      const computerIntent = /\b(open|navigate|inspect|click|type|scroll|browser|terminal|command|file|folder|filesystem|computer|website|site)\b/i.test(userText);
+      const shouldUseTools = Boolean(requestedConnectorKey && connectorActionIntent) || computerIntent;
+      const combinedTools = shouldUseTools
+        ? [
+            ...availableTools,
+            ...oauthBundle.tools,
+            ...composioTools,
+            ...mcpTools,
+          ]
+        : [];
       availableTools = combinedTools;
 
       if (combinedTools.length > 0 && !isGithubRepositoryRequest) {
