@@ -1275,6 +1275,100 @@ async function executeVerifiedGithubRepositories(userId: string, connectedAccoun
   return UNVERIFIED_GITHUB_RESULT;
 }
 
+type DiscordReadIntent = "user" | "servers" | "channels";
+
+function detectDiscordReadIntent(text: string): DiscordReadIntent | null {
+  const value = text.toLowerCase();
+  if (!/\bdiscord\b/.test(value)) return null;
+  if (/\b(channel|channels)\b/.test(value)) return "channels";
+  if (/\b(server|servers|guild|guilds|membership|memberships)\b/.test(value)) return "servers";
+  if (/\b(my|mine|user|username|profile|account|who am i|user id|userid)\b/.test(value)) return "user";
+  return null;
+}
+
+function formatVerifiedConnectorData(value: unknown): string {
+  if (typeof value === "string") {
+    const trimmed = value.trim();
+    if (trimmed) {
+      try {
+        return formatVerifiedConnectorData(JSON.parse(trimmed));
+      } catch {
+        return trimmed.slice(0, 12000);
+      }
+    }
+  }
+
+  const serializable = value && typeof value === "object" ? value : { result: value };
+  let json = "";
+  try {
+    json = JSON.stringify(serializable, null, 2);
+  } catch {
+    json = String(serializable);
+  }
+  return json.slice(0, 12000);
+}
+
+async function executeVerifiedDiscordRead(
+  userId: string,
+  intent: DiscordReadIntent
+): Promise<string> {
+  const apiKey = process.env.COMPOSIO_API_KEY;
+  if (!apiKey || !userId) return NO_GITHUB_ACCOUNT;
+
+  try {
+    const composio = new Composio({ apiKey });
+    const accounts: any = await composio.connectedAccounts.list({
+      userIds: getComposioUserIds(userId),
+      toolkitSlugs: ["discord"],
+      limit: 1000,
+    });
+    const account = (accounts?.items || []).find((item: any) =>
+      !item?.isDisabled && ["active", "connected"].includes(String(item?.status || "").toLowerCase())
+    );
+    if (!account?.id) return NO_GITHUB_ACCOUNT;
+
+    const rawTools: any[] = await composio.tools.getRawComposioTools(
+      { toolkits: ["discord"], limit: 250, important: false },
+      undefined,
+      { signal: AbortSignal.timeout(10000) }
+    );
+
+    const intentPatterns: Record<DiscordReadIntent, RegExp[]> = {
+      user: [/(current|authenticated|my).*user/i, /user.*(info|profile|details)/i, /get.*user/i, /who.*am.*i/i],
+      servers: [/(list|show|get|fetch).*?(server|guild)/i, /(server|guild).*(list|membership)/i, /my.*(server|guild)/i],
+      channels: [/(list|show|get|fetch).*channel/i, /channel.*(list|info)/i],
+    };
+    const candidates = rawTools.filter((tool: any) => {
+      const descriptor = `${tool?.slug || ""} ${tool?.name || ""} ${tool?.description || ""}`;
+      return intentPatterns[intent].some((pattern) => pattern.test(descriptor));
+    });
+    const tool = candidates.find((candidate: any) => {
+      const required = candidate?.inputParameters?.required || candidate?.input_parameters?.required || [];
+      return Array.isArray(required) && required.length === 0;
+    }) || candidates[0];
+    if (!tool?.slug) return UNVERIFIED_GITHUB_RESULT;
+
+    const required = tool?.inputParameters?.required || tool?.input_parameters?.required || [];
+    if (Array.isArray(required) && required.length > 0) return UNVERIFIED_GITHUB_RESULT;
+
+    const response: any = await composio.tools.execute(
+      tool.slug,
+      {
+        userId: getComposioUserId(userId),
+        connectedAccountId: account.id,
+        arguments: {},
+        dangerouslySkipVersionCheck: true,
+      },
+      { signal: AbortSignal.timeout(15000) }
+    );
+    if (response?.successful === false || response?.error) return UNVERIFIED_GITHUB_RESULT;
+    return formatVerifiedConnectorData(response?.data ?? response);
+  } catch (error) {
+    console.error("Verified Discord execution failed:", error);
+    return UNVERIFIED_GITHUB_RESULT;
+  }
+}
+
 function buildOAuthTools(req: NextRequest, baseUrl: string) {
   const cookieHeader = req.headers.get("cookie") || "";
   const providers = [
@@ -1863,6 +1957,44 @@ export async function POST(req: NextRequest) {
         },
       });
       return createStreamResponse(stream, "GitHub", "connected-action", []);
+    }
+
+    // ==================== VERIFIED DISCORD READS ====================
+    // Discord identity/server reads are handled directly so a connected account
+    // cannot be replaced by generic model prose or invented sample data.
+    const discordReadIntent = detectDiscordReadIntent(userText);
+    if (discordReadIntent) {
+      let reply = "Discord isn’t connected yet. Open Settings → Connectors and connect Discord.";
+      let shouldShowPermission = true;
+      try {
+        const session = await getSession();
+        const resultText = await executeVerifiedDiscordRead(session?.user?.sub || "", discordReadIntent);
+        if (resultText !== NO_GITHUB_ACCOUNT && resultText !== UNVERIFIED_GITHUB_RESULT) {
+          const heading = discordReadIntent === "user" ? "Here is your verified Discord account information:" : discordReadIntent === "servers" ? "Here are your verified Discord servers:" : "Here are your verified Discord channels:";
+          reply = `${heading}\n\n\`\`\`json\n${resultText}\n\`\`\``;
+          shouldShowPermission = false;
+        } else if (resultText === UNVERIFIED_GITHUB_RESULT) {
+          reply = "Discord is connected, but it did not return verifiable data for that request.";
+          shouldShowPermission = false;
+        }
+      } catch {
+        reply = "I couldn’t access the connected Discord account right now. Please try again.";
+        shouldShowPermission = false;
+      }
+
+      const encoder = new TextEncoder();
+      const stream = new ReadableStream({
+        start(controller) {
+          controller.enqueue(encoder.encode(`data: ${JSON.stringify({ provider: "Discord", model: "connected-action" })}\\n\\n`));
+          if (shouldShowPermission) {
+            controller.enqueue(encoder.encode(`data: ${JSON.stringify({ permission_request: { toolkit: "discord", label: "Discord", description: "read your profile, servers, and permitted Discord data", iconUrl: "https://cdn.simpleicons.org/discord", mode: "connect" } })}\\n\\n`));
+          }
+          controller.enqueue(encoder.encode(`data: ${JSON.stringify({ content: reply })}\\n\\n`));
+          controller.enqueue(encoder.encode("data: [DONE]\\n\\n"));
+          controller.close();
+        },
+      });
+      return createStreamResponse(stream, "Discord", "connected-action", []);
     }
 
     // ==================== CALL MODEL ====================
