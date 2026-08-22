@@ -303,20 +303,12 @@ export function MessageContent({ content }: MessageContentProps) {
           const hasTag = Boolean(part.content?.trim());
           return (
             <div key={`discord-tag-${index}`} role="status" aria-label="Discord tag" className="my-3 inline-flex max-w-full items-center gap-3 rounded-2xl border border-white/10 bg-white/[0.045] px-3.5 py-2.5 shadow-sm">
-              <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-indigo-500/15 text-indigo-200 ring-1 ring-indigo-300/15">
-                <Tag className="h-4 w-4 opacity-90" aria-hidden="true" />
+              <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-indigo-500/20 text-indigo-200 ring-1 ring-indigo-300/20">
+                <Tag className="h-[18px] w-[18px] opacity-90" aria-hidden="true" />
               </div>
               <div className="min-w-0">
                 <div className="text-[10px] font-semibold uppercase tracking-[0.18em] text-white/45">{part.kind === 'server' ? 'Discord server tag' : 'Discord tag'}</div>
-                <div className="truncate text-sm font-medium text-white/90">{hasTag ? part.content : "You don’t have a tag"}</div>
-                {part.kind === 'server' && part.badge && part.guildId && (
-                  <img
-                    src={`https://cdn.discordapp.com/clan-badges/${encodeURIComponent(part.guildId)}/${encodeURIComponent(part.badge)}.png?size=64`}
-                    alt="Discord server tag badge"
-                    className="mt-1 h-4 w-4 rounded object-contain opacity-80"
-                    loading="lazy"
-                  />
-                )}
+                <div className="mt-0.5 whitespace-nowrap text-base font-semibold tracking-wide text-white/95">{hasTag ? part.content : "You don’t have a tag"}</div>
               </div>
             </div>
           );

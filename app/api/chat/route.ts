@@ -1435,8 +1435,11 @@ async function executeVerifiedDiscordRead(
         const legacyTag = username && discriminator ? `${username}#${discriminator}` : "";
         const tag = explicitTag || legacyTag;
         if (!tag) return "[[DISCORD_NO_TAG]]";
+        const cleanTag = primaryGuildTag
+          ? String(tag).replace(/\s+/g, "").slice(0, 4)
+          : String(tag).trim();
         const payload = JSON.stringify({
-          tag: String(tag),
+          tag: cleanTag,
           kind: primaryGuildTag ? "server" : "account",
           badge: primaryGuildBadge ? String(primaryGuildBadge) : "",
           guildId: primaryGuild && typeof primaryGuild === "object" ? String((primaryGuild as any).identity_guild_id || (primaryGuild as any).identityGuildId || "") : "",
