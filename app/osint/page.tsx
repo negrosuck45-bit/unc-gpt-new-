@@ -174,7 +174,7 @@ export default function OsintPage() {
         </div>
       </header>
 
-      <main className="max-w-3xl mx-auto px-6 py-8 space-y-6">
+      <main className="document-scroll-page max-w-3xl mx-auto px-6 py-8 space-y-6">
         <section className="space-y-4 rounded-xl border border-border bg-muted/20 p-5">
           <div className="grid grid-cols-1 sm:grid-cols-[180px_1fr] gap-3">
             <div className="space-y-1.5">

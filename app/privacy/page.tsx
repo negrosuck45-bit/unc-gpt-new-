@@ -1,6 +1,6 @@
 export default function PrivacyPage() {
   return (
-    <main className="min-h-screen bg-[#070709] px-6 py-16 text-white">
+    <main className="document-scroll-page min-h-screen bg-[#070709] px-6 py-16 text-white">
       <article className="mx-auto max-w-2xl rounded-3xl border border-white/10 bg-white/[0.04] p-8 backdrop-blur-xl sm:p-12">
         <p className="text-xs uppercase tracking-[0.22em] text-violet-300/80">uncgpt</p>
         <h1 className="mt-4 text-3xl font-semibold">Privacy</h1>
