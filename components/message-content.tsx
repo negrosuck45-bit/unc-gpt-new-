@@ -160,22 +160,8 @@ function parseContent(content: string | undefined | null): ContentPart[] {
   return parts.length > 0 ? parts : [{ type: 'text', content: cleanedContent.trim() }];
 }
 
-function DiscordTagIcon({ badge, guildId }: { badge?: string; guildId?: string }) {
-  const [failed, setFailed] = useState(false);
-
-  if (!badge || !guildId || failed) {
-    return <Tag className="h-[18px] w-[18px] opacity-90" aria-hidden="true" />;
-  }
-
-  return (
-    <img
-      src={`https://cdn.discordapp.com/clan-badges/${encodeURIComponent(guildId)}/${encodeURIComponent(badge)}.png?size=64`}
-      alt="Discord server tag icon"
-      className="h-full w-full object-cover"
-      loading="lazy"
-      onError={() => setFailed(true)}
-    />
-  );
+function DiscordTagIcon() {
+  return <Tag className="h-5 w-5 opacity-90" aria-hidden="true" />;
 }
 
 function ImageWithLoader({ src, alt }: { src: string; alt: string }) {
@@ -323,8 +309,8 @@ export function MessageContent({ content }: MessageContentProps) {
           const hasTag = Boolean(part.content?.trim());
           return (
             <div key={`discord-tag-${index}`} role="status" aria-label="Discord tag" className="my-3 inline-flex max-w-full items-center gap-3 rounded-2xl border border-white/10 bg-white/[0.045] px-3.5 py-2.5 shadow-sm">
-              <div className="flex h-10 w-10 shrink-0 items-center justify-center overflow-hidden rounded-full bg-indigo-500/20 text-indigo-200 ring-1 ring-indigo-300/20">
-                <DiscordTagIcon badge={part.kind === 'server' ? part.badge : undefined} guildId={part.kind === 'server' ? part.guildId : undefined} />
+              <div className="flex h-10 w-10 shrink-0 items-center justify-center text-indigo-300">
+                <DiscordTagIcon />
               </div>
               <div className="min-w-0">
                 <div className="max-w-[14rem] truncate text-[10px] font-semibold uppercase tracking-[0.18em] text-white/45">{part.kind === 'server' ? (part.serverName || 'Server tag') : 'Discord tag'}</div>
