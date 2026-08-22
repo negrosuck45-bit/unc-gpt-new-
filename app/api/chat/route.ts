@@ -1358,10 +1358,10 @@ async function executeVerifiedDiscordRead(
         return score(right) - score(left);
       });
 
-    const formatDiscordIdentity = (value: unknown): string | null => {
+    const formatDiscordProfile = (value: unknown): string | null => {
       const seen = new Set<any>();
       const visit = (item: any, depth = 0): any => {
-        if (!item || depth > 5 || typeof item !== "object" || seen.has(item)) return null;
+        if (!item || depth > 6 || typeof item !== "object" || seen.has(item)) return null;
         seen.add(item);
         if (Array.isArray(item)) {
           for (const entry of item) {
@@ -1370,29 +1370,55 @@ async function executeVerifiedDiscordRead(
           }
           return null;
         }
-        const username = item.username || item.user_name || item.display_name || item.global_name;
+        const username = item.username || item.user_name;
         const id = item.id || item.user_id || item.userId;
-        const looksLikeBotApplication = Boolean(item.application || item.oauth2_install_params || item.integration_types_config || item.storefront_available !== undefined);
-        if (username && id && !looksLikeBotApplication) {
-          return {
-            username: String(username),
-            id: String(id),
-            displayName: item.global_name || item.display_name || null,
-            discriminator: item.discriminator && String(item.discriminator) !== "0" ? String(item.discriminator) : null,
-          };
-        }
+        const looksLikeBotApplication = Boolean(
+          item.application ||
+          item.oauth2_install_params ||
+          item.integration_types_config ||
+          item.storefront_available !== undefined ||
+          item.bot === true ||
+          item.bot_public !== undefined ||
+          item.bot_require_code_grant !== undefined
+        );
+        if (username && id && !looksLikeBotApplication) return item;
         for (const child of Object.values(item)) {
           const match = visit(child, depth + 1);
           if (match) return match;
         }
         return null;
       };
-      const identity = visit(value);
-      if (!identity) return null;
-      const lines = [`Username: ${identity.username}`, `User ID: ${identity.id}`];
-      if (identity.displayName && identity.displayName !== identity.username) lines.push(`Display name: ${identity.displayName}`);
-      if (identity.discriminator) lines.push(`Tag: ${identity.username}#${identity.discriminator}`);
-      return lines.join("\n");
+
+      const profile = visit(value);
+      if (!profile) return null;
+      const lines: string[] = [];
+      const add = (label: string, field: unknown, format?: (value: any) => string) => {
+        if (field === undefined || field === null || field === "") return;
+        lines.push(`${label}: ${format ? format(field) : String(field)}`);
+      };
+      const yesNo = (field: unknown) => field ? "Yes" : "No";
+      const available = (field: unknown) => field ? "Available" : "Not set";
+
+      add("Username", profile.username || profile.user_name);
+      add("Display name", profile.global_name || profile.display_name);
+      add("User ID", profile.id || profile.user_id || profile.userId);
+      if (profile.discriminator && String(profile.discriminator) !== "0") {
+        add("Tag", `${profile.username || profile.user_name}#${profile.discriminator}`);
+      }
+      add("Email", profile.email);
+      add("Verified", profile.verified, yesNo);
+      add("MFA enabled", profile.mfa_enabled, yesNo);
+      add("Locale", profile.locale);
+      add("Avatar", profile.avatar, available);
+      add("Avatar decoration", profile.avatar_decoration_data, available);
+      add("Banner", profile.banner, available);
+      add("Accent color", profile.accent_color || profile.banner_color);
+      add("Premium type", profile.premium_type);
+      add("Public flags", profile.public_flags);
+      add("Account flags", profile.flags);
+      add("Bot account", profile.bot, yesNo);
+      add("System account", profile.system, yesNo);
+      return lines.length ? lines.join("\n") : null;
     };
 
     for (const tool of candidates.slice(0, 8)) {
@@ -1412,7 +1438,7 @@ async function executeVerifiedDiscordRead(
         if (response?.successful === false || response?.error) continue;
         const rawResult = response?.data ?? response;
         if (intent === "user") {
-          const identity = formatDiscordIdentity(rawResult);
+          const identity = formatDiscordProfile(rawResult);
           if (identity) return identity;
           continue;
         }
