@@ -1430,8 +1430,12 @@ async function executeVerifiedDiscordRead(
       const primaryGuildBadge = primaryGuild && typeof primaryGuild === "object"
         ? (primaryGuild as any).badge || (primaryGuild as any).badge_hash || (primaryGuild as any).badgeHash
         : undefined;
+      const relatedGuild = findField(value, ["guild", "server"]);
       const primaryGuildName = primaryGuild && typeof primaryGuild === "object"
         ? (primaryGuild as any).name || (primaryGuild as any).guild_name || (primaryGuild as any).guildName || (primaryGuild as any).server_name || (primaryGuild as any).serverName
+        : undefined;
+      const relatedGuildName = relatedGuild && typeof relatedGuild === "object"
+        ? (relatedGuild as any).name || (relatedGuild as any).guild_name || (relatedGuild as any).guildName || (relatedGuild as any).server_name || (relatedGuild as any).serverName
         : findField(value, ["guild_name", "guildName", "server_name", "serverName"]);
       if (requestedIntent === "tag") {
         const explicitTag = primaryGuildTag || profile.tag || profile.user_tag || profile.userTag || profile.discord_tag || profile.discordTag || findField(value, ["tag", "user_tag", "userTag", "discord_tag", "discordTag"]);
@@ -1446,7 +1450,7 @@ async function executeVerifiedDiscordRead(
           kind: primaryGuildTag ? "server" : "account",
           badge: primaryGuildBadge ? String(primaryGuildBadge) : "",
           guildId: primaryGuild && typeof primaryGuild === "object" ? String((primaryGuild as any).identity_guild_id || (primaryGuild as any).identityGuildId || "") : "",
-          serverName: primaryGuildName ? String(primaryGuildName).trim() : "",
+          serverName: primaryGuildName || relatedGuildName ? String(primaryGuildName || relatedGuildName).trim() : "",
         });
         return `[[DISCORD_TAG:${encodeURIComponent(payload)}]]`;
       }

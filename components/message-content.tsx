@@ -327,7 +327,7 @@ export function MessageContent({ content }: MessageContentProps) {
                 <DiscordTagIcon badge={part.kind === 'server' ? part.badge : undefined} guildId={part.kind === 'server' ? part.guildId : undefined} />
               </div>
               <div className="min-w-0">
-                <div className="max-w-[14rem] truncate text-[10px] font-semibold uppercase tracking-[0.18em] text-white/45">{part.kind === 'server' ? (part.serverName || 'Discord server tag') : 'Discord tag'}</div>
+                <div className="max-w-[14rem] truncate text-[10px] font-semibold uppercase tracking-[0.18em] text-white/45">{part.kind === 'server' ? (part.serverName || 'Server tag') : 'Discord tag'}</div>
                 <div className="mt-0.5 whitespace-nowrap text-base font-semibold tracking-wide text-white/95">{hasTag ? part.content : "You don’t have a tag"}</div>
               </div>
             </div>
