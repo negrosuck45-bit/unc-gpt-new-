@@ -7,6 +7,9 @@ export async function proxy(request: NextRequest, event: NextFetchEvent) {
     const reason = url.searchParams.get("error_description") || url.searchParams.get("error") || "authorization_failed"
     return NextResponse.redirect(new URL(`/auth/error?reason=${encodeURIComponent(reason)}`, url.origin))
   }
+  // Keep the preview renderable when Clerk keys are not present in a local/preview environment.
+  // Authenticated deployments still use Clerk middleware normally.
+  if (!process.env.NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY) return NextResponse.next()
   return clerkMiddleware()(request, event)
 }
 

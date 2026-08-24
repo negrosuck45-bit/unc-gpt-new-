@@ -10,7 +10,6 @@ import { playReplySound, unlockReplySound } from "@/lib/notifications";
 import { readUserPreferences } from "@/lib/user-preferences";
 import { triggerHaptic } from "@/lib/haptics";
 import { localVisionSupported, runLocalVision } from "@/lib/local-vision";
-import { AgentComputerCard, connectorIdentity, type ActiveConnector } from "@/components/agent-computer-card";
 import { connectorPermissionIdentity } from "@/components/connector-permission-card";
 import { accountStorageKey } from "@/lib/account-scope";
 import { ConnectionStatusBanner, type ConnectionIssue } from "@/components/connection-status-banner";
@@ -55,7 +54,6 @@ export function ChatInterface({ onSwitchToImagine, onOpenSidebar, isSidebarOpen 
   const [mounted, setMounted] = useState(false);
   const [isThinking, setIsThinking] = useState(false);
   const [agentComputerEnabled, setAgentComputerEnabled] = useState(false);
-  const [activeConnector, setActiveConnector] = useState<ActiveConnector | null>(null);
   const [connectionIssue, setConnectionIssue] = useState<ConnectionIssue>(null);
 
   const abortControllerRef = useRef<AbortController | null>(null);
@@ -78,7 +76,7 @@ export function ChatInterface({ onSwitchToImagine, onOpenSidebar, isSidebarOpen 
 
   useEffect(() => {
     setMounted(true);
-    setAgentComputerEnabled(window.localStorage.getItem(accountStorageKey("uncgpt-agent-computer-auto-enabled")) === "true");
+    setAgentComputerEnabled(window.localStorage.getItem(accountStorageKey("uncgpt-agent-computer-auto-enabled")) !== "false");
   }, []);
 
   const currentChat = getCurrentChat();
@@ -98,7 +96,6 @@ export function ChatInterface({ onSwitchToImagine, onOpenSidebar, isSidebarOpen 
     unlockReplySound();
     setIsStreaming(true, chatId);
     setIsThinking(true);
-    setActiveConnector(null);
     abortControllerRef.current = new AbortController();
 
     let completed = false;
@@ -145,7 +142,6 @@ export function ChatInterface({ onSwitchToImagine, onOpenSidebar, isSidebarOpen 
     unlockReplySound();
     setIsStreaming(true, chatId);
     setIsThinking(true);
-    setActiveConnector(null);
     abortControllerRef.current = new AbortController();
 
     let completed = false;
@@ -256,7 +252,10 @@ export function ChatInterface({ onSwitchToImagine, onOpenSidebar, isSidebarOpen 
       if (stored) {
         const connectors = JSON.parse(stored);
         const normalized = Array.isArray(connectors) ? connectors : [];
-        if (normalized.length > 0) payload.mcpConnectors = normalized;
+        // Connected accounts and enabled state are authoritative on the server. Only
+        // send explicit user disables so a stale client cannot hide newly connected apps.
+        const disabled = normalized.filter((connector: any) => connector?.source === "composio" && connector?.enabled === false);
+        if (disabled.length > 0) payload.mcpConnectors = disabled;
       }
     } catch {}
 
@@ -345,7 +344,6 @@ export function ChatInterface({ onSwitchToImagine, onOpenSidebar, isSidebarOpen 
               }
             } else if (parsed.tool_step) {
               const toolName = String(parsed.tool_step.tool || parsed.tool_step.name || parsed.tool_step.action || '');
-              if (toolName) setActiveConnector(connectorIdentity(toolName));
               // Tool activity stays behind the scenes; only the final answer is shown.
               continue;
             } else if (parsed.content) {
@@ -409,7 +407,6 @@ export function ChatInterface({ onSwitchToImagine, onOpenSidebar, isSidebarOpen 
       return fallback;
     }
 
-    window.setTimeout(() => setActiveConnector(null), 1800);
     return fullContent;
   };
 
@@ -426,7 +423,6 @@ export function ChatInterface({ onSwitchToImagine, onOpenSidebar, isSidebarOpen 
         isSidebarOpen={isSidebarOpen}
       />
       <ConnectionStatusBanner issue={connectionIssue} />
-      <AgentComputerCard onChange={setAgentComputerEnabled} activeConnector={activeConnector} />
       {hasMessages ? (
         <div className="flex-1 flex flex-col min-h-0 overflow-hidden relative">
           <div 

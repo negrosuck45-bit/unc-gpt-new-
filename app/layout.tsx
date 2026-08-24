@@ -38,10 +38,9 @@ export default async function RootLayout({
   const session = await getSession()
   const accountScope = session?.user?.sub ?? "guest"
 
-  return (
-    <ClerkProvider appearance={{ layout: { unsafe_disableDevelopmentModeWarnings: true } }}>
-      <html lang="en" suppressHydrationWarning>
-        <body className="font-sans antialiased">
+  const page = (
+    <html lang="en" suppressHydrationWarning>
+      <body className="font-sans antialiased">
         <script dangerouslySetInnerHTML={{ __html: `window.__UNCGPT_ACCOUNT_SCOPE__ = ${JSON.stringify(accountScope)};` }} />
         <ThemeProvider attribute="class" defaultTheme="dark" enableSystem disableTransitionOnChange>
           {children}
@@ -49,9 +48,15 @@ export default async function RootLayout({
           <Toaster position="bottom-center" theme="system" />
           {process.env.NODE_ENV === "production" && <Analytics />}
         </ThemeProvider>
-          <script src="https://js.puter.com/v2/"></script>
-        </body>
-      </html>
-    </ClerkProvider>
+        <script src="https://js.puter.com/v2/"></script>
+      </body>
+    </html>
   )
+
+  const publishableKey = process.env.NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY
+  return publishableKey ? (
+    <ClerkProvider publishableKey={publishableKey} appearance={{ layout: { unsafe_disableDevelopmentModeWarnings: true } }}>
+      {page}
+    </ClerkProvider>
+  ) : page
 }

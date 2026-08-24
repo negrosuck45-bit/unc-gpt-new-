@@ -1,6 +1,12 @@
+export const dynamic = "force-dynamic"
+
 import { SignUp } from "@clerk/nextjs"
 
 export default function SignupPage() {
+  if (!process.env.NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY) {
+    return <main className="flex min-h-screen items-center justify-center bg-background px-6 text-foreground"><p>Authentication is not configured in this preview.</p></main>
+  }
+
   return (
     <main className="relative flex min-h-screen items-center justify-center overflow-hidden bg-[#070709] px-5 py-10 text-white">
       <div className="pointer-events-none fixed inset-0 bg-[radial-gradient(circle_at_50%_12%,rgba(124,58,237,0.22),transparent_38%),radial-gradient(circle_at_85%_85%,rgba(37,99,235,0.14),transparent_32%)]" />

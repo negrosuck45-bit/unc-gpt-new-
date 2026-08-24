@@ -16,17 +16,22 @@ export type AppSession = {
  * Clerk's userId is the account-isolation key for profiles, chats, and social data.
  */
 export async function getSession(): Promise<AppSession | null> {
-  const { userId } = await auth()
-  if (!userId) return null
+  try {
+    const { userId } = await auth()
+    if (!userId) return null
 
-  const user = await currentUser()
-  return {
-    user: {
-      sub: userId,
-      name: user?.fullName ?? user?.username ?? null,
-      email: user?.primaryEmailAddress?.emailAddress ?? null,
-      picture: user?.imageUrl ?? null,
-    },
+    const user = await currentUser()
+    return {
+      user: {
+        sub: userId,
+        name: user?.fullName ?? user?.username ?? null,
+        email: user?.primaryEmailAddress?.emailAddress ?? null,
+        picture: user?.imageUrl ?? null,
+      },
+    }
+  } catch (error) {
+    console.warn("[uncgpt] Auth unavailable; rendering signed-out preview.", error)
+    return null
   }
 }
 
