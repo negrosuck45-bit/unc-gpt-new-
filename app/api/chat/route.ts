@@ -5,6 +5,7 @@ import { getComposioSession, getComposioUserId, getComposioUserIds } from "@/lib
 import { Composio } from "@composio/core";
 import { chooseUncGptRoute } from "@/lib/uncgpt-router";
 import { executeAgentGateway, gatewayResultText } from "@/lib/agent-gateway";
+import { normalizeConnectorResult } from "@/lib/connector-results";
 
 export const runtime = "nodejs";
 
@@ -1095,11 +1096,11 @@ async function executeMcpTool(
       name: tool._toolName,
       arguments: args,
     });
-    if (!result) return "No result";
-    if (Array.isArray(result.content)) {
-      return result.content.map((p: any) => p.text || JSON.stringify(p)).join("\n");
-    }
-    return JSON.stringify(result);
+    if (!result) return "Tool error: MCP returned no result.";
+    const content = Array.isArray(result.content)
+      ? result.content.map((part: any) => part.text ?? part.data ?? part).join("\n")
+      : result;
+    return normalizeConnectorResult(content, `${tool._connector?.name || ""} ${tool._toolName || ""}`);
   } catch (error: any) {
     return `Tool error: ${error?.message || "MCP execution failed"}`;
   }
@@ -1127,6 +1128,7 @@ async function runToolLoop(
 
   let working = [...messages];
 
+  const executedCalls = new Set<string>();
   for (let step = 1; step <= 6; step++) {
     const key = GROQ_KEYS[currentGroqKeyIndex % GROQ_KEYS.length];
     if (!key) break;
@@ -1148,7 +1150,10 @@ async function runToolLoop(
       }),
     });
 
-    if (!res.ok) return working;
+    if (!res.ok) {
+      working.push({ role: "system", content: `Tool planning failed (${res.status}); do not claim that any action succeeded.` });
+      return working;
+    }
     const data = await res.json();
     const msg = data.choices?.[0]?.message;
     if (!msg) return working;
@@ -1158,10 +1163,25 @@ async function runToolLoop(
     if (!msg.tool_calls?.length) return working;
 
     for (const tc of msg.tool_calls) {
-      let args: any = {};
+      let args: any;
       try {
         args = JSON.parse(tc.function.arguments || "{}");
-      } catch {}
+        if (!args || Array.isArray(args) || typeof args !== "object") throw new Error("arguments must be an object");
+      } catch {
+        const result = "Tool error: the model supplied malformed JSON arguments; the tool was not run.";
+        onStep({ iteration: step, action: "tool_use", tool: tc.function.name, input: {}, result });
+        working.push({ role: "tool", tool_call_id: tc.id, content: result });
+        continue;
+      }
+
+      const callKey = `${tc.function.name}:${JSON.stringify(args)}`;
+      if (executedCalls.has(callKey)) {
+        const result = "Tool error: duplicate call skipped to avoid repeating an external action.";
+        onStep({ iteration: step, action: "tool_use", tool: tc.function.name, input: args, result });
+        working.push({ role: "tool", tool_call_id: tc.id, content: result });
+        continue;
+      }
+      executedCalls.add(callKey);
 
       let result = "";
       const builtIn = tools.find(
@@ -2082,7 +2102,8 @@ export async function POST(req: NextRequest) {
                 _composioSlug: tool.function.name,
                 _exec: async (args: any) => {
                   const result = await composioSession.execute(tool.function.name, args || {});
-                  return typeof result === "string" ? result : JSON.stringify(result);
+                  if (result?.successful === false || result?.error) throw new Error(result?.error?.message || result?.error || "Connector action failed");
+                  return normalizeConnectorResult(result?.data ?? result, tool.function.name);
                 },
               }));
 
