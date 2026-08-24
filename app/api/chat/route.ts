@@ -1998,6 +1998,22 @@ export async function POST(req: NextRequest) {
       const connectorPreferences = Array.isArray(mcpConnectors) ? mcpConnectors : [];
       const disabledToolkits = new Set(connectorPreferences.filter((connector: any) => connector?.source === 'composio' && connector?.enabled === false).map((connector: any) => String(connector.provider || connector.toolkit || '').toLowerCase()).filter(Boolean));
       const activeMcpConnectors = connectorPreferences.filter((connector: any) => connector?.enabled !== false);
+      // Browser state is only a UI preference. Resolve the actual Composio accounts
+      // for this Clerk user so connected apps are always available to the AI.
+      const liveChatSession = await getSession();
+      const liveChatUserId = liveChatSession?.user?.sub;
+      if (liveChatUserId && process.env.COMPOSIO_API_KEY) {
+        try {
+          const composio = new Composio({ apiKey: process.env.COMPOSIO_API_KEY });
+          const liveAccounts: any = await composio.connectedAccounts.list({ userIds: getComposioUserIds(liveChatUserId), limit: 1000 });
+          for (const account of liveAccounts?.items || []) {
+            const toolkit = String(account?.toolkit?.slug || '').toLowerCase().replace(/[- ]/g, '_');
+            if (toolkit && account?.isDisabled) disabledToolkits.add(toolkit);
+          }
+        } catch (error) {
+          console.warn('[uncgpt] Live Composio permissions lookup failed:', error);
+        }
+      }
 
       // If a user asks for a connector that is absent or explicitly disabled, stop before
       // the model can hallucinate access and return a structured approval card instead.
