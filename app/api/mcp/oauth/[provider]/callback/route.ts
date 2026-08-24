@@ -67,14 +67,6 @@ export async function GET(
 
   const storedState = request.cookies.get(`oauth_state_${provider}`)?.value;
   
-  // Debug logging to see what's happening
-  console.log("OAuth callback debug:", {
-    provider,
-    urlState: state,
-    cookieState: storedState,
-    allCookies: request.cookies.getAll().map(c => c.name),
-  });
-
   if (!state || state !== storedState) {
     return fail(`${provider} authorization expired. Please try connecting again.`);
   }
@@ -129,7 +121,7 @@ export async function GET(
       });
     }
 
-    tokenData = await tokenResponse.json();
+    tokenData = await tokenResponse.json().catch(() => ({}));
 
     if (!tokenResponse.ok) {
       return fail(`${provider} token exchange failed. Check its OAuth callback URL and client credentials.`);
@@ -146,14 +138,15 @@ export async function GET(
     response.cookies.set(`mcp_oauth_${provider}`, accessToken, {
       httpOnly: true,
       secure: true,
-      sameSite: "none",
+      sameSite: "lax",
       path: "/",
       maxAge: 30 * 24 * 60 * 60,
     });
 
     response.cookies.set(`mcp_oauth_${provider}_connected`, "1", {
+      httpOnly: true,
       secure: true,
-      sameSite: "none",
+      sameSite: "lax",
       path: "/",
       maxAge: 30 * 24 * 60 * 60,
     });
@@ -162,7 +155,8 @@ export async function GET(
 
     return response;
   } catch (error) {
-    console.error(`OAuth callback error for ${provider}:`, error);
+    // OAuth errors can contain provider response details; do not risk logging tokens.
+    console.error(`OAuth callback error for ${provider}`);
     return fail(`${provider} connection failed unexpectedly. Please try again.`);
   }
 }
