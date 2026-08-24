@@ -10,7 +10,6 @@ import { playReplySound, unlockReplySound } from "@/lib/notifications";
 import { readUserPreferences } from "@/lib/user-preferences";
 import { triggerHaptic } from "@/lib/haptics";
 import { localVisionSupported, runLocalVision } from "@/lib/local-vision";
-import { AgentComputerCard, connectorIdentity, type ActiveConnector } from "@/components/agent-computer-card";
 import { connectorPermissionIdentity } from "@/components/connector-permission-card";
 import { accountStorageKey } from "@/lib/account-scope";
 import { ConnectionStatusBanner, type ConnectionIssue } from "@/components/connection-status-banner";
@@ -54,8 +53,6 @@ async function persistNeuralMemory(chatId: string, messages: any[], responseCont
 export function ChatInterface({ onSwitchToImagine, onOpenSidebar, isSidebarOpen }: ChatInterfaceProps) {
   const [mounted, setMounted] = useState(false);
   const [isThinking, setIsThinking] = useState(false);
-  const [agentComputerEnabled, setAgentComputerEnabled] = useState(false);
-  const [activeConnector, setActiveConnector] = useState<ActiveConnector | null>(null);
   const [connectionIssue, setConnectionIssue] = useState<ConnectionIssue>(null);
 
   const abortControllerRef = useRef<AbortController | null>(null);
@@ -76,10 +73,7 @@ export function ChatInterface({ onSwitchToImagine, onOpenSidebar, isSidebarOpen 
 
   const isCurrentChatStreaming = currentChatId ? getIsStreamingForChat(currentChatId) : false;
 
-  useEffect(() => {
-    setMounted(true);
-    setAgentComputerEnabled(window.localStorage.getItem(accountStorageKey("uncgpt-agent-computer-auto-enabled")) === "true");
-  }, []);
+  useEffect(() => { setMounted(true); }, []);
 
   const currentChat = getCurrentChat();
   const currentProject = getProject(currentChat?.projectId);
@@ -98,7 +92,6 @@ export function ChatInterface({ onSwitchToImagine, onOpenSidebar, isSidebarOpen 
     unlockReplySound();
     setIsStreaming(true, chatId);
     setIsThinking(true);
-    setActiveConnector(null);
     abortControllerRef.current = new AbortController();
 
     let completed = false;
@@ -122,7 +115,7 @@ export function ChatInterface({ onSwitchToImagine, onOpenSidebar, isSidebarOpen 
         playReplySound();
       }
     }
-  }, [currentChat, isCurrentChatStreaming, addMessage, deleteMessage, setIsStreaming, agentComputerEnabled]);
+  }, [currentChat, isCurrentChatStreaming, addMessage, deleteMessage, setIsStreaming]);
 
   const handleSend = useCallback(async (content: string, attachments?: Attachment[]) => {
     if (!content?.trim() && (!attachments || attachments.length === 0)) return;
@@ -145,7 +138,6 @@ export function ChatInterface({ onSwitchToImagine, onOpenSidebar, isSidebarOpen 
     unlockReplySound();
     setIsStreaming(true, chatId);
     setIsThinking(true);
-    setActiveConnector(null);
     abortControllerRef.current = new AbortController();
 
     let completed = false;
@@ -186,7 +178,7 @@ export function ChatInterface({ onSwitchToImagine, onOpenSidebar, isSidebarOpen 
         playReplySound();
       }
     }
-  }, [currentChatId, createNewChat, addMessage, updateChatTitle, setIsStreaming, settings, agentComputerEnabled]);
+  }, [currentChatId, createNewChat, addMessage, updateChatTitle, setIsStreaming, settings]);
 
   const processAIResponse = async (chatId: string, messages: any[]) => {
     const currentChat = useChatStore.getState().chats.find(c => c.id === chatId);
@@ -219,7 +211,8 @@ export function ChatInterface({ onSwitchToImagine, onOpenSidebar, isSidebarOpen 
       messages: formattedMessages,
       preferredModel: selectedModel,
       preferredProvider: selectedProvider,
-      computerUse: agentComputerEnabled,
+      // Keep Agent Computer available to the backend without exposing a chat-level toggle.
+      computerUse: true,
     };
 
     try {
@@ -345,7 +338,6 @@ export function ChatInterface({ onSwitchToImagine, onOpenSidebar, isSidebarOpen 
               }
             } else if (parsed.tool_step) {
               const toolName = String(parsed.tool_step.tool || parsed.tool_step.name || parsed.tool_step.action || '');
-              if (toolName) setActiveConnector(connectorIdentity(toolName));
               // Tool activity stays behind the scenes; only the final answer is shown.
               continue;
             } else if (parsed.content) {
@@ -385,7 +377,7 @@ export function ChatInterface({ onSwitchToImagine, onOpenSidebar, isSidebarOpen 
     }
 
     const latestUserText = String(messages[messages.length - 1]?.content || '');
-    const genericGmailRefusal = /(?:don't|do not|cannot|can't|no) (?:have )?(?:direct )?access to your (?:personal )?data|text-based AI assistant|external data sources/i.test(fullContent);
+    const genericGmailRefusal = /(?:don't|do not|cannot|can't|no) (?:have )?(?:direct )?access to (?:your )?(?:personal )?(?:data|email|emails|mail|inbox|email account)|text-based AI assistant|external data sources/i.test(fullContent);
     if (permissionRequest) {
       const permission = permissionRequest;
       const cleanContent = permission.mode === 'enable' ? `Turn on ${permission.label} to continue.` : `Connect ${permission.label} to continue.`;
@@ -409,7 +401,6 @@ export function ChatInterface({ onSwitchToImagine, onOpenSidebar, isSidebarOpen 
       return fallback;
     }
 
-    window.setTimeout(() => setActiveConnector(null), 1800);
     return fullContent;
   };
 
@@ -426,7 +417,6 @@ export function ChatInterface({ onSwitchToImagine, onOpenSidebar, isSidebarOpen 
         isSidebarOpen={isSidebarOpen}
       />
       <ConnectionStatusBanner issue={connectionIssue} />
-      <AgentComputerCard onChange={setAgentComputerEnabled} activeConnector={activeConnector} />
       {hasMessages ? (
         <div className="flex-1 flex flex-col min-h-0 overflow-hidden relative">
           <div 
