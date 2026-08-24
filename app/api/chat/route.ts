@@ -1321,25 +1321,37 @@ function detectDiscordReadIntent(text: string): DiscordReadIntent | null {
 }
 
 function formatVerifiedConnectorData(value: unknown): string {
-  if (typeof value === "string") {
-    const trimmed = value.trim();
-    if (trimmed) {
-      try {
-        return formatVerifiedConnectorData(JSON.parse(trimmed));
-      } catch {
-        return trimmed.slice(0, 12000);
-      }
-    }
+  let parsed: any = value;
+  if (typeof parsed === "string") {
+    const trimmed = parsed.trim();
+    if (!trimmed) return "No results found.";
+    try { parsed = JSON.parse(trimmed); } catch { return trimmed.slice(0, 12000); }
   }
 
-  const serializable = value && typeof value === "object" ? value : { result: value };
-  let json = "";
-  try {
-    json = JSON.stringify(serializable, null, 2);
-  } catch {
-    json = String(serializable);
+  const messages: any[] = [];
+  const visit = (item: any, depth = 0) => {
+    if (!item || depth > 5) return;
+    if (Array.isArray(item)) return item.forEach((child) => visit(child, depth + 1));
+    if (typeof item !== "object") return;
+    if ((item.id || item.messageId) && (item.threadId || item.threadid || item.snippet || item.subject || item.payload || item.headers)) messages.push(item);
+    Object.values(item).forEach((child) => visit(child, depth + 1));
+  };
+  visit(parsed);
+  const unique = Array.from(new Map(messages.map((message) => [String(message.id || message.messageId), message])).values());
+  if (unique.length) {
+    return unique.slice(0, 10).map((message: any, index) => {
+      const headers = message.headers || message.payload?.headers || [];
+      const header = (name: string) => headers.find((item: any) => String(item?.name || "").toLowerCase() === name)?.value;
+      const from = message.from || header("from") || "Unknown sender";
+      const subject = message.subject || header("subject") || "(no subject)";
+      const date = message.date || header("date") || "";
+      const snippet = String(message.snippet || message.body || message.text || "").replace(/\\s+/g, " ").trim();
+      return `${index + 1}. **${subject}**\\n   From: ${from}${date ? `\\n   Date: ${date}` : ""}${snippet ? `\\n   ${snippet.slice(0, 280)}` : ""}`;
+    }).join("\\n\\n");
   }
-  return json.slice(0, 12000);
+
+  try { return JSON.stringify(parsed && typeof parsed === "object" ? parsed : { result: parsed }, null, 2).slice(0, 12000); }
+  catch { return String(parsed).slice(0, 12000); }
 }
 
 async function executeVerifiedDiscordRead(
