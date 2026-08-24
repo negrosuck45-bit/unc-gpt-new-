@@ -2017,17 +2017,18 @@ export async function POST(req: NextRequest) {
     // Gmail reads must use verified connector data, never generic model prose.
     if (/\b(latest|recent|new|unread|show|list|read|find)\b/i.test(userText) && /\b(email|emails|mail|inbox|gmail)\b/i.test(userText)) {
       const gmailSession = await getSession();
-      const gmailResult = await executeVerifiedGmailRead(gmailSession?.user?.sub || "");
-      const reply = gmailResult === NO_GITHUB_ACCOUNT
-        ? "Gmail is not connected yet. Open Settings → Connectors and connect Gmail."
+      const gmailUserId = gmailSession?.user?.sub || "";
+      const gmailResult = await executeVerifiedGmailRead(gmailUserId);
+      const reply = !gmailUserId || gmailResult === NO_GITHUB_ACCOUNT
+        ? "Connect Gmail to let me read the latest messages from your account."
         : gmailResult === UNVERIFIED_GITHUB_RESULT
           ? "Gmail is connected, but I could not retrieve verified messages. Reconnect Gmail in Settings → Connectors and try again."
           : `Here are the latest messages from your connected Gmail account:\n\n${gmailResult}`;
       const encoder = new TextEncoder();
       const stream = new ReadableStream({ start(controller) {
-        controller.enqueue(encoder.encode(`data: ${JSON.stringify({ provider: "Gmail", model: "connected-action" })}\\n\\n`));
-        if (gmailResult === NO_GITHUB_ACCOUNT) controller.enqueue(encoder.encode(`data: ${JSON.stringify({ permission_request: { toolkit: "gmail", label: "Gmail", description: "read and manage your email", iconUrl: "https://cdn.simpleicons.org/gmail", mode: "connect" } })}\\n\\n`));
-        controller.enqueue(encoder.encode(`data: ${JSON.stringify({ content: reply })}\\n\\n`));
+        controller.enqueue(encoder.encode(`data: ${JSON.stringify({ provider: "Gmail", model: "connected-action" })}\n\n`));
+        if (!gmailUserId || gmailResult === NO_GITHUB_ACCOUNT) controller.enqueue(encoder.encode(`data: ${JSON.stringify({ permission_request: { toolkit: "gmail", label: "Gmail", description: "read and manage your email", iconUrl: "https://cdn.simpleicons.org/gmail", mode: "connect" } })}\n\n`));
+        controller.enqueue(encoder.encode(`data: ${JSON.stringify({ content: reply })}\n\n`));
         controller.enqueue(encoder.encode("data: [DONE]\\n\\n"));
         controller.close();
       }});
@@ -2246,11 +2247,11 @@ export async function POST(req: NextRequest) {
       const encoder = new TextEncoder();
       const stream = new ReadableStream({
         start(controller) {
-          controller.enqueue(encoder.encode(`data: ${JSON.stringify({ provider: "Discord", model: "connected-action" })}\\n\\n`));
+          controller.enqueue(encoder.encode(`data: ${JSON.stringify({ provider: "Discord", model: "connected-action" })}\n\n`));
           if (shouldShowPermission) {
-            controller.enqueue(encoder.encode(`data: ${JSON.stringify({ permission_request: { toolkit: "discord", label: "Discord", description: "read your profile, servers, and permitted Discord data", iconUrl: "https://cdn.simpleicons.org/discord", mode: "connect" } })}\\n\\n`));
+            controller.enqueue(encoder.encode(`data: ${JSON.stringify({ permission_request: { toolkit: "discord", label: "Discord", description: "read your profile, servers, and permitted Discord data", iconUrl: "https://cdn.simpleicons.org/discord", mode: "connect" } })}\n\n`));
           }
-          controller.enqueue(encoder.encode(`data: ${JSON.stringify({ content: reply })}\\n\\n`));
+          controller.enqueue(encoder.encode(`data: ${JSON.stringify({ content: reply })}\n\n`));
           controller.enqueue(encoder.encode("data: [DONE]\\n\\n"));
           controller.close();
         },
