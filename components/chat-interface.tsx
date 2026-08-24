@@ -377,7 +377,7 @@ export function ChatInterface({ onSwitchToImagine, onOpenSidebar, isSidebarOpen 
     }
 
     const latestUserText = String(messages[messages.length - 1]?.content || '');
-    const genericGmailRefusal = /(?:don't|do not|cannot|can't|no) (?:have )?(?:any )?(?:information about your account(?: or)? )?(?:direct )?access to (?:your )?(?:personal )?(?:data|email|emails|mail|inbox|email account)|text-based AI assistant|external data sources/i.test(fullContent);
+    const genericGmailRefusal = /\b(?:unable|cannot|can't|do not|don't|no)\b[\s\S]{0,100}\baccess\b[\s\S]{0,100}\b(?:email|emails|mail|inbox|account)\b|text-based AI assistant|external data sources/i.test(fullContent);
     if (permissionRequest) {
       const permission = permissionRequest;
       const cleanContent = permission.mode === 'enable' ? `Turn on ${permission.label} to continue.` : `Connect ${permission.label} to continue.`;
