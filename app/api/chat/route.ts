@@ -1275,6 +1275,34 @@ async function executeVerifiedGithubRepositories(userId: string, connectedAccoun
   return UNVERIFIED_GITHUB_RESULT;
 }
 
+async function executeVerifiedGmailRead(userId: string): Promise<string> {
+  const apiKey = process.env.COMPOSIO_API_KEY;
+  if (!apiKey || !userId) return NO_GITHUB_ACCOUNT;
+  try {
+    const composio = new Composio({ apiKey });
+    const accounts: any = await composio.connectedAccounts.list({ userIds: getComposioUserIds(userId), toolkitSlugs: ["gmail"], limit: 1000 });
+    const account = (accounts?.items || []).find((item: any) => !item?.isDisabled && ["active", "connected"].includes(String(item?.status || "").toLowerCase()));
+    if (!account?.id) return NO_GITHUB_ACCOUNT;
+    const rawTools: any[] = await composio.tools.getRawComposioTools({ toolkits: ["gmail"], limit: 250, important: false }, undefined, { signal: AbortSignal.timeout(10000) });
+    const candidates = rawTools.filter((tool: any) => /gmail/i.test(String(tool?.slug || tool?.name || "")) && /(list|search|fetch|get|thread|message)/i.test(String(tool?.slug || tool?.name || ""))).sort((a: any, b: any) => {
+      const score = (tool: any) => /(search|list).*?(message|email)/i.test(String(tool?.slug || tool?.name || "")) ? 2 : 1;
+      return score(b) - score(a);
+    });
+    for (const tool of candidates.slice(0, 12)) {
+      const required = tool?.inputParameters?.required || tool?.input_parameters?.required || [];
+      const args = required.length ? { query: "", max_results: 10, maxResults: 10 } : {};
+      try {
+        const response: any = await composio.tools.execute(tool.slug, { userId: getComposioUserId(userId), connectedAccountId: account.id, arguments: args, dangerouslySkipVersionCheck: true }, { signal: AbortSignal.timeout(15000) });
+        if (response?.successful === false || response?.error) continue;
+        return formatVerifiedConnectorData(response?.data ?? response);
+      } catch {}
+    }
+  } catch (error) {
+    console.error("Verified Gmail execution failed:", error);
+  }
+  return UNVERIFIED_GITHUB_RESULT;
+}
+
 type DiscordReadIntent = "user" | "tag" | "servers" | "channels" | "avatar" | "banner";
 
 function detectDiscordReadIntent(text: string): DiscordReadIntent | null {
@@ -1986,6 +2014,25 @@ export async function POST(req: NextRequest) {
     }> = [];
 
     // ==================== TOOL SETUP ====================
+    // Gmail reads must use verified connector data, never generic model prose.
+    if (/\b(latest|recent|new|unread|show|list|read|find)\b/i.test(userText) && /\b(email|emails|mail|inbox|gmail)\b/i.test(userText)) {
+      const gmailSession = await getSession();
+      const gmailResult = await executeVerifiedGmailRead(gmailSession?.user?.sub || "");
+      const reply = gmailResult === NO_GITHUB_ACCOUNT
+        ? "Gmail is not connected yet. Open Settings → Connectors and connect Gmail."
+        : gmailResult === UNVERIFIED_GITHUB_RESULT
+          ? "Gmail is connected, but I could not retrieve verified messages. Reconnect Gmail in Settings → Connectors and try again."
+          : `Here are the latest messages from your connected Gmail account:\n\n${gmailResult}`;
+      const encoder = new TextEncoder();
+      const stream = new ReadableStream({ start(controller) {
+        controller.enqueue(encoder.encode(`data: ${JSON.stringify({ provider: "Gmail", model: "connected-action" })}\\n\\n`));
+        if (gmailResult === NO_GITHUB_ACCOUNT) controller.enqueue(encoder.encode(`data: ${JSON.stringify({ permission_request: { toolkit: "gmail", label: "Gmail", description: "read and manage your email", iconUrl: "https://cdn.simpleicons.org/gmail", mode: "connect" } })}\\n\\n`));
+        controller.enqueue(encoder.encode(`data: ${JSON.stringify({ content: reply })}\\n\\n`));
+        controller.enqueue(encoder.encode("data: [DONE]\\n\\n"));
+        controller.close();
+      }});
+      return createStreamResponse(stream, "Gmail", "connected-action", []);
+    }
     const explicitGithubRepositoryRequest = /github/i.test(userText) && /\b(repo|repos|repositories)\b/i.test(userText) && !/\b(create|new|make|delete|remove|update|edit|push|commit|change)\b/i.test(userText);
     const contextualGithubFollowUp = /^(it is|yes|yeah|yep|list them|show them|go ahead|do it|okay|ok)$/i.test(String(userText).trim()) && /github/i.test(recentConversationText) && /\b(repo|repos|repositories)\b/i.test(recentConversationText);
     const isGithubRepositoryRequest = explicitGithubRepositoryRequest || contextualGithubFollowUp;
