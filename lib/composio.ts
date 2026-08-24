@@ -30,9 +30,8 @@ export async function getComposioSession(userId: string) {
 
   const composio = new Composio({ apiKey });
   return composio.sessions.create(getComposioUserId(userId), {
-    // Keep the session user-scoped, but preload the catalog tools so the model can
-    // call Gmail, Discord, GitHub, and any other connected toolkit directly.
-    preload: { tools: "all" },
+    // Keep the session user-scoped. Tools are discovered from connected accounts
+    // at runtime; Composio rejects the old preload="all" scope.
     mcp: true,
     manageConnections: true,
   });

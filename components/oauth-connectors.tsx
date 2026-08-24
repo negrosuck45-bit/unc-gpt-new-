@@ -222,16 +222,16 @@ export function OAuthConnectors() {
   );
 
   return (
-    <div className="space-y-4">
+      <div className="flex min-w-0 max-w-full flex-col gap-4 overflow-x-hidden">
       {oauthError && (
-        <div role="alert" className="flex items-start justify-between gap-3 rounded-xl border border-amber-400/25 bg-amber-400/[0.08] px-3 py-2.5 text-sm text-amber-100">
-          <div><p className="font-medium">Connector connection needs attention</p><p className="mt-0.5 text-xs text-amber-100/70">{oauthError}</p></div>
+        <div role="alert" className="flex min-w-0 max-w-full items-start justify-between gap-3 overflow-hidden rounded-xl border border-amber-400/25 bg-amber-400/[0.08] px-3 py-2.5 text-sm text-amber-100">
+          <div className="min-w-0"><p className="font-medium">Connector connection needs attention</p><p className="mt-0.5 break-words text-xs text-amber-100/70">{oauthError}</p></div>
           <button onClick={() => setOauthError(null)} className="text-amber-100/60 hover:text-amber-100" aria-label="Dismiss connector error">×</button>
         </div>
       )}
       {composio && (
         <div className={cn(
-          'flex items-center gap-3 rounded-xl border p-4 transition-colors',
+          'flex min-w-0 max-w-full flex-col items-start gap-3 overflow-hidden rounded-xl border p-4 transition-colors sm:flex-row sm:items-center',
           composio.configured ? 'border-emerald-500/30 bg-emerald-500/[0.06]' : 'border-white/10 bg-white/[0.03]'
         )}>
           <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-violet-500/10 text-violet-300">
@@ -246,8 +246,8 @@ export function OAuthConnectors() {
             </div>
             <p className="mt-1 text-xs leading-relaxed text-zinc-400">Connect the apps you use and control what uncgpt can access.</p>
             <p className="mt-1 text-[11px] leading-relaxed text-zinc-500">Choose an app below and finish its secure sign-in once.</p>
-            <div className="mt-3 flex flex-wrap items-center gap-2">
-              <select value={composioToolkit} onChange={(event) => setComposioToolkit(event.target.value)} className="h-8 rounded-lg border border-white/10 bg-black/20 px-2 text-xs text-zinc-200 outline-none">
+            <div className="mt-3 flex min-w-0 max-w-full flex-col items-stretch gap-2 sm:flex-row sm:items-center">
+              <select value={composioToolkit} onChange={(event) => setComposioToolkit(event.target.value)} className="h-9 w-full max-w-full rounded-lg border border-white/10 bg-black/20 px-2 text-xs text-zinc-200 outline-none sm:w-auto">
                 <option value="github">GitHub</option>
                 <option value="gmail">Gmail</option>
                 <option value="slack">Slack</option>
