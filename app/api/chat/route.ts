@@ -1613,9 +1613,25 @@ function isWebsiteBuildRequest(text: string) {
   return creationIntent && pageIntent && repositoryIntent;
 }
 
+function githubErrorText(value: unknown, depth = 0): string {
+  if (value === null || value === undefined || depth > 3) return "";
+  if (typeof value === "string") return value;
+  if (value instanceof Error) return `${value.message} ${githubErrorText((value as any).cause, depth + 1)}`;
+  if (typeof value === "object") {
+    const record = value as Record<string, unknown>;
+    const prioritized = [record.message, record.error, record.detail, record.statusText, record.data, record.body, record.response, record.cause]
+      .map((candidate) => githubErrorText(candidate, depth + 1))
+      .filter(Boolean)
+      .join(" ");
+    if (prioritized) return prioritized;
+    try { return JSON.stringify(value); } catch { return ""; }
+  }
+  return String(value);
+}
+
 function isMissingGithubRepositoryError(error: unknown) {
-  const message = String((error as any)?.message || error || "").toLowerCase();
-  return message.includes("not found") || message.includes("does not exist") || message.includes("404") || message.includes("could not find repository");
+  const message = githubErrorText(error).toLowerCase();
+  return /(?:\b404\b|not\s+found|does\s+not\s+exist|could\s+not\s+find\s+(?:the\s+)?repository|repository\s+.*(?:missing|unavailable))/i.test(message);
 }
 
 function escapeTemplateHtml(value: string) {
@@ -1899,7 +1915,7 @@ async function executeComposioWebsiteScaffold(session: any, owner: string, repo:
     }
     const failed = executionError || response?.error || response?.successful === false || response?.data?.error;
     if (failed) {
-      if (isMissingGithubRepositoryError(executionError || response) && createRepoSchema && !createdRepository) {
+      if (isMissingGithubRepositoryError(executionError || response || response?.data) && createRepoSchema && !createdRepository) {
         const created = await session.execute(createRepoSchema.toolSlug, composioSchemaArguments(createRepoSchema, { owner, repo, name: repo, description: `Website created by uncgpt for ${owner}/${repo}`, private: false }));
         if (created?.error || created?.successful === false || created?.data?.error) throw new Error(String(created?.error || created?.data?.error || `GitHub did not confirm repository creation.`));
         createdRepository = true;
