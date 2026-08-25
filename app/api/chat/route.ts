@@ -2304,10 +2304,11 @@ export async function POST(req: NextRequest) {
       try {
         const shouldLoadConnectedTools = Boolean(requestedConnectorKey && connectorActionIntent);
         if (shouldLoadConnectedTools) {
+          let matchedToolkit: string | undefined;
           const session = await getSession();
           if (session?.user?.sub && requestedConnectorKey) {
             const enabledToolkits = await getEnabledComposioToolkits(session.user.sub);
-            const matchedToolkit = enabledToolkits.find(
+            matchedToolkit = enabledToolkits.find(
               (toolkit) => toolkit.replace(/[- ]/g, "_") === requestedConnectorKey
             );
             if (matchedToolkit) {

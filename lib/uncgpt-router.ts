@@ -43,5 +43,5 @@ export function chooseUncGptRoute(messages: any[], hasImage: boolean): UncGptRou
     return { provider: "cloudflare", model: "@cf/meta/llama-3.3-70b-instruct-fp8-fast", reason: "general" };
   }
 
-  return { provider: "groq", model: "llama-3.3-70b-versatile", reason: "general" };
+  return { provider: "cloudflare", model: "@cf/meta/llama-3.3-70b-instruct-fp8-fast", reason: "general" };
 }
