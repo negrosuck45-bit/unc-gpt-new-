@@ -1559,7 +1559,16 @@ function sanitizeGithubRepositoryName(value: string) {
     .replace(/[^A-Za-z0-9._-]+/g, "-")
     .replace(/^-+|-+$/g, "")
     .slice(0, 100);
-  return normalized || "uncgpt-portfolio";
+  return normalized || "uncgpt-site";
+}
+
+function generateWebsiteRepositoryName(userText: string) {
+  const requested = extractGithubRepositoryName(userText);
+  if (requested) return sanitizeGithubRepositoryName(requested);
+  const source = String(userText || "").toLowerCase();
+  const base = /count\s*down/i.test(source) ? "countdown" : /hello\s+world/i.test(source) ? "hello-world" : /portfolio/i.test(source) ? "portfolio" : /landing/i.test(source) ? "landing-page" : "uncgpt-site";
+  const suffix = crypto.randomUUID().replace(/-/g, "").slice(0, 8);
+  return `${base}-${suffix}`;
 }
 
 function isWebsiteFollowUpRequest(text: string, conversationText: string) {
@@ -1639,6 +1648,17 @@ function escapeTemplateHtml(value: string) {
 }
 
 function buildPortfolioFiles(userText: string) {
+  const forwardCountdown = userText.match(/\bcount\s*down[\s\S]{0,48}?(?:from\s*)?(\d{1,6})\s*(?:to|down\s+to)\s*(\d{1,6})\b/i);
+  const reverseCountdown = userText.match(/\bcount\s*down[\s\S]{0,48}?to\s*(\d{1,6})[\s\S]{0,48}?from\s*(\d{1,6})\b/i);
+  if (forwardCountdown || reverseCountdown) {
+    const start = Math.max(0, Number(forwardCountdown?.[1] ?? reverseCountdown?.[2] ?? 100));
+    const end = Math.max(0, Number(forwardCountdown?.[2] ?? reverseCountdown?.[1] ?? 0));
+    return {
+      "index.html": `<!doctype html>\n<html lang="en">\n<head>\n  <meta charset="UTF-8">\n  <meta name="viewport" content="width=device-width, initial-scale=1">\n  <meta name="description" content="An interactive countdown created by uncgpt.">\n  <title>${start} to ${end} Countdown</title>\n  <link rel="stylesheet" href="style.css">\n</head>\n<body>\n  <main class="shell">\n    <section class="card" aria-labelledby="title">\n      <p class="eyebrow">Live countdown</p>\n      <h1 id="title">${start} <span>→</span> ${end}</h1>\n      <output id="counter" aria-live="polite">${start}</output>\n      <div class="actions"><button id="start" type="button">Start countdown</button><button id="reset" class="secondary" type="button">Reset</button></div>\n      <p id="status">Ready to count down to ${end}.</p>\n    </section>\n  </main>\n  <script>window.COUNTDOWN_CONFIG={start:${start},end:${end}};</script>\n  <script src="script.js"></script>\n</body>\n</html>\n`,
+      "style.css": `:root{color-scheme:dark;--bg:#070a13;--text:#f8fafc;--muted:#9fb0cc;--accent:#74f2bf;--line:rgba(255,255,255,.14)}*{box-sizing:border-box}body{min-height:100vh;margin:0;display:grid;place-items:center;background:radial-gradient(circle at 50% 0,#233b77 0,transparent 44%),var(--bg);color:var(--text);font:16px/1.5 Inter,ui-sans-serif,system-ui,sans-serif}.shell{width:min(100% - 30px,680px)}.card{padding:clamp(2.4rem,8vw,5rem);text-align:center;border:1px solid var(--line);border-radius:32px;background:rgba(13,20,38,.8);box-shadow:0 28px 90px rgba(0,0,0,.42)}.eyebrow{margin:0;color:var(--accent);font-size:.78rem;font-weight:800;letter-spacing:.14em;text-transform:uppercase}.card h1{margin:.5rem 0 0;font-size:clamp(2rem,8vw,4.6rem);letter-spacing:-.06em}.card h1 span{color:var(--accent)}output{display:block;margin:.8rem 0 1.5rem;font-size:clamp(7rem,28vw,13rem);font-weight:850;letter-spacing:-.12em;line-height:.85;color:var(--accent);font-variant-numeric:tabular-nums}.actions{display:flex;justify-content:center;gap:.75rem;flex-wrap:wrap}button{border:1px solid var(--accent);border-radius:999px;padding:.78rem 1.15rem;background:var(--accent);color:#062017;font:inherit;font-weight:800;cursor:pointer;transition:transform .16s ease,filter .16s ease}button:hover{transform:translateY(-2px);filter:brightness(1.07)}button.secondary{border-color:var(--line);background:transparent;color:var(--text)}button:disabled{opacity:.55;cursor:not-allowed;transform:none}#status{min-height:1.5em;margin:1.3rem 0 0;color:var(--muted)}@media(max-width:460px){.card{padding:2.5rem 1.3rem;border-radius:25px}}\n`,
+      "script.js": `const {start,end}=window.COUNTDOWN_CONFIG;const counter=document.getElementById('counter');const status=document.getElementById('status');const startButton=document.getElementById('start');const resetButton=document.getElementById('reset');let value=start;let timer;function render(){counter.textContent=value;status.textContent=value===end?\`Done — reached \${end}.\`:\`Counting down to \${end}…\`;startButton.disabled=Boolean(timer)||value===end}function stop(){window.clearInterval(timer);timer=undefined;render()}startButton.addEventListener('click',()=>{if(timer||value===end)return;timer=window.setInterval(()=>{value+=start>=end?-1:1;if(value===end)stop();else render()},90);render()});resetButton.addEventListener('click',()=>{window.clearInterval(timer);timer=undefined;value=start;status.textContent=\`Ready to count down to \${end}.\`;render()});render();\n`,
+    };
+  }
   if (/\bhello\s+world\b/i.test(userText)) {
     return {
       "index.html": `<!doctype html>
@@ -3111,7 +3131,9 @@ export async function POST(req: NextRequest) {
       const websiteBuildRequest = isWebsiteBuildRequest(userText) || isWebsiteFollowUpRequest(userText, recentConversationText);
       let websiteRepository = extractGithubRepositoryRef(userText) || extractGithubRepositoryRef(recentConversationText);
       const websiteConversationText = `${recentConversationText}\n${userText}`;
-      const wantsGithubPages = /github\s*pages|github\.io/i.test(websiteConversationText);
+      // A request to create a GitHub website should be publishable by default.
+      // Users can explicitly opt out when they only want repository files.
+      const wantsGithubPages = websiteBuildRequest && !/\b(?:do\s+not|don't|dont|no)\s+(?:deploy|publish|github\s*pages)\b/i.test(websiteConversationText);
       const wantsVercel = /\bvercel\b/i.test(websiteConversationText);
       const composioGithubPreference = Array.isArray(mcpConnectors)
         ? mcpConnectors.find((connector: any) => normalizeConnectorKeyForRouting(connector.provider || connector.toolkit || connector.name) === "github" && connector?.enabled !== false)
@@ -3142,7 +3164,7 @@ export async function POST(req: NextRequest) {
         try {
           const profile: any = await executeOAuthGithubAction(baseUrl, req.headers.get("cookie") || "", "get_user", {});
           const owner = String(profile?.login || profile?.name || "").trim();
-          if (owner) websiteRepository = { owner, repo: sanitizeGithubRepositoryName(extractGithubRepositoryName(userText) || "uncgpt-portfolio") };
+          if (owner) websiteRepository = { owner, repo: generateWebsiteRepositoryName(userText) };
         } catch (error) {
           console.warn("Could not derive GitHub username for website creation", error);
         }
@@ -3156,7 +3178,7 @@ export async function POST(req: NextRequest) {
           const rawProfile: any = profileResponse?.data ?? profileResponse;
           const profile: any = parseComposioObject(rawProfile) || rawProfile;
           const owner = String(profile?.login || profile?.username || profile?.name || profile?.data?.login || profile?.data?.username || "").trim();
-          if (owner) websiteRepository = { owner, repo: sanitizeGithubRepositoryName(extractGithubRepositoryName(userText) || "uncgpt-portfolio") };
+          if (owner) websiteRepository = { owner, repo: generateWebsiteRepositoryName(userText) };
         } catch (error) {
           console.warn("Could not derive Composio GitHub username for website creation", error);
         }
@@ -3171,11 +3193,12 @@ export async function POST(req: NextRequest) {
             ? await executeComposioWebsiteScaffold(websiteComposioSession, websiteRepository.owner, websiteRepository.repo, userText, wantsGithubPages)
             : await executeWebsiteScaffold(baseUrl, req.headers.get("cookie") || "", websiteRepository.owner, websiteRepository.repo, userText, wantsGithubPages, wantsVercel);
           const lines = [`Created and committed the website files in **${websiteRepository.owner}/${websiteRepository.repo}**: ${result.files.join(", ")}.`];
-          if (result.githubPagesUrl) {
-            const pageLabel = result.githubPagesVerified ? "GitHub Pages" : "GitHub Pages is still building";
-            lines.push(`\n${pageLabel}: [Open site](${result.githubPagesUrl})`);
+          const launchUrl = result.githubPagesUrl || result.vercelUrl;
+          const launchStatus = result.githubPagesUrl ? result.githubPagesStatus : result.vercelState;
+          const launchVerified = result.githubPagesUrl ? result.githubPagesVerified === true : Boolean(result.vercelUrl && /ready|success/i.test(String(result.vercelState || "")));
+          if (launchUrl) {
+            lines.push(`[[UNCGPT_WEBSITE_DEPLOYMENT:${JSON.stringify({ title: result.githubPagesUrl ? "GitHub Pages deployment" : "Vercel deployment", repository: `${websiteRepository.owner}/${websiteRepository.repo}`, url: launchUrl, status: launchStatus || (launchVerified ? "ready" : "building"), verified: launchVerified })}]]`);
           }
-          if (result.vercelUrl) lines.push(`\nVercel deployment: [Open site](${result.vercelUrl}) (${result.vercelState || "starting"})`);
           return directTextResponse(lines.join("\n"), wantsGithubPages && wantsVercel ? "GitHub + GitHub Pages + Vercel" : wantsGithubPages ? "GitHub Pages" : wantsVercel ? "Vercel" : "GitHub", "connected-action");
         } catch (error: any) {
           return directTextResponse(`I couldn’t finish the website publish for **${websiteRepository.owner}/${websiteRepository.repo}**. ${String(error?.message || "The connected service did not confirm the requested write or deployment.").slice(0, 360)}`, "GitHub", "connector-error");

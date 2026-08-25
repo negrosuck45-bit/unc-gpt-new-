@@ -24,6 +24,14 @@ interface ContentPart {
   serverName?: string;
 }
 
+type WebsiteDeployment = {
+  title: string;
+  repository?: string;
+  url: string;
+  status?: string;
+  verified?: boolean;
+};
+
 type NormalizedEmail = {
   sender?: string;
   senderPhoto?: string;
@@ -34,6 +42,26 @@ type NormalizedEmail = {
   body?: string;
   attachments?: Array<{ filename?: string }>;
 };
+
+function parseWebsiteDeployment(content: string | undefined | null): WebsiteDeployment | null {
+  if (!content) return null;
+  const match = content.match(/\[\[UNCGPT_WEBSITE_DEPLOYMENT:([\s\S]*?)\]\]/);
+  if (!match?.[1]) return null;
+  try {
+    const parsed = JSON.parse(match[1]);
+    const url = String(parsed?.url || '').trim();
+    if (!/^https:\/\/[^\s]+$/i.test(url)) return null;
+    return {
+      title: String(parsed?.title || 'Website deployment').slice(0, 100),
+      repository: parsed?.repository ? String(parsed.repository).slice(0, 160) : undefined,
+      url,
+      status: parsed?.status ? String(parsed.status).slice(0, 80) : undefined,
+      verified: parsed?.verified === true,
+    };
+  } catch {
+    return null;
+  }
+}
 
 function parseEmailPayload(content: string | undefined | null): NormalizedEmail[] | null {
   if (!content?.trim()) return null;
@@ -306,6 +334,28 @@ function connectorBrand(content: string): { label: string; iconUrl: string } | n
   ] as const;
   const match = brands.find(([slug]) => value.includes(slug));
   return match ? { label: match[1], iconUrl: `https://cdn.simpleicons.org/${match[0]}` } : { label: 'Connected service', iconUrl: 'https://cdn.simpleicons.org/composio' };
+}
+
+function WebsiteDeploymentCard({ deployment }: { deployment: WebsiteDeployment }) {
+  const isBuilding = !deployment.verified;
+  return (
+    <section className="my-1 w-full max-w-xl overflow-hidden rounded-2xl border border-emerald-500/20 bg-gradient-to-br from-emerald-500/[0.12] via-card to-card shadow-sm">
+      <div className="flex items-start gap-3 border-b border-emerald-500/15 px-4 py-3.5">
+        <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-emerald-500/15 text-sm font-bold text-emerald-300">WEB</div>
+        <div className="min-w-0">
+          <p className="text-sm font-semibold text-foreground">{deployment.title}</p>
+          <p className="mt-0.5 text-xs text-muted-foreground">{isBuilding ? 'GitHub Pages is building your site.' : 'Your website is live and ready to open.'}</p>
+        </div>
+      </div>
+      <div className="space-y-3 px-4 py-4">
+        {deployment.repository && <p className="truncate text-xs text-muted-foreground">Repository: <span className="font-medium text-foreground">{deployment.repository}</span></p>}
+        <a href={deployment.url} target="_blank" rel="noopener noreferrer" className="inline-flex w-full items-center justify-center gap-2 rounded-xl bg-emerald-400 px-4 py-3 text-sm font-bold text-emerald-950 shadow-sm transition hover:bg-emerald-300 focus:outline-none focus:ring-2 focus:ring-emerald-300 focus:ring-offset-2 focus:ring-offset-card active:scale-[0.98]">
+          <span>{isBuilding ? 'Open website when ready' : 'Open live website'}</span><ExternalLink className="h-4 w-4" aria-hidden="true" />
+        </a>
+        {deployment.status && <p className="text-center text-[11px] text-muted-foreground">Status: {deployment.status}</p>}
+      </div>
+    </section>
+  );
 }
 
 function ConnectorResultCard({ text, brand }: { text: string; brand: { label: string; iconUrl: string } }) {
@@ -644,16 +694,17 @@ function ImagePreview({ src, alt, compact = false }: { src: string; alt?: string
 }
 
 export function MessageContent({ content }: MessageContentProps) {
+  const websiteDeployment = useMemo(() => parseWebsiteDeployment(content), [content]);
   const emails = useMemo(() => parseEmailPayload(content), [content]);
   const connectorText = useMemo(() => genericConnectorText(content || ''), [content]);
   const connectorBrandInfo = useMemo(() => connectorText ? connectorBrand(content || '') : null, [connectorText, content]);
   const parts = useMemo(() => parseContent(content), [content]);
-
-  if (emails) return <EmailCards emails={emails} />;
-  if (connectorText && connectorBrandInfo) return <ConnectorResultCard text={connectorText} brand={connectorBrandInfo} />;
-
   const images = useMemo(() => parts.filter(p => p.type === 'image'), [parts]);
   const otherParts = useMemo(() => parts.filter(p => p.type !== 'image'), [parts]);
+
+  if (websiteDeployment) return <WebsiteDeploymentCard deployment={websiteDeployment} />;
+  if (emails) return <EmailCards emails={emails} />;
+  if (connectorText && connectorBrandInfo) return <ConnectorResultCard text={connectorText} brand={connectorBrandInfo} />;
 
   return (
     <div className="space-y-2">
