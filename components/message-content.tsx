@@ -47,6 +47,137 @@ function parseEmailPayload(content: string | undefined | null): NormalizedEmail[
   }
 }
 
+function decodeEmailBase64(value: string): string {
+  try {
+    const normalized = value.replace(/-/g, '+').replace(/_/g, '/').replace(/\s/g, '');
+    const padded = normalized.padEnd(Math.ceil(normalized.length / 4) * 4, '=');
+    const binary = atob(padded);
+    const bytes = Uint8Array.from(binary, (character) => character.charCodeAt(0));
+    return new TextDecoder().decode(bytes);
+  } catch {
+    return value;
+  }
+}
+
+function cleanEmailText(value: string, html = false): string {
+  return (html ? value.replace(/<style[\s\S]*?<\/style>/gi, ' ').replace(/<script[\s\S]*?<\/script>/gi, ' ').replace(/<br\s*\/?\s*>/gi, '\n').replace(/<\/p\s*>|<\/div\s*>|<\/li\s*>/gi, '\n').replace(/<[^>]+>/g, ' ') : value)
+    .replace(/&nbsp;/gi, ' ').replace(/&amp;/gi, '&').replace(/&lt;/gi, '<').replace(/&gt;/gi, '>').replace(/&quot;/gi, '"').replace(/&#39;|&apos;/gi, "'")
+    .replace(/\r\n?/g, '\n').replace(/[ \t]+\n/g, '\n').replace(/\n{3,}/g, '\n\n').trim();
+}
+
+function emailBodyText(email: any): string {
+  const directKeys = ['body', 'body_text', 'bodyText', 'plain_text', 'plainText', 'text_body', 'textBody', 'message_body', 'messageBody', 'body_html', 'bodyHtml', 'html_body', 'htmlBody'];
+  for (const key of directKeys) {
+    if (typeof email?.[key] === 'string' && email[key].trim() && email[key] !== 'unavailable') {
+      const raw = email[key].trim();
+      const looksEncoded = /^(?:[A-Za-z0-9+/_-]{24,})={0,2}$/.test(raw) && !/\s/.test(raw);
+      return cleanEmailText(looksEncoded ? decodeEmailBase64(raw) : raw, /html/i.test(key));
+    }
+  }
+  const candidates: Array<{ text: string; score: number }> = [];
+  const visit = (value: any, depth = 0) => {
+    if (!value || depth > 10) return;
+    if (Array.isArray(value)) { value.forEach((entry) => visit(entry, depth + 1)); return; }
+    if (typeof value !== 'object') return;
+    const mime = String(value.mimeType || value.contentType || '').toLowerCase();
+    const html = mime.includes('html') || String(value.type || '').toLowerCase() === 'html';
+    if (typeof value.data === 'string' && value.data.trim()) {
+      const decoded = decodeEmailBase64(value.data);
+      const text = cleanEmailText(decoded, html);
+      if (text && text !== 'unavailable') candidates.push({ text, score: mime.includes('plain') ? 100 : html ? 80 : 90 });
+    }
+    for (const key of ['plainText', 'plain_text', 'textBody', 'text_body', 'bodyText', 'body_text', 'htmlBody', 'html_body', 'body', 'payload', 'parts', 'message']) visit(value[key], depth + 1);
+  };
+  visit(email?.payload);
+  candidates.sort((left, right) => right.score - left.score);
+  return candidates[0]?.text || '';
+}
+
+function genericConnectorText(content: string): string | null {
+  const trimmed = content.trim();
+  if (!(trimmed.startsWith('{') || trimmed.startsWith('[')) || !(trimmed.endsWith('}') || trimmed.endsWith(']'))) return null;
+  let parsed: any;
+  try { parsed = JSON.parse(trimmed); } catch { return null; }
+  if (!parsed || typeof parsed !== 'object' || Array.isArray(parsed) && parsed.length === 0) return null;
+  if (parsed?.emails && Array.isArray(parsed.emails)) return null;
+
+  const sensitive = /(?:token|secret|password|api[_-]?key|private[_-]?key|authorization)/i;
+  const humanize = (key: string) => key.replace(/([a-z0-9])([A-Z])/g, '$1 $2').replace(/[_-]+/g, ' ').replace(/\b\w/g, (letter) => letter.toUpperCase());
+  const scalar = (value: any): string => {
+    if (value === null || value === undefined || value === '') return 'Not set';
+    if (typeof value === 'boolean') return value ? 'Yes' : 'No';
+    if (typeof value === 'object') return '';
+    return String(value);
+  };
+  const title = (item: any, fallback: string) => ['name', 'title', 'full_name', 'display_name', 'subject', 'summary', 'slug', 'ref', 'id'].map((key) => item?.[key]).find((value) => value !== undefined && value !== null && typeof value !== 'object' && String(value).trim()) || fallback;
+  const fields = (item: any, prefix = '', depth = 0): string[] => {
+    if (!item || typeof item !== 'object' || depth > 3) return [];
+    const lines: string[] = [];
+    Object.entries(item).forEach(([key, value]) => {
+      if (sensitive.test(key) || value === null || value === undefined || value === '') return;
+      const label = prefix ? `${prefix} ${humanize(key)}` : humanize(key);
+      if (Array.isArray(value)) {
+        if (!value.length) return;
+        if (value.every((entry) => entry && typeof entry === 'object')) {
+          lines.push(`${label}: ${value.length} item${value.length === 1 ? '' : 's'}`);
+          value.slice(0, 10).forEach((entry, index) => lines.push(`${index + 1}. ${title(entry, `Item ${index + 1}`)}`));
+        } else lines.push(`${label}: ${value.slice(0, 20).map(scalar).join(', ')}`);
+      } else if (typeof value === 'object') {
+        lines.push(...fields(value, label, depth + 1));
+      } else {
+        lines.push(`${label}: ${scalar(value)}`);
+      }
+    });
+    return lines;
+  };
+
+  let root = parsed;
+  if (!Array.isArray(root) && root && typeof root === 'object') {
+    for (const key of ['data', 'result', 'response', 'output']) {
+      if (Object.keys(root).length === 1 && root[key] && typeof root[key] === 'object') root = root[key];
+    }
+  }
+  const lower = content.toLowerCase();
+  const provider = lower.includes('supabase') ? 'Supabase' : lower.includes('github') ? 'GitHub' : lower.includes('vercel') ? 'Vercel' : 'Connected service';
+  const lines = [`${provider} result`];
+  if (Array.isArray(root)) {
+    lines[0] += ` (${root.length} item${root.length === 1 ? '' : 's'})`;
+    root.slice(0, 50).forEach((entry, index) => {
+      if (entry && typeof entry === 'object') { lines.push(`${index + 1}. ${title(entry, `Item ${index + 1}`)}`); lines.push(...fields(entry).slice(0, 12).map((line) => `   ${line}`)); }
+      else lines.push(`${index + 1}. ${scalar(entry)}`);
+    });
+  } else if (root && typeof root === 'object') {
+    lines.push(...fields(root).slice(0, 160));
+  }
+  return lines.join('\n');
+}
+
+function connectorBrand(content: string): { label: string; iconUrl: string } | null {
+  const value = content.toLowerCase();
+  const brands = [
+    ['supabase', 'Supabase'], ['github', 'GitHub'], ['vercel', 'Vercel'], ['linear', 'Linear'], ['slack', 'Slack'],
+    ['notion', 'Notion'], ['discord', 'Discord'], ['gmail', 'Gmail'], ['stripe', 'Stripe'], ['asana', 'Asana'],
+  ] as const;
+  const match = brands.find(([slug]) => value.includes(slug));
+  return match ? { label: match[1], iconUrl: `https://cdn.simpleicons.org/${match[0]}` } : { label: 'Connected service', iconUrl: 'https://cdn.simpleicons.org/composio' };
+}
+
+function ConnectorResultCard({ text, brand }: { text: string; brand: { label: string; iconUrl: string } }) {
+  const [iconFailed, setIconFailed] = useState(false);
+  const body = text.replace(/^[^\n]* result(?: \([^\n]+\))?\n?/i, '').trim();
+  return (
+    <div className="my-1 w-full max-w-xl overflow-hidden rounded-2xl border border-border/70 bg-card/60 shadow-sm">
+      <div className="flex items-center gap-2 border-b border-border/60 px-3.5 py-3">
+        <div className="flex h-7 w-7 items-center justify-center rounded-lg bg-primary/10 p-1.5 text-primary">
+          {!iconFailed ? <img src={brand.iconUrl} alt="" aria-hidden="true" className="h-full w-full object-contain" onError={() => setIconFailed(true)} /> : <span className="text-xs font-bold">{brand.label.slice(0, 1)}</span>}
+        </div>
+        <div className="min-w-0"><div className="text-sm font-semibold text-foreground">{brand.label}</div><div className="text-[11px] text-muted-foreground">Connected service result</div></div>
+      </div>
+      <div className="px-3.5 py-3 text-sm leading-relaxed text-foreground/85" dangerouslySetInnerHTML={{ __html: formatText(body) }} />
+    </div>
+  );
+}
+
 function senderDetails(sender: string | undefined) {
   const value = (sender || 'Unknown sender').trim();
   const match = value.match(/^(.*?)\s*<([^>]+)>$/);
@@ -100,9 +231,9 @@ function EmailCards({ emails }: { emails: NormalizedEmail[] }) {
       <div className="divide-y divide-border/60">
         {emails.map((email, index) => {
           const sender = senderDetails(email.sender);
-          const body = email.body && email.body !== 'unavailable' ? email.body.trim() : '';
+          const body = emailBodyText(email);
           const snippet = email.snippet && email.snippet !== 'unavailable' ? email.snippet.trim() : '';
-          const preview = body || snippet || 'No preview available';
+          const preview = body || snippet || 'Message text unavailable — reconnect Gmail with read access to show the full preview.';
           const subject = email.subject && email.subject !== 'unavailable' ? email.subject : '(No subject)';
           return (
             <details key={`${email.messageId || index}`} className="group">
@@ -188,7 +319,10 @@ function parseContent(content: string | undefined | null): ContentPart[] {
     return [{ type: 'text', content: '' }];
   }
 
-  const { text: cleanedContent, terminals } = parseTerminalBlocks(content);
+  const emailPayload = parseEmailPayload(content);
+  if (emailPayload) return [{ type: 'text', content: '' }];
+  const connectorPayload = genericConnectorText(content);
+  const { text: cleanedContent, terminals } = parseTerminalBlocks(connectorPayload || content);
 
   const parts: ContentPart[] = [];
   const regex = /```(\w+)?\n([\s\S]*?)```|!\[([^\]]*)\]\((https?:\/\/[^\)]+)\)|\[\[DISCORD_TAG:([^\]]+)\]\]|\[\[DISCORD_NO_TAG\]\]|__TERMINAL_(\d+)__/g;
@@ -348,9 +482,12 @@ function ImageWithLoader({ src, alt }: { src: string; alt: string }) {
 
 export function MessageContent({ content }: MessageContentProps) {
   const emails = useMemo(() => parseEmailPayload(content), [content]);
+  const connectorText = useMemo(() => genericConnectorText(content || ''), [content]);
+  const connectorBrandInfo = useMemo(() => connectorText ? connectorBrand(content || '') : null, [connectorText, content]);
   const parts = useMemo(() => parseContent(content), [content]);
 
   if (emails) return <EmailCards emails={emails} />;
+  if (connectorText && connectorBrandInfo) return <ConnectorResultCard text={connectorText} brand={connectorBrandInfo} />;
 
   const images = useMemo(() => parts.filter(p => p.type === 'image'), [parts]);
   const otherParts = useMemo(() => parts.filter(p => p.type !== 'image'), [parts]);

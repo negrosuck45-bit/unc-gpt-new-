@@ -61,9 +61,13 @@ function findEmails(value: unknown, emails: AnyRecord[], seen = new Set<unknown>
   if (Array.isArray(value)) return void value.forEach((item) => findEmails(item, emails, seen, depth + 1));
   const item = record(value);
   if (!item) return;
-  if ((item.id || item.messageId || item.message_id) && (item.threadId || item.thread_id || item.payload || item.headers || item.snippet || item.subject || item.body)) {
-    emails.push(item);
-  }
+  const hasMessageId = Boolean(item.id || item.messageId || item.message_id);
+  const bodyObject = record(item.body);
+  const hasBodyContent = typeof item.body === "string" || Boolean(bodyObject && (bodyObject.data || bodyObject.text || bodyObject.value || bodyObject.content));
+  const hasMessageIdentity = Boolean(item.from || item.sender || item.senderEmail || item.subject || item.snippet);
+  const hasDirectBodyField = Boolean(typeof item.body === "string" || item.body_text || item.body_html || item.plain_text || item.html_body || item.message_body);
+  const hasStrongEmailFields = Boolean(hasMessageIdentity || hasDirectBodyField || item.raw || (hasBodyContent && !item.mimeType && !item.contentType));
+  if ((hasMessageId && (hasStrongEmailFields || item.payload || item.headers)) || (!hasMessageId && hasStrongEmailFields)) emails.push(item);
   Object.values(item).forEach((child) => findEmails(child, emails, seen, depth + 1));
 }
 
@@ -122,6 +126,19 @@ function collectBodyCandidates(value: unknown, candidates: BodyCandidate[], seen
     if (text) candidates.push({ text, score: isPlain ? 100 : isHtml ? 80 : 90, order: candidates.length });
   }
 
+  const directBodyKeys = ["body_text", "bodyText", "plain_text", "plainText", "text_body", "textBody", "message_body", "messageBody", "body_html", "bodyHtml", "html_body", "htmlBody"];
+  for (const key of directBodyKeys) {
+    if (typeof item[key] !== "string" || !item[key].trim()) continue;
+    const html = /html/i.test(key) || isHtml;
+    const text = cleanBody(item[key], html);
+    if (text) candidates.push({ text, score: /plain|text/i.test(key) ? 100 : html ? 78 : 90, order: candidates.length });
+  }
+
+  if (typeof item.data === "string" && item.data.trim() && !/^\s*[\\[{]/.test(item.data)) {
+    const text = cleanBody(decodeBase64Url(item.data) || item.data, isHtml);
+    if (text) candidates.push({ text, score: isPlain ? 98 : 86, order: candidates.length });
+  }
+
   if (body) {
     for (const key of ["data", "value", "text", "content"]) {
       if (typeof body[key] !== "string" || !body[key].trim()) continue;
@@ -131,7 +148,7 @@ function collectBodyCandidates(value: unknown, candidates: BodyCandidate[], seen
     }
   }
 
-  for (const key of ["plainText", "textBody", "bodyText", "text", "htmlBody", "html", "content", "value"]) {
+  for (const key of ["plainText", "textBody", "bodyText", "plain_text", "text_body", "messageBody", "message_body", "text", "htmlBody", "html_body", "html", "content", "value"]) {
     if (typeof item[key] !== "string" || !item[key].trim()) continue;
     const html = key === "htmlBody" || key === "html" || isHtml;
     const text = cleanBody(item[key], html);
@@ -192,6 +209,132 @@ function normalizeEmail(message: AnyRecord) {
   };
 }
 
+const SENSITIVE_KEYS = /(?:access[_-]?token|refresh[_-]?token|api[_-]?key|client[_-]?secret|authorization|password|secret|private[_-]?key)/i;
+const TITLE_KEYS = ["name", "title", "full_name", "fullName", "display_name", "displayName", "subject", "summary", "slug", "ref", "id"];
+
+function humanizeKey(key: string): string {
+  const labels: Record<string, string> = {
+    id: "ID", url: "URL", uri: "URL", html_url: "URL", api_url: "API URL", created_at: "Created", updated_at: "Updated",
+    createdAt: "Created", updatedAt: "Updated", organization_id: "Organization ID", organization_slug: "Organization", project_id: "Project ID",
+    database_host: "Database Host", postgres_engine: "Postgres Engine", release_channel: "Release Channel", email_address: "Email", user_id: "User ID",
+    thread_id: "Thread ID", message_id: "Message ID", avatar_url: "Avatar URL", profile_url: "Profile URL",
+  };
+  if (labels[key]) return labels[key];
+  return key.replace(/([a-z0-9])([A-Z])/g, "$1 $2").replace(/[_-]+/g, " ").replace(/\b\w/g, (letter) => letter.toUpperCase());
+}
+
+function formatScalar(value: unknown): string {
+  if (value === null || value === undefined || value === "") return "Not set";
+  if (typeof value === "boolean") return value ? "Yes" : "No";
+  if (typeof value === "number") return Number.isFinite(value) ? String(value) : "Not available";
+  const text = String(value).trim();
+  if (/^https?:\/\//i.test(text)) return `[Open link](${text})`;
+  if (/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}/.test(text)) {
+    const timestamp = Date.parse(text);
+    if (!Number.isNaN(timestamp)) return new Intl.DateTimeFormat("en", { dateStyle: "medium", timeStyle: "short", timeZone: "UTC" }).format(timestamp);
+  }
+  return text.length > 1000 ? `${text.slice(0, 1000)}…` : text;
+}
+
+function recordTitle(item: AnyRecord, fallback: string): string {
+  for (const key of TITLE_KEYS) {
+    const value = item[key];
+    if (value !== null && value !== undefined && typeof value !== "object" && String(value).trim()) return String(value).trim();
+  }
+  return fallback;
+}
+
+function renderObjectFields(item: AnyRecord, depth = 0, prefix = ""): string[] {
+  const lines: string[] = [];
+  for (const [key, value] of Object.entries(item)) {
+    if (SENSITIVE_KEYS.test(key)) continue;
+    const label = prefix ? `${prefix} ${humanizeKey(key)}` : humanizeKey(key);
+    if (value === null || value === undefined || value === "") continue;
+    if (Array.isArray(value)) {
+      if (value.length === 0) continue;
+      if (depth < 2 && value.every((entry) => record(entry))) {
+        lines.push(`${label}: ${value.length} item${value.length === 1 ? "" : "s"}`);
+        value.slice(0, 10).forEach((entry, index) => {
+          const child = record(entry)!;
+          lines.push(`  ${index + 1}. ${recordTitle(child, `Item ${index + 1}`)}`);
+          renderObjectFields(child, depth + 1, "").slice(0, 8).forEach((line) => lines.push(`     ${line.trim()}`));
+        });
+      } else {
+        lines.push(`${label}: ${value.slice(0, 20).map(formatScalar).join(", ")}${value.length > 20 ? ", …" : ""}`);
+      }
+      continue;
+    }
+    const child = record(value);
+    if (child && depth < 3) {
+      const childLines = renderObjectFields(child, depth + 1, label);
+      lines.push(...childLines);
+      continue;
+    }
+    lines.push(`${label}: ${formatScalar(value)}`);
+  }
+  return lines;
+}
+
+function connectorDisplayName(connectorName: string): string {
+  const slug = String(connectorName || "connector").split(/\s+/).find((part) => /[a-z]/i.test(part)) || "connector";
+  const known: Record<string, string> = { supabase: "Supabase", github: "GitHub", gmail: "Gmail", slack: "Slack", notion: "Notion", vercel: "Vercel", discord: "Discord", linear: "Linear", dropbox: "Dropbox", trello: "Trello", jira: "Jira" };
+  const normalized = slug.toLowerCase().replace(/[^a-z0-9_-]/g, "").replace(/_(tool|action|execute|fetch|list|search).*$/i, "");
+  const knownKey = Object.keys(known).find((key) => normalized === key || normalized.startsWith(`${key}_`) || normalized.startsWith(`${key}-`));
+  if (knownKey) return known[knownKey];
+  return normalized.replace(/[_-]+/g, " ").replace(/\b\w/g, (letter) => letter.toUpperCase()) || "Connector";
+}
+
+function formatGenericConnectorResult(value: unknown, connectorName: string): string {
+  const parsedValue = parsed(value);
+  if (typeof parsedValue === "string") return parsedValue.trim().slice(0, MAX_RESULT_LENGTH);
+  if (parsedValue === null || parsedValue === undefined) return `${connectorName || "Connector"} returned no data.`;
+
+  let root: any = parsedValue;
+  if (record(root)) {
+    for (const key of ["data", "result", "response", "output"]) {
+      const child = root[key];
+      if (child && (Array.isArray(child) || record(child))) {
+        const siblingKeys = Object.keys(root).filter((candidate) => candidate !== key && !SENSITIVE_KEYS.test(candidate));
+        if (siblingKeys.length === 0) root = child;
+      }
+    }
+  }
+
+  const displayName = connectorDisplayName(connectorName);
+  const lines: string[] = [`${displayName} result`];
+  if (Array.isArray(root)) {
+    lines[0] += ` (${root.length} item${root.length === 1 ? "" : "s"})`;
+    root.slice(0, 50).forEach((entry, index) => {
+      const item = record(entry);
+      if (!item) lines.push(`${index + 1}. ${formatScalar(entry)}`);
+      else {
+        lines.push(`${index + 1}. ${recordTitle(item, `Item ${index + 1}`)}`);
+        renderObjectFields(item, 0).slice(0, 12).forEach((line) => lines.push(`   ${line}`));
+      }
+    });
+  } else if (record(root)) {
+    const entries = Object.entries(root);
+    const recordArrays = entries.filter(([, entry]) => Array.isArray(entry) && entry.length > 0);
+    if (recordArrays.length === 1 && entries.every(([key]) => key === recordArrays[0][0] || SENSITIVE_KEYS.test(key))) {
+      const [key, items] = recordArrays[0];
+      lines[0] += ` — ${humanizeKey(key)} (${(items as unknown[]).length})`;
+      (items as unknown[]).slice(0, 50).forEach((entry, index) => {
+        const item = record(entry);
+        if (!item) lines.push(`${index + 1}. ${formatScalar(entry)}`);
+        else {
+          lines.push(`${index + 1}. ${recordTitle(item, `Item ${index + 1}`)}`);
+          renderObjectFields(item, 0).slice(0, 12).forEach((line) => lines.push(`   ${line}`));
+        }
+      });
+    } else {
+      renderObjectFields(root).slice(0, 160).forEach((line) => lines.push(line));
+    }
+  } else {
+    lines.push(formatScalar(root));
+  }
+  return lines.join("\n").slice(0, MAX_RESULT_LENGTH);
+}
+
 export function normalizeConnectorResult(value: unknown, connectorName = "connector"): string {
   const valueToNormalize = parsed(value);
   if (/gmail|email|mail/i.test(connectorName)) {
@@ -208,6 +351,5 @@ export function normalizeConnectorResult(value: unknown, connectorName = "connec
     });
     return JSON.stringify(normalized.length ? { emails: normalized.slice(0, 50) } : { emails: [], note: "The connected Gmail tool returned no email records." }, null, 2);
   }
-  const text = typeof valueToNormalize === "string" ? valueToNormalize : JSON.stringify(valueToNormalize);
-  return text.length > MAX_RESULT_LENGTH ? `${text.slice(0, MAX_RESULT_LENGTH)}\n[connector result truncated]` : text;
+  return formatGenericConnectorResult(valueToNormalize, connectorName);
 }

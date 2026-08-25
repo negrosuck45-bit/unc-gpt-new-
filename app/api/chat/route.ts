@@ -1431,6 +1431,11 @@ async function executeLatestGmailMessages(session: any) {
   if (result?.error) throw new Error(String(result.error));
 
   const normalized = parseNormalizedEmailResult(normalizeConnectorResult(result?.data ?? result, "GMAIL_FETCH_EMAILS"));
+  console.info("Gmail list normalized", {
+    emailCount: normalized.emails.length,
+    bodyCount: normalized.emails.filter((email: any) => !isUnavailableEmailField(email?.body)).length,
+    hydrationCount: normalized.emails.filter((email: any) => !isUnavailableEmailField(email?.messageId) && isUnavailableEmailField(email?.body)).length,
+  });
   const emailsNeedingHydration = normalized.emails.filter((email: any) =>
     !isUnavailableEmailField(email?.messageId) && isUnavailableEmailField(email?.body)
   );
@@ -1438,24 +1443,65 @@ async function executeLatestGmailMessages(session: any) {
   for (let offset = 0; offset < emailsNeedingHydration.length; offset += 6) {
     const batch = emailsNeedingHydration.slice(offset, offset + 6);
     await Promise.all(batch.map(async (email: any) => {
+      let detailed: any = null;
+      let detailSlug = "GMAIL_FETCH_MESSAGE_BY_MESSAGE_ID";
       try {
-        const detailed = await session.execute("GMAIL_FETCH_MESSAGE_BY_MESSAGE_ID", {
+        detailed = await session.execute(detailSlug, {
           user_id: "me",
           message_id: email.messageId,
           format: "full",
         });
-        if (detailed?.error) return;
-        const detailResult = parseNormalizedEmailResult(normalizeConnectorResult(detailed?.data ?? detailed, "GMAIL_FETCH_MESSAGE_BY_MESSAGE_ID"));
-        const detail = detailResult.emails.find((candidate: any) => candidate?.messageId === email.messageId) || detailResult.emails[0];
-        if (!detail) return;
+
+        // Some older Gmail connections expose thread hydration more reliably
+        // than single-message hydration. Fall back to the thread when needed.
+        if (detailed?.error && !isUnavailableEmailField(email?.threadId)) {
+          detailSlug = "GMAIL_FETCH_MESSAGE_BY_THREAD_ID";
+          detailed = await session.execute(detailSlug, {
+            user_id: "me",
+            thread_id: email.threadId,
+          });
+        }
+        if (detailed?.error) {
+          console.warn("Gmail detail action returned an error", { messageId: email.messageId, detailSlug, error: String(detailed.error) });
+          return;
+        }
+        let detailResult = parseNormalizedEmailResult(normalizeConnectorResult(detailed?.data ?? detailed, detailSlug));
+        let detail = detailResult.emails.find((candidate: any) => candidate?.messageId === email.messageId) || detailResult.emails[0];
+        if ((!detail || isUnavailableEmailField(detail.body)) && detailSlug === "GMAIL_FETCH_MESSAGE_BY_MESSAGE_ID") {
+          try {
+            const rawResponse = await session.execute("GMAIL_FETCH_MESSAGE_BY_MESSAGE_ID", {
+              user_id: "me",
+              message_id: email.messageId,
+              format: "raw",
+            });
+            if (!rawResponse?.error) {
+              const rawData = rawResponse?.data ?? rawResponse;
+              const rawPayload = typeof rawData === "string"
+                ? { id: email.messageId, threadId: email.threadId, raw: rawData }
+                : rawData;
+              detailResult = parseNormalizedEmailResult(normalizeConnectorResult(rawPayload, "GMAIL_FETCH_MESSAGE_BY_MESSAGE_ID"));
+              detail = detailResult.emails.find((candidate: any) => candidate?.messageId === email.messageId) || detailResult.emails[0];
+            }
+          } catch (rawError) {
+            console.warn("Gmail raw-message fallback failed", { messageId: email.messageId, error: String(rawError) });
+          }
+        }
+        if (!detail) {
+          console.warn("Gmail detail action returned no normalizable body", { messageId: email.messageId, detailSlug });
+          return;
+        }
         const index = normalized.emails.findIndex((candidate: any) => candidate?.messageId === email.messageId);
         if (index >= 0) normalized.emails[index] = mergeNormalizedEmail(normalized.emails[index], detail);
       } catch (error) {
-        console.warn("Gmail full-message hydration failed", { messageId: email.messageId, error: String(error) });
+        console.warn("Gmail full-message hydration failed", { messageId: email.messageId, detailSlug, error: String(error) });
       }
     }));
   }
 
+  console.info("Gmail hydration complete", {
+    emailCount: normalized.emails.length,
+    bodyCount: normalized.emails.filter((email: any) => !isUnavailableEmailField(email?.body)).length,
+  });
   return JSON.stringify(normalized.emails.length ? { emails: normalized.emails.slice(0, 50) } : { emails: [], note: normalized.note || "The connected Gmail tool returned no email records." }, null, 2);
 }
 
@@ -1701,25 +1747,7 @@ function detectDiscordReadIntent(text: string): DiscordReadIntent | null {
 }
 
 function formatVerifiedConnectorData(value: unknown): string {
-  if (typeof value === "string") {
-    const trimmed = value.trim();
-    if (trimmed) {
-      try {
-        return formatVerifiedConnectorData(JSON.parse(trimmed));
-      } catch {
-        return trimmed.slice(0, 12000);
-      }
-    }
-  }
-
-  const serializable = value && typeof value === "object" ? value : { result: value };
-  let json = "";
-  try {
-    json = JSON.stringify(serializable, null, 2);
-  } catch {
-    json = String(serializable);
-  }
-  return json.slice(0, 12000);
+  return normalizeConnectorResult(value, "connector");
 }
 
 async function executeVerifiedDiscordRead(
@@ -2448,6 +2476,7 @@ export async function POST(req: NextRequest) {
         dropbox: { label: 'Dropbox', description: 'find and manage your files', iconUrl: 'https://cdn.simpleicons.org/dropbox' },
         trello: { label: 'Trello', description: 'read and manage boards and cards', iconUrl: 'https://cdn.simpleicons.org/trello' },
         jira: { label: 'Jira', description: 'read and manage issues and projects', iconUrl: 'https://cdn.simpleicons.org/jira' },
+        supabase: { label: 'Supabase', description: 'read and manage projects and databases', iconUrl: 'https://cdn.simpleicons.org/supabase' },
       };
       const staticConnectorKey = Object.keys(connectorHints).find((key) => {
         const pattern = key.replace(/_/g, '[ _-]?');
@@ -2468,7 +2497,7 @@ export async function POST(req: NextRequest) {
         ? connectorHints[requestedConnectorKey] || {
             label: requestedConnectorKey.replace(/[_-]/g, ' ').replace(/\b\w/g, (letter) => letter.toUpperCase()),
             description: `read and manage your ${requestedConnectorKey.replace(/[_-]/g, ' ')} data`,
-            iconUrl: 'https://cdn.simpleicons.org/composio',
+            iconUrl: `https://cdn.simpleicons.org/${requestedConnectorKey.replace(/[^a-z0-9-]/g, '')}` ,
           }
         : null;
       let requestedState = requestedConnectorKey ? connectorPreferences.find((connector: any) => connector?.source === 'composio' && String(connector.provider || connector.toolkit || '').toLowerCase().replace(/[- ]/g, '_') === requestedConnectorKey) : null;
