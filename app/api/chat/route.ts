@@ -826,7 +826,7 @@ const TERMINAL_SYSTEM_PROMPT = `You are uncgpt, a helpful AI assistant. Answer t
 
 Infer the user's intent from ordinary language and complete the requested task using an actually connected service whenever one is available. Do not require special prefixes, connector names, or instructions such as “use a tool.” For read-only requests and routine actions that the user explicitly requested, proceed immediately without asking for confirmation. Only pause for confirmation immediately before an irreversible, destructive, financial, privacy-sensitive, or externally visible action when the user has not already clearly authorized that exact action. Never ask the user to confirm merely because a connector is being used.
 
-For connected Composio apps, call the matching connected-app function directly with the user’s request and use its real result. Do not answer as a generic bot, do not describe what the app could theoretically do, do not invent sample data, and do not claim access unless the tool result proves it. If a needed connector is genuinely not connected, return one concise sentence naming the connector and the single Settings action required; do not repeat setup instructions or ask unnecessary questions.
+For connected Composio apps, call the matching connected-app function directly with the user’s request and use its real result. This includes create, add, edit, update, modify, send, publish, deploy, commit, and manage requests—not only read requests. Do not answer as a generic bot, do not describe what the app could theoretically do, do not invent sample data, and do not claim access unless the tool result proves it. If a write tool requires a missing value that cannot be inferred safely, ask only for that value. If a needed connector is genuinely not connected, return one concise sentence naming the connector and the single Settings action required; do not repeat setup instructions or ask unnecessary questions.
 
 Keep final responses concise and natural: usually one short paragraph or a compact list, like ChatGPT. Do not narrate reasoning, tool names, intermediate steps, command syntax, or implementation details. For connector requests, use the connected service silently and return the verified result. When a connector returns multiple records or rows, present them as a compact Markdown table with useful columns; use short labeled sections or key-value cards for nested details. Do not dump raw JSON, huge paragraphs, or a long unstructured bullet list when a table is clearer. Never claim an external action succeeded unless a tool result confirms it.`;
 
@@ -2454,6 +2454,7 @@ export async function POST(req: NextRequest) {
     let availableTools: any[] = computerUse === false ? [...BUILTIN_TOOLS] : buildAgentComputerTools();
     try {
       const oauthBundle = buildOAuthTools(req, baseUrl);
+      const oauthConnected = new Set((oauthBundle.connected || []).map((provider: string) => String(provider).toLowerCase().replace(/[- ]/g, '_')));
       let mcpTools: any[] = [];
       let composioTools: any[] = [];
       let composioSession: any = null;
@@ -2500,10 +2501,14 @@ export async function POST(req: NextRequest) {
             iconUrl: `https://cdn.simpleicons.org/${requestedConnectorKey.replace(/[^a-z0-9-]/g, '')}` ,
           }
         : null;
-      let requestedState = requestedConnectorKey ? connectorPreferences.find((connector: any) => connector?.source === 'composio' && String(connector.provider || connector.toolkit || '').toLowerCase().replace(/[- ]/g, '_') === requestedConnectorKey) : null;
+      const normalizeConnectorKey = (value: unknown) => String(value || '').toLowerCase().replace(/[- ]/g, '_').replace(/[^a-z0-9_]/g, '');
+      let requestedState = requestedConnectorKey ? connectorPreferences.find((connector: any) => normalizeConnectorKey(connector.provider || connector.toolkit || connector.name) === requestedConnectorKey) : null;
+      if (requestedConnectorKey && oauthConnected.has(requestedConnectorKey)) {
+        requestedState = { source: 'oauth', provider: requestedConnectorKey, toolkit: requestedConnectorKey, enabled: true };
+      }
       // Client storage can be stale or empty. Resolve the live Composio account before deciding
       // whether to ask for authorization, so the AI and connector panel see the same state.
-      if (requestedConnectorKey && process.env.COMPOSIO_API_KEY && (!requestedState || requestedState.enabled === false)) {
+      if (requestedConnectorKey && process.env.COMPOSIO_API_KEY && (!requestedState || requestedState.enabled === false) && !oauthConnected.has(requestedConnectorKey)) {
         try {
           const liveSession = await getSession();
           const liveUserId = liveSession?.user?.sub;
