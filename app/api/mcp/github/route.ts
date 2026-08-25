@@ -54,6 +54,10 @@ export async function POST(request: NextRequest) {
         result = await gh(token, "/user/repos?per_page=50&sort=updated");
         break;
 
+      case "get_user":
+        result = await gh(token, "/user");
+        break;
+
       case "get_repo":
         result = await gh(token, `/repos/${params.owner}/${params.repo}`);
         break;
@@ -76,15 +80,67 @@ export async function POST(request: NextRequest) {
         break;
 
       case "create_or_update_file": {
+        const filePath = String(params.path || "").replace(/^\/+/, "");
+        if (!filePath) throw new Error("A file path is required");
         const payload: Record<string, unknown> = {
-          message: params.message,
-          content: params.content, // must be base64
+          message: params.message || `Update ${filePath}`,
+          content: params.contentEncoding === "base64" || params.content_base64 === true
+            ? String(params.content || "")
+            : Buffer.from(String(params.content || ""), "utf8").toString("base64"),
         };
         if (params.branch) payload.branch = params.branch;
-        if (params.sha)    payload.sha    = params.sha; // required for updates
-        result = await gh(token, `/repos/${params.owner}/${params.repo}/contents/${params.path}`, "PUT", payload);
+        let sha = params.sha;
+        if (!sha) {
+          try {
+            const existing: any = await gh(token, `/repos/${params.owner}/${params.repo}/contents/${filePath}${params.branch ? `?ref=${encodeURIComponent(params.branch)}` : ""}`);
+            if (existing?.sha) sha = existing.sha;
+          } catch (error: any) {
+            if (!String(error?.message || "").toLowerCase().includes("not found")) throw error;
+          }
+        }
+        if (sha) payload.sha = sha;
+        result = await gh(token, `/repos/${params.owner}/${params.repo}/contents/${filePath}`, "PUT", payload);
         break;
       }
+
+      case "delete_file": {
+        const filePath = String(params.path || "").replace(/^\/+/, "");
+        if (!filePath) throw new Error("A file path is required");
+        let sha = params.sha;
+        if (!sha) {
+          const existing: any = await gh(token, `/repos/${params.owner}/${params.repo}/contents/${filePath}${params.branch ? `?ref=${encodeURIComponent(params.branch)}` : ""}`);
+          sha = existing?.sha;
+        }
+        if (!sha) throw new Error("Could not find the file SHA required to delete this file");
+        const payload: Record<string, unknown> = { message: params.message || `Delete ${filePath}`, sha };
+        if (params.branch) payload.branch = params.branch;
+        result = await gh(token, `/repos/${params.owner}/${params.repo}/contents/${filePath}`, "DELETE", payload);
+        break;
+      }
+
+      case "get_pages":
+        result = await gh(token, `/repos/${params.owner}/${params.repo}/pages`);
+        break;
+
+      case "enable_pages": {
+        const source = { branch: params.branch || "main", path: params.path === "/docs" ? "/docs" : "/" };
+        let pagesPayload: Record<string, unknown> = { build_type: params.build_type === "workflow" ? "workflow" : "legacy", source };
+        try {
+          result = await gh(token, `/repos/${params.owner}/${params.repo}/pages`, "POST", pagesPayload);
+        } catch (error: any) {
+          if (!String(error?.message || "").toLowerCase().includes("already exists") && !String(error?.message || "").includes("409")) throw error;
+          result = await gh(token, `/repos/${params.owner}/${params.repo}/pages`, "PUT", pagesPayload);
+        }
+        break;
+      }
+
+      case "build_pages":
+        result = await gh(token, `/repos/${params.owner}/${params.repo}/pages/builds`, "POST");
+        break;
+
+      case "get_pages_build":
+        result = await gh(token, `/repos/${params.owner}/${params.repo}/pages/builds/latest`);
+        break;
 
       case "create_issue":
         result = await gh(token, `/repos/${params.owner}/${params.repo}/issues`, "POST", {
