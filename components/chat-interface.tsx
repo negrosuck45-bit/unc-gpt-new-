@@ -9,7 +9,6 @@ import { ChatHeader } from "@/components/chat-header";
 import { playReplySound, unlockReplySound } from "@/lib/notifications";
 import { readUserPreferences } from "@/lib/user-preferences";
 import { triggerHaptic } from "@/lib/haptics";
-import { localVisionSupported, runLocalVision } from "@/lib/local-vision";
 import { connectorPermissionIdentity } from "@/components/connector-permission-card";
 import { accountStorageKey } from "@/lib/account-scope";
 import { ConnectionStatusBanner, type ConnectionIssue } from "@/components/connection-status-banner";
@@ -144,23 +143,9 @@ export function ChatInterface({ onSwitchToImagine, onOpenSidebar, isSidebarOpen 
     let completed = false;
     try {
       const messagesToSend = useChatStore.getState().chats.find((c) => c.id === chatId)?.messages || [];
-      const imageAttachment = attachments?.find((attachment) => attachment.type === "image");
-      if (imageAttachment) {
-        const canRunLocally = await localVisionSupported();
-        const localImage = imageAttachment.visionUrl || imageAttachment.url;
-        if (canRunLocally && localImage) {
-          try {
-            const responseContent = await runLocalVision(localImage, content || "Describe this image and answer my question.");
-            addMessage(chatId, { role: "assistant", content: responseContent });
-            void persistNeuralMemory(chatId, messagesToSend, responseContent);
-            completed = true;
-            setConnectionIssue(null);
-            return;
-          } catch (localError) {
-            console.warn("[uncgpt] Local vision unavailable; falling back to hosted vision.", localError);
-          }
-        }
-      }
+      // Always use the hosted vision path for images. Browser-local WebGPU vision can
+      // report support while still failing to load a remote Supabase URL on mobile;
+      // the hosted path receives the same public image URL and has provider fallbacks.
       const responseContent = await processAIResponse(chatId, messagesToSend);
       void persistNeuralMemory(chatId, messagesToSend, responseContent);
       completed = true;
@@ -198,7 +183,8 @@ export function ChatInterface({ onSwitchToImagine, onOpenSidebar, isSidebarOpen 
         const contentParts: any[] = [{ type: "text", text: m.content || "" }];
         m.attachments.forEach((a: any) => {
           if (a.type === "image") {
-            contentParts.push({ type: "image_url", image_url: { url: a.visionUrl || a.url } });
+            const imageUrl = a.permanentUrl || a.url || a.visionUrl;
+            if (imageUrl) contentParts.push({ type: "image_url", image_url: { url: imageUrl } });
           } else if (a.type === "file" || a.type === "link") {
             contentParts[0].text += `\n\n[Attached ${a.type}: ${a.name}](${a.url})`;
           }

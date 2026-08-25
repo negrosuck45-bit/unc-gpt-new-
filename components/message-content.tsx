@@ -419,10 +419,22 @@ function formatText(text: string | undefined | null): string {
     .replace(/&/g, '&amp;')
     .replace(/</g, '&lt;')
     .replace(/>/g, '&gt;')
-    .replace(/\[([^\]]+)\]\((https?:\/\/[^\s\)]+)\)/g, '<a href="$2" target="_blank" rel="noopener noreferrer" class="text-blue-500 hover:underline inline-flex items-center gap-1">$1 <svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-external-link"><path d="M15 3h6v6"/><path d="M10 14 21 3"/><path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"/></svg></a>')
+    // Older connector replies sometimes emitted an empty label such as [](https://...).
+    // Keep the destination visible and give it an accessible action label instead of
+    // rendering a blank bracket pair.
+    .replace(/\[\s*\]\((https?:\/\/[^\s\)]+)\)/g, '$1')
+    .replace(/\[([^\]]*)\]\((https?:\/\/[^\s\)]+)\)/g, (_match, label, url) => {
+      const visibleLabel = String(label || '').trim() || String(url).replace(/^https?:\/\//i, '').replace(/\/$/, '');
+      return `<a href="${url}" target="_blank" rel="noopener noreferrer" class="my-0.5 inline-flex max-w-full items-center gap-1.5 rounded-lg border border-primary/20 bg-primary/5 px-2 py-1 text-primary hover:bg-primary/10 hover:underline"><span class="truncate">${visibleLabel}</span> <svg aria-hidden="true" xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M15 3h6v6"/><path d="M10 14 21 3"/><path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"/></svg></a>`;
+    })
     .replace(/\*\*(.*?)\*\*/g, '<strong class="font-bold text-foreground">$1</strong>')
     .replace(/\*(.*?)\*/g, '<em class="italic">$1</em>')
     .replace(/`([^`]+)`/g, '<code class="px-1.5 py-0.5 rounded bg-accent text-sm font-mono border border-border/50">$1</code>')
+    // Link plain deployment URLs while leaving URLs inside generated anchor hrefs alone.
+    .replace(/(^|[\s>])(https?:\/\/[^\s<)]+)/g, (_match, prefix, url) => {
+      const label = String(url).replace(/^https?:\/\//i, '').replace(/\/$/, '');
+      return `${prefix}<a href="${url}" target="_blank" rel="noopener noreferrer" class="my-0.5 inline-flex max-w-full items-center gap-1.5 rounded-lg border border-primary/20 bg-primary/5 px-2 py-1 text-primary hover:bg-primary/10 hover:underline"><span class="truncate">${label}</span> <span aria-hidden="true">↗</span></a>`;
+    })
     .replace(/\n/g, '<br />');
 
   // Format repository rows with only the subtle GitHub mark and repository name—no decorative dash separators.
@@ -549,7 +561,7 @@ function DiscordTagIcon() {
   return <Tag className="h-5 w-5 opacity-90" aria-hidden="true" />;
 }
 
-function ImageWithLoader({ src, alt }: { src: string; alt: string }) {
+function ImagePreview({ src, alt, compact = false }: { src: string; alt?: string; compact?: boolean }) {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(false);
 
@@ -572,8 +584,13 @@ function ImageWithLoader({ src, alt }: { src: string; alt: string }) {
 
   if (error) {
     return (
-      <div className="my-3 p-4 rounded-xl bg-destructive/10 border border-destructive/20 text-destructive text-sm">
-        Failed to load image. It may still be generating.
+      <div className={cn('my-3 flex max-w-full items-center gap-3 rounded-xl border border-border/70 bg-muted/30 p-3 text-sm', compact ? 'w-56' : 'w-full max-w-xl')}>
+        <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-muted text-muted-foreground" aria-hidden="true">IMG</div>
+        <div className="min-w-0 flex-1">
+          <div className="font-medium text-foreground">{alt || 'Image preview'}</div>
+          <div className="text-xs text-muted-foreground">The image is unavailable or still processing.</div>
+        </div>
+        <a href={src} target="_blank" rel="noopener noreferrer" className="shrink-0 rounded-lg border border-border bg-background px-2.5 py-1.5 text-xs font-medium text-foreground hover:bg-muted">Open</a>
       </div>
     );
   }
@@ -655,7 +672,16 @@ export function MessageContent({ content }: MessageContentProps) {
                   alt={part.alt || 'Image'}
                   className="h-full w-full object-cover"
                   loading="lazy"
+                  onError={(event) => {
+                    event.currentTarget.style.display = 'none';
+                    const fallback = event.currentTarget.parentElement?.querySelector('[data-image-fallback]') as HTMLElement | null;
+                    if (fallback) fallback.classList.remove('hidden');
+                  }}
                 />
+                <div data-image-fallback className="absolute inset-0 hidden flex-col items-center justify-center gap-1 bg-muted/60 px-3 text-center text-xs text-muted-foreground">
+                  <span className="font-medium text-foreground">Preview unavailable</span>
+                  <a href={part.content} target="_blank" rel="noopener noreferrer" className="text-primary hover:underline">Open image</a>
+                </div>
                 <div className="absolute inset-0 opacity-0 group-hover:opacity-100 transition-opacity bg-black/20 flex items-center justify-center">
                   <a
                     href={part.content}

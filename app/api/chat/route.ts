@@ -619,6 +619,35 @@ function decodeFileContent(dataUrl: string): string {
   }
 }
 
+const visionImageUrlCache = new Map<string, string>();
+
+async function normalizeVisionImageUrl(value: unknown): Promise<string> {
+  const url = String(value || '').trim();
+  if (!url || url.startsWith('data:') || url.startsWith('blob:')) return url;
+  if (!/^https:\/\//i.test(url)) return url;
+  const cached = visionImageUrlCache.get(url);
+  if (cached) return cached;
+  try {
+    const response = await fetch(url, {
+      method: 'GET',
+      headers: { Accept: 'image/*' },
+      redirect: 'follow',
+      cache: 'no-store',
+      signal: AbortSignal.timeout(10000),
+    });
+    const contentType = String(response.headers.get('content-type') || '').split(';')[0].toLowerCase();
+    const contentLength = Number(response.headers.get('content-length') || 0);
+    if (!response.ok || !contentType.startsWith('image/') || (contentLength > 8 * 1024 * 1024)) return url;
+    const bytes = new Uint8Array(await response.arrayBuffer());
+    if (!bytes.length || bytes.length > 8 * 1024 * 1024) return url;
+    const dataUrl = `data:${contentType};base64,${Buffer.from(bytes).toString('base64')}`;
+    visionImageUrlCache.set(url, dataUrl);
+    return dataUrl;
+  } catch {
+    return url;
+  }
+}
+
 function sanitizeMessagesForAPI(messages: any[]): any[] {
   return messages.map(msg => {
     const sanitized: any = { role: msg.role, content: msg.content };
@@ -652,7 +681,8 @@ async function processAttachmentsForModel(
           continue;
         }
         if (hasVision) {
-          imageParts.push({ type: "image_url", image_url: { url: imageUrl } });
+          const normalizedImageUrl = await normalizeVisionImageUrl(imageUrl);
+          imageParts.push({ type: "image_url", image_url: { url: normalizedImageUrl } });
         } else {
           textParts.push(`[User attached an image. You can view it at: ${imageUrl}]`);
         }
@@ -700,7 +730,8 @@ function convertMessageWithAttachments(msg: any): any {
   }
   for (const att of msg.attachments) {
     if (att.type === "image") {
-      content.push({ type: "image_url", image_url: { url: att.url } });
+      const imageUrl = att.permanentUrl || att.url || att.visionUrl;
+      if (imageUrl) content.push({ type: "image_url", image_url: { url: imageUrl } });
     }
   }
   return { ...msg, content: content.length > 0 ? content : msg.content };
@@ -1622,6 +1653,41 @@ function buildPortfolioFiles(userText: string) {
   };
 }
 
+function canonicalGithubPagesUrl(owner: string, repo: string, candidate?: unknown) {
+  const fallback = repo.toLowerCase() === `${owner.toLowerCase()}.github.io`
+    ? `https://${owner}.github.io/`
+    : `https://${owner}.github.io/${encodeURIComponent(repo)}/`;
+  const value = String(candidate || "").trim();
+  if (!/^https?:\/\/[^\s]+$/i.test(value) || !/github\.io/i.test(value)) return fallback;
+  return value.endsWith("/") ? value : `${value}/`;
+}
+
+async function probePublicUrl(url: string) {
+  try {
+    const response = await fetch(url, { method: "GET", redirect: "follow", cache: "no-store", headers: { Accept: "text/html" }, signal: AbortSignal.timeout(5000) });
+    return { ok: response.ok, statusCode: response.status };
+  } catch {
+    return { ok: false, statusCode: 0 };
+  }
+}
+
+async function waitForGithubPages(getPages: () => Promise<any>, getBuild: () => Promise<any>, owner: string, repo: string, initialPages?: any) {
+  let pages = initialPages || null;
+  let build: any = null;
+  let url = canonicalGithubPagesUrl(owner, repo, pages?.html_url || pages?.https_url || pages?.url);
+  let status = String(pages?.status || "building").toLowerCase();
+  for (let attempt = 0; attempt < 5; attempt += 1) {
+    try { pages = await getPages(); } catch {}
+    try { build = await getBuild(); } catch {}
+    url = canonicalGithubPagesUrl(owner, repo, pages?.html_url || pages?.https_url || pages?.url || url);
+    status = String(build?.status || pages?.status || status || "building").toLowerCase();
+    const probe = await probePublicUrl(url);
+    if (probe.ok) return { url, status: status || "built", verified: true, httpStatus: probe.statusCode };
+    if (attempt < 4) await new Promise((resolve) => setTimeout(resolve, 3000));
+  }
+  return { url, status: status || "building", verified: false, httpStatus: 404 };
+}
+
 async function executeWebsiteScaffold(baseUrl: string, cookieHeader: string, owner: string, repo: string, userText: string, deployPages: boolean, deployVercel: boolean) {
   const files = buildPortfolioFiles(userText);
   const paths = Object.keys(files);
@@ -1648,7 +1714,16 @@ async function executeWebsiteScaffold(baseUrl: string, cookieHeader: string, own
   if (deployPages) {
     const pages = await executeOAuthGithubAction(baseUrl, cookieHeader, "enable_pages", { owner, repo, branch, path: "/", build_type: "legacy" });
     try { await executeOAuthGithubAction(baseUrl, cookieHeader, "build_pages", { owner, repo }); } catch (error) { console.warn("GitHub Pages build request failed after enable", error); }
-    result.githubPagesUrl = pages?.html_url || pages?.url || (repo.toLowerCase() === `${owner.toLowerCase()}.github.io` ? `https://${owner}.github.io/` : `https://${owner}.github.io/${repo}/`);
+    const readiness = await waitForGithubPages(
+      () => executeOAuthGithubAction(baseUrl, cookieHeader, "get_pages", { owner, repo }),
+      () => executeOAuthGithubAction(baseUrl, cookieHeader, "get_pages_build", { owner, repo }),
+      owner,
+      repo,
+      pages,
+    );
+    result.githubPagesUrl = readiness.url;
+    result.githubPagesStatus = readiness.status;
+    result.githubPagesVerified = readiness.verified;
   }
   if (deployVercel) {
     try {
@@ -1712,7 +1787,7 @@ function knownComposioGithubSchema(toolSlug: string) {
   const properties = toolSlug === "GITHUB_CREATE_A_REPOSITORY_FOR_THE_AUTHENTICATED_USER"
     ? { name: { type: "string" }, description: { type: "string" }, private: { type: "boolean" } }
     : toolSlug === "GITHUB_CREATE_OR_UPDATE_FILE_CONTENTS"
-      ? { owner: { type: "string" }, repo: { type: "string" }, path: { type: "string" }, content: { type: "string" }, message: { type: "string" }, branch: { type: "string" } }
+      ? { owner: { type: "string" }, repo: { type: "string" }, path: { type: "string" }, content: { type: "string", description: "Base64 encoded file content." }, message: { type: "string" }, branch: { type: "string" } }
       : toolSlug === "GITHUB_CREATE_OR_UPDATE_GITHUB_PAGES_SITE" || toolSlug === "GITHUB_CREATE_A_GITHUB_PAGES_SITE"
         ? { owner: { type: "string" }, repo: { type: "string" }, build_type: { type: "string" }, source_branch: { type: "string" } }
         : { owner: { type: "string" }, repo: { type: "string" } };
@@ -1814,7 +1889,16 @@ async function executeComposioWebsiteScaffold(session: any, owner: string, repo:
     if (pageResponse?.error || pageResponse?.successful === false || pageResponse?.data?.error) throw new Error(String(pageResponse?.error || pageResponse?.data?.error || "GitHub Pages was not enabled."));
     const buildResponse = await session.execute(buildSchema.toolSlug, composioSchemaArguments(buildSchema, { owner, repo, branch }));
     if (buildResponse?.error || buildResponse?.successful === false || buildResponse?.data?.error) throw new Error(String(buildResponse?.error || buildResponse?.data?.error || "GitHub Pages build was not confirmed."));
-    result.githubPagesUrl = repo.toLowerCase() === `${owner.toLowerCase()}.github.io` ? `https://${owner}.github.io/` : `https://${owner}.github.io/${repo}/`;
+    const readiness = await waitForGithubPages(
+      async () => ({}),
+      async () => ({}),
+      owner,
+      repo,
+      { url: canonicalGithubPagesUrl(owner, repo) },
+    );
+    result.githubPagesUrl = readiness.url;
+    result.githubPagesStatus = readiness.status;
+    result.githubPagesVerified = readiness.verified;
   }
   return result;
 }
@@ -3032,8 +3116,11 @@ export async function POST(req: NextRequest) {
             ? await executeComposioWebsiteScaffold(websiteComposioSession, websiteRepository.owner, websiteRepository.repo, userText, wantsGithubPages)
             : await executeWebsiteScaffold(baseUrl, req.headers.get("cookie") || "", websiteRepository.owner, websiteRepository.repo, userText, wantsGithubPages, wantsVercel);
           const lines = [`Created and committed the website files in **${websiteRepository.owner}/${websiteRepository.repo}**: ${result.files.join(", ")}.`];
-          if (result.githubPagesUrl) lines.push(`\nGitHub Pages: ${result.githubPagesUrl}`);
-          if (result.vercelUrl) lines.push(`\nVercel deployment: ${result.vercelUrl} (${result.vercelState || "starting"})`);
+          if (result.githubPagesUrl) {
+            const pageLabel = result.githubPagesVerified ? "GitHub Pages" : "GitHub Pages is still building";
+            lines.push(`\n${pageLabel}: [Open site](${result.githubPagesUrl})`);
+          }
+          if (result.vercelUrl) lines.push(`\nVercel deployment: [Open site](${result.vercelUrl}) (${result.vercelState || "starting"})`);
           return directTextResponse(lines.join("\n"), wantsGithubPages && wantsVercel ? "GitHub + GitHub Pages + Vercel" : wantsGithubPages ? "GitHub Pages" : wantsVercel ? "Vercel" : "GitHub", "connected-action");
         } catch (error: any) {
           return directTextResponse(`I couldn’t finish the website publish for **${websiteRepository.owner}/${websiteRepository.repo}**. ${String(error?.message || "The connected service did not confirm the requested write or deployment.").slice(0, 360)}`, "GitHub", "connector-error");
