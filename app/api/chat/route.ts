@@ -1522,6 +1522,22 @@ function extractGithubRepositoryName(text: string): string | null {
   return compact?.trim() || null;
 }
 
+function sanitizeGithubRepositoryName(value: string) {
+  const normalized = String(value || "")
+    .trim()
+    .replace(/[^A-Za-z0-9._-]+/g, "-")
+    .replace(/^-+|-+$/g, "")
+    .slice(0, 100);
+  return normalized || "uncgpt-portfolio";
+}
+
+function isWebsiteFollowUpRequest(text: string, conversationText: string) {
+  const followUpIntent = /\b(?:create|build|make|generate|deploy|publish|launch|set\s*up|do\s+it|go\s+ahead)\b/i.test(text);
+  const websiteContext = /\b(?:website|web\s*site|landing\s*page|portfolio|index\.html|github\s*pages|github\.io|vercel)\b/i.test(conversationText);
+  const repositoryContext = /\b(?:github|repository|repo|github\s*pages|github\.io|vercel)\b/i.test(conversationText);
+  return followUpIntent && websiteContext && repositoryContext;
+}
+
 async function executeOAuthGithubAction(baseUrl: string, cookieHeader: string, action: string, params: Record<string, unknown>) {
   const response = await fetch(`${baseUrl}/api/mcp/github`, {
     method: "POST",
@@ -1549,13 +1565,24 @@ async function executeOAuthVercelAction(baseUrl: string, cookieHeader: string, a
 }
 
 function extractGithubRepositoryRef(text: string): { owner: string; repo: string } | null {
-  const match = text.match(/\b([A-Za-z0-9][A-Za-z0-9-]{0,38})\/([A-Za-z0-9][A-Za-z0-9._-]{0,99})\b/);
+  const matches = [...String(text || "").matchAll(/\b([A-Za-z0-9][A-Za-z0-9-]{0,38})\/([A-Za-z0-9][A-Za-z0-9._-]{0,99})\b/g)];
+  const placeholders = new Set(["your-username", "your-repo-name", "username", "repo-name", "owner", "repository"]);
+  const match = matches.reverse().find((candidate) => {
+    const owner = String(candidate[1] || "").toLowerCase();
+    const repo = String(candidate[2] || "").replace(/\.git$/i, "").toLowerCase();
+    return !placeholders.has(owner) && !placeholders.has(repo) && !owner.includes("example") && !repo.includes("example");
+  });
   return match ? { owner: match[1], repo: match[2].replace(/\.git$/i, "") } : null;
 }
 
 function isWebsiteBuildRequest(text: string) {
   return /\b(?:create|build|make|generate|set\s+up)\b[\s\S]{0,120}\b(?:website|web\s+site|landing\s+page|portfolio|index\.html)\b/i.test(text)
     && /\b(?:github|repository|repo|github\.io|vercel)\b/i.test(text);
+}
+
+function isMissingGithubRepositoryError(error: unknown) {
+  const message = String((error as any)?.message || error || "").toLowerCase();
+  return message.includes("not found") || message.includes("does not exist") || message.includes("404") || message.includes("could not find repository");
 }
 
 function escapeTemplateHtml(value: string) {
@@ -1598,26 +1625,45 @@ function buildPortfolioFiles(userText: string) {
 async function executeWebsiteScaffold(baseUrl: string, cookieHeader: string, owner: string, repo: string, userText: string, deployPages: boolean, deployVercel: boolean) {
   const files = buildPortfolioFiles(userText);
   const paths = Object.keys(files);
+  let repository: any;
+  let createdRepository = false;
+  try {
+    repository = await executeOAuthGithubAction(baseUrl, cookieHeader, "get_repo", { owner, repo });
+  } catch (error) {
+    if (!isMissingGithubRepositoryError(error)) throw error;
+    repository = await executeOAuthGithubAction(baseUrl, cookieHeader, "create_repo", {
+      name: repo,
+      description: `Website created by uncgpt for ${owner}/${repo}`,
+      private: false,
+    });
+    createdRepository = true;
+  }
+  const branch = String(repository?.default_branch || "main");
   for (const path of paths) {
     await executeOAuthGithubAction(baseUrl, cookieHeader, "create_or_update_file", {
-      owner, repo, path, content: files[path as keyof typeof files], message: `Create portfolio website: ${path}`, branch: "main",
+      owner, repo, path, content: files[path as keyof typeof files], message: `Create portfolio website: ${path}`, branch,
     });
   }
-  const result: any = { owner, repo, files: paths };
+  const result: any = { owner, repo, branch, createdRepository, repositoryUrl: repository?.html_url || `https://github.com/${owner}/${repo}`, files: paths };
   if (deployPages) {
-    const pages = await executeOAuthGithubAction(baseUrl, cookieHeader, "enable_pages", { owner, repo, branch: "main", path: "/", build_type: "legacy" });
+    const pages = await executeOAuthGithubAction(baseUrl, cookieHeader, "enable_pages", { owner, repo, branch, path: "/", build_type: "legacy" });
     try { await executeOAuthGithubAction(baseUrl, cookieHeader, "build_pages", { owner, repo }); } catch (error) { console.warn("GitHub Pages build request failed after enable", error); }
     result.githubPagesUrl = pages?.html_url || pages?.url || (repo.toLowerCase() === `${owner.toLowerCase()}.github.io` ? `https://${owner}.github.io/` : `https://${owner}.github.io/${repo}/`);
   }
   if (deployVercel) {
-    const deployment = await executeOAuthVercelAction(baseUrl, cookieHeader, "create_deployment", { name: repo, owner, repo, branch: "main", target: "production" });
+    try {
+      await executeOAuthVercelAction(baseUrl, cookieHeader, "create_project", { name: repo, owner, repo });
+    } catch (error) {
+      if (!/already exists|project already|duplicate|409/i.test(String((error as any)?.message || error))) throw error;
+    }
+    const deployment = await executeOAuthVercelAction(baseUrl, cookieHeader, "create_deployment", { name: repo, owner, repo, branch, target: "production" });
     result.vercelUrl = deployment?.url ? (String(deployment.url).startsWith("http") ? deployment.url : `https://${deployment.url}`) : undefined;
     result.vercelState = deployment?.readyState || deployment?.state || "QUEUED";
   }
   return result;
 }
 
-function composioSchemaArguments(schema: any, base: { owner: string; repo: string; path?: string; content?: string; message?: string; branch?: string }) {
+function composioSchemaArguments(schema: any, base: { owner: string; repo: string; name?: string; description?: string; private?: boolean; path?: string; content?: string; message?: string; branch?: string }) {
   const properties = schema?.inputSchema?.properties && typeof schema.inputSchema.properties === "object" ? schema.inputSchema.properties : {};
   const args: Record<string, unknown> = {};
   const put = (aliases: string[], value: unknown) => {
@@ -1626,6 +1672,12 @@ function composioSchemaArguments(schema: any, base: { owner: string; repo: strin
   };
   put(["owner", "owner_login", "username", "user"], base.owner);
   put(["repo", "repository", "repository_name", "repo_name", "repoName"], base.repo);
+  put(["name", "repo_name", "repository_name", "repoName", "repositoryName"], base.name || base.repo);
+  put(["description", "repo_description", "repository_description"], base.description);
+  if (base.private !== undefined) {
+    const visibilityProperty = ["private", "is_private", "visibility"].find((candidate) => properties[candidate]);
+    if (visibilityProperty) args[visibilityProperty] = visibilityProperty === "visibility" ? (base.private ? "private" : "public") : base.private;
+  }
   put(["path", "file_path", "filename", "file_name"], base.path);
   put(["branch", "branch_name", "ref", "source_branch"], base.branch || "main");
   put(["message", "commit_message", "commitMessage"], base.message);
@@ -1641,24 +1693,58 @@ function composioSchemaArguments(schema: any, base: { owner: string; repo: strin
 
 async function executeComposioWebsiteScaffold(session: any, owner: string, repo: string, userText: string, deployPages: boolean) {
   const files = buildPortfolioFiles(userText);
-  const search = await session.search({ query: "create or update GitHub repository files and enable GitHub Pages", toolkits: ["github"] });
+  const search = await session.search({ query: "create GitHub repository, get repository, create or update repository files, enable GitHub Pages, and build Pages", toolkits: ["github"] });
   const schemas = Object.values(search?.toolSchemas || {}) as any[];
   const descriptor = (schema: any) => `${schema?.toolSlug || ""} ${schema?.name || ""} ${schema?.description || ""}`.toLowerCase();
   const fileSchema = schemas.find((schema) => /(?:create|update|write|upload).*(?:file|content)|(?:file|content).*(?:create|update|write|upload)/.test(descriptor(schema)) && !/list|search|get|read|delete/.test(descriptor(schema)));
   if (!fileSchema) throw new Error("The connected GitHub account does not expose a file-write action yet. Reconnect GitHub with repository write access.");
-  for (const path of Object.keys(files)) {
-    const response = await session.execute(fileSchema.toolSlug, composioSchemaArguments(fileSchema, { owner, repo, path, content: files[path as keyof typeof files], message: `Create portfolio website: ${path}`, branch: "main" }));
-    if (response?.error || response?.successful === false) throw new Error(String(response?.error || `GitHub did not confirm writing ${path}.`));
+  const getRepoSchema = schemas.find((schema) => /(?:get|retrieve|fetch|inspect).*(?:repo|repository)|(?:repo|repository).*(?:get|retrieve|fetch|inspect)/.test(descriptor(schema)) && !/list|search/.test(descriptor(schema)));
+  const createRepoSchema = schemas.find((schema) => /(?:create|make|new).*(?:repo|repository)|(?:repo|repository).*(?:create|make|new)/.test(descriptor(schema)) && !/file|issue|pull|branch/.test(descriptor(schema)));
+  let repository: any = null;
+  let createdRepository = false;
+  let branch = "main";
+  if (getRepoSchema) {
+    try {
+      repository = await session.execute(getRepoSchema.toolSlug, composioSchemaArguments(getRepoSchema, { owner, repo }));
+      repository = repository?.data ?? repository;
+    } catch (error) {
+      if (!isMissingGithubRepositoryError(error)) throw error;
+    }
   }
-  const result: any = { owner, repo, files: Object.keys(files) };
+  if (!repository && createRepoSchema) {
+    const response = await session.execute(createRepoSchema.toolSlug, composioSchemaArguments(createRepoSchema, {
+      owner, repo, name: repo, description: `Website created by uncgpt for ${owner}/${repo}`, private: false,
+    }));
+    if (response?.error || response?.successful === false || response?.data?.error) throw new Error(String(response?.error || response?.data?.error || "GitHub did not confirm repository creation."));
+    repository = response?.data ?? response;
+    createdRepository = true;
+  }
+  branch = String(repository?.default_branch || repository?.defaultBranch || "main");
+  for (const path of Object.keys(files)) {
+    const response = await session.execute(fileSchema.toolSlug, composioSchemaArguments(fileSchema, { owner, repo, path, content: files[path as keyof typeof files], message: `Create portfolio website: ${path}`, branch }));
+    if (response?.error || response?.successful === false || response?.data?.error) {
+      if (isMissingGithubRepositoryError(response) && createRepoSchema && !createdRepository) {
+        const created = await session.execute(createRepoSchema.toolSlug, composioSchemaArguments(createRepoSchema, { owner, repo, name: repo, description: `Website created by uncgpt for ${owner}/${repo}`, private: false }));
+        if (created?.error || created?.successful === false || created?.data?.error) throw new Error(String(created?.error || created?.data?.error || `GitHub did not confirm repository creation.`));
+        createdRepository = true;
+        repository = created?.data ?? created;
+        branch = String(repository?.default_branch || repository?.defaultBranch || "main");
+        const retry = await session.execute(fileSchema.toolSlug, composioSchemaArguments(fileSchema, { owner, repo, path, content: files[path as keyof typeof files], message: `Create portfolio website: ${path}`, branch }));
+        if (retry?.error || retry?.successful === false || retry?.data?.error) throw new Error(String(retry?.error || retry?.data?.error || `GitHub did not confirm writing ${path}.`));
+      } else {
+        throw new Error(String(response?.error || response?.data?.error || `GitHub did not confirm writing ${path}.`));
+      }
+    }
+  }
+  const result: any = { owner, repo, branch, createdRepository, repositoryUrl: repository?.html_url || repository?.htmlUrl || `https://github.com/${owner}/${repo}`, files: Object.keys(files) };
   if (deployPages) {
     const pageSchema = schemas.find((schema) => /(?:enable|create|configure|setup).*(?:page|pages)|(?:page|pages).*(?:enable|create|configure|setup)/.test(descriptor(schema)) && !/list|search|get|build/.test(descriptor(schema)));
     const buildSchema = schemas.find((schema) => /(?:build|publish|deploy|request).*(?:page|pages)|(?:page|pages).*(?:build|publish|deploy)/.test(descriptor(schema)));
     if (!pageSchema || !buildSchema) throw new Error("GitHub files were committed, but the connected GitHub account did not expose GitHub Pages actions.");
-    const pageResponse = await session.execute(pageSchema.toolSlug, composioSchemaArguments(pageSchema, { owner, repo, branch: "main" }));
-    if (pageResponse?.error || pageResponse?.successful === false) throw new Error(String(pageResponse?.error || "GitHub Pages was not enabled."));
-    const buildResponse = await session.execute(buildSchema.toolSlug, composioSchemaArguments(buildSchema, { owner, repo }));
-    if (buildResponse?.error || buildResponse?.successful === false) throw new Error(String(buildResponse?.error || "GitHub Pages build was not confirmed."));
+    const pageResponse = await session.execute(pageSchema.toolSlug, composioSchemaArguments(pageSchema, { owner, repo, branch }));
+    if (pageResponse?.error || pageResponse?.successful === false || pageResponse?.data?.error) throw new Error(String(pageResponse?.error || pageResponse?.data?.error || "GitHub Pages was not enabled."));
+    const buildResponse = await session.execute(buildSchema.toolSlug, composioSchemaArguments(buildSchema, { owner, repo, branch }));
+    if (buildResponse?.error || buildResponse?.successful === false || buildResponse?.data?.error) throw new Error(String(buildResponse?.error || buildResponse?.data?.error || "GitHub Pages build was not confirmed."));
     result.githubPagesUrl = repo.toLowerCase() === `${owner.toLowerCase()}.github.io` ? `https://${owner}.github.io/` : `https://${owner}.github.io/${repo}/`;
   }
   return result;
@@ -2822,10 +2908,11 @@ export async function POST(req: NextRequest) {
       const oauthBundle = buildOAuthTools(req, baseUrl);
       const oauthConnected = new Set((oauthBundle.connected || []).map((provider: string) => String(provider).toLowerCase().replace(/[- ]/g, '_')));
       const githubCreateRequest = isGithubCreateRepositoryRequest(userText);
-      const websiteBuildRequest = isWebsiteBuildRequest(userText);
-      const websiteRepository = extractGithubRepositoryRef(userText) || extractGithubRepositoryRef(recentConversationText);
-      const wantsGithubPages = /github\s*pages|github\.io/i.test(userText);
-      const wantsVercel = /\bvercel\b/i.test(userText);
+      const websiteBuildRequest = isWebsiteBuildRequest(userText) || isWebsiteFollowUpRequest(userText, recentConversationText);
+      let websiteRepository = extractGithubRepositoryRef(userText) || extractGithubRepositoryRef(recentConversationText);
+      const websiteConversationText = `${recentConversationText}\n${userText}`;
+      const wantsGithubPages = /github\s*pages|github\.io/i.test(websiteConversationText);
+      const wantsVercel = /\bvercel\b/i.test(websiteConversationText);
       const composioGithubPreference = Array.isArray(mcpConnectors)
         ? mcpConnectors.find((connector: any) => normalizeConnectorKeyForRouting(connector.provider || connector.toolkit || connector.name) === "github" && connector?.enabled !== false)
         : null;
@@ -2843,8 +2930,32 @@ export async function POST(req: NextRequest) {
           console.warn("Composio GitHub website session lookup failed", error);
         }
       }
+      if (websiteBuildRequest && !websiteRepository && oauthConnected.has("github")) {
+        try {
+          const profile: any = await executeOAuthGithubAction(baseUrl, req.headers.get("cookie") || "", "get_user", {});
+          const owner = String(profile?.login || profile?.name || "").trim();
+          if (owner) websiteRepository = { owner, repo: sanitizeGithubRepositoryName(extractGithubRepositoryName(userText) || "uncgpt-portfolio") };
+        } catch (error) {
+          console.warn("Could not derive GitHub username for website creation", error);
+        }
+      }
+      if (websiteBuildRequest && !websiteRepository && websiteComposioSession) {
+        try {
+          const search = await websiteComposioSession.search({ query: "get the authenticated GitHub user profile", toolkits: ["github"] });
+          const schemas = Object.values(search?.toolSchemas || {}) as any[];
+          const profileSchema = schemas.find((schema: any) => /(?:get|retrieve|fetch|current|authenticated).*(?:user|profile)|(?:user|profile).*(?:get|retrieve|fetch|current|authenticated)/i.test(`${schema?.toolSlug || ""} ${schema?.name || ""} ${schema?.description || ""}`));
+          if (profileSchema) {
+            const profileResponse: any = await websiteComposioSession.execute(profileSchema.toolSlug, {});
+            const profile: any = profileResponse?.data ?? profileResponse;
+            const owner = String(profile?.login || profile?.username || profile?.name || "").trim();
+            if (owner) websiteRepository = { owner, repo: sanitizeGithubRepositoryName(extractGithubRepositoryName(userText) || "uncgpt-portfolio") };
+          }
+        } catch (error) {
+          console.warn("Could not derive Composio GitHub username for website creation", error);
+        }
+      }
       if (websiteBuildRequest) {
-        if (!websiteRepository) return directTextResponse("Which GitHub repository should I use? Please provide it as owner/repository.", "GitHub", "connected-action");
+        if (!websiteRepository) return directTextResponse("I need a GitHub repository like **your-username/your-repository**, or a connected GitHub account that exposes your username, before I can create and deploy the site.", "GitHub", "connected-action");
         if (!oauthConnected.has("github") && !websiteComposioSession) return connectorPermissionResponse("github", "GitHub", "create and update website files and commits", "https://cdn.simpleicons.org/github");
         if (wantsVercel && !oauthConnected.has("vercel")) return connectorPermissionResponse("vercel", "Vercel", "deploy the committed GitHub website", "https://cdn.simpleicons.org/vercel");
         try {
