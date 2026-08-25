@@ -26,8 +26,8 @@ function uniqueToolkitSlugs(toolkits: string[]) {
 }
 
 /**
- * Reads the user’s live, enabled Composio accounts. Chat uses this server-side
- * source of truth instead of relying on possibly stale browser localStorage.
+ * Reads the user’s live, enabled Composio accounts. This is the source of truth
+ * for chat; browser localStorage is treated only as a UI cache.
  */
 export async function getEnabledComposioToolkits(userId: string): Promise<string[]> {
   const apiKey = process.env.COMPOSIO_API_KEY;
@@ -47,10 +47,9 @@ export async function getEnabledComposioToolkits(userId: string): Promise<string
 }
 
 /**
- * Creates a short-lived, user-scoped Tool Router session. Whenever a toolkit
- * is requested we pass a positive toolkit allowlist and preload its tools.
- * This is required by current Composio validation and makes the selected app’s
- * tool schemas directly available to the model.
+ * Creates a user-scoped native Tool Router session. The app uses this session
+ * for authorize(), search(), and execute(), which is the supported path for a
+ * custom connection UI and avoids preloading every tool schema into chat.
  */
 export async function getComposioSession(userId: string, toolkits: string[] = []) {
   const apiKey = process.env.COMPOSIO_API_KEY;
@@ -60,15 +59,9 @@ export async function getComposioSession(userId: string, toolkits: string[] = []
   const composio = new Composio({ apiKey });
 
   return composio.sessions.create(getComposioUserId(userId), {
-    mcp: true,
-    manageConnections: true,
+    manageConnections: false,
     sandbox: { enable: false },
-    ...(scopedToolkits.length > 0
-      ? {
-          toolkits: scopedToolkits,
-          preload: { tools: "all" as const },
-        }
-      : {}),
+    ...(scopedToolkits.length > 0 ? { toolkits: scopedToolkits } : {}),
   });
 }
 

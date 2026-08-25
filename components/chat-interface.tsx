@@ -213,6 +213,8 @@ export function ChatInterface({ onSwitchToImagine, onOpenSidebar, isSidebarOpen 
       preferredProvider: selectedProvider,
       // Keep Agent Computer available to the backend without exposing a chat-level toggle.
       computerUse: true,
+      clientTimeZone: Intl.DateTimeFormat().resolvedOptions().timeZone || "UTC",
+      clientLocale: navigator.language || "en-US",
     };
 
     try {
@@ -376,17 +378,11 @@ export function ChatInterface({ onSwitchToImagine, onOpenSidebar, isSidebarOpen 
       }
     }
 
-    const latestUserText = String(messages[messages.length - 1]?.content || '');
-    const genericGmailRefusal = /(?:don't|do not|cannot|can't|no) (?:have )?(?:any )?(?:information about your account(?: or)? )?(?:direct )?access to (?:your )?(?:personal )?(?:data|email|emails|mail|inbox|email account)|text-based AI assistant|external data sources/i.test(fullContent);
     if (permissionRequest) {
       const permission = permissionRequest;
       const cleanContent = permission.mode === 'enable' ? `Turn on ${permission.label} to continue.` : `Connect ${permission.label} to continue.`;
       if (assistantMsgId) updateMessage(chatId, assistantMsgId, cleanContent, undefined, undefined, undefined, undefined, permission);
       else assistantMsgId = addMessage(chatId, { role: 'assistant', content: cleanContent, connectorPermission: permission });
-    } else if (/\b(email|emails|mail|inbox|gmail)\b/i.test(latestUserText) && genericGmailRefusal) {
-      const permission = connectorPermissionIdentity('gmail', 'connect');
-      if (assistantMsgId) updateMessage(chatId, assistantMsgId, 'Connect Gmail to continue.', undefined, undefined, undefined, undefined, permission);
-      else assistantMsgId = addMessage(chatId, { role: 'assistant', content: 'Connect Gmail to continue.', connectorPermission: permission });
     } else if (!streamingPreference && fullContent && !assistantMsgId) {
       setIsThinking(false);
       addMessage(chatId, { role: "assistant", content: fullContent });

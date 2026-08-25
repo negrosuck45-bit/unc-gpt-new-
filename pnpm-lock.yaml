@@ -12,8 +12,8 @@ importers:
         specifier: ^7.8.0
         version: 7.8.0(next@16.2.0(react-dom@19.2.6(react@19.2.6))(react@19.2.6))(react-dom@19.2.6(react@19.2.6))(react@19.2.6)
       '@composio/core':
-        specifier: 0.16.0
-        version: 0.16.0(zod@3.25.76)
+        specifier: 0.17.0
+        version: 0.17.0(zod@3.25.76)
       '@heyputer/puter.js':
         specifier: ^2.0.0
         version: 2.3.2
@@ -285,8 +285,8 @@ packages:
   '@composio/client@0.1.0-alpha.76':
     resolution: {integrity: sha512-MXC5JGRVdiQ4EgLricy9o/mqBa1+1T7wHFZ6Q4ZJkrjzZqOMvxTgy21Zlb5J/1oGkB2bg9UDzpH8PkXCp/D4zA==}
 
-  '@composio/core@0.16.0':
-    resolution: {integrity: sha512-m4LEjOaH4LdhP3rz3NyNXZwh3AI915morLV1vrjscW2ACGqL+fTHACiuem0sz45tPoW5DkPYP8k/Z5D4Zk3KLA==}
+  '@composio/core@0.17.0':
+    resolution: {integrity: sha512-HJzpKWgise3piltWorEHt07nrjUR3gPZnBmrFgnJXx5+6AiKn79YGBYLytdtuMscElLt/7pHOIxfcaYpiGkJ7A==}
     peerDependencies:
       zod: '>=3.25.76 <5'
 
@@ -2308,8 +2308,8 @@ packages:
       zod:
         optional: true
 
-  openai@7.4.0:
-    resolution: {integrity: sha512-+C9Muit5x8j9R8ej8ZzVgKcrVDtqFqTy9gxFdov0EItLgU68zrJtF9ZeT0cyqJQW9S3PCJkdFgADtRGquRBtew==}
+  openai@7.5.0:
+    resolution: {integrity: sha512-ZbDBz8FSB8Mv8fFYIUvzTFMdV5vl93/octp1MdtK2lfYepSpfv/ewmeugpKz/cwGtFSx+YuUM4NwpZ2P55YiPA==}
     engines: {node: '>=22.0.0'}
     peerDependencies:
       '@aws-sdk/credential-provider-node': '>=3.972.0 <4'
@@ -2823,13 +2823,13 @@ snapshots:
 
   '@composio/client@0.1.0-alpha.76': {}
 
-  '@composio/core@0.16.0(zod@3.25.76)':
+  '@composio/core@0.17.0(zod@3.25.76)':
     dependencies:
       '@composio/client': 0.1.0-alpha.76
       '@composio/json-schema-to-zod': 0.3.0(zod@3.25.76)
       '@types/json-schema': 7.0.15
       is-fs-case-sensitive: 2.0.0
-      openai: 7.4.0(zod@3.25.76)
+      openai: 7.5.0(zod@3.25.76)
       picocolors: 1.1.1
       pusher-js: 8.6.0
       semver: 7.8.5
@@ -4711,7 +4711,7 @@ snapshots:
     transitivePeerDependencies:
       - encoding
 
-  openai@7.4.0(zod@3.25.76):
+  openai@7.5.0(zod@3.25.76):
     optionalDependencies:
       zod: 3.25.76
 

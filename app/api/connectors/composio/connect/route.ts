@@ -2,6 +2,13 @@ import { NextRequest } from "next/server";
 import { getSession } from "@/lib/auth";
 import { getComposioSession } from "@/lib/composio";
 
+function appCallbackUrl(req: NextRequest) {
+  const protocol = req.headers.get("x-forwarded-proto") || "https";
+  const host = req.headers.get("host");
+  if (!host) return undefined;
+  return `${protocol}://${host}/?connector=connected`;
+}
+
 export async function POST(req: NextRequest) {
   const session = await getSession();
   const userId = session?.user?.sub;
@@ -22,18 +29,19 @@ export async function POST(req: NextRequest) {
     const composio = await getComposioSession(userId, [toolkit]);
     if (!composio) return Response.json({ error: "Composio is not configured on this deployment." }, { status: 503 });
 
-    const result: any = await composio.execute("COMPOSIO_MANAGE_CONNECTIONS", {
-      toolkits: [toolkit],
+    const connectionRequest = await composio.authorize(toolkit, {
+      callbackUrl: appCallbackUrl(req),
     });
-    const connection = result?.data?.results?.[toolkit] || result?.results?.[toolkit];
-    const redirectUrl = connection?.redirect_url;
-    if (!redirectUrl) {
-      return Response.json({ error: connection?.instruction || "Composio did not return a connection link." }, { status: 502 });
+    if (!connectionRequest?.redirectUrl) {
+      return Response.json({ error: "Composio did not return a connection link. Please try again." }, { status: 502 });
     }
 
-    return Response.json({ toolkit, redirectUrl, expiresInMinutes: 10 });
+    return Response.json({ toolkit, redirectUrl: connectionRequest.redirectUrl, expiresInMinutes: 10 });
   } catch (error: any) {
-    console.error("Composio connection link error:", error);
+    console.error("Composio connection link error:", {
+      toolkit,
+      message: error?.message || "Unable to start the app connection.",
+    });
     return Response.json({ error: error?.message || "Unable to start the app connection." }, { status: 502 });
   }
 }

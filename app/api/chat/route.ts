@@ -205,6 +205,8 @@ const HF_URL = "https://router.huggingface.co/v1/chat/completions";
 const HF_TOKEN = process.env.HF_TOKEN || process.env.HUGGINGFACE_API_KEY || "";
 const CEREBRAS_URL = "https://api.cerebras.ai/v1/chat/completions";
 const CEREBRAS_KEY = process.env.CEREBRAS_API_KEY || process.env.CEREBRAS_KEY || "";
+const OPENAI_KEY = process.env.OPENAI_API_KEY || "";
+const OPENAI_CHAT_MODEL = process.env.OPENAI_CHAT_MODEL || "gpt-4.1-mini";
 
 let currentGroqKeyIndex = 0;
 let currentChatIndex = 0;
@@ -246,6 +248,35 @@ const SEARCH_TRIGGERS = [
 
 function shouldSearchWeb(text: string): boolean {
   return SEARCH_TRIGGERS.some(pattern => pattern.test(text));
+}
+
+function isCurrentDateOrTimeQuestion(text: string) {
+  return /\b(what(?:'s| is) today|what(?:'s| is) (?:the )?(?:date|day|time)|what day is it|today'?s date|date today|current (?:date|day|time))\b/i.test(text.trim());
+}
+
+function currentDateOrTimeReply(timeZone?: string, locale?: string) {
+  const safeLocale = locale || "en-US";
+  const safeTimeZone = timeZone || "UTC";
+  try {
+    const now = new Date();
+    const date = new Intl.DateTimeFormat(safeLocale, {
+      weekday: "long",
+      year: "numeric",
+      month: "long",
+      day: "numeric",
+      timeZone: safeTimeZone,
+    }).format(now);
+    const time = new Intl.DateTimeFormat(safeLocale, {
+      hour: "numeric",
+      minute: "2-digit",
+      timeZone: safeTimeZone,
+      timeZoneName: "short",
+    }).format(now);
+    return `Today is ${date}. The current time is ${time}.`;
+  } catch {
+    const now = new Date();
+    return `Today is ${now.toUTCString()}.`;
+  }
 }
 
 async function searchSerpAPI(query: string): Promise<string> {
@@ -716,6 +747,50 @@ async function callGroq(
   throw new Error("All Groq keys failed");
 }
 
+async function callOpenAI(
+  messages: any[],
+  hasImage: boolean,
+  tools: any[] = []
+): Promise<{ stream: ReadableStream; provider: string; model: string }> {
+  if (!OPENAI_KEY) throw new Error("OpenAI key not configured");
+
+  const cleanMessages = sanitizeMessagesForAPI(messages);
+  const processedMessages = await processAttachmentsForModel(
+    cleanMessages,
+    OPENAI_CHAT_MODEL,
+    hasImage
+  );
+  const body: any = {
+    model: OPENAI_CHAT_MODEL,
+    messages: [
+      { role: "system", content: TERMINAL_SYSTEM_PROMPT },
+      ...processedMessages,
+    ],
+    stream: true,
+    temperature: 0.35,
+    max_tokens: 4096,
+  };
+  if (!hasImage && tools.length > 0) {
+    body.tools = tools;
+    body.tool_choice = "auto";
+  }
+
+  const response = await fetch("https://api.openai.com/v1/chat/completions", {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+      Authorization: `Bearer ${OPENAI_KEY}`,
+    },
+    body: JSON.stringify(body),
+    signal: AbortSignal.timeout(45000),
+  });
+  if (!response.ok || !response.body) {
+    const detail = await response.text().catch(() => "");
+    throw new Error(`OpenAI failed: ${response.status} ${detail.slice(0, 160)}`);
+  }
+  return { stream: response.body, provider: "OpenAI", model: OPENAI_CHAT_MODEL };
+}
+
 async function callOpenRouter(
   messages: any[],
   hasImage: boolean,
@@ -943,6 +1018,13 @@ async function fallbackChat(
   const errors: string[] = [];
 
   if (hasImage) {
+    if (OPENAI_KEY) {
+      try {
+        return await callOpenAI(messages, true, tools);
+      } catch (err: any) {
+        errors.push(`OpenAI: ${err.message}`);
+      }
+    }
     if (HF_TOKEN) {
       try {
         return await callHuggingFaceVision(messages, tools);
@@ -976,6 +1058,13 @@ async function fallbackChat(
     throw new Error(`No vision providers: ${errors.join(", ")}`);
   }
 
+  if (OPENAI_KEY) {
+    try {
+      return await callOpenAI(messages, false, tools);
+    } catch (err: any) {
+      errors.push(`OpenAI: ${err.message}`);
+    }
+  }
   try {
     return await callGroq(messages, "llama-3.3-70b-versatile", false, tools);
   } catch (err: any) {
@@ -1106,11 +1195,94 @@ async function executeMcpTool(
   }
 }
 
+function isReadOnlyConnectorRequest(text: string) {
+  return /\b(latest|recent|list|show|find|search|read|get|fetch|my|inbox|messages|emails?|files?|events?|issues?|repositories|repos)\b/i.test(text) && !/\b(send|create|update|edit|delete|remove|post|publish|deploy|commit|push|close|archive)\b/i.test(text);
+}
+
+function defaultReadToolArguments(schema: any): Record<string, unknown> | null {
+  const properties = schema?.properties && typeof schema.properties === "object" ? schema.properties : {};
+  const required = Array.isArray(schema?.required) ? schema.required : [];
+  const args: Record<string, unknown> = {};
+  for (const name of required) {
+    const property = properties[name] || {};
+    if (["limit", "max_results", "maxResults", "page_size", "pageSize", "count"].includes(name)) {
+      args[name] = Math.min(Number(property.maximum) || 10, 10);
+    } else if (property.default !== undefined) {
+      args[name] = property.default;
+    } else {
+      return null;
+    }
+  }
+  for (const name of ["limit", "max_results", "maxResults", "page_size", "pageSize", "count"]) {
+    if (properties[name] && args[name] === undefined) args[name] = Math.min(Number(properties[name].maximum) || 10, 10);
+  }
+  return args;
+}
+
+function isSafeReadConnectorTool(tool: any) {
+  const descriptor = `${tool?.function?.name || ""} ${tool?.function?.description || ""}`.toLowerCase();
+  return /\b(fetch|get|list|search|read|find|retrieve)\b/.test(descriptor) && !/\b(send|create|update|edit|delete|remove|post|publish|deploy|commit|push|close|archive)\b/.test(descriptor);
+}
+
+function directTextResponse(content: string, provider: string, model = "connected-action") {
+  const encoder = new TextEncoder();
+  const stream = new ReadableStream({
+    start(controller) {
+      controller.enqueue(encoder.encode(`data: ${JSON.stringify({ content })}\\n\\n`));
+      controller.enqueue(encoder.encode("data: [DONE]\\n\\n"));
+      controller.close();
+    },
+  });
+  return createStreamResponse(stream, provider, model, []);
+}
+
 // ============================================================
 // TOOL LOOP WITH BUILTIN TOOLS
 // ============================================================
 // Connector actions are executed only by the verified tool loop below. No synthetic
 // assistant messages are injected into model context.
+
+async function planToolCalls(messages: any[], tools: any[]) {
+  const body = {
+    model: OPENAI_CHAT_MODEL,
+    messages,
+    tools,
+    tool_choice: "auto",
+    stream: false,
+    temperature: 0.15,
+    max_tokens: 2048,
+  };
+
+  if (OPENAI_KEY) {
+    const response = await fetch("https://api.openai.com/v1/chat/completions", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        Authorization: `Bearer ${OPENAI_KEY}`,
+      },
+      body: JSON.stringify(body),
+      signal: AbortSignal.timeout(30000),
+    });
+    if (!response.ok) throw new Error(`OpenAI tool planning failed (${response.status})`);
+    const data = await response.json();
+    return data.choices?.[0]?.message || null;
+  }
+
+  const key = GROQ_KEYS[currentGroqKeyIndex % GROQ_KEYS.length];
+  if (!key) throw new Error("No capable tool-planning provider is configured");
+  const response = await fetch("https://api.groq.com/openai/v1/chat/completions", {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+      Authorization: `Bearer ${key}`,
+    },
+    body: JSON.stringify({ ...body, model: "llama-3.3-70b-versatile" }),
+    signal: AbortSignal.timeout(30000),
+  });
+  if (!response.ok) throw new Error(`Groq tool planning failed (${response.status})`);
+  const data = await response.json();
+  return data.choices?.[0]?.message || null;
+}
 
 async function runToolLoop(
   messages: any[],
@@ -1130,32 +1302,13 @@ async function runToolLoop(
 
   const executedCalls = new Set<string>();
   for (let step = 1; step <= 6; step++) {
-    const key = GROQ_KEYS[currentGroqKeyIndex % GROQ_KEYS.length];
-    if (!key) break;
-
-    const res = await fetch("https://api.groq.com/openai/v1/chat/completions", {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-        Authorization: `Bearer ${key}`,
-      },
-      body: JSON.stringify({
-        model: "llama-3.3-70b-versatile",
-        messages: working,
-        tools: tools,
-        tool_choice: "auto",
-        stream: false,
-        temperature: 0.3,
-        max_tokens: 2048,
-      }),
-    });
-
-    if (!res.ok) {
-      working.push({ role: "system", content: `Tool planning failed (${res.status}); do not claim that any action succeeded.` });
+    let msg: any;
+    try {
+      msg = await planToolCalls(working, tools);
+    } catch (error: any) {
+      working.push({ role: "system", content: `Tool planning failed; do not claim that any external action succeeded. (${error?.message || "provider unavailable"})` });
       return working;
     }
-    const data = await res.json();
-    const msg = data.choices?.[0]?.message;
     if (!msg) return working;
 
     working.push(msg);
@@ -1812,6 +1965,8 @@ export async function POST(req: NextRequest) {
       mcpConnectors,
       webSearch,
       computerUse,
+      clientTimeZone,
+      clientLocale,
     } = body;
 
     // The replacement release exposes one model only; old client model values are ignored.
@@ -1864,6 +2019,19 @@ export async function POST(req: NextRequest) {
         },
       });
       return createStreamResponse(stream, "Discord", "connected-action", []);
+    }
+
+    if (isCurrentDateOrTimeQuestion(userText)) {
+      const content = currentDateOrTimeReply(clientTimeZone, clientLocale);
+      const encoder = new TextEncoder();
+      const stream = new ReadableStream({
+        start(controller) {
+          controller.enqueue(encoder.encode(`data: ${JSON.stringify({ content })}\\n\\n`));
+          controller.enqueue(encoder.encode("data: [DONE]\\n\\n"));
+          controller.close();
+        },
+      });
+      return createStreamResponse(stream, "UncGPT Clock", "local-time", []);
     }
 
     // ==================== SILENT WEB SEARCH ====================
@@ -2104,28 +2272,35 @@ export async function POST(req: NextRequest) {
               ]);
             }
           }
-          if (composioSession) {
-            const nativeTools: any[] = await composioSession.tools();
-            composioTools = nativeTools
-              .filter((tool: any) => {
-                const name = String(tool?.function?.name || "");
-                const belongsToDisabledToolkit = [...disabledToolkits].some((slug) => name.toLowerCase().includes(slug));
-                return tool?.function?.name && tool?.function?.parameters && !belongsToDisabledToolkit && !/github.*(repo|repos)|(?:repo|repos).*github/i.test(name);
-              })
-              .map((tool: any) => ({
+          if (composioSession && requestedConnectorKey) {
+            const search = await composioSession.search({
+              query: userText,
+              toolkits: [matchedToolkit!],
+            });
+            const discoveredSchemas = Object.values(search?.toolSchemas || {}) as any[];
+            composioTools = discoveredSchemas
+              .filter((schema: any) => schema?.toolSlug && schema?.inputSchema)
+              .slice(0, 8)
+              .map((schema: any) => ({
                 type: "function",
                 function: {
-                  name: String(tool.function.name).replace(/[^a-zA-Z0-9_-]/g, "_").slice(0, 64),
-                  description: tool.function.description || tool.function.name,
-                  parameters: tool.function.parameters,
+                  name: `composio__${schema.toolSlug}`.replace(/[^a-zA-Z0-9_]/g, "_").slice(0, 64),
+                  description: `[${schema.toolkit || matchedToolkit}] ${schema.description || schema.toolSlug}`,
+                  parameters: schema.inputSchema,
                 },
-                _composioSlug: tool.function.name,
+                _composioSlug: schema.toolSlug,
                 _exec: async (args: any) => {
-                  const result = await composioSession.execute(tool.function.name, args || {});
-                  if (result?.successful === false || result?.error) throw new Error(result?.error?.message || result?.error || "Connector action failed");
-                  return normalizeConnectorResult(result?.data ?? result, tool.function.name);
+                  const result = await composioSession.execute(schema.toolSlug, args || {});
+                  if (result?.error) throw new Error(result.error);
+                  return normalizeConnectorResult(result?.data ?? result, schema.toolSlug);
                 },
               }));
+            if (search?.success && composioTools.length === 0) {
+              console.warn("Composio returned no executable tool schemas", {
+                toolkit: matchedToolkit,
+                nextSteps: search?.nextStepsGuidance,
+              });
+            }
           }
         }
       } catch (error) {
@@ -2147,6 +2322,19 @@ export async function POST(req: NextRequest) {
           ]
         : [];
       availableTools = combinedTools;
+
+      const directReadTool = requestedConnectorKey && isReadOnlyConnectorRequest(userText)
+        ? composioTools.find((tool: any) => isSafeReadConnectorTool(tool))
+        : null;
+      if (directReadTool) {
+        const args = defaultReadToolArguments(directReadTool.function?.parameters);
+        if (args) {
+          const result = await directReadTool._exec(args);
+          if (!String(result).startsWith("Tool error:")) {
+            return directTextResponse(String(result), requestedConnector?.label || requestedConnectorKey);
+          }
+        }
+      }
 
       if (combinedTools.length > 0 && !isGithubRepositoryRequest) {
         messagesWithSystem = await runToolLoop(
@@ -2240,7 +2428,9 @@ export async function POST(req: NextRequest) {
     let result: { stream: ReadableStream; provider: string; model: string };
 
     try {
-      if (resolvedProvider === "groq" || GROQ_CHAT_MODELS[resolvedModel]) {
+      if (resolvedProvider === "openai") {
+        result = await callOpenAI(messagesWithSystem, hasImage, availableTools);
+      } else if (resolvedProvider === "groq" || GROQ_CHAT_MODELS[resolvedModel]) {
         result = await callGroq(messagesWithSystem, resolvedModel, hasImage, availableTools);
       } else if (resolvedProvider === "openrouter") {
         result = await callOpenRouter(messagesWithSystem, hasImage, availableTools);

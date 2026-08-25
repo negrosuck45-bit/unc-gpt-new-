@@ -1,5 +1,5 @@
 export type UncGptRoute = {
-  provider: "groq" | "openrouter" | "cloudflare";
+  provider: "openai" | "groq" | "openrouter" | "cloudflare";
   model: string;
   reason: "vision" | "reasoning" | "coding-and-connected-tools" | "fast" | "general";
 };
@@ -14,6 +14,10 @@ export function chooseUncGptRoute(messages: any[], hasImage: boolean): UncGptRou
     .map((message) => typeof message?.content === "string" ? message.content : JSON.stringify(message?.content || ""))
     .join(" ")
     .toLowerCase();
+
+  if (hasKey("OPENAI_API_KEY")) {
+    return { provider: "openai", model: process.env.OPENAI_CHAT_MODEL || "gpt-4.1-mini", reason: hasImage ? "vision" : "general" };
+  }
 
   if (hasImage) {
     return { provider: "groq", model: "meta-llama/llama-4-scout-17b-16e-instruct", reason: "vision" };
