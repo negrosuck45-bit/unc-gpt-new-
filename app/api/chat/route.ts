@@ -828,6 +828,8 @@ Infer the user's intent from ordinary language and complete the requested task u
 
 For connected Composio apps, call the matching connected-app function directly with the user’s request and use its real result. This includes create, add, edit, update, modify, send, publish, deploy, commit, and manage requests—not only read requests. Do not answer as a generic bot, do not describe what the app could theoretically do, do not invent sample data, and do not claim access unless the tool result proves it. If a write tool requires a missing value that cannot be inferred safely, ask only for that value. If a needed connector is genuinely not connected, return one concise sentence naming the connector and the single Settings action required; do not repeat setup instructions or ask unnecessary questions.
 
+When the user asks to build or publish a website in GitHub, perform the work rather than only showing code. Create or update every requested file using the GitHub file tool with the complete file contents and a clear commit message; never claim files exist until GitHub confirms the write. For Vercel publishing, use the connected Vercel deployment tool only after the repository files are committed, and report the verified deployment URL/status. For GitHub Pages, enable Pages and request a build after the files are committed; use the correct URL format: https://OWNER.github.io/REPO/ for a project site, or https://OWNER.github.io/ when the repository itself is named OWNER.github.io. If the user asks for both hosts, complete both workflows and report each verified URL separately. If the owner, repository, file path, or required website content is missing, ask only for the missing value.
+
 Keep final responses concise and natural: usually one short paragraph or a compact list, like ChatGPT. Do not narrate reasoning, tool names, intermediate steps, command syntax, or implementation details. For connector requests, use the connected service silently and return the verified result. When a connector returns multiple records or rows, present them as a compact Markdown table with useful columns; use short labeled sections or key-value cards for nested details. Do not dump raw JSON, huge paragraphs, or a long unstructured bullet list when a table is clearer. Never claim an external action succeeded unless a tool result confirms it.`;
 
 async function callGroq(
@@ -2140,6 +2142,199 @@ function buildOAuthTools(req: NextRequest, baseUrl: string) {
           },
         },
         _exec: async (args: any) => callGh("create_issue", args),
+      }
+    );
+  }
+
+  if (connected.includes("github")) {
+    tools.push(
+      {
+        type: "function",
+        function: {
+          name: "github_get_user",
+          description: "Get the authenticated GitHub account, including its login. Use this when the user says my repository and does not provide an owner.",
+          parameters: { type: "object", properties: {} },
+        },
+        _exec: async () => callGh("get_user", {}),
+      },
+      {
+        type: "function",
+        function: {
+          name: "github_get_file",
+          description: "Read an existing file from a GitHub repository before editing it.",
+          parameters: {
+            type: "object",
+            properties: {
+              owner: { type: "string" },
+              repo: { type: "string" },
+              path: { type: "string" },
+              ref: { type: "string" },
+            },
+            required: ["owner", "repo", "path"],
+          },
+        },
+        _exec: async (args: any) => callGh("get_file", args),
+      },
+      {
+        type: "function",
+        function: {
+          name: "github_delete_file",
+          description: "Delete a file from a GitHub repository. Use only when the user explicitly asks to delete it.",
+          parameters: {
+            type: "object",
+            properties: {
+              owner: { type: "string" },
+              repo: { type: "string" },
+              path: { type: "string" },
+              message: { type: "string" },
+              branch: { type: "string" },
+              sha: { type: "string" },
+            },
+            required: ["owner", "repo", "path"],
+          },
+        },
+        _exec: async (args: any) => callGh("delete_file", args),
+      },
+      {
+        type: "function",
+        function: {
+          name: "github_enable_pages",
+          description: "Enable or update GitHub Pages for a repository using the main branch or docs directory.",
+          parameters: {
+            type: "object",
+            properties: {
+              owner: { type: "string" },
+              repo: { type: "string" },
+              branch: { type: "string" },
+              path: { type: "string", enum: ["/", "/docs"] },
+              build_type: { type: "string", enum: ["legacy", "workflow"] },
+            },
+            required: ["owner", "repo"],
+          },
+        },
+        _exec: async (args: any) => callGh("enable_pages", args),
+      },
+      {
+        type: "function",
+        function: {
+          name: "github_build_pages",
+          description: "Request a fresh GitHub Pages build after website files have been committed.",
+          parameters: {
+            type: "object",
+            properties: { owner: { type: "string" }, repo: { type: "string" } },
+            required: ["owner", "repo"],
+          },
+        },
+        _exec: async (args: any) => callGh("build_pages", args),
+      },
+      {
+        type: "function",
+        function: {
+          name: "github_get_pages",
+          description: "Get the GitHub Pages URL, source branch, and current site status for a repository.",
+          parameters: {
+            type: "object",
+            properties: { owner: { type: "string" }, repo: { type: "string" } },
+            required: ["owner", "repo"],
+          },
+        },
+        _exec: async (args: any) => callGh("get_pages", args),
+      },
+      {
+        type: "function",
+        function: {
+          name: "github_get_pages_build",
+          description: "Get the latest GitHub Pages build status and any build error.",
+          parameters: {
+            type: "object",
+            properties: { owner: { type: "string" }, repo: { type: "string" } },
+            required: ["owner", "repo"],
+          },
+        },
+        _exec: async (args: any) => callGh("get_pages_build", args),
+      }
+    );
+  }
+
+  if (connected.includes("vercel")) {
+    const callVercel = async (action: string, params: any) => {
+      const res = await fetch(`${baseUrl}/api/mcp/vercel`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json", cookie: cookieHeader },
+        body: JSON.stringify({ action, ...params }),
+        cache: "no-store",
+      });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) return `Vercel error: ${data.error || res.status}`;
+      return JSON.stringify(data.data ?? data);
+    };
+
+    tools.push(
+      {
+        type: "function",
+        function: {
+          name: "vercel_list_projects",
+          description: "List Vercel projects available to the connected account.",
+          parameters: { type: "object", properties: { limit: { type: "number" } } },
+        },
+        _exec: async (args: any) => callVercel("list_projects", args),
+      },
+      {
+        type: "function",
+        function: {
+          name: "vercel_create_project",
+          description: "Create a Vercel project and optionally connect it to a GitHub repository.",
+          parameters: {
+            type: "object",
+            properties: {
+              name: { type: "string" },
+              owner: { type: "string" },
+              repo: { type: "string" },
+              framework: { type: "string" },
+            },
+            required: ["name"],
+          },
+        },
+        _exec: async (args: any) => callVercel("create_project", args),
+      },
+      {
+        type: "function",
+        function: {
+          name: "vercel_deploy_github",
+          description: "Deploy a committed GitHub repository to Vercel. Use after the requested files exist in GitHub.",
+          parameters: {
+            type: "object",
+            properties: {
+              name: { type: "string" },
+              owner: { type: "string" },
+              repo: { type: "string" },
+              branch: { type: "string" },
+              projectId: { type: "string" },
+              target: { type: "string", enum: ["production", "preview"] },
+              repoId: { type: "string" },
+            },
+            required: ["owner", "repo"],
+          },
+        },
+        _exec: async (args: any) => callVercel("create_deployment", args),
+      },
+      {
+        type: "function",
+        function: {
+          name: "vercel_list_deployments",
+          description: "List recent Vercel deployments and their current status.",
+          parameters: { type: "object", properties: { projectId: { type: "string" }, limit: { type: "number" } } },
+        },
+        _exec: async (args: any) => callVercel("list_deployments", args),
+      },
+      {
+        type: "function",
+        function: {
+          name: "vercel_get_deployment",
+          description: "Get the status and URL of a specific Vercel deployment.",
+          parameters: { type: "object", properties: { deploymentId: { type: "string" } }, required: ["deploymentId"] },
+        },
+        _exec: async (args: any) => callVercel("get_deployment", args),
       }
     );
   }
