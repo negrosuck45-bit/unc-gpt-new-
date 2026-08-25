@@ -251,7 +251,7 @@ function shouldSearchWeb(text: string): boolean {
 }
 
 function isCurrentDateOrTimeQuestion(text: string) {
-  return /\b(what(?:'s| is) today|what(?:'s| is) (?:the )?(?:date|day|time)|what day is it|today'?s date|date today|current (?:date|day|time))\b/i.test(text.trim());
+  return /\b(what(?:['’]s| is) today|what(?:['’]s| is) (?:the )?(?:date|day|time)|what day is it|today['’]?s date|date today|current (?:date|day|time))\b/i.test(text.trim());
 }
 
 function currentDateOrTimeReply(timeZone?: string, locale?: string) {
@@ -377,6 +377,43 @@ async function searchBing(query: string): Promise<string> {
   }
 }
 
+function decodeSearchHtml(value: string): string {
+  return value.replace(/<[^>]+>/g, " ").replace(/&amp;/g, "&").replace(/&quot;/g, '"').replace(/&#x27;|&#39;/g, "'").replace(/&lt;/g, "<").replace(/&gt;/g, ">").replace(/\s+/g, " ").trim();
+}
+
+async function searchDuckDuckGo(query: string): Promise<string> {
+  try {
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => controller.abort(), 10000);
+    const res = await fetch(`https://html.duckduckgo.com/html/?q=${encodeURIComponent(query)}`, {
+      headers: { "Accept": "text/html", "User-Agent": "Mozilla/5.0 (compatible; UncGPT/1.0)" },
+      signal: controller.signal,
+    });
+    clearTimeout(timeoutId);
+    if (!res.ok) return "";
+    const html = await res.text();
+    const output: string[] = [];
+    for (const block of html.split("result__body").slice(1)) {
+      const link = block.match(/<a[^>]*class=["']result__a["'][^>]*href=["']([^"']+)["'][^>]*>([\s\S]*?)<\/a>/i);
+      if (!link) continue;
+      const snippet = block.match(/class=["']result__snippet["'][^>]*>([\s\S]*?)<\/a>/i) || block.match(/class=["']result__snippet["'][^>]*>([\s\S]*?)<\/div>/i);
+      let url = link[1];
+      try {
+        const parsed = new URL(url, "https://html.duckduckgo.com");
+        url = parsed.searchParams.get("uddg") || url;
+      } catch {}
+      output.push(`RESULT ${output.length + 1}: ${decodeSearchHtml(link[2])}\n${decodeSearchHtml(snippet?.[1] || "").slice(0, 400)}\nSource: ${url}\n`);
+      if (output.length >= 5) break;
+    }
+    if (!output.length) return "";
+    console.log(`[DuckDuckGo] Success - ${output.length} results`);
+    return output.join("\n");
+  } catch (err: any) {
+    console.error("[DuckDuckGo] Error:", err.message);
+    return "";
+  }
+}
+
 async function searchSearXNG(query: string): Promise<string> {
   for (const instance of SEARXNG_INSTANCES) {
     try {
@@ -428,6 +465,11 @@ async function silentWebSearch(userQuery: string): Promise<string> {
   result = await searchBing(userQuery);
   if (result) {
     console.log("[SilentSearch] Used Bing");
+    return result;
+  }
+  result = await searchDuckDuckGo(userQuery);
+  if (result) {
+    console.log("[SilentSearch] Used DuckDuckGo");
     return result;
   }
   result = await searchSearXNG(userQuery);
