@@ -93,8 +93,42 @@ function emailBodyText(email: any): string {
   return candidates[0]?.text || '';
 }
 
+function clientRecord(value: any): Record<string, any> | null {
+  return value && typeof value === 'object' && !Array.isArray(value) ? value as Record<string, any> : null;
+}
+
+function clientFlattenRecord(item: Record<string, any>, prefix = '', depth = 0): Record<string, string> {
+  const sensitive = /(?:token|secret|password|api[_-]?key|private[_-]?key|authorization)/i;
+  const output: Record<string, string> = {};
+  for (const [key, value] of Object.entries(item)) {
+    if (sensitive.test(key) || value === null || value === undefined || value === '' || Array.isArray(value)) continue;
+    const words = key.replace(/([a-z0-9])([A-Z])/g, '$1 $2').replace(/[_-]+/g, ' ');
+    const label = prefix ? `${prefix} ${words.replace(/\b\w/g, (letter) => letter.toUpperCase())}` : words.replace(/\b\w/g, (letter) => letter.toUpperCase());
+    const child = clientRecord(value);
+    if (child && depth < 2) Object.assign(output, clientFlattenRecord(child, label, depth + 1));
+    else if (!child) output[label] = typeof value === 'boolean' ? (value ? 'Yes' : 'No') : String(value);
+  }
+  return output;
+}
+
+function clientRecordTable(items: any[]): string {
+  const rows = items.map(clientRecord).filter(Boolean).map((item: any) => {
+    const row = clientFlattenRecord(item);
+    const title = item.name || item.title || item.subject || item.slug || item.id;
+    if (title && !row.Name && !row.Title) row.Name = String(title);
+    return row;
+  });
+  const available = [...new Set(rows.flatMap((row) => Object.keys(row)))];
+  const priority = ['Name', 'Title', 'Status', 'State', 'Region', 'Created', 'Updated', 'Database Host', 'Organization', 'URL', 'ID'];
+  const columns = [...priority.filter((column) => available.includes(column)), ...available.filter((column) => !priority.includes(column))].slice(0, 8);
+  if (!columns.length) return '';
+  const escape = (value: string) => String(value || '—').replace(/\|/g, '\\|').replace(/\r?\n/g, ' ');
+  return [`| ${columns.join(' | ')} |`, `| ${columns.map(() => '---').join(' | ')} |`, ...rows.slice(0, 50).map((row) => `| ${columns.map((column) => escape(row[column] || '—')).join(' | ')} |`)].join('\n');
+}
+
 function genericConnectorText(content: string): string | null {
   const trimmed = content.trim();
+  if (/^(?:supabase|github|vercel|linear|slack|notion|discord|gmail|stripe|asana|connected service) result\b/i.test(trimmed)) return trimmed;
   if (!(trimmed.startsWith('{') || trimmed.startsWith('[')) || !(trimmed.endsWith('}') || trimmed.endsWith(']'))) return null;
   let parsed: any;
   try { parsed = JSON.parse(trimmed); } catch { return null; }
@@ -141,15 +175,127 @@ function genericConnectorText(content: string): string | null {
   const provider = lower.includes('supabase') ? 'Supabase' : lower.includes('github') ? 'GitHub' : lower.includes('vercel') ? 'Vercel' : 'Connected service';
   const lines = [`${provider} result`];
   if (Array.isArray(root)) {
-    lines[0] += ` (${root.length} item${root.length === 1 ? '' : 's'})`;
-    root.slice(0, 50).forEach((entry, index) => {
-      if (entry && typeof entry === 'object') { lines.push(`${index + 1}. ${title(entry, `Item ${index + 1}`)}`); lines.push(...fields(entry).slice(0, 12).map((line) => `   ${line}`)); }
-      else lines.push(`${index + 1}. ${scalar(entry)}`);
-    });
+    const table = clientRecordTable(root);
+    if (table) {
+      lines.push(`${root.length} ${root.length === 1 ? 'item' : 'items'}`);
+      lines.push('');
+      lines.push(table);
+    } else {
+      lines[0] += ` (${root.length} item${root.length === 1 ? '' : 's'})`;
+      root.slice(0, 50).forEach((entry, index) => lines.push(`${index + 1}. ${entry && typeof entry === 'object' ? title(entry, `Item ${index + 1}`) : scalar(entry)}`));
+    }
   } else if (root && typeof root === 'object') {
     lines.push(...fields(root).slice(0, 160));
   }
   return lines.join('\n');
+}
+
+type RichSegment =
+  | { type: 'paragraph'; content: string }
+  | { type: 'table'; headers: string[]; rows: string[][] }
+  | { type: 'list'; items: Array<{ content: string; level: number; ordered: boolean }> };
+
+function splitTableRow(line: string): string[] {
+  const trimmed = line.trim().replace(/^\|/, '').replace(/\|$/, '');
+  return trimmed.split('|').map((cell) => cell.trim().replace(/\\n/g, ' '));
+}
+
+function isTableSeparator(line: string): boolean {
+  const cells = splitTableRow(line);
+  return cells.length >= 2 && cells.every((cell) => /^:?-{3,}:?$/.test(cell));
+}
+
+function parseRichSegments(text: string): RichSegment[] {
+  const lines = text.replace(/\r\n?/g, '\n').split('\n');
+  const segments: RichSegment[] = [];
+  let paragraph: string[] = [];
+  let index = 0;
+  const flushParagraph = () => {
+    const value = paragraph.join('\n').trim();
+    if (value) segments.push({ type: 'paragraph', content: value });
+    paragraph = [];
+  };
+
+  while (index < lines.length) {
+    const line = lines[index];
+    const next = lines[index + 1] || '';
+    if (line.includes('|') && isTableSeparator(next)) {
+      flushParagraph();
+      const headers = splitTableRow(line);
+      const rows: string[][] = [];
+      index += 2;
+      while (index < lines.length && lines[index].trim().includes('|')) {
+        const row = splitTableRow(lines[index]);
+        if (row.length) rows.push(headers.map((_, column) => row[column] || ''));
+        index += 1;
+      }
+      segments.push({ type: 'table', headers, rows });
+      continue;
+    }
+
+    const listMatch = line.match(/^(\s*)([-*•]|\d+[.)])\s+(.+)$/);
+    if (listMatch) {
+      flushParagraph();
+      const items: Array<{ content: string; level: number; ordered: boolean }> = [];
+      while (index < lines.length) {
+        const match = lines[index].match(/^(\s*)([-*•]|\d+[.)])\s+(.+)$/);
+        if (!match) break;
+        items.push({ content: match[3].trim(), level: Math.min(3, Math.floor(match[1].length / 2)), ordered: /^\d/.test(match[2]) });
+        index += 1;
+      }
+      segments.push({ type: 'list', items });
+      continue;
+    }
+
+    paragraph.push(line);
+    index += 1;
+  }
+  flushParagraph();
+  return segments.length ? segments : [{ type: 'paragraph', content: text }];
+}
+
+function RichTextBlock({ text }: { text: string }) {
+  const segments = useMemo(() => parseRichSegments(text), [text]);
+  return (
+    <div className="space-y-3 min-w-0">
+      {segments.map((segment, index) => {
+        if (segment.type === 'table') {
+          return (
+            <div key={`table-${index}`} className="overflow-hidden rounded-xl border border-border/70 bg-background/30 shadow-sm">
+              <div className="overflow-x-auto">
+                <table className="w-full min-w-[32rem] border-collapse text-left text-xs">
+                  <thead className="bg-muted/60 text-[10px] uppercase tracking-[0.12em] text-muted-foreground">
+                    <tr>{segment.headers.map((header, column) => <th key={column} className="whitespace-nowrap border-b border-border/70 px-3 py-2.5 font-semibold">{header || `Column ${column + 1}`}</th>)}</tr>
+                  </thead>
+                  <tbody className="divide-y divide-border/50">
+                    {segment.rows.map((row, rowIndex) => (
+                      <tr key={rowIndex} className="transition-colors hover:bg-muted/30">
+                        {segment.headers.map((_, column) => <td key={column} className="max-w-[18rem] px-3 py-2.5 align-top text-foreground/85"><span dangerouslySetInnerHTML={{ __html: formatText(row[column] || '—') }} /></td>)}
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+              <div className="border-t border-border/50 px-3 py-2 text-[10px] text-muted-foreground">{segment.rows.length} {segment.rows.length === 1 ? 'row' : 'rows'}</div>
+            </div>
+          );
+        }
+        if (segment.type === 'list') {
+          return (
+            <div key={`list-${index}`} className="overflow-hidden rounded-xl border border-border/60 bg-muted/20 py-1">
+              {segment.items.map((item, itemIndex) => (
+                <div key={itemIndex} className="flex items-start gap-2 px-3 py-2 text-sm leading-relaxed text-foreground/85" style={{ paddingLeft: `${0.75 + item.level * 1.05}rem` }}>
+                  <span className="mt-2 h-1.5 w-1.5 shrink-0 rounded-full bg-primary/70" aria-hidden="true" />
+                  <span className="min-w-0" dangerouslySetInnerHTML={{ __html: formatText(item.content) }} />
+                </div>
+              ))}
+            </div>
+          );
+        }
+        return <div key={`paragraph-${index}`} className="min-w-0 max-w-full overflow-wrap-anywhere text-sm leading-relaxed whitespace-pre-wrap break-words" dangerouslySetInnerHTML={{ __html: formatText(segment.content) }} />;
+      })}
+    </div>
+  );
 }
 
 function connectorBrand(content: string): { label: string; iconUrl: string } | null {
@@ -173,7 +319,7 @@ function ConnectorResultCard({ text, brand }: { text: string; brand: { label: st
         </div>
         <div className="min-w-0"><div className="text-sm font-semibold text-foreground">{brand.label}</div><div className="text-[11px] text-muted-foreground">Connected service result</div></div>
       </div>
-      <div className="px-3.5 py-3 text-sm leading-relaxed text-foreground/85" dangerouslySetInnerHTML={{ __html: formatText(body) }} />
+      <div className="px-3.5 py-3 text-foreground/85"><RichTextBlock text={body} /></div>
     </div>
   );
 }
@@ -566,11 +712,7 @@ export function MessageContent({ content }: MessageContentProps) {
         }
 
         return (
-          <p
-            key={`text-${index}`}
-            className="min-w-0 max-w-full overflow-wrap-anywhere text-sm leading-relaxed whitespace-pre-wrap break-words"
-            dangerouslySetInnerHTML={{ __html: formatText(part.content) }}
-          />
+            <RichTextBlock key={`text-${index}`} text={part.content} />
         );
       })}
     </div>

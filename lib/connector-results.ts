@@ -275,6 +275,40 @@ function renderObjectFields(item: AnyRecord, depth = 0, prefix = ""): string[] {
   return lines;
 }
 
+function flattenRecord(item: AnyRecord, prefix = "", depth = 0): Record<string, string> {
+  const output: Record<string, string> = {};
+  for (const [key, value] of Object.entries(item)) {
+    if (SENSITIVE_KEYS.test(key) || value === null || value === undefined || value === "" || Array.isArray(value)) continue;
+    const label = prefix ? `${prefix} ${humanizeKey(key)}` : humanizeKey(key);
+    if (record(value) && depth < 2) Object.assign(output, flattenRecord(value, label, depth + 1));
+    else if (!record(value)) output[label] = formatScalar(value);
+  }
+  return output;
+}
+
+function escapeTableCell(value: string): string {
+  return String(value || "—").replace(/\|/g, "\\|").replace(/\r?\n/g, " ").trim() || "—";
+}
+
+function renderRecordTable(items: unknown[]): string {
+  const records = items.map((item) => record(item)).filter((item): item is AnyRecord => Boolean(item));
+  if (!records.length) return "";
+  const rows = records.map((item) => {
+    const flattened = flattenRecord(item);
+    const title = recordTitle(item, "Untitled");
+    if (!flattened.Name && !flattened.Title && title !== "Untitled") flattened.Name = title;
+    return flattened;
+  });
+  const priority = ["Name", "Title", "Status", "State", "Region", "Created", "Updated", "Database Host", "Organization", "Owner", "URL", "ID"];
+  const allColumns = [...new Set(rows.flatMap((row) => Object.keys(row)))];
+  const columns = [...priority.filter((column) => allColumns.includes(column)), ...allColumns.filter((column) => !priority.includes(column))].slice(0, 8);
+  if (!columns.length) return "";
+  const header = `| ${columns.map(escapeTableCell).join(" | ")} |`;
+  const separator = `| ${columns.map(() => "---").join(" | ")} |`;
+  const body = rows.slice(0, 50).map((row) => `| ${columns.map((column) => escapeTableCell(row[column] || "—")).join(" | ")} |`);
+  return [header, separator, ...body].join("\n");
+}
+
 function connectorDisplayName(connectorName: string): string {
   const slug = String(connectorName || "connector").split(/\s+/).find((part) => /[a-z]/i.test(part)) || "connector";
   const known: Record<string, string> = { supabase: "Supabase", github: "GitHub", gmail: "Gmail", slack: "Slack", notion: "Notion", vercel: "Vercel", discord: "Discord", linear: "Linear", dropbox: "Dropbox", trello: "Trello", jira: "Jira" };
@@ -303,29 +337,29 @@ function formatGenericConnectorResult(value: unknown, connectorName: string): st
   const displayName = connectorDisplayName(connectorName);
   const lines: string[] = [`${displayName} result`];
   if (Array.isArray(root)) {
-    lines[0] += ` (${root.length} item${root.length === 1 ? "" : "s"})`;
-    root.slice(0, 50).forEach((entry, index) => {
-      const item = record(entry);
-      if (!item) lines.push(`${index + 1}. ${formatScalar(entry)}`);
-      else {
-        lines.push(`${index + 1}. ${recordTitle(item, `Item ${index + 1}`)}`);
-        renderObjectFields(item, 0).slice(0, 12).forEach((line) => lines.push(`   ${line}`));
-      }
-    });
+    const table = renderRecordTable(root);
+    if (table) {
+      lines.push(`${root.length} ${root.length === 1 ? "item" : "items"}`);
+      lines.push("");
+      lines.push(table);
+    } else {
+      lines[0] += ` (${root.length} item${root.length === 1 ? "" : "s"})`;
+      root.slice(0, 50).forEach((entry, index) => lines.push(`${index + 1}. ${record(entry) ? recordTitle(record(entry)!, `Item ${index + 1}`) : formatScalar(entry)}`));
+    }
   } else if (record(root)) {
     const entries = Object.entries(root);
     const recordArrays = entries.filter(([, entry]) => Array.isArray(entry) && entry.length > 0);
     if (recordArrays.length === 1 && entries.every(([key]) => key === recordArrays[0][0] || SENSITIVE_KEYS.test(key))) {
       const [key, items] = recordArrays[0];
-      lines[0] += ` — ${humanizeKey(key)} (${(items as unknown[]).length})`;
-      (items as unknown[]).slice(0, 50).forEach((entry, index) => {
-        const item = record(entry);
-        if (!item) lines.push(`${index + 1}. ${formatScalar(entry)}`);
-        else {
-          lines.push(`${index + 1}. ${recordTitle(item, `Item ${index + 1}`)}`);
-          renderObjectFields(item, 0).slice(0, 12).forEach((line) => lines.push(`   ${line}`));
-        }
-      });
+      lines[0] += ` — ${humanizeKey(key)}`;
+      const table = renderRecordTable(items as unknown[]);
+      if (table) {
+        lines.push(`${(items as unknown[]).length} ${(items as unknown[]).length === 1 ? "item" : "items"}`);
+        lines.push("");
+        lines.push(table);
+      } else {
+        (items as unknown[]).slice(0, 50).forEach((entry, index) => lines.push(`${index + 1}. ${record(entry) ? recordTitle(record(entry)!, `Item ${index + 1}`) : formatScalar(entry)}`));
+      }
     } else {
       renderObjectFields(root).slice(0, 160).forEach((line) => lines.push(line));
     }

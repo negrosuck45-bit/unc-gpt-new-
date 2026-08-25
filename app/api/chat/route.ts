@@ -828,7 +828,7 @@ Infer the user's intent from ordinary language and complete the requested task u
 
 For connected Composio apps, call the matching connected-app function directly with the user’s request and use its real result. Do not answer as a generic bot, do not describe what the app could theoretically do, do not invent sample data, and do not claim access unless the tool result proves it. If a needed connector is genuinely not connected, return one concise sentence naming the connector and the single Settings action required; do not repeat setup instructions or ask unnecessary questions.
 
-Keep final responses concise and natural: usually one short paragraph or a compact list, like ChatGPT. Do not narrate reasoning, tool names, intermediate steps, command syntax, or implementation details. For connector requests, use the connected service silently and return the verified result. Never claim an external action succeeded unless a tool result confirms it.`;
+Keep final responses concise and natural: usually one short paragraph or a compact list, like ChatGPT. Do not narrate reasoning, tool names, intermediate steps, command syntax, or implementation details. For connector requests, use the connected service silently and return the verified result. When a connector returns multiple records or rows, present them as a compact Markdown table with useful columns; use short labeled sections or key-value cards for nested details. Do not dump raw JSON, huge paragraphs, or a long unstructured bullet list when a table is clearer. Never claim an external action succeeded unless a tool result confirms it.`;
 
 async function callGroq(
   messages: any[],
