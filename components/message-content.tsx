@@ -3,7 +3,7 @@ import { useMemo, useState, useCallback } from 'react';
 import { cn } from '@/lib/utils';
 import { CodeBlock } from './code-block';
 import { TerminalBlock } from './terminal-block';
-import { Download, ExternalLink, Loader2, Tag } from 'lucide-react';
+import { Download, ExternalLink, Loader2, Tag, Mail, ChevronDown } from 'lucide-react';
 import { toast } from 'sonner';
 
 interface MessageContentProps {
@@ -22,6 +22,81 @@ interface ContentPart {
   kind?: 'account' | 'server';
   guildId?: string;
   serverName?: string;
+}
+
+type NormalizedEmail = {
+  sender?: string;
+  recipient?: string;
+  subject?: string;
+  date?: string;
+  snippet?: string;
+  body?: string;
+  attachments?: Array<{ filename?: string }>;
+};
+
+function parseEmailPayload(content: string | undefined | null): NormalizedEmail[] | null {
+  if (!content?.trim()) return null;
+  try {
+    const parsed = JSON.parse(content);
+    if (!Array.isArray(parsed?.emails)) return null;
+    const emails = parsed.emails.filter((email: any) => email && typeof email === 'object');
+    return emails.length ? emails.slice(0, 25) : null;
+  } catch {
+    return null;
+  }
+}
+
+function senderDetails(sender: string | undefined) {
+  const value = (sender || 'Unknown sender').trim();
+  const match = value.match(/^(.*?)\s*<([^>]+)>$/);
+  const email = match?.[2] || (value.includes('@') ? value.replace(/^.*?\s/, '') : '');
+  const name = (match?.[1] || value.replace(/<[^>]+>/, '')).trim() || email || 'Unknown sender';
+  const initials = name.split(/\s+/).filter(Boolean).slice(0, 2).map((part) => part[0]).join('').toUpperCase() || '?';
+  return { name, email, initials };
+}
+
+function formatEmailDate(value: string | undefined) {
+  if (!value || value === 'unavailable') return '';
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) return value;
+  return new Intl.DateTimeFormat(undefined, { month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit' }).format(date);
+}
+
+function EmailCards({ emails }: { emails: NormalizedEmail[] }) {
+  return (
+    <div className="my-1 w-full max-w-xl overflow-hidden rounded-2xl border border-border/70 bg-card/60 shadow-sm">
+      <div className="flex items-center gap-2 border-b border-border/60 px-3.5 py-3">
+        <div className="flex h-7 w-7 items-center justify-center rounded-lg bg-primary/10 text-primary"><Mail className="h-4 w-4" /></div>
+        <div className="min-w-0"><div className="text-sm font-semibold text-foreground">Latest emails</div><div className="text-[11px] text-muted-foreground">{emails.length} {emails.length === 1 ? 'message' : 'messages'}</div></div>
+      </div>
+      <div className="divide-y divide-border/60">
+        {emails.map((email, index) => {
+          const sender = senderDetails(email.sender);
+          const preview = email.snippet && email.snippet !== 'unavailable' ? email.snippet : (email.body && email.body !== 'unavailable' ? email.body : 'No preview available');
+          const subject = email.subject && email.subject !== 'unavailable' ? email.subject : '(No subject)';
+          return (
+            <details key={`${email.messageId || index}`} className="group">
+              <summary className="flex cursor-pointer list-none items-center gap-3 px-3.5 py-3 transition-colors hover:bg-muted/40 [&::-webkit-details-marker]:hidden">
+                <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-gradient-to-br from-primary/80 to-primary/35 text-xs font-semibold text-primary-foreground">{sender.initials}</div>
+                <div className="min-w-0 flex-1">
+                  <div className="flex items-center gap-2"><span className="truncate text-sm font-medium text-foreground">{sender.name}</span>{formatEmailDate(email.date) && <time className="ml-auto shrink-0 text-[11px] text-muted-foreground">{formatEmailDate(email.date)}</time>}</div>
+                  <div className="truncate text-sm text-foreground/85">{subject}</div>
+                  <div className="truncate text-xs text-muted-foreground">{preview}</div>
+                </div>
+                <ChevronDown className="h-4 w-4 shrink-0 text-muted-foreground transition-transform group-open:rotate-180" />
+              </summary>
+              <div className="border-t border-border/50 bg-muted/20 px-3.5 pb-3.5 pt-3 pl-[3.75rem] text-xs leading-relaxed text-muted-foreground">
+                {sender.email && <div className="mb-1">From: <span className="text-foreground/80">{sender.email}</span></div>}
+                {email.recipient && email.recipient !== 'unavailable' && <div className="mb-2">To: <span className="text-foreground/80">{email.recipient}</span></div>}
+                <p className="whitespace-pre-wrap break-words text-foreground/85">{preview}</p>
+                {!!email.attachments?.length && <div className="mt-2">{email.attachments.length} attachment{email.attachments.length === 1 ? '' : 's'}</div>}
+              </div>
+            </details>
+          );
+        })}
+      </div>
+    </div>
+  );
 }
 
 function formatText(text: string | undefined | null): string {
@@ -242,7 +317,10 @@ function ImageWithLoader({ src, alt }: { src: string; alt: string }) {
 }
 
 export function MessageContent({ content }: MessageContentProps) {
+  const emails = useMemo(() => parseEmailPayload(content), [content]);
   const parts = useMemo(() => parseContent(content), [content]);
+
+  if (emails) return <EmailCards emails={emails} />;
 
   const images = useMemo(() => parts.filter(p => p.type === 'image'), [parts]);
   const otherParts = useMemo(() => parts.filter(p => p.type !== 'image'), [parts]);
