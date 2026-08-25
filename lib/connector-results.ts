@@ -99,7 +99,12 @@ export function normalizeConnectorResult(value: unknown, connectorName = "connec
       const result = normalizeEmail(email);
       return [`${result.messageId}:${result.threadId}`, result];
     })).values()];
-    return JSON.stringify(normalized.length ? { emails: normalized.slice(0, 25) } : { emails: [], note: "The connected Gmail tool returned no email records." }, null, 2);
+    normalized.sort((a, b) => {
+      const timeA = Date.parse(a.date);
+      const timeB = Date.parse(b.date);
+      return (Number.isNaN(timeB) ? 0 : timeB) - (Number.isNaN(timeA) ? 0 : timeA);
+    });
+    return JSON.stringify(normalized.length ? { emails: normalized.slice(0, 50) } : { emails: [], note: "The connected Gmail tool returned no email records." }, null, 2);
   }
   const text = typeof valueToNormalize === "string" ? valueToNormalize : JSON.stringify(valueToNormalize);
   return text.length > MAX_RESULT_LENGTH ? `${text.slice(0, MAX_RESULT_LENGTH)}\n[connector result truncated]` : text;
