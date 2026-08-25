@@ -948,7 +948,7 @@ async function callChatWorkers(
   hasImage: boolean,
   tools: any[] = []
 ): Promise<{ stream: ReadableStream; provider: string; model: string }> {
-  const cfModel = model.startsWith("@cf/") ? model : "@cf/anthropic/claude-3-haiku";
+  const cfModel = model.startsWith("@cf/") ? model : "@cf/meta/llama-3.3-70b-instruct-fp8-fast";
 
   for (let i = 0; i < CHAT_WORKER_URLS.length; i++) {
     const index = (currentChatIndex + i) % CHAT_WORKER_URLS.length;
@@ -1078,7 +1078,7 @@ async function fallbackChat(
   try {
     return await callChatWorkers(
       { task: "chat", messages },
-      "@cf/anthropic/claude-3-haiku",
+      "@cf/meta/llama-3.3-70b-instruct-fp8-fast",
       false,
       tools
     );

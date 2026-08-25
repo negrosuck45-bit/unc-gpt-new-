@@ -40,7 +40,7 @@ export function chooseUncGptRoute(messages: any[], hasImage: boolean): UncGptRou
   }
 
   if (hasKey("CLOUDFLARE_API_TOKEN") && hasKey("CLOUDFLARE_ACCOUNT_ID")) {
-    return { provider: "cloudflare", model: "@cf/meta/llama-3.1-8b-instruct", reason: "general" };
+    return { provider: "cloudflare", model: "@cf/meta/llama-3.3-70b-instruct-fp8-fast", reason: "general" };
   }
 
   return { provider: "groq", model: "llama-3.3-70b-versatile", reason: "general" };
