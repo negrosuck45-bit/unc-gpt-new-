@@ -381,6 +381,40 @@ function decodeSearchHtml(value: string): string {
   return value.replace(/<[^>]+>/g, " ").replace(/&amp;/g, "&").replace(/&quot;/g, '"').replace(/&#x27;|&#39;/g, "'").replace(/&lt;/g, "<").replace(/&gt;/g, ">").replace(/\s+/g, " ").trim();
 }
 
+async function searchJinaDuckDuckGo(query: string): Promise<string> {
+  try {
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => controller.abort(), 12000);
+    const res = await fetch(`https://r.jina.ai/http://html.duckduckgo.com/html/?q=${encodeURIComponent(query)}`, {
+      headers: { "Accept": "text/plain", "User-Agent": "UncGPT/1.0" },
+      signal: controller.signal,
+    });
+    clearTimeout(timeoutId);
+    if (!res.ok) return "";
+    const markdown = await res.text();
+    const output: string[] = [];
+    const resultPattern = /^## \[([^\]]+)\]\((https?:\/\/[^)]+)\)\s*\n([\s\S]*?)(?=\n## |$)/gm;
+    for (const match of markdown.matchAll(resultPattern)) {
+      const title = decodeSearchHtml(match[1]);
+      let url = match[2];
+      try {
+        const parsed = new URL(url);
+        url = parsed.searchParams.get("uddg") || url;
+      } catch {}
+      const snippet = decodeSearchHtml(match[3]).replace(/!\[[^\]]*\]\([^)]*\)/g, "").slice(0, 400);
+      if (!title || !url || /duckduckgo|captcha|about this page/i.test(title)) continue;
+      output.push(`RESULT ${output.length + 1}: ${title}\n${snippet}\nSource: ${url}\n`);
+      if (output.length >= 5) break;
+    }
+    if (!output.length) return "";
+    console.log(`[Jina/DuckDuckGo] Success - ${output.length} results`);
+    return output.join("\n");
+  } catch (err: any) {
+    console.error("[Jina/DuckDuckGo] Error:", err.message);
+    return "";
+  }
+}
+
 async function searchDuckDuckGo(query: string): Promise<string> {
   try {
     const controller = new AbortController();
@@ -467,16 +501,18 @@ async function silentWebSearch(userQuery: string): Promise<string> {
     console.log("[SilentSearch] Used Bing");
     return result;
   }
+  result = await searchJinaDuckDuckGo(userQuery);
+  if (result) {
+    console.log("[SilentSearch] Used Jina/DuckDuckGo");
+    return result;
+  }
   result = await searchDuckDuckGo(userQuery);
   if (result) {
     console.log("[SilentSearch] Used DuckDuckGo");
     return result;
   }
-  result = await searchSearXNG(userQuery);
-  if (result) {
-    console.log("[SilentSearch] Used SearXNG");
-    return result;
-  }
+  // Do not use unreliable public SearXNG mirrors as a final source: stale results
+  // are worse than transparently telling the model that live retrieval failed.
   console.log("[SilentSearch] All search sources failed");
   return "";
 }
