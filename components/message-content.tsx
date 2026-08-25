@@ -59,8 +59,17 @@ function senderDetails(sender: string | undefined) {
 function SenderAvatar({ sender, photoUrl }: { sender: ReturnType<typeof senderDetails>; photoUrl?: string }) {
   const [imageError, setImageError] = useState(false);
   const safePhoto = photoUrl?.startsWith('https://') ? photoUrl : undefined;
+  const senderDomain = sender.email.split('@')[1]?.toLowerCase() || '';
+  const providerIcon = senderDomain === 'google.com' || senderDomain.endsWith('.google.com') || senderDomain === 'googlemail.com'
+    ? 'google'
+    : senderDomain === 'anthropic.com' || senderDomain.endsWith('.anthropic.com')
+      ? 'anthropic'
+      : senderDomain === 'substack.com' || senderDomain.endsWith('.substack.com')
+        ? 'substack'
+        : undefined;
+  const brandedPhoto = providerIcon ? `https://cdn.simpleicons.org/${providerIcon}` : undefined;
   const lookupPhoto = sender.email ? `https://unavatar.io/${encodeURIComponent(sender.email)}` : undefined;
-  const imageUrl = safePhoto || lookupPhoto;
+  const imageUrl = safePhoto || brandedPhoto || lookupPhoto;
   if (imageUrl && !imageError) {
     return <img src={imageUrl} alt={`${sender.name} profile`} className="h-9 w-9 shrink-0 rounded-full object-cover" loading="lazy" referrerPolicy="no-referrer" onError={() => setImageError(true)} />;
   }

@@ -1395,8 +1395,9 @@ function isSafeReadConnectorTool(tool: any) {
 async function executeLatestGmailMessages(session: any) {
   const result = await session.execute("GMAIL_FETCH_EMAILS", {
     user_id: "me",
-    max_results: 50,
-    include_payload: false,
+    max_results: 30,
+    verbose: true,
+    include_payload: true,
   });
   if (result?.error) throw new Error(String(result.error));
   return normalizeConnectorResult(result?.data ?? result, "GMAIL_FETCH_EMAILS");
