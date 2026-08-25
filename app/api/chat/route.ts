@@ -254,6 +254,30 @@ function isCurrentDateOrTimeQuestion(text: string) {
   return /\b(what(?:['’]s| is) today|what(?:['’]s| is) (?:the )?(?:date|day|time)|what day is it|today['’]?s date|date today|current (?:date|day|time))\b/i.test(text.trim());
 }
 
+function isBitcoinPriceQuestion(text: string) {
+  return /\b(bitcoin|btc)\b/i.test(text) && /\b(price|value|worth|cost|trading|rate|quote|how much|now|current|today)\b/i.test(text);
+}
+
+async function currentBitcoinPriceReply(countryCode?: string, locale?: string) {
+  const currencyByCountry: Record<string, string> = { US: "usd", BR: "brl", GB: "gbp", DE: "eur", FR: "eur", ES: "eur", IT: "eur", PT: "eur", NL: "eur", IE: "eur", CA: "cad", AU: "aud", JP: "jpy", IN: "inr" };
+  const currency = currencyByCountry[String(countryCode || "").toUpperCase()] || "usd";
+  try {
+    const response = await fetch(`https://api.coingecko.com/api/v3/simple/price?ids=bitcoin&vs_currencies=usd,${currency}&include_24hr_change=true&include_last_updated_at=true`, { headers: { Accept: "application/json", "User-Agent": "UncGPT/1.0" }, signal: AbortSignal.timeout(8000) });
+    if (!response.ok) throw new Error(`CoinGecko returned ${response.status}`);
+    const data = await response.json();
+    const bitcoin = data?.bitcoin;
+    const amount = bitcoin?.[currency];
+    const usd = bitcoin?.usd;
+    if (typeof amount !== "number") throw new Error("Bitcoin price was unavailable");
+    const formatter = new Intl.NumberFormat(locale || "en-US", { style: "currency", currency: currency.toUpperCase(), maximumFractionDigits: currency === "jpy" ? 0 : 2 });
+    const change = typeof bitcoin?.usd_24h_change === "number" ? `24-hour USD change: ${bitcoin.usd_24h_change >= 0 ? "+" : ""}${bitcoin.usd_24h_change.toFixed(2)}%.` : "";
+    const updated = typeof bitcoin?.last_updated_at === "number" ? new Date(bitcoin.last_updated_at * 1000).toISOString() : new Date().toISOString();
+    return `Bitcoin is currently ${formatter.format(amount)}${currency !== "usd" && typeof usd === "number" ? ` (about $${usd.toLocaleString("en-US", { maximumFractionDigits: 2 })} USD)` : ""}. ${change} Live price retrieved at ${updated}. Source: https://www.coingecko.com/en/coins/bitcoin`;
+  } catch (error: any) {
+    return `I couldn’t retrieve a verified live Bitcoin price right now. The market-data request failed: ${error?.message || "temporary provider error"}. I won’t guess a price.`;
+  }
+}
+
 function currentDateOrTimeReply(timeZone?: string, locale?: string) {
   const safeLocale = locale || "en-US";
   const safeTimeZone = timeZone || "UTC";
@@ -2175,6 +2199,11 @@ export async function POST(req: NextRequest) {
         },
       });
       return createStreamResponse(stream, "Discord", "connected-action", []);
+    }
+
+    if (isBitcoinPriceQuestion(userText)) {
+      const content = await currentBitcoinPriceReply(clientCountryCode, clientLocale);
+      return directTextResponse(content, "CoinGecko", "live-price");
     }
 
     if (isCurrentDateOrTimeQuestion(userText)) {
