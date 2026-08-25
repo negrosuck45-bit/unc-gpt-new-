@@ -1563,9 +1563,9 @@ function sanitizeGithubRepositoryName(value: string) {
 }
 
 function isWebsiteFollowUpRequest(text: string, conversationText: string) {
-  const followUpIntent = /\b(?:create|build|make|generate|deploy|publish|launch|set\s*up|do\s+it|go\s+ahead)\b/i.test(text);
-  const websiteContext = /\b(?:website|web\s*site|landing\s*page|portfolio|index\.html|github\s*pages|github\.io|vercel)\b/i.test(conversationText);
-  const repositoryContext = /\b(?:github|repository|repo|github\s*pages|github\.io|vercel)\b/i.test(conversationText);
+  const followUpIntent = /\b(?:create|build|make|generate|deploy|publish|launch|set\s*up|do\s+it|go\s+ahead|make\s+it\s+live)\b/i.test(text);
+  const websiteContext = /\b(?:website|web\s*site|landing\s*page|portfolio|(?:hello\s+world\s+)?page|index\.(?:html|md)|github\s*pages|github\.io|vercel)\b/i.test(conversationText);
+  const repositoryContext = /\b(?:github|repository|repo|github\s*pages|github\.io|vercel|live\s+page)\b/i.test(conversationText);
   return followUpIntent && websiteContext && repositoryContext;
 }
 
@@ -1607,8 +1607,10 @@ function extractGithubRepositoryRef(text: string): { owner: string; repo: string
 }
 
 function isWebsiteBuildRequest(text: string) {
-  return /\b(?:create|build|make|generate|set\s+up)\b[\s\S]{0,120}\b(?:website|web\s+site|landing\s+page|portfolio|index\.html)\b/i.test(text)
-    && /\b(?:github|repository|repo|github\.io|vercel)\b/i.test(text);
+  const creationIntent = /\b(?:create|build|make|generate|set\s+up|publish|deploy|launch)\b/i.test(text);
+  const pageIntent = /\b(?:website|web\s+site|landing\s+page|portfolio|(?:hello\s+world\s+)?page|index\.(?:html|md)|github\s*pages|github\.io|live\s+page)\b/i.test(text);
+  const repositoryIntent = /\b(?:github|repository|repo|github\.io|vercel)\b/i.test(text);
+  return creationIntent && pageIntent && repositoryIntent;
 }
 
 function isMissingGithubRepositoryError(error: unknown) {
@@ -1621,6 +1623,35 @@ function escapeTemplateHtml(value: string) {
 }
 
 function buildPortfolioFiles(userText: string) {
+  if (/\bhello\s+world\b/i.test(userText)) {
+    return {
+      "index.html": `<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="description" content="A Hello World page created by uncgpt.">
+  <title>Hello World</title>
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+  <main class="shell">
+    <section class="hero" aria-labelledby="title">
+      <p class="eyebrow">A new GitHub Pages site</p>
+      <h1 id="title">Hello, world<span>.</span></h1>
+      <p class="lede">This page was created, committed, and published by uncgpt.</p>
+      <button id="hello-button" type="button">Say hello</button>
+      <p id="message" class="message" aria-live="polite">Ready when you are.</p>
+    </section>
+  </main>
+  <script src="script.js"></script>
+</body>
+</html>
+`,
+      "style.css": `:root{color-scheme:dark;--bg:#090b12;--panel:#111827;--text:#f8fafc;--muted:#a5b4c8;--accent:#70f3c2}*{box-sizing:border-box}body{min-height:100vh;margin:0;display:grid;place-items:center;background:radial-gradient(circle at 78% 8%,#21365f 0,transparent 32%),var(--bg);color:var(--text);font:16px/1.55 Inter,ui-sans-serif,system-ui,sans-serif}.shell{width:min(100% - 32px,760px)}.hero{padding:clamp(3rem,10vw,7rem);border:1px solid rgba(255,255,255,.13);border-radius:32px;background:linear-gradient(145deg,rgba(20,31,53,.92),rgba(10,14,25,.84));box-shadow:0 28px 90px rgba(0,0,0,.38)}.eyebrow{margin:0;color:var(--accent);font-size:.76rem;font-weight:800;letter-spacing:.13em;text-transform:uppercase}.hero h1{margin:.4rem 0 1rem;font-size:clamp(3.5rem,12vw,7rem);line-height:.95;letter-spacing:-.075em}.hero h1 span{color:var(--accent)}.lede{max-width:32rem;color:var(--muted);font-size:clamp(1.05rem,2vw,1.25rem)}button{margin-top:1.4rem;border:0;border-radius:999px;padding:.8rem 1.2rem;background:var(--accent);color:#062017;font:inherit;font-weight:800;cursor:pointer;transition:transform .16s ease,filter .16s ease}button:hover{filter:brightness(1.05);transform:translateY(-2px)}button:focus-visible{outline:3px solid #fff;outline-offset:3px}.message{min-height:1.5em;margin:1.2rem 0 0;color:var(--muted)}@media(max-width:520px){.hero{padding:2.5rem 1.6rem;border-radius:25px}}\n`,
+      "script.js": `const button=document.getElementById('hello-button');const message=document.getElementById('message');button?.addEventListener('click',()=>{message.textContent='Hello from your live GitHub Pages site.';});\n`,
+    };
+  }
   const titleMatch = userText.match(/\b(?:for|called|named)\s+["'“”]?([^"'“”\n]+?)(?:["'“”]|\s+in\s+|\s+with\s+|$)/i);
   const title = escapeTemplateHtml((titleMatch?.[1] || "Your Name").trim().slice(0, 80));
   const subtitle = "Designer, developer, and creative problem solver.";
@@ -3070,18 +3101,26 @@ export async function POST(req: NextRequest) {
         ? mcpConnectors.find((connector: any) => normalizeConnectorKeyForRouting(connector.provider || connector.toolkit || connector.name) === "github" && connector?.enabled !== false)
         : null;
       let websiteComposioSession: any = null;
+      let githubComposioConnected = false;
       if (websiteBuildRequest && !oauthConnected.has("github") && process.env.COMPOSIO_API_KEY) {
         try {
           const session = await getSession();
           const userId = session?.user?.sub;
           if (userId) {
-            const enabledToolkits = await getEnabledComposioToolkits(userId);
+            // Create a user-scoped session even if the cached browser connector list is stale.
+            // A live execute call is more authoritative than localStorage and prevents a
+            // connected Composio account from receiving a false Connect card.
+            const enabledToolkits = await getEnabledComposioToolkits(userId).catch(() => []);
             const githubToolkit = enabledToolkits.find((toolkit) => normalizeConnectorKeyForRouting(toolkit) === "github");
-            if (githubToolkit || composioGithubPreference) websiteComposioSession = await getComposioSession(userId, [githubToolkit || "github"]);
+            githubComposioConnected = Boolean(githubToolkit);
+            websiteComposioSession = await getComposioSession(userId, [githubToolkit || "github"]);
           }
         } catch (error) {
           console.warn("Composio GitHub website session lookup failed", error);
         }
+      }
+      if (websiteBuildRequest && !websiteRepository && !oauthConnected.has("github") && !githubComposioConnected) {
+        return connectorPermissionResponse("github", "GitHub", "create and update website files and commits", "https://cdn.simpleicons.org/github");
       }
       if (websiteBuildRequest && !websiteRepository && oauthConnected.has("github")) {
         try {
@@ -3095,21 +3134,21 @@ export async function POST(req: NextRequest) {
       if (websiteBuildRequest && !websiteRepository && websiteComposioSession) {
         try {
           const search = await websiteComposioSession.search({ query: "get the authenticated GitHub user profile", toolkits: ["github"] });
-          const schemas = Object.values(search?.toolSchemas || {}) as any[];
-          const profileSchema = schemas.find((schema: any) => /(?:get|retrieve|fetch|current|authenticated).*(?:user|profile)|(?:user|profile).*(?:get|retrieve|fetch|current|authenticated)/i.test(`${schema?.toolSlug || ""} ${schema?.name || ""} ${schema?.description || ""}`));
-          if (profileSchema) {
-            const profileResponse: any = await websiteComposioSession.execute(profileSchema.toolSlug, {});
-            const profile: any = profileResponse?.data ?? profileResponse;
-            const owner = String(profile?.login || profile?.username || profile?.name || "").trim();
-            if (owner) websiteRepository = { owner, repo: sanitizeGithubRepositoryName(extractGithubRepositoryName(userText) || "uncgpt-portfolio") };
-          }
+          const schemas = normalizeComposioSearchSchemas(search);
+          const profileSchema = schemas.find((schema: any) => /(?:get|retrieve|fetch|current|authenticated).*(?:user|profile)|(?:user|profile).*(?:get|retrieve|fetch|current|authenticated)/i.test(`${schema?.toolSlug || ""} ${schema?.name || ""} ${schema?.description || ""}`)) || knownComposioGithubSchema("GITHUB_GET_THE_AUTHENTICATED_USER");
+          const profileResponse: any = await websiteComposioSession.execute(profileSchema.toolSlug, {});
+          const rawProfile: any = profileResponse?.data ?? profileResponse;
+          const profile: any = parseComposioObject(rawProfile) || rawProfile;
+          const owner = String(profile?.login || profile?.username || profile?.name || profile?.data?.login || profile?.data?.username || "").trim();
+          if (owner) websiteRepository = { owner, repo: sanitizeGithubRepositoryName(extractGithubRepositoryName(userText) || "uncgpt-portfolio") };
         } catch (error) {
           console.warn("Could not derive Composio GitHub username for website creation", error);
         }
       }
       if (websiteBuildRequest) {
         if (!websiteRepository) return directTextResponse("I need a GitHub repository like **your-username/your-repository**, or a connected GitHub account that exposes your username, before I can create and deploy the site.", "GitHub", "connected-action");
-        if (!oauthConnected.has("github") && !websiteComposioSession) return connectorPermissionResponse("github", "GitHub", "create and update website files and commits", "https://cdn.simpleicons.org/github");
+        if (!oauthConnected.has("github") && !githubComposioConnected) return connectorPermissionResponse("github", "GitHub", "create and update website files and commits", "https://cdn.simpleicons.org/github");
+        if (!oauthConnected.has("github") && !websiteComposioSession) return directTextResponse("Your GitHub account is connected, but I could not open its action session right now. Please try again in a moment; you do not need to reconnect it.", "GitHub", "connector-error");
         if (wantsVercel && !oauthConnected.has("vercel")) return connectorPermissionResponse("vercel", "Vercel", "deploy the committed GitHub website", "https://cdn.simpleicons.org/vercel");
         try {
           const result = websiteComposioSession && !oauthConnected.has("github")
@@ -3125,9 +3164,6 @@ export async function POST(req: NextRequest) {
         } catch (error: any) {
           return directTextResponse(`I couldn’t finish the website publish for **${websiteRepository.owner}/${websiteRepository.repo}**. ${String(error?.message || "The connected service did not confirm the requested write or deployment.").slice(0, 360)}`, "GitHub", "connector-error");
         }
-      }
-      if (githubCreateRequest && !oauthConnected.has("github") && !composioGithubPreference) {
-        return connectorPermissionResponse("github", "GitHub", "create and manage repositories, issues, files, and pull requests", "https://cdn.simpleicons.org/github");
       }
       if (githubCreateRequest && oauthConnected.has("github")) {
         const name = extractGithubRepositoryName(userText);
@@ -3203,9 +3239,10 @@ export async function POST(req: NextRequest) {
           const liveAccounts: any = liveUserId ? await composio.connectedAccounts.list({ userIds: getComposioUserIds(liveUserId), limit: 1000 }) : null;
           const liveAccount = (liveAccounts?.items || []).find((account: any) => {
             const toolkit = String(account?.toolkit?.slug || '').toLowerCase().replace(/[- ]/g, '_');
-            return toolkit === requestedConnectorKey;
+            const status = String(account?.status || '').toLowerCase();
+            return toolkit === requestedConnectorKey && !account?.isDisabled && ['active', 'connected', 'success'].includes(status);
           });
-          if (liveAccount) requestedState = { source: 'composio', provider: requestedConnectorKey, toolkit: requestedConnectorKey, accountId: liveAccount.id, enabled: !Boolean(liveAccount.isDisabled) };
+          if (liveAccount) requestedState = { source: 'composio', provider: requestedConnectorKey, toolkit: requestedConnectorKey, accountId: liveAccount.id, enabled: true };
         } catch (error) {
           console.warn('Live connector state lookup failed:', error);
         }
@@ -3260,9 +3297,8 @@ export async function POST(req: NextRequest) {
               query: userText,
               toolkits: [matchedToolkit!],
             });
-            const discoveredSchemas = Object.values(search?.toolSchemas || {}) as any[];
+            const discoveredSchemas = normalizeComposioSearchSchemas(search);
             composioTools = discoveredSchemas
-              .filter((schema: any) => schema?.toolSlug && schema?.inputSchema)
               .slice(0, 8)
               .map((schema: any) => ({
                 type: "function",
