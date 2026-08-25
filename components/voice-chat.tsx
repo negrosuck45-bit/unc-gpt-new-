@@ -6,6 +6,7 @@ import { useChatStore, type Attachment } from "@/lib/chat-store";
 import { truncateMemory } from "@/lib/memory-parsers";
 import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
+import { getClientRuntimeContext } from "@/lib/client-runtime-context";
 
 function stripForSpeech(text: string): string {
   return text
@@ -192,10 +193,15 @@ export default function VoiceChat({ onOpenSidebar, isSidebarOpen }: VoiceChatPro
         return m;
       });
 
+      const runtimeContext = await getClientRuntimeContext();
       const payload: any = {
         messages: formattedMessages,
         preferredModel: selectedModel,
         preferredProvider: selectedProvider,
+        clientTimeZone: runtimeContext.timeZone,
+        clientLocale: runtimeContext.locale,
+        clientCountry: runtimeContext.country,
+        clientCountryCode: runtimeContext.countryCode,
       };
 
       if (currentProject) {

@@ -654,6 +654,36 @@ async function generateMedia(
 // ============================================================
 
 // Keep provider instructions focused on ordinary chat; never expose internal tools.
+const UNCGPT_IDENTITY_PROMPT = `You are uncgpt, the AI inside the uncgpt workspace at unc-gptt.vercel.app. uncgpt provides chat, projects and memory, file/reference search, image generation, optional computer-use capabilities, and user-authorized connectors through MCP and Composio. You should understand these capabilities, explain them accurately when asked, and use a connected service only when the user has connected and authorized it. Never claim a capability, account, external result, or action is available unless the current request and its verified tools show that it is.`;
+
+function safeRuntimeContextValue(value: unknown, pattern: RegExp, maxLength: number) {
+  const text = String(value || "").trim();
+  return pattern.test(text) ? text.slice(0, maxLength) : undefined;
+}
+
+function buildRuntimeContextMessage({
+  clientTimeZone,
+  clientLocale,
+  clientCountry,
+  clientCountryCode,
+}: {
+  clientTimeZone?: unknown;
+  clientLocale?: unknown;
+  clientCountry?: unknown;
+  clientCountryCode?: unknown;
+}) {
+  const timeZone = safeRuntimeContextValue(clientTimeZone, /^[A-Za-z_+\-/]{1,80}$/, 80);
+  const locale = safeRuntimeContextValue(clientLocale, /^[A-Za-z0-9_-]{2,35}$/, 35);
+  const country = safeRuntimeContextValue(clientCountry, /^[A-Za-z .'-]{2,80}$/, 80);
+  const countryCode = safeRuntimeContextValue(clientCountryCode, /^[A-Z]{2}$/i, 2)?.toUpperCase();
+  const parts = [
+    timeZone ? `timezone: ${timeZone}` : "timezone: unavailable",
+    locale ? `locale: ${locale}` : "locale: unavailable",
+    country ? `approximate country: ${country}${countryCode ? ` (${countryCode})` : ""}` : "approximate country: unavailable",
+  ];
+  return `Runtime context for this turn (device-provided; may be approximate): ${parts.join("; ")}. Raw IP address, city, ISP, hostname, and precise location were not provided. Use timezone for local dates/times and country only when it is relevant.`;
+}
+
 const TERMINAL_SYSTEM_PROMPT = `You are uncgpt, a helpful AI assistant. Answer the user's request directly and clearly.
 
 Infer the user's intent from ordinary language and complete the requested task using an actually connected service whenever one is available. Do not require special prefixes, connector names, or instructions such as “use a tool.” For read-only requests and routine actions that the user explicitly requested, proceed immediately without asking for confirmation. Only pause for confirmation immediately before an irreversible, destructive, financial, privacy-sensitive, or externally visible action when the user has not already clearly authorized that exact action. Never ask the user to confirm merely because a connector is being used.
@@ -1222,6 +1252,15 @@ function defaultReadToolArguments(schema: any): Record<string, unknown> | null {
 function isSafeReadConnectorTool(tool: any) {
   const descriptor = `${tool?.function?.name || ""} ${tool?.function?.description || ""}`.toLowerCase();
   return /\b(fetch|get|list|search|read|find|retrieve)\b/.test(descriptor) && !/\b(send|create|update|edit|delete|remove|post|publish|deploy|commit|push|close|archive)\b/.test(descriptor);
+}
+
+async function executeLatestGmailMessages(session: any) {
+  const result = await session.execute("GMAIL_FETCH_EMAILS", {
+    user_id: "me",
+    max_results: 10,
+  });
+  if (result?.error) throw new Error(String(result.error));
+  return normalizeConnectorResult(result?.data ?? result, "GMAIL_FETCH_EMAILS");
 }
 
 function directTextResponse(content: string, provider: string, model = "connected-action") {
@@ -1967,6 +2006,8 @@ export async function POST(req: NextRequest) {
       computerUse,
       clientTimeZone,
       clientLocale,
+      clientCountry,
+      clientCountryCode,
     } = body;
 
     // The replacement release exposes one model only; old client model values are ignored.
@@ -2144,7 +2185,11 @@ export async function POST(req: NextRequest) {
 
     // Build system prompt
     const systemContent = TERMINAL_SYSTEM_PROMPT;
-    const systemParts: string[] = [systemContent];
+    const systemParts: string[] = [
+      systemContent,
+      `\n\n${UNCGPT_IDENTITY_PROMPT}`,
+      `\n\n${buildRuntimeContextMessage({ clientTimeZone, clientLocale, clientCountry, clientCountryCode })}`,
+    ];
     if (projectInstructions) {
       systemParts.push(`\n\nProject Instructions:\n${projectInstructions}`);
     }
@@ -2270,6 +2315,21 @@ export async function POST(req: NextRequest) {
                 getComposioSession(session.user.sub, [matchedToolkit]),
                 new Promise((_, reject) => setTimeout(() => reject(new Error('Connector lookup timed out')), 10000)),
               ]);
+            }
+          }
+          if (composioSession && requestedConnectorKey === "gmail" && isReadOnlyConnectorRequest(userText)) {
+            try {
+              const result = await executeLatestGmailMessages(composioSession);
+              return directTextResponse(result, "Gmail");
+            } catch (error: any) {
+              const message = String(error?.message || "Unable to retrieve email.")
+                .replace(/https?:\/\/\S+/g, "")
+                .slice(0, 240);
+              return directTextResponse(
+                `Gmail is connected, but I could not retrieve your latest emails. ${message} Reconnect Gmail in Settings → Connectors and try again if this keeps happening.`,
+                "Gmail",
+                "connector-error"
+              );
             }
           }
           if (composioSession && requestedConnectorKey) {

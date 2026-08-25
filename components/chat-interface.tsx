@@ -13,6 +13,7 @@ import { localVisionSupported, runLocalVision } from "@/lib/local-vision";
 import { connectorPermissionIdentity } from "@/components/connector-permission-card";
 import { accountStorageKey } from "@/lib/account-scope";
 import { ConnectionStatusBanner, type ConnectionIssue } from "@/components/connection-status-banner";
+import { getClientRuntimeContext } from "@/lib/client-runtime-context";
 
 interface ChatInterfaceProps {
   onSwitchToImagine?: () => void;
@@ -207,14 +208,17 @@ export function ChatInterface({ onSwitchToImagine, onOpenSidebar, isSidebarOpen 
       return m;
     });
 
+    const runtimeContext = await getClientRuntimeContext();
     const payload: any = {
       messages: formattedMessages,
       preferredModel: selectedModel,
       preferredProvider: selectedProvider,
       // Keep Agent Computer available to the backend without exposing a chat-level toggle.
       computerUse: true,
-      clientTimeZone: Intl.DateTimeFormat().resolvedOptions().timeZone || "UTC",
-      clientLocale: navigator.language || "en-US",
+      clientTimeZone: runtimeContext.timeZone,
+      clientLocale: runtimeContext.locale,
+      clientCountry: runtimeContext.country,
+      clientCountryCode: runtimeContext.countryCode,
     };
 
     try {

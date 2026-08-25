@@ -7,6 +7,7 @@ import { ChatInput } from "@/components/chat-input";
 import { WelcomeScreen } from "@/components/welcome-screen";
 import { ChatHeader } from "@/components/chat-header";
 import detectComputerUseNeeded from "@/lib/agents/auto-detection";
+import { getClientRuntimeContext } from "@/lib/client-runtime-context";
 
 interface ChatInterfaceProps {
   onSwitchToImagine?: () => void;
@@ -160,10 +161,15 @@ export function ChatInterface({ onSwitchToImagine, onOpenSidebar, isSidebarOpen 
     }
 
     // Regular chat flow
+    const runtimeContext = await getClientRuntimeContext();
     const payload: any = {
       messages: formattedMessages,
       preferredModel: selectedModel,
       preferredProvider: selectedProvider,
+      clientTimeZone: runtimeContext.timeZone,
+      clientLocale: runtimeContext.locale,
+      clientCountry: runtimeContext.country,
+      clientCountryCode: runtimeContext.countryCode,
     };
 
     if (selectedProvider === "anthropic" && settings.anthropicApiKey) {
