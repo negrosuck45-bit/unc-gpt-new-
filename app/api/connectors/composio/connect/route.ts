@@ -19,7 +19,7 @@ export async function POST(req: NextRequest) {
   }
 
   try {
-    const composio = await getComposioSession(userId);
+    const composio = await getComposioSession(userId, [toolkit]);
     if (!composio) return Response.json({ error: "Composio is not configured on this deployment." }, { status: 503 });
 
     const result: any = await composio.execute("COMPOSIO_MANAGE_CONNECTIONS", {

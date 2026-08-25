@@ -1,7 +1,7 @@
 import type { NextRequest } from "next/server";
 
 import { getSession } from "@/lib/auth";
-import { getComposioSession, getComposioUserId, getComposioUserIds } from "@/lib/composio";
+import { getComposioSession, getComposioUserId, getComposioUserIds, getEnabledComposioToolkits } from "@/lib/composio";
 import { Composio } from "@composio/core";
 import { chooseUncGptRoute } from "@/lib/uncgpt-router";
 import { executeAgentGateway, gatewayResultText } from "@/lib/agent-gateway";
@@ -2035,14 +2035,28 @@ export async function POST(req: NextRequest) {
         trello: { label: 'Trello', description: 'read and manage boards and cards', iconUrl: 'https://cdn.simpleicons.org/trello' },
         jira: { label: 'Jira', description: 'read and manage issues and projects', iconUrl: 'https://cdn.simpleicons.org/jira' },
       };
-      const requestedConnectorKey = Object.keys(connectorHints).find((key) => {
+      const staticConnectorKey = Object.keys(connectorHints).find((key) => {
         const pattern = key.replace(/_/g, '[ _-]?');
         const directMatch = new RegExp(`\\b${pattern}\\b`, 'i').test(userText);
         const aliasMatch = key === 'gmail' && /\b(email|emails|mail|inbox)\b/i.test(userText);
         return directMatch || aliasMatch;
       });
+      const dynamicConnectorKey = connectorPreferences
+        .filter((connector: any) => connector?.source === 'composio' && connector?.enabled !== false)
+        .map((connector: any) => String(connector.provider || connector.toolkit || '').toLowerCase())
+        .find((toolkit: string) => {
+          const tokens = toolkit.replace(/[-_]/g, ' ').split(/\s+/).filter((token) => token.length > 2);
+          return tokens.length > 0 && tokens.every((token) => new RegExp(`\\b${token.replace(/[.*+?^${}()|[\\]\\]/g, '\\$&')}\\b`, 'i').test(userText));
+        });
+      const requestedConnectorKey = staticConnectorKey || dynamicConnectorKey;
       const connectorActionIntent = /\b(my|mine|latest|list|show|find|read|send|email|message|calendar|create|update|delete|open|search|manage|deploy|repository|repositories|repo)\b/i.test(userText);
-      const requestedConnector = requestedConnectorKey ? connectorHints[requestedConnectorKey] : null;
+      const requestedConnector = requestedConnectorKey
+        ? connectorHints[requestedConnectorKey] || {
+            label: requestedConnectorKey.replace(/[_-]/g, ' ').replace(/\b\w/g, (letter) => letter.toUpperCase()),
+            description: `read and manage your ${requestedConnectorKey.replace(/[_-]/g, ' ')} data`,
+            iconUrl: 'https://cdn.simpleicons.org/composio',
+          }
+        : null;
       let requestedState = requestedConnectorKey ? connectorPreferences.find((connector: any) => connector?.source === 'composio' && String(connector.provider || connector.toolkit || '').toLowerCase().replace(/[- ]/g, '_') === requestedConnectorKey) : null;
       // Client storage can be stale or empty. Resolve the live Composio account before deciding
       // whether to ask for authorization, so the AI and connector panel see the same state.
@@ -2078,11 +2092,17 @@ export async function POST(req: NextRequest) {
         const shouldLoadConnectedTools = Boolean(requestedConnectorKey && connectorActionIntent);
         if (shouldLoadConnectedTools) {
           const session = await getSession();
-          if (session?.user?.sub) {
-            composioSession = await Promise.race([
-              getComposioSession(session.user.sub),
-              new Promise((_, reject) => setTimeout(() => reject(new Error('Connector lookup timed out')), 10000)),
-            ]);
+          if (session?.user?.sub && requestedConnectorKey) {
+            const enabledToolkits = await getEnabledComposioToolkits(session.user.sub);
+            const matchedToolkit = enabledToolkits.find(
+              (toolkit) => toolkit.replace(/[- ]/g, "_") === requestedConnectorKey
+            );
+            if (matchedToolkit) {
+              composioSession = await Promise.race([
+                getComposioSession(session.user.sub, [matchedToolkit]),
+                new Promise((_, reject) => setTimeout(() => reject(new Error('Connector lookup timed out')), 10000)),
+              ]);
+            }
           }
           if (composioSession) {
             const nativeTools: any[] = await composioSession.tools();
@@ -2106,14 +2126,14 @@ export async function POST(req: NextRequest) {
                   return normalizeConnectorResult(result?.data ?? result, tool.function.name);
                 },
               }));
-
           }
         }
       } catch (error) {
         console.error("Composio session unavailable:", error);
       }
-      if (requestedConnectorKey && connectorActionIntent && activeMcpConnectors.length > 0) {
-        mcpTools = await fetchMcpTools(activeMcpConnectors, baseUrl);
+      const remoteMcpConnectors = activeMcpConnectors.filter((connector: any) => connector?.source !== "composio");
+      if (requestedConnectorKey && connectorActionIntent && remoteMcpConnectors.length > 0) {
+        mcpTools = await fetchMcpTools(remoteMcpConnectors, baseUrl);
       }
 
       const computerIntent = /\b(open|navigate|inspect|click|type|scroll|browser|terminal|command|file|folder|filesystem|computer|website|site)\b/i.test(userText);
