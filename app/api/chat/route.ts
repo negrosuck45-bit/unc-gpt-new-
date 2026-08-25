@@ -1663,12 +1663,73 @@ async function executeWebsiteScaffold(baseUrl: string, cookieHeader: string, own
   return result;
 }
 
+function parseComposioObject(value: any) {
+  if (!value) return null;
+  if (typeof value === "object") return value;
+  if (typeof value === "string") {
+    try { return JSON.parse(value); } catch { return null; }
+  }
+  return null;
+}
+
+function getComposioInputSchema(schema: any) {
+  const candidates = [schema?.inputSchema, schema?.input_schema, schema?.inputParameters, schema?.input_parameters, schema?.parameters];
+  for (const candidate of candidates) {
+    const parsed = parseComposioObject(candidate);
+    if (!parsed) continue;
+    if (parsed.properties && typeof parsed.properties === "object") return { type: "object", ...parsed };
+    if (parsed.input_parameters && typeof parsed.input_parameters === "object") return { type: "object", properties: parsed.input_parameters, required: parsed.required };
+    if (parsed.fields && typeof parsed.fields === "object") return { type: "object", properties: parsed.fields, required: parsed.required };
+    if (parsed.type === "object" || Object.keys(parsed).length > 0) return { type: "object", properties: parsed };
+  }
+  return null;
+}
+
+function normalizeComposioSearchSchemas(search: any) {
+  const sources = [search?.toolSchemas, search?.tools, search?.results, search?.data?.toolSchemas, search?.data?.tools, search?.data?.results];
+  const schemas: any[] = [];
+  for (const source of sources) {
+    if (Array.isArray(source)) {
+      for (const item of source) {
+        if (item && typeof item === "object") schemas.push(item);
+      }
+    } else if (source && typeof source === "object") {
+      for (const [key, item] of Object.entries(source)) {
+        if (item && typeof item === "object") schemas.push({ ...(item as any), toolSlug: (item as any).toolSlug || (item as any).slug || key });
+      }
+    }
+  }
+  const unique = new Map<string, any>();
+  for (const schema of schemas) {
+    const toolSlug = String(schema?.toolSlug || schema?.slug || schema?.name || "").trim();
+    const inputSchema = getComposioInputSchema(schema);
+    if (toolSlug && inputSchema) unique.set(toolSlug, { ...schema, toolSlug, inputSchema });
+  }
+  return [...unique.values()];
+}
+
+function knownComposioGithubSchema(toolSlug: string) {
+  const properties = toolSlug === "GITHUB_CREATE_A_REPOSITORY_FOR_THE_AUTHENTICATED_USER"
+    ? { name: { type: "string" }, description: { type: "string" }, private: { type: "boolean" } }
+    : toolSlug === "GITHUB_CREATE_OR_UPDATE_FILE_CONTENTS"
+      ? { owner: { type: "string" }, repo: { type: "string" }, path: { type: "string" }, content: { type: "string" }, message: { type: "string" }, branch: { type: "string" } }
+      : toolSlug === "GITHUB_CREATE_OR_UPDATE_GITHUB_PAGES_SITE" || toolSlug === "GITHUB_CREATE_A_GITHUB_PAGES_SITE"
+        ? { owner: { type: "string" }, repo: { type: "string" }, build_type: { type: "string" }, source_branch: { type: "string" } }
+        : { owner: { type: "string" }, repo: { type: "string" } };
+  return { toolSlug, inputSchema: { type: "object", properties } };
+}
+
 function composioSchemaArguments(schema: any, base: { owner: string; repo: string; name?: string; description?: string; private?: boolean; path?: string; content?: string; message?: string; branch?: string }) {
-  const properties = schema?.inputSchema?.properties && typeof schema.inputSchema.properties === "object" ? schema.inputSchema.properties : {};
+  const inputSchema = getComposioInputSchema(schema) || schema?.inputSchema || {};
+  const properties = inputSchema?.properties && typeof inputSchema.properties === "object" ? inputSchema.properties : {};
+  const required = Array.isArray(inputSchema?.required) ? inputSchema.required : [];
+  const hasDeclaredProperties = Object.keys(properties).length > 0;
   const args: Record<string, unknown> = {};
   const put = (aliases: string[], value: unknown) => {
-    const key = aliases.find((candidate) => properties[candidate]) || aliases[0];
-    if (value !== undefined && value !== null && value !== "") args[key] = value;
+    const key = aliases.find((candidate) => properties[candidate]) || aliases.find((candidate) => required.includes(candidate));
+    if (!key && hasDeclaredProperties) return;
+    const finalKey = key || aliases[0];
+    if (value !== undefined && value !== null && value !== "") args[finalKey] = value;
   };
   put(["owner", "owner_login", "username", "user"], base.owner);
   put(["repo", "repository", "repository_name", "repo_name", "repoName"], base.repo);
@@ -1682,24 +1743,33 @@ function composioSchemaArguments(schema: any, base: { owner: string; repo: strin
   put(["branch", "branch_name", "ref", "source_branch"], base.branch || "main");
   put(["message", "commit_message", "commitMessage"], base.message);
   if (base.content !== undefined) {
-    const contentProperty = ["content", "file_content", "contents", "text"].find((candidate) => properties[candidate]);
-    if (contentProperty) {
-      const description = String(properties[contentProperty]?.description || "").toLowerCase();
-      args[contentProperty] = description.includes("base64") ? Buffer.from(base.content, "utf8").toString("base64") : base.content;
-    }
+    const contentAliases = ["content", "file_content", "contents", "text", "fileContent", "file_contents"];
+    const contentProperty = contentAliases.find((candidate) => properties[candidate]) || contentAliases.find((candidate) => required.includes(candidate)) || "content";
+    const description = String(properties[contentProperty]?.description || inputSchema?.description || "").toLowerCase();
+    args[contentProperty] = description.includes("base64") ? Buffer.from(base.content, "utf8").toString("base64") : base.content;
   }
   return args;
 }
 
 async function executeComposioWebsiteScaffold(session: any, owner: string, repo: string, userText: string, deployPages: boolean) {
   const files = buildPortfolioFiles(userText);
-  const search = await session.search({ query: "create GitHub repository, get repository, create or update repository files, enable GitHub Pages, and build Pages", toolkits: ["github"] });
-  const schemas = Object.values(search?.toolSchemas || {}) as any[];
-  const descriptor = (schema: any) => `${schema?.toolSlug || ""} ${schema?.name || ""} ${schema?.description || ""}`.toLowerCase();
-  const fileSchema = schemas.find((schema) => /(?:create|update|write|upload).*(?:file|content)|(?:file|content).*(?:create|update|write|upload)/.test(descriptor(schema)) && !/list|search|get|read|delete/.test(descriptor(schema)));
-  if (!fileSchema) throw new Error("The connected GitHub account does not expose a file-write action yet. Reconnect GitHub with repository write access.");
+  let search: any = null;
+  try {
+    search = await session.search({ query: "create GitHub repository, get repository, create or update repository files, enable GitHub Pages, and build Pages", toolkits: ["github"] });
+  } catch (error) {
+    console.warn("Composio GitHub tool search failed; using canonical slugs", error);
+  }
+  const schemas = normalizeComposioSearchSchemas(search);
+  const descriptor = (schema: any) => `${schema?.toolSlug || ""} ${schema?.name || ""} ${schema?.displayName || ""} ${schema?.description || ""} ${schema?.humanDescription || ""}`.toLowerCase();
+  const hasField = (schema: any, aliases: string[]) => {
+    const inputSchema = getComposioInputSchema(schema);
+    const properties = inputSchema?.properties && typeof inputSchema.properties === "object" ? inputSchema.properties : {};
+    const required = Array.isArray(inputSchema?.required) ? inputSchema.required : [];
+    return aliases.some((alias) => Boolean(properties[alias]) || required.includes(alias));
+  };
+  const fileSchema = schemas.find((schema) => /(?:create|update|write|upload).*(?:file|content)|(?:file|content).*(?:create|update|write|upload)/.test(descriptor(schema)) && !/list|search|get|read|delete/.test(descriptor(schema)) && hasField(schema, ["content", "file_content", "contents", "text", "fileContent", "file_contents"])) || knownComposioGithubSchema("GITHUB_CREATE_OR_UPDATE_FILE_CONTENTS");
   const getRepoSchema = schemas.find((schema) => /(?:get|retrieve|fetch|inspect).*(?:repo|repository)|(?:repo|repository).*(?:get|retrieve|fetch|inspect)/.test(descriptor(schema)) && !/list|search/.test(descriptor(schema)));
-  const createRepoSchema = schemas.find((schema) => /(?:create|make|new).*(?:repo|repository)|(?:repo|repository).*(?:create|make|new)/.test(descriptor(schema)) && !/file|issue|pull|branch/.test(descriptor(schema)));
+  const createRepoSchema = schemas.find((schema) => /(?:create|make|new).*(?:repo|repository)|(?:repo|repository).*(?:create|make|new)/.test(descriptor(schema)) && !/file|issue|pull|branch/.test(descriptor(schema))) || knownComposioGithubSchema("GITHUB_CREATE_A_REPOSITORY_FOR_THE_AUTHENTICATED_USER");
   let repository: any = null;
   let createdRepository = false;
   let branch = "main";
@@ -1708,39 +1778,38 @@ async function executeComposioWebsiteScaffold(session: any, owner: string, repo:
       repository = await session.execute(getRepoSchema.toolSlug, composioSchemaArguments(getRepoSchema, { owner, repo }));
       repository = repository?.data ?? repository;
     } catch (error) {
-      if (!isMissingGithubRepositoryError(error)) throw error;
+      if (!isMissingGithubRepositoryError(error)) console.warn("Composio GitHub repository preflight failed; file write will determine availability", error);
     }
-  }
-  if (!repository && createRepoSchema) {
-    const response = await session.execute(createRepoSchema.toolSlug, composioSchemaArguments(createRepoSchema, {
-      owner, repo, name: repo, description: `Website created by uncgpt for ${owner}/${repo}`, private: false,
-    }));
-    if (response?.error || response?.successful === false || response?.data?.error) throw new Error(String(response?.error || response?.data?.error || "GitHub did not confirm repository creation."));
-    repository = response?.data ?? response;
-    createdRepository = true;
   }
   branch = String(repository?.default_branch || repository?.defaultBranch || "main");
   for (const path of Object.keys(files)) {
-    const response = await session.execute(fileSchema.toolSlug, composioSchemaArguments(fileSchema, { owner, repo, path, content: files[path as keyof typeof files], message: `Create portfolio website: ${path}`, branch }));
-    if (response?.error || response?.successful === false || response?.data?.error) {
-      if (isMissingGithubRepositoryError(response) && createRepoSchema && !createdRepository) {
+    const fileArguments = () => composioSchemaArguments(fileSchema, { owner, repo, path, content: files[path as keyof typeof files], message: `Create portfolio website: ${path}`, branch });
+    let response: any = null;
+    let executionError: unknown = null;
+    try {
+      response = await session.execute(fileSchema.toolSlug, fileArguments());
+    } catch (error) {
+      executionError = error;
+    }
+    const failed = executionError || response?.error || response?.successful === false || response?.data?.error;
+    if (failed) {
+      if (isMissingGithubRepositoryError(executionError || response) && createRepoSchema && !createdRepository) {
         const created = await session.execute(createRepoSchema.toolSlug, composioSchemaArguments(createRepoSchema, { owner, repo, name: repo, description: `Website created by uncgpt for ${owner}/${repo}`, private: false }));
         if (created?.error || created?.successful === false || created?.data?.error) throw new Error(String(created?.error || created?.data?.error || `GitHub did not confirm repository creation.`));
         createdRepository = true;
         repository = created?.data ?? created;
         branch = String(repository?.default_branch || repository?.defaultBranch || "main");
-        const retry = await session.execute(fileSchema.toolSlug, composioSchemaArguments(fileSchema, { owner, repo, path, content: files[path as keyof typeof files], message: `Create portfolio website: ${path}`, branch }));
+        const retry = await session.execute(fileSchema.toolSlug, fileArguments());
         if (retry?.error || retry?.successful === false || retry?.data?.error) throw new Error(String(retry?.error || retry?.data?.error || `GitHub did not confirm writing ${path}.`));
       } else {
-        throw new Error(String(response?.error || response?.data?.error || `GitHub did not confirm writing ${path}.`));
+        throw new Error(String((executionError as any)?.message || response?.error || response?.data?.error || `GitHub did not confirm writing ${path}.`));
       }
     }
   }
   const result: any = { owner, repo, branch, createdRepository, repositoryUrl: repository?.html_url || repository?.htmlUrl || `https://github.com/${owner}/${repo}`, files: Object.keys(files) };
   if (deployPages) {
-    const pageSchema = schemas.find((schema) => /(?:enable|create|configure|setup).*(?:page|pages)|(?:page|pages).*(?:enable|create|configure|setup)/.test(descriptor(schema)) && !/list|search|get|build/.test(descriptor(schema)));
-    const buildSchema = schemas.find((schema) => /(?:build|publish|deploy|request).*(?:page|pages)|(?:page|pages).*(?:build|publish|deploy)/.test(descriptor(schema)));
-    if (!pageSchema || !buildSchema) throw new Error("GitHub files were committed, but the connected GitHub account did not expose GitHub Pages actions.");
+    const pageSchema = schemas.find((schema) => /(?:enable|create|configure|setup).*(?:page|pages)|(?:page|pages).*(?:enable|create|configure|setup)/.test(descriptor(schema)) && !/list|search|get|build/.test(descriptor(schema))) || knownComposioGithubSchema("GITHUB_CREATE_OR_UPDATE_GITHUB_PAGES_SITE");
+    const buildSchema = schemas.find((schema) => /(?:build|publish|deploy|request).*(?:page|pages)|(?:page|pages).*(?:build|publish|deploy)/.test(descriptor(schema))) || knownComposioGithubSchema("GITHUB_REQUEST_A_GITHUB_PAGES_BUILD");
     const pageResponse = await session.execute(pageSchema.toolSlug, composioSchemaArguments(pageSchema, { owner, repo, branch }));
     if (pageResponse?.error || pageResponse?.successful === false || pageResponse?.data?.error) throw new Error(String(pageResponse?.error || pageResponse?.data?.error || "GitHub Pages was not enabled."));
     const buildResponse = await session.execute(buildSchema.toolSlug, composioSchemaArguments(buildSchema, { owner, repo, branch }));
