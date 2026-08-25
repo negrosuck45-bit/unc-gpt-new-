@@ -1535,6 +1535,88 @@ async function executeOAuthGithubAction(baseUrl: string, cookieHeader: string, a
   return data?.data ?? data;
 }
 
+async function executeOAuthVercelAction(baseUrl: string, cookieHeader: string, action: string, params: Record<string, unknown>) {
+  const response = await fetch(`${baseUrl}/api/mcp/vercel`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json", cookie: cookieHeader },
+    body: JSON.stringify({ action, ...params }),
+    cache: "no-store",
+    signal: AbortSignal.timeout(30000),
+  });
+  const data: any = await response.json().catch(() => ({}));
+  if (!response.ok || data?.error) throw new Error(data?.error || `Vercel action failed (${response.status})`);
+  return data?.data ?? data;
+}
+
+function extractGithubRepositoryRef(text: string): { owner: string; repo: string } | null {
+  const match = text.match(/\b([A-Za-z0-9][A-Za-z0-9-]{0,38})\/([A-Za-z0-9][A-Za-z0-9._-]{0,99})\b/);
+  return match ? { owner: match[1], repo: match[2].replace(/\.git$/i, "") } : null;
+}
+
+function isWebsiteBuildRequest(text: string) {
+  return /\b(?:create|build|make|generate|set\s+up)\b[\s\S]{0,120}\b(?:website|web\s+site|landing\s+page|portfolio|index\.html)\b/i.test(text)
+    && /\b(?:github|repository|repo|github\.io|vercel)\b/i.test(text);
+}
+
+function escapeTemplateHtml(value: string) {
+  return value.replace(/[&<>"']/g, (character) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", "\\\"": "&quot;", "'": "&#39;" } as Record<string, string>)[character] || character);
+}
+
+function buildPortfolioFiles(userText: string) {
+  const titleMatch = userText.match(/\b(?:for|called|named)\s+["'“”]?([^"'“”\n]+?)(?:["'“”]|\s+in\s+|\s+with\s+|$)/i);
+  const title = escapeTemplateHtml((titleMatch?.[1] || "Your Name").trim().slice(0, 80));
+  const subtitle = "Designer, developer, and creative problem solver.";
+  return {
+    "index.html": `<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="description" content="A modern personal portfolio website.">
+  <title>${title} — Portfolio</title>
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+  <header class="site-header"><a class="brand" href="#top">${title}</a><nav><a href="#work">Work</a><a href="#about">About</a><a href="#contact">Contact</a></nav></header>
+  <main id="top">
+    <section class="hero"><p class="eyebrow">Hello, I’m</p><h1>${title}<span>.</span></h1><p class="lede">${subtitle}</p><div class="actions"><a class="button primary" href="#work">View my work</a><a class="button" href="#contact">Let’s talk</a></div></section>
+    <section id="work" class="section"><div class="section-heading"><p class="eyebrow">Selected work</p><h2>Ideas made useful.</h2></div><div class="work-grid"><article class="project"><div class="project-art gradient-one"></div><h3>Project One</h3><p>A thoughtful digital experience built around clarity and momentum.</p></article><article class="project"><div class="project-art gradient-two"></div><h3>Project Two</h3><p>A flexible visual system that makes complex things feel simple.</p></article><article class="project"><div class="project-art gradient-three"></div><h3>Project Three</h3><p>A responsive product that turns good ideas into real outcomes.</p></article></div></section>
+    <section id="about" class="section split"><div><p class="eyebrow">About</p><h2>Curious by nature. Focused on the details.</h2></div><p>I combine strategy, design, and technology to create work that feels clear, useful, and distinctly human.</p></section>
+    <section id="contact" class="contact-card"><p class="eyebrow">Have a project in mind?</p><h2>Let’s make something great.</h2><a class="button primary" href="mailto:hello@example.com">hello@example.com</a></section>
+  </main>
+  <footer><span>© <span id="year"></span> ${title}</span><a href="#top">Back to top ↑</a></footer>
+  <script src="script.js"></script>
+</body>
+</html>
+`,
+    "style.css": `:root{--bg:#0b0d12;--panel:#121620;--text:#f5f7fb;--muted:#a7afc0;--line:rgba(255,255,255,.12);--accent:#9cf3d3}*{box-sizing:border-box}html{scroll-behavior:smooth}body{margin:0;background:radial-gradient(circle at 80% 0%,#1b263d 0,#0b0d12 35%);color:var(--text);font:16px/1.6 Inter,ui-sans-serif,system-ui,sans-serif}a{color:inherit;text-decoration:none}.site-header,main,footer{width:min(1120px,calc(100% - 40px));margin:auto}.site-header{display:flex;justify-content:space-between;align-items:center;padding:28px 0;border-bottom:1px solid var(--line)}.brand{font-weight:800;letter-spacing:-.03em}.site-header nav{display:flex;gap:26px;color:var(--muted);font-size:.95rem}.hero{padding:clamp(100px,16vw,190px) 0 140px;max-width:800px}.eyebrow{color:var(--accent);font-size:.76rem;font-weight:800;letter-spacing:.14em;text-transform:uppercase}.hero h1{font-size:clamp(4rem,12vw,9rem);line-height:.95;letter-spacing:-.08em;margin:18px 0}.hero h1 span{color:var(--accent)}.lede{color:var(--muted);font-size:clamp(1.15rem,2vw,1.5rem);max-width:540px}.actions{display:flex;gap:12px;margin-top:32px;flex-wrap:wrap}.button{display:inline-flex;border:1px solid var(--line);border-radius:999px;padding:12px 20px;transition:.2s}.button:hover{transform:translateY(-2px);border-color:var(--accent)}.button.primary{background:var(--accent);color:#0b0d12;border-color:var(--accent);font-weight:800}.section{padding:90px 0;border-top:1px solid var(--line)}.section-heading{display:flex;justify-content:space-between;align-items:end;margin-bottom:32px}.section h2,.contact-card h2{font-size:clamp(2rem,5vw,4.4rem);line-height:1.05;letter-spacing:-.06em;margin:8px 0}.work-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:18px}.project{background:var(--panel);border:1px solid var(--line);border-radius:24px;padding:14px}.project-art{aspect-ratio:1.35;border-radius:16px;margin-bottom:20px}.gradient-one{background:linear-gradient(135deg,#b4f8d9,#6075ff)}.gradient-two{background:linear-gradient(135deg,#ffca8b,#e85d9e)}.gradient-three{background:linear-gradient(135deg,#a0d9ff,#8b72ff)}.project h3,.project p{margin:0 10px 8px}.project p,.split>p{color:var(--muted)}.split{display:grid;grid-template-columns:1fr 1fr;gap:48px}.split>p{font-size:1.35rem;align-self:end}.contact-card{margin:90px 0;padding:clamp(32px,7vw,80px);border-radius:28px;background:linear-gradient(135deg,#1c2c3d,#172020);border:1px solid var(--line)}footer{display:flex;justify-content:space-between;padding:28px 0 50px;color:var(--muted);font-size:.9rem}@media(max-width:720px){.site-header nav{gap:12px}.work-grid,.split{grid-template-columns:1fr}.section-heading{display:block}.hero{padding-top:100px}.site-header,main,footer{width:min(100% - 28px,1120px)}}
+`,
+    "script.js": "document.getElementById('year').textContent = new Date().getFullYear();\n",
+  };
+}
+
+async function executeWebsiteScaffold(baseUrl: string, cookieHeader: string, owner: string, repo: string, userText: string, deployPages: boolean, deployVercel: boolean) {
+  const files = buildPortfolioFiles(userText);
+  const paths = Object.keys(files);
+  for (const path of paths) {
+    await executeOAuthGithubAction(baseUrl, cookieHeader, "create_or_update_file", {
+      owner, repo, path, content: files[path as keyof typeof files], message: `Create portfolio website: ${path}`, branch: "main",
+    });
+  }
+  const result: any = { owner, repo, files: paths };
+  if (deployPages) {
+    const pages = await executeOAuthGithubAction(baseUrl, cookieHeader, "enable_pages", { owner, repo, branch: "main", path: "/", build_type: "legacy" });
+    try { await executeOAuthGithubAction(baseUrl, cookieHeader, "build_pages", { owner, repo }); } catch (error) { console.warn("GitHub Pages build request failed after enable", error); }
+    result.githubPagesUrl = pages?.html_url || pages?.url || (repo.toLowerCase() === `${owner.toLowerCase()}.github.io` ? `https://${owner}.github.io/` : `https://${owner}.github.io/${repo}/`);
+  }
+  if (deployVercel) {
+    const deployment = await executeOAuthVercelAction(baseUrl, cookieHeader, "create_deployment", { name: repo, owner, repo, branch: "main", target: "production" });
+    result.vercelUrl = deployment?.url ? (String(deployment.url).startsWith("http") ? deployment.url : `https://${deployment.url}`) : undefined;
+    result.vercelState = deployment?.readyState || deployment?.state || "QUEUED";
+  }
+  return result;
+}
+
 function connectorPermissionResponse(toolkit: string, label: string, description: string, iconUrl: string) {
   const encoder = new TextEncoder();
   const stream = new ReadableStream({
@@ -2693,9 +2775,27 @@ export async function POST(req: NextRequest) {
       const oauthBundle = buildOAuthTools(req, baseUrl);
       const oauthConnected = new Set((oauthBundle.connected || []).map((provider: string) => String(provider).toLowerCase().replace(/[- ]/g, '_')));
       const githubCreateRequest = isGithubCreateRepositoryRequest(userText);
+      const websiteBuildRequest = isWebsiteBuildRequest(userText);
+      const websiteRepository = extractGithubRepositoryRef(userText) || extractGithubRepositoryRef(recentConversationText);
+      const wantsGithubPages = /github\s*pages|github\.io/i.test(userText);
+      const wantsVercel = /\bvercel\b/i.test(userText);
       const composioGithubPreference = Array.isArray(mcpConnectors)
         ? mcpConnectors.find((connector: any) => normalizeConnectorKeyForRouting(connector.provider || connector.toolkit || connector.name) === "github" && connector?.enabled !== false)
         : null;
+      if (websiteBuildRequest) {
+        if (!websiteRepository) return directTextResponse("Which GitHub repository should I use? Please provide it as owner/repository.", "GitHub", "connected-action");
+        if (!oauthConnected.has("github")) return connectorPermissionResponse("github", "GitHub", "create and update website files and commits", "https://cdn.simpleicons.org/github");
+        if (wantsVercel && !oauthConnected.has("vercel")) return connectorPermissionResponse("vercel", "Vercel", "deploy the committed GitHub website", "https://cdn.simpleicons.org/vercel");
+        try {
+          const result = await executeWebsiteScaffold(baseUrl, req.headers.get("cookie") || "", websiteRepository.owner, websiteRepository.repo, userText, wantsGithubPages, wantsVercel);
+          const lines = [`Created and committed the website files in **${websiteRepository.owner}/${websiteRepository.repo}**: ${result.files.join(", ")}.`];
+          if (result.githubPagesUrl) lines.push(`\nGitHub Pages: ${result.githubPagesUrl}`);
+          if (result.vercelUrl) lines.push(`\nVercel deployment: ${result.vercelUrl} (${result.vercelState || "starting"})`);
+          return directTextResponse(lines.join("\n"), wantsGithubPages && wantsVercel ? "GitHub + GitHub Pages + Vercel" : wantsGithubPages ? "GitHub Pages" : wantsVercel ? "Vercel" : "GitHub", "connected-action");
+        } catch (error: any) {
+          return directTextResponse(`I couldn’t finish the website publish for **${websiteRepository.owner}/${websiteRepository.repo}**. ${String(error?.message || "The connected service did not confirm the requested write or deployment.").slice(0, 360)}`, "GitHub", "connector-error");
+        }
+      }
       if (githubCreateRequest && !oauthConnected.has("github") && !composioGithubPreference) {
         return connectorPermissionResponse("github", "GitHub", "create and manage repositories, issues, files, and pull requests", "https://cdn.simpleicons.org/github");
       }
