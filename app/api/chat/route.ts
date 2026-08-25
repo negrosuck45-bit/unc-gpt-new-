@@ -1505,6 +1505,48 @@ async function executeLatestGmailMessages(session: any) {
   return JSON.stringify(normalized.emails.length ? { emails: normalized.emails.slice(0, 50) } : { emails: [], note: normalized.note || "The connected Gmail tool returned no email records." }, null, 2);
 }
 
+function normalizeConnectorKeyForRouting(value: unknown) {
+  return String(value || '').toLowerCase().replace(/[- ]/g, '_').replace(/[^a-z0-9_]/g, '');
+}
+
+function isGithubCreateRepositoryRequest(text: string) {
+  return /\b(?:create|make|new|set\s+up)\b[\s\S]{0,100}\b(?:github\s+)?(?:repo|repository)\b/i.test(text) || /\b(?:github\s+)?(?:repo|repository)\b[\s\S]{0,100}\b(?:create|make|new)\b/i.test(text);
+}
+
+function extractGithubRepositoryName(text: string): string | null {
+  const named = text.match(/\b(?:named|called)\s+["'“”`]?([A-Za-z0-9][A-Za-z0-9._-]{0,99})["'“”`]?/i)?.[1];
+  if (named) return named.trim();
+  const compact = text.match(/\b(?:repo|repository)\s+(?:called\s+|named\s+)?["'“”`]?([A-Za-z0-9][A-Za-z0-9._-]{0,99})["'“”`]?\s*$/i)?.[1];
+  return compact?.trim() || null;
+}
+
+async function executeOAuthGithubAction(baseUrl: string, cookieHeader: string, action: string, params: Record<string, unknown>) {
+  const response = await fetch(`${baseUrl}/api/mcp/github`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json", cookie: cookieHeader },
+    body: JSON.stringify({ action, ...params }),
+    cache: "no-store",
+    signal: AbortSignal.timeout(30000),
+  });
+  const data: any = await response.json().catch(() => ({}));
+  if (!response.ok || data?.error) throw new Error(data?.error || `GitHub action failed (${response.status})`);
+  return data?.data ?? data;
+}
+
+function connectorPermissionResponse(toolkit: string, label: string, description: string, iconUrl: string) {
+  const encoder = new TextEncoder();
+  const stream = new ReadableStream({
+    start(controller) {
+      controller.enqueue(encoder.encode(`data: ${JSON.stringify({ provider: label, model: "connector-permission" })}\n\n`));
+      controller.enqueue(encoder.encode(`data: ${JSON.stringify({ permission_request: { toolkit, label, description, iconUrl, mode: "connect" } })}\n\n`));
+      controller.enqueue(encoder.encode(`data: ${JSON.stringify({ content: `Connect ${label} to continue.` })}\n\n`));
+      controller.enqueue(encoder.encode("data: [DONE]\n\n"));
+      controller.close();
+    },
+  });
+  return createStreamResponse(stream, label, "connector-permission", []);
+}
+
 function directTextResponse(content: string, provider: string, model = "connected-action") {
   const encoder = new TextEncoder();
   const stream = new ReadableStream({
@@ -2455,6 +2497,27 @@ export async function POST(req: NextRequest) {
     try {
       const oauthBundle = buildOAuthTools(req, baseUrl);
       const oauthConnected = new Set((oauthBundle.connected || []).map((provider: string) => String(provider).toLowerCase().replace(/[- ]/g, '_')));
+      const githubCreateRequest = isGithubCreateRepositoryRequest(userText);
+      const composioGithubPreference = Array.isArray(mcpConnectors)
+        ? mcpConnectors.find((connector: any) => normalizeConnectorKeyForRouting(connector.provider || connector.toolkit || connector.name) === "github" && connector?.enabled !== false)
+        : null;
+      if (githubCreateRequest && !oauthConnected.has("github") && !composioGithubPreference) {
+        return connectorPermissionResponse("github", "GitHub", "create and manage repositories, issues, files, and pull requests", "https://cdn.simpleicons.org/github");
+      }
+      if (githubCreateRequest && oauthConnected.has("github")) {
+        const name = extractGithubRepositoryName(userText);
+        if (!name) {
+          return directTextResponse("What name should I use for the new GitHub repository?", "GitHub", "connected-action");
+        }
+        try {
+          const repository = await executeOAuthGithubAction(baseUrl, req.headers.get("cookie") || "", "create_repo", { name, private: /\bprivate\b/i.test(userText) });
+          const fullName = repository?.full_name || repository?.name || name;
+          const repositoryUrl = repository?.html_url || `https://github.com/${fullName}`;
+          return directTextResponse(`Created the GitHub repository **${repository?.name || name}**.\n\n[Open ${fullName}](${repositoryUrl})`, "GitHub", "connected-action");
+        } catch (error: any) {
+          return directTextResponse(`I couldn’t create the GitHub repository **${name}**. ${String(error?.message || "GitHub did not confirm the creation.").slice(0, 300)}`, "GitHub", "connector-error");
+        }
+      }
       let mcpTools: any[] = [];
       let composioTools: any[] = [];
       let composioSession: any = null;
@@ -2501,8 +2564,7 @@ export async function POST(req: NextRequest) {
             iconUrl: `https://cdn.simpleicons.org/${requestedConnectorKey.replace(/[^a-z0-9-]/g, '')}` ,
           }
         : null;
-      const normalizeConnectorKey = (value: unknown) => String(value || '').toLowerCase().replace(/[- ]/g, '_').replace(/[^a-z0-9_]/g, '');
-      let requestedState = requestedConnectorKey ? connectorPreferences.find((connector: any) => normalizeConnectorKey(connector.provider || connector.toolkit || connector.name) === requestedConnectorKey) : null;
+      let requestedState = requestedConnectorKey ? connectorPreferences.find((connector: any) => normalizeConnectorKeyForRouting(connector.provider || connector.toolkit || connector.name) === requestedConnectorKey) : null;
       if (requestedConnectorKey && oauthConnected.has(requestedConnectorKey)) {
         requestedState = { source: 'oauth', provider: requestedConnectorKey, toolkit: requestedConnectorKey, enabled: true };
       }
@@ -2591,6 +2653,36 @@ export async function POST(req: NextRequest) {
                   return normalizeConnectorResult(result?.data ?? result, schema.toolSlug);
                 },
               }));
+            if (githubCreateRequest && requestedConnectorKey === "github" && composioSession && !oauthConnected.has("github")) {
+              const createTool = composioTools.find((tool: any) => {
+                const descriptor = `${tool?.function?.name || ""} ${tool?.function?.description || ""}`.toLowerCase();
+                return /create.*(?:repo|repository)|(?:repo|repository).*create/.test(descriptor) && !/list|search|get|read/.test(descriptor);
+              });
+              const name = extractGithubRepositoryName(userText);
+              if (!name) return directTextResponse("What name should I use for the new GitHub repository?", "GitHub", "connected-action");
+              if (!createTool) {
+                return directTextResponse("GitHub is connected, but its create-repository action is unavailable right now. Reconnect GitHub in Settings → Connectors and try again.", "GitHub", "connector-error");
+              }
+              try {
+                const schema = createTool.function?.parameters || {};
+                const properties = schema?.properties && typeof schema.properties === "object" ? schema.properties : {};
+                const nameKey = ["name", "repo_name", "repository_name", "repoName", "repositoryName"].find((key) => properties[key]) || "name";
+                const args: Record<string, unknown> = { [nameKey]: name };
+                const description = userText.match(/\b(?:described|description)\s+(?:as|is)\s+["“”']?(.+?)["“”']?$/i)?.[1]?.trim();
+                const descriptionKey = ["description", "repo_description", "repository_description"].find((key) => properties[key]);
+                if (description && descriptionKey) args[descriptionKey] = description;
+                const privateKey = ["private", "is_private", "visibility"].find((key) => properties[key]);
+                if (privateKey) args[privateKey] = privateKey === "visibility" ? (/\bprivate\b/i.test(userText) ? "private" : "public") : /\bprivate\b/i.test(userText);
+                const response: any = await composioSession.execute(createTool._composioSlug, args);
+                if (response?.error || response?.successful === false) throw new Error(String(response?.error || "GitHub did not confirm repository creation."));
+                const data: any = response?.data ?? response;
+                const fullName = data?.full_name || data?.fullName || data?.name || name;
+                const repositoryUrl = data?.html_url || data?.url || `https://github.com/${fullName}`;
+                return directTextResponse(`Created the GitHub repository **${data?.name || name}**.\n\n[Open ${fullName}](${repositoryUrl})`, "GitHub", "connected-action");
+              } catch (error: any) {
+                return directTextResponse(`I couldn’t create the GitHub repository **${name}**. ${String(error?.message || "GitHub did not confirm the creation.").slice(0, 300)}`, "GitHub", "connector-error");
+              }
+            }
             if (search?.success && composioTools.length === 0) {
               console.warn("Composio returned no executable tool schemas", {
                 toolkit: matchedToolkit,
@@ -2618,6 +2710,10 @@ export async function POST(req: NextRequest) {
           ]
         : [];
       availableTools = combinedTools;
+
+      if (githubCreateRequest && !oauthConnected.has("github") && !composioSession) {
+        return directTextResponse("I couldn’t load GitHub’s create-repository action. Reconnect GitHub in Settings → Connectors and try again.", "GitHub", "connector-error");
+      }
 
       const directReadTool = requestedConnectorKey && isReadOnlyConnectorRequest(userText)
         ? composioTools.find((tool: any) => isSafeReadConnectorTool(tool))
