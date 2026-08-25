@@ -1228,8 +1228,8 @@ function directTextResponse(content: string, provider: string, model = "connecte
   const encoder = new TextEncoder();
   const stream = new ReadableStream({
     start(controller) {
-      controller.enqueue(encoder.encode(`data: ${JSON.stringify({ content })}\\n\\n`));
-      controller.enqueue(encoder.encode("data: [DONE]\\n\\n"));
+      controller.enqueue(encoder.encode(`data: ${JSON.stringify({ content })}\n\n`));
+      controller.enqueue(encoder.encode("data: [DONE]\n\n"));
       controller.close();
     },
   });
@@ -2026,8 +2026,8 @@ export async function POST(req: NextRequest) {
       const encoder = new TextEncoder();
       const stream = new ReadableStream({
         start(controller) {
-          controller.enqueue(encoder.encode(`data: ${JSON.stringify({ content })}\\n\\n`));
-          controller.enqueue(encoder.encode("data: [DONE]\\n\\n"));
+          controller.enqueue(encoder.encode(`data: ${JSON.stringify({ content })}\n\n`));
+          controller.enqueue(encoder.encode("data: [DONE]\n\n"));
           controller.close();
         },
       });
