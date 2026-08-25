@@ -1617,6 +1617,53 @@ async function executeWebsiteScaffold(baseUrl: string, cookieHeader: string, own
   return result;
 }
 
+function composioSchemaArguments(schema: any, base: { owner: string; repo: string; path?: string; content?: string; message?: string; branch?: string }) {
+  const properties = schema?.inputSchema?.properties && typeof schema.inputSchema.properties === "object" ? schema.inputSchema.properties : {};
+  const args: Record<string, unknown> = {};
+  const put = (aliases: string[], value: unknown) => {
+    const key = aliases.find((candidate) => properties[candidate]) || aliases[0];
+    if (value !== undefined && value !== null && value !== "") args[key] = value;
+  };
+  put(["owner", "owner_login", "username", "user"], base.owner);
+  put(["repo", "repository", "repository_name", "repo_name", "repoName"], base.repo);
+  put(["path", "file_path", "filename", "file_name"], base.path);
+  put(["branch", "branch_name", "ref", "source_branch"], base.branch || "main");
+  put(["message", "commit_message", "commitMessage"], base.message);
+  if (base.content !== undefined) {
+    const contentProperty = ["content", "file_content", "contents", "text"].find((candidate) => properties[candidate]);
+    if (contentProperty) {
+      const description = String(properties[contentProperty]?.description || "").toLowerCase();
+      args[contentProperty] = description.includes("base64") ? Buffer.from(base.content, "utf8").toString("base64") : base.content;
+    }
+  }
+  return args;
+}
+
+async function executeComposioWebsiteScaffold(session: any, owner: string, repo: string, userText: string, deployPages: boolean) {
+  const files = buildPortfolioFiles(userText);
+  const search = await session.search({ query: "create or update GitHub repository files and enable GitHub Pages", toolkits: ["github"] });
+  const schemas = Object.values(search?.toolSchemas || {}) as any[];
+  const descriptor = (schema: any) => `${schema?.toolSlug || ""} ${schema?.name || ""} ${schema?.description || ""}`.toLowerCase();
+  const fileSchema = schemas.find((schema) => /(?:create|update|write|upload).*(?:file|content)|(?:file|content).*(?:create|update|write|upload)/.test(descriptor(schema)) && !/list|search|get|read|delete/.test(descriptor(schema)));
+  if (!fileSchema) throw new Error("The connected GitHub account does not expose a file-write action yet. Reconnect GitHub with repository write access.");
+  for (const path of Object.keys(files)) {
+    const response = await session.execute(fileSchema.toolSlug, composioSchemaArguments(fileSchema, { owner, repo, path, content: files[path as keyof typeof files], message: `Create portfolio website: ${path}`, branch: "main" }));
+    if (response?.error || response?.successful === false) throw new Error(String(response?.error || `GitHub did not confirm writing ${path}.`));
+  }
+  const result: any = { owner, repo, files: Object.keys(files) };
+  if (deployPages) {
+    const pageSchema = schemas.find((schema) => /(?:enable|create|configure|setup).*(?:page|pages)|(?:page|pages).*(?:enable|create|configure|setup)/.test(descriptor(schema)) && !/list|search|get|build/.test(descriptor(schema)));
+    const buildSchema = schemas.find((schema) => /(?:build|publish|deploy|request).*(?:page|pages)|(?:page|pages).*(?:build|publish|deploy)/.test(descriptor(schema)));
+    if (!pageSchema || !buildSchema) throw new Error("GitHub files were committed, but the connected GitHub account did not expose GitHub Pages actions.");
+    const pageResponse = await session.execute(pageSchema.toolSlug, composioSchemaArguments(pageSchema, { owner, repo, branch: "main" }));
+    if (pageResponse?.error || pageResponse?.successful === false) throw new Error(String(pageResponse?.error || "GitHub Pages was not enabled."));
+    const buildResponse = await session.execute(buildSchema.toolSlug, composioSchemaArguments(buildSchema, { owner, repo }));
+    if (buildResponse?.error || buildResponse?.successful === false) throw new Error(String(buildResponse?.error || "GitHub Pages build was not confirmed."));
+    result.githubPagesUrl = repo.toLowerCase() === `${owner.toLowerCase()}.github.io` ? `https://${owner}.github.io/` : `https://${owner}.github.io/${repo}/`;
+  }
+  return result;
+}
+
 function connectorPermissionResponse(toolkit: string, label: string, description: string, iconUrl: string) {
   const encoder = new TextEncoder();
   const stream = new ReadableStream({
@@ -2782,12 +2829,28 @@ export async function POST(req: NextRequest) {
       const composioGithubPreference = Array.isArray(mcpConnectors)
         ? mcpConnectors.find((connector: any) => normalizeConnectorKeyForRouting(connector.provider || connector.toolkit || connector.name) === "github" && connector?.enabled !== false)
         : null;
+      let websiteComposioSession: any = null;
+      if (websiteBuildRequest && !oauthConnected.has("github") && process.env.COMPOSIO_API_KEY) {
+        try {
+          const session = await getSession();
+          const userId = session?.user?.sub;
+          if (userId) {
+            const enabledToolkits = await getEnabledComposioToolkits(userId);
+            const githubToolkit = enabledToolkits.find((toolkit) => normalizeConnectorKeyForRouting(toolkit) === "github");
+            if (githubToolkit || composioGithubPreference) websiteComposioSession = await getComposioSession(userId, [githubToolkit || "github"]);
+          }
+        } catch (error) {
+          console.warn("Composio GitHub website session lookup failed", error);
+        }
+      }
       if (websiteBuildRequest) {
         if (!websiteRepository) return directTextResponse("Which GitHub repository should I use? Please provide it as owner/repository.", "GitHub", "connected-action");
-        if (!oauthConnected.has("github")) return connectorPermissionResponse("github", "GitHub", "create and update website files and commits", "https://cdn.simpleicons.org/github");
+        if (!oauthConnected.has("github") && !websiteComposioSession) return connectorPermissionResponse("github", "GitHub", "create and update website files and commits", "https://cdn.simpleicons.org/github");
         if (wantsVercel && !oauthConnected.has("vercel")) return connectorPermissionResponse("vercel", "Vercel", "deploy the committed GitHub website", "https://cdn.simpleicons.org/vercel");
         try {
-          const result = await executeWebsiteScaffold(baseUrl, req.headers.get("cookie") || "", websiteRepository.owner, websiteRepository.repo, userText, wantsGithubPages, wantsVercel);
+          const result = websiteComposioSession && !oauthConnected.has("github")
+            ? await executeComposioWebsiteScaffold(websiteComposioSession, websiteRepository.owner, websiteRepository.repo, userText, wantsGithubPages)
+            : await executeWebsiteScaffold(baseUrl, req.headers.get("cookie") || "", websiteRepository.owner, websiteRepository.repo, userText, wantsGithubPages, wantsVercel);
           const lines = [`Created and committed the website files in **${websiteRepository.owner}/${websiteRepository.repo}**: ${result.files.join(", ")}.`];
           if (result.githubPagesUrl) lines.push(`\nGitHub Pages: ${result.githubPagesUrl}`);
           if (result.vercelUrl) lines.push(`\nVercel deployment: ${result.vercelUrl} (${result.vercelState || "starting"})`);

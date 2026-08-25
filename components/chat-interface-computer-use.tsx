@@ -8,6 +8,7 @@ import { WelcomeScreen } from "@/components/welcome-screen";
 import { ChatHeader } from "@/components/chat-header";
 import detectComputerUseNeeded from "@/lib/agents/auto-detection";
 import { getClientRuntimeContext } from "@/lib/client-runtime-context";
+import { accountStorageKey } from "@/lib/account-scope";
 
 interface ChatInterfaceProps {
   onSwitchToImagine?: () => void;
@@ -184,7 +185,7 @@ export function ChatInterface({ onSwitchToImagine, onOpenSidebar, isSidebarOpen 
     }
 
     try {
-      const stored = localStorage.getItem("mcp-connectors");
+      const stored = localStorage.getItem(accountStorageKey("mcp-connectors"));
       if (stored) {
         const connectors = JSON.parse(stored);
         const enabled = (connectors || []).filter((c: any) => c.enabled);
