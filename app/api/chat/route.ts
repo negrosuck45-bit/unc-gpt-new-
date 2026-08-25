@@ -1392,15 +1392,71 @@ function isSafeReadConnectorTool(tool: any) {
   return /\b(fetch|get|list|search|read|find|retrieve)\b/.test(descriptor) && !/\b(send|create|update|edit|delete|remove|post|publish|deploy|commit|push|close|archive)\b/.test(descriptor);
 }
 
+function isUnavailableEmailField(value: unknown) {
+  return value == null || value === "" || value === "unavailable";
+}
+
+function parseNormalizedEmailResult(value: string): { emails: any[]; note?: string } {
+  try {
+    const parsed = JSON.parse(value);
+    return { emails: Array.isArray(parsed?.emails) ? parsed.emails : [], note: parsed?.note };
+  } catch {
+    return { emails: [] };
+  }
+}
+
+function mergeNormalizedEmail(base: any, detail: any) {
+  const merged = { ...base };
+  for (const field of ["sender", "senderPhoto", "recipient", "subject", "date", "messageId", "threadId", "snippet", "body"]) {
+    if (isUnavailableEmailField(merged[field]) && !isUnavailableEmailField(detail?.[field])) merged[field] = detail[field];
+    if (field === "body" && !isUnavailableEmailField(detail?.[field])) merged[field] = detail[field];
+    if (field === "senderPhoto" && !isUnavailableEmailField(detail?.[field])) merged[field] = detail[field];
+  }
+  const attachments = [...(Array.isArray(base?.attachments) ? base.attachments : []), ...(Array.isArray(detail?.attachments) ? detail.attachments : [])];
+  merged.attachments = [...new Map(attachments.map((attachment: any) => [`${attachment?.id || ""}:${attachment?.filename || ""}`, attachment])).values()];
+  return merged;
+}
+
 async function executeLatestGmailMessages(session: any) {
+  // The list action can legally return metadata-only rows even when verbose and
+  // include_payload are requested. Hydrate those rows with the dedicated full
+  // message action so the UI always receives the actual text that was sent.
   const result = await session.execute("GMAIL_FETCH_EMAILS", {
     user_id: "me",
     max_results: 30,
     verbose: true,
+    ids_only: false,
     include_payload: true,
   });
   if (result?.error) throw new Error(String(result.error));
-  return normalizeConnectorResult(result?.data ?? result, "GMAIL_FETCH_EMAILS");
+
+  const normalized = parseNormalizedEmailResult(normalizeConnectorResult(result?.data ?? result, "GMAIL_FETCH_EMAILS"));
+  const emailsNeedingHydration = normalized.emails.filter((email: any) =>
+    !isUnavailableEmailField(email?.messageId) && isUnavailableEmailField(email?.body)
+  );
+
+  for (let offset = 0; offset < emailsNeedingHydration.length; offset += 6) {
+    const batch = emailsNeedingHydration.slice(offset, offset + 6);
+    await Promise.all(batch.map(async (email: any) => {
+      try {
+        const detailed = await session.execute("GMAIL_FETCH_MESSAGE_BY_MESSAGE_ID", {
+          user_id: "me",
+          message_id: email.messageId,
+          format: "full",
+        });
+        if (detailed?.error) return;
+        const detailResult = parseNormalizedEmailResult(normalizeConnectorResult(detailed?.data ?? detailed, "GMAIL_FETCH_MESSAGE_BY_MESSAGE_ID"));
+        const detail = detailResult.emails.find((candidate: any) => candidate?.messageId === email.messageId) || detailResult.emails[0];
+        if (!detail) return;
+        const index = normalized.emails.findIndex((candidate: any) => candidate?.messageId === email.messageId);
+        if (index >= 0) normalized.emails[index] = mergeNormalizedEmail(normalized.emails[index], detail);
+      } catch (error) {
+        console.warn("Gmail full-message hydration failed", { messageId: email.messageId, error: String(error) });
+      }
+    }));
+  }
+
+  return JSON.stringify(normalized.emails.length ? { emails: normalized.emails.slice(0, 50) } : { emails: [], note: normalized.note || "The connected Gmail tool returned no email records." }, null, 2);
 }
 
 function directTextResponse(content: string, provider: string, model = "connected-action") {

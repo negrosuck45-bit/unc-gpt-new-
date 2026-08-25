@@ -57,7 +57,7 @@ function senderDetails(sender: string | undefined) {
 }
 
 function SenderAvatar({ sender, photoUrl }: { sender: ReturnType<typeof senderDetails>; photoUrl?: string }) {
-  const [imageError, setImageError] = useState(false);
+  const [failedUrls, setFailedUrls] = useState<string[]>([]);
   const safePhoto = photoUrl?.startsWith('https://') ? photoUrl : undefined;
   const senderDomain = sender.email.split('@')[1]?.toLowerCase() || '';
   const providerIcon = senderDomain === 'google.com' || senderDomain.endsWith('.google.com') || senderDomain === 'googlemail.com'
@@ -67,11 +67,18 @@ function SenderAvatar({ sender, photoUrl }: { sender: ReturnType<typeof senderDe
       : senderDomain === 'substack.com' || senderDomain.endsWith('.substack.com')
         ? 'substack'
         : undefined;
-  const brandedPhoto = providerIcon ? `https://cdn.simpleicons.org/${providerIcon}` : undefined;
+  const isMyGiftCard = senderDomain === 'mygiftcard.info' || senderDomain.endsWith('.mygiftcard.info') || senderDomain === 'mygiftcard.it' || senderDomain.endsWith('.mygiftcard.it');
+  const brandedPhoto = isMyGiftCard
+    ? 'https://www.google.com/s2/favicons?domain=mygiftcard.it&sz=128'
+    : providerIcon
+      ? `https://cdn.simpleicons.org/${providerIcon}`
+      : undefined;
   const lookupPhoto = sender.email ? `https://unavatar.io/${encodeURIComponent(sender.email)}` : undefined;
-  const imageUrl = safePhoto || brandedPhoto || lookupPhoto;
-  if (imageUrl && !imageError) {
-    return <img src={imageUrl} alt={`${sender.name} profile`} className="h-9 w-9 shrink-0 rounded-full object-cover" loading="lazy" referrerPolicy="no-referrer" onError={() => setImageError(true)} />;
+  const domainPhoto = senderDomain ? `https://www.google.com/s2/favicons?domain=${encodeURIComponent(senderDomain)}&sz=128` : undefined;
+  const imageCandidates = [safePhoto, brandedPhoto, lookupPhoto, domainPhoto].filter((url): url is string => Boolean(url));
+  const imageUrl = imageCandidates.find((url) => !failedUrls.includes(url));
+  if (imageUrl) {
+    return <img src={imageUrl} alt={`${sender.name} profile`} className="h-9 w-9 shrink-0 rounded-full object-cover" loading="lazy" referrerPolicy="no-referrer" onError={() => setFailedUrls((current) => current.includes(imageUrl) ? current : [...current, imageUrl])} />;
   }
   return <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-gradient-to-br from-primary/80 to-primary/35 text-xs font-semibold text-primary-foreground">{sender.initials}</div>;
 }
@@ -93,7 +100,9 @@ function EmailCards({ emails }: { emails: NormalizedEmail[] }) {
       <div className="divide-y divide-border/60">
         {emails.map((email, index) => {
           const sender = senderDetails(email.sender);
-          const preview = email.snippet && email.snippet !== 'unavailable' ? email.snippet : (email.body && email.body !== 'unavailable' ? email.body : 'No preview available');
+          const body = email.body && email.body !== 'unavailable' ? email.body.trim() : '';
+          const snippet = email.snippet && email.snippet !== 'unavailable' ? email.snippet.trim() : '';
+          const preview = body || snippet || 'No preview available';
           const subject = email.subject && email.subject !== 'unavailable' ? email.subject : '(No subject)';
           return (
             <details key={`${email.messageId || index}`} className="group">
