@@ -381,6 +381,37 @@ function decodeSearchHtml(value: string): string {
   return value.replace(/<[^>]+>/g, " ").replace(/&amp;/g, "&").replace(/&quot;/g, '"').replace(/&#x27;|&#39;/g, "'").replace(/&lt;/g, "<").replace(/&gt;/g, ">").replace(/\s+/g, " ").trim();
 }
 
+async function searchGoogleNewsRss(query: string): Promise<string> {
+  try {
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => controller.abort(), 8000);
+    const res = await fetch(`https://news.google.com/rss/search?q=${encodeURIComponent(query)}&hl=en-US&gl=US&ceid=US:en`, {
+      headers: { "Accept": "application/rss+xml, application/xml, text/xml", "User-Agent": "UncGPT/1.0" },
+      signal: controller.signal,
+    });
+    clearTimeout(timeoutId);
+    if (!res.ok) return "";
+    const xml = await res.text();
+    const clean = (value: string) => decodeSearchHtml(value.replace(/<!\[CDATA\[|\]\]>/g, "").trim());
+    const output: string[] = [];
+    for (const item of xml.match(/<item>[\s\S]*?<\/item>/gi) || []) {
+      const title = item.match(/<title>([\s\S]*?)<\/title>/i)?.[1];
+      const link = item.match(/<link>([\s\S]*?)<\/link>/i)?.[1];
+      const pubDate = item.match(/<pubDate>([\s\S]*?)<\/pubDate>/i)?.[1];
+      const source = item.match(/<source[^>]*>([\s\S]*?)<\/source>/i)?.[1];
+      if (!title || !link) continue;
+      output.push(`RESULT ${output.length + 1}: ${clean(title)}\n${source ? `Publisher: ${clean(source)}\n` : ""}${pubDate ? `Published: ${clean(pubDate)}\n` : ""}Source: ${clean(link)}\n`);
+      if (output.length >= 8) break;
+    }
+    if (!output.length) return "";
+    console.log(`[Google News RSS] Success - ${output.length} results`);
+    return output.join("\n");
+  } catch (err: any) {
+    console.error("[Google News RSS] Error:", err.message);
+    return "";
+  }
+}
+
 async function searchJinaDuckDuckGo(query: string): Promise<string> {
   try {
     const controller = new AbortController();
@@ -499,6 +530,11 @@ async function silentWebSearch(userQuery: string): Promise<string> {
   result = await searchBing(userQuery);
   if (result) {
     console.log("[SilentSearch] Used Bing");
+    return result;
+  }
+  result = await searchGoogleNewsRss(userQuery);
+  if (result) {
+    console.log("[SilentSearch] Used Google News RSS");
     return result;
   }
   result = await searchJinaDuckDuckGo(userQuery);
