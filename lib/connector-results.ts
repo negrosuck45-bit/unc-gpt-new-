@@ -78,6 +78,7 @@ function normalizeEmail(message: Record<string, any>) {
   const body = textBody(message);
   return {
     sender: header(message, "from") || firstString(message, ["from", "sender", "senderEmail"]) || "unavailable",
+    senderPhoto: firstString(message, ["photoUrl", "photo_url", "profilePhoto", "profile_photo", "avatarUrl", "avatar_url", "avatar"]) || undefined,
     recipient: header(message, "to") || firstString(message, ["to", "recipient", "recipientEmail"]) || "unavailable",
     subject: header(message, "subject") || firstString(message, ["subject", "title"]) || "unavailable",
     date: header(message, "date") || firstString(message, ["internalDate", "date", "timestamp", "receivedAt"]) || "unavailable",

@@ -26,6 +26,7 @@ interface ContentPart {
 
 type NormalizedEmail = {
   sender?: string;
+  senderPhoto?: string;
   recipient?: string;
   subject?: string;
   date?: string;
@@ -55,6 +56,17 @@ function senderDetails(sender: string | undefined) {
   return { name, email, initials };
 }
 
+function SenderAvatar({ sender, photoUrl }: { sender: ReturnType<typeof senderDetails>; photoUrl?: string }) {
+  const [imageError, setImageError] = useState(false);
+  const safePhoto = photoUrl?.startsWith('https://') ? photoUrl : undefined;
+  const lookupPhoto = sender.email ? `https://unavatar.io/${encodeURIComponent(sender.email)}` : undefined;
+  const imageUrl = safePhoto || lookupPhoto;
+  if (imageUrl && !imageError) {
+    return <img src={imageUrl} alt={`${sender.name} profile`} className="h-9 w-9 shrink-0 rounded-full object-cover" loading="lazy" referrerPolicy="no-referrer" onError={() => setImageError(true)} />;
+  }
+  return <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-gradient-to-br from-primary/80 to-primary/35 text-xs font-semibold text-primary-foreground">{sender.initials}</div>;
+}
+
 function formatEmailDate(value: string | undefined) {
   if (!value || value === 'unavailable') return '';
   const date = new Date(value);
@@ -77,7 +89,7 @@ function EmailCards({ emails }: { emails: NormalizedEmail[] }) {
           return (
             <details key={`${email.messageId || index}`} className="group">
               <summary className="flex cursor-pointer list-none items-center gap-3 px-3.5 py-3 transition-colors hover:bg-muted/40 [&::-webkit-details-marker]:hidden">
-                <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-gradient-to-br from-primary/80 to-primary/35 text-xs font-semibold text-primary-foreground">{sender.initials}</div>
+                <SenderAvatar sender={sender} photoUrl={email.senderPhoto} />
                 <div className="min-w-0 flex-1">
                   <div className="flex items-center gap-2"><span className="truncate text-sm font-medium text-foreground">{sender.name}</span>{formatEmailDate(email.date) && <time className="ml-auto shrink-0 text-[11px] text-muted-foreground">{formatEmailDate(email.date)}</time>}</div>
                   <div className="truncate text-sm text-foreground/85">{subject}</div>
