@@ -70,6 +70,15 @@ function VercelIcon({ className }: { className?: string }) {
 
 // ─── Config ────────────────────────────────────────────────────────────────────
 
+function ConnectorLogo({ slug, name, src, className = 'h-7 w-7' }: { slug: string; name: string; src?: string | null; className?: string }) {
+  const [failed, setFailed] = useState<string[]>([]);
+  const normalized = slug.toLowerCase().replace(/[^a-z0-9-]/g, '');
+  const sources = [src || '', `https://cdn.simpleicons.org/${normalized}`, `https://www.google.com/s2/favicons?domain=${encodeURIComponent(`${normalized}.com`)}&sz=128`].filter(Boolean);
+  const current = sources.find((candidate) => !failed.includes(candidate));
+  if (!current) return <span className={cn('flex items-center justify-center rounded-md bg-violet-500/10 text-xs font-semibold text-violet-300', className)}>{String(name || slug).slice(0, 1).toUpperCase()}</span>;
+  return <img src={current} alt="" className={cn('object-contain', className)} onError={() => setFailed((items) => items.includes(current) ? items : [...items, current])} />;
+}
+
 const PROVIDERS = [
   { name: 'github',      label: 'GitHub',       description: 'Read & write repos, issues, PRs', Icon: GithubIcon,      iconBg: 'bg-[#24292e]',       iconColor: 'text-white' },
   { name: 'slack',       label: 'Slack',        description: 'Send messages, read channels',     Icon: SlackIcon,       iconBg: 'bg-[#611f69]/10',    iconColor: '' },
@@ -288,7 +297,7 @@ export function OAuthConnectors() {
                 <div key={account.id} className="group relative overflow-hidden rounded-2xl border border-white/10 bg-white/[0.035] p-3.5 shadow-[0_12px_40px_rgba(0,0,0,0.18)] backdrop-blur-xl transition hover:border-white/20 hover:bg-white/[0.055]">
                   <div className="flex items-start gap-3">
                     <div className="flex h-11 w-11 shrink-0 items-center justify-center overflow-hidden rounded-xl border border-white/10 bg-black/20">
-                      {meta?.logo ? <img src={meta.logo} alt="" className="h-7 w-7 object-contain" /> : <span className="text-sm font-semibold text-violet-200">{String(meta?.name || account.toolkit).slice(0, 1).toUpperCase()}</span>}
+                      <ConnectorLogo slug={account.toolkit} name={meta?.name || account.toolkit} src={meta?.logo} className="h-7 w-7" />
                     </div>
                     <div className="min-w-0 flex-1">
                       <div className="flex items-center gap-2"><span className="truncate text-sm font-medium text-zinc-100">{meta?.name || account.toolkit}</span><span className={cn('h-1.5 w-1.5 rounded-full', connected ? 'bg-emerald-400 shadow-[0_0_10px_rgba(52,211,153,.8)]' : 'bg-amber-400')} /></div>
@@ -315,7 +324,7 @@ export function OAuthConnectors() {
           <div className="mt-3 grid max-h-80 grid-cols-1 gap-2 overflow-y-auto sm:grid-cols-2">
             {catalog.filter((item) => `${item.name} ${item.slug} ${item.description}`.toLowerCase().includes(catalogQuery.toLowerCase())).map((item) => (
               <button key={item.slug} onClick={() => connectComposio(item.slug)} disabled={composioBusy} className="flex items-center gap-3 rounded-lg border border-white/8 bg-white/[0.025] p-2.5 text-left transition-colors hover:bg-white/[0.07] disabled:opacity-50">
-                {item.logo ? <img src={item.logo} alt="" className="h-7 w-7 rounded-md object-contain" /> : <span className="flex h-7 w-7 items-center justify-center rounded-md bg-violet-500/10 text-xs font-semibold text-violet-300">{String(item.name || item.slug).slice(0, 1).toUpperCase()}</span>}
+                <ConnectorLogo slug={item.slug} name={item.name || item.slug} src={item.logo} className="h-7 w-7 rounded-md" />
                 <span className="min-w-0 flex-1"><span className="block truncate text-xs font-medium text-zinc-200">{item.name}</span><span className="block truncate text-[10px] text-zinc-500">{item.slug}</span></span><span className="shrink-0 rounded-full border border-violet-300/15 bg-violet-300/10 px-2 py-1 text-[10px] font-medium text-violet-200">Connect</span>
               </button>
             ))}

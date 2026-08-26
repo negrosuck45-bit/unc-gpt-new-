@@ -167,18 +167,32 @@ function ToastNotification({ message, onClose }: { message: string; onClose: () 
 // ============= ATTACHMENT COMPONENTS =============
 function AttachmentPreview({ attachment, onView, compact = false }: { attachment: Attachment; onView: (attachment: Attachment) => void; compact?: boolean }) {
   if (attachment.type === 'image') {
+    const mediaUrl = String((attachment as any).permanentUrl || attachment.visionUrl || attachment.url || '');
     return (
       <motion.div
-        initial={{ opacity: 0, scale: 0.9 }}
+        initial={{ opacity: 0, scale: 0.96 }}
         animate={{ opacity: 1, scale: 1 }}
-        className={cn('rounded-lg overflow-hidden flex-shrink-0 cursor-pointer', compact ? 'w-16 h-16' : 'mt-2 max-w-sm')}
+        className={cn('group relative overflow-hidden rounded-xl border border-border/70 bg-muted/30 flex-shrink-0 cursor-pointer', compact ? 'h-16 w-16' : 'mt-2 w-full max-w-sm')}
         onClick={() => onView(attachment)}
       >
-        {attachment.url.startsWith('data:') ? (
-          <img src={attachment.url} alt="Attachment" className={cn('object-cover rounded-lg', compact ? 'w-16 h-16' : 'w-full h-auto')} />
-        ) : (
-          <NextImage src={attachment.url} alt="Attachment" width={compact ? 64 : 400} height={compact ? 64 : 300} className={cn('object-cover rounded-lg', compact ? 'w-16 h-16' : 'w-full h-auto')} loading="lazy" unoptimized={attachment.url.includes('blob:')} />
-        )}
+        {mediaUrl ? (
+          <img
+            src={mediaUrl}
+            alt={attachment.name || 'Attached image'}
+            className={cn('object-cover transition-transform duration-200 group-hover:scale-[1.02]', compact ? 'h-16 w-16' : 'h-auto max-h-80 w-full')}
+            loading="lazy"
+            referrerPolicy="no-referrer"
+            onError={(event) => {
+              event.currentTarget.style.display = 'none';
+              const fallback = event.currentTarget.parentElement?.querySelector('[data-attachment-fallback]') as HTMLElement | null;
+              if (fallback) fallback.classList.remove('hidden');
+            }}
+          />
+        ) : null}
+        <div data-attachment-fallback className={cn('items-center justify-center gap-1 px-2 text-center text-[11px] text-muted-foreground', mediaUrl ? 'absolute inset-0 hidden' : 'flex h-full min-h-16 w-full')}>
+          <span className="font-medium text-foreground">Image unavailable</span>
+          {mediaUrl && <a href={mediaUrl} target="_blank" rel="noopener noreferrer" className="text-primary hover:underline" onClick={(event) => event.stopPropagation()}>Open</a>}
+        </div>
       </motion.div>
     );
   }
@@ -192,7 +206,7 @@ function AttachmentPreview({ attachment, onView, compact = false }: { attachment
   }
 
   return (
-    <motion.div initial={{ opacity: 0, y: 5 }} animate={{ opacity: 1, y: 0 }} className="mt-2 flex items-center gap-2 p-2.5 rounded-lg bg-muted/50 border border-border hover:bg-muted/70 transition-colors">
+    <motion.div initial={{ opacity: 0, y: 5 }} animate={{ opacity: 1, y: 0 }} className="mt-2 flex min-w-0 items-center gap-2 rounded-xl border border-border/70 bg-muted/40 p-2.5 transition-colors hover:bg-muted/70">
       <FileText className="h-4 w-4 flex-shrink-0 text-white" />
       <span className="text-sm text-muted-foreground truncate">{attachment.name} {attachment.size && `(${(attachment.size / 1024).toFixed(1)} KB)`}</span>
       <button onClick={() => onView(attachment)} className="ml-auto p-1.5 rounded-md hover:bg-accent transition-colors" title="View content">
@@ -695,12 +709,12 @@ export function ChatMessages({ messages, isStreaming, isThinking, onRegenerate, 
                       <ConnectorPermissionCard request={message.connectorPermission} />
                     )}
 
-                    {/* Assistant stays flat; user messages use a compact Manus-style bubble. */}
+                    {/* Assistant replies use a quiet card; user messages keep the compact bubble. */}
                     {message.content && message.content.trim().length > 0 && (
                       <div className={cn(
                         'text-[15px] sm:text-base leading-7',
                         isAssistant
-                          ? 'text-foreground'
+                          ? 'rounded-2xl border border-border/60 bg-card/35 px-3.5 py-3 text-foreground shadow-sm sm:px-4'
                           : 'rounded-[20px] border border-border bg-secondary px-4 py-2.5 text-foreground shadow-sm'
                       )}>
                         <MessageContent content={message.content} />

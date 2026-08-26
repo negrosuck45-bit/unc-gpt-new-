@@ -80,14 +80,14 @@ export function ConnectorPermissionCard({ request }: { request: ConnectorPermiss
 
 export function connectorPermissionIdentity(toolkit: string, mode: "connect" | "enable", accountId?: string): ConnectorPermissionRequest {
   const key = toolkit.toLowerCase().replace(/[^a-z0-9]+/g, "-");
-  const match = key.match(/github|gmail|slack|notion|linear|google-drive|google-calendar|vercel|discord|dropbox|trello|jira/);
+  const match = key.match(/github|gmail|slack|notion|linear|google-drive|google-calendar|vercel|discord|dropbox|trello|jira|supabase/);
   const rawSlug = match?.[0] || key || "composio";
   const slug = rawSlug === "google-drive" ? "googledrive" : rawSlug === "google-calendar" ? "googlecalendar" : rawSlug;
   const labels: Record<string, string> = {
-    github: "GitHub", gmail: "Gmail", slack: "Slack", notion: "Notion", linear: "Linear", googledrive: "Google Drive", googlecalendar: "Google Calendar", vercel: "Vercel", discord: "Discord", dropbox: "Dropbox", trello: "Trello", jira: "Jira", composio: "Connector",
+    github: "GitHub", gmail: "Gmail", slack: "Slack", notion: "Notion", linear: "Linear", googledrive: "Google Drive", googlecalendar: "Google Calendar", vercel: "Vercel", discord: "Discord", dropbox: "Dropbox", trello: "Trello", jira: "Jira", supabase: "Supabase", composio: "Connector",
   };
   const descriptions: Record<string, string> = {
-    github: "read your repositories, issues, and pull requests", gmail: "read and manage your email", slack: "read channels and send messages", notion: "read and update pages and databases", linear: "read and manage issues and projects", "google-drive": "find and edit files", "google-calendar": "read and manage calendar events", vercel: "read and manage deployments", composio: "access the requested connected service",
+    github: "read your repositories, issues, and pull requests", gmail: "read and manage your email", slack: "read channels and send messages", notion: "read and update pages and databases", linear: "read and manage issues and projects", "google-drive": "find and edit files", "google-calendar": "read and manage calendar events", vercel: "read and manage deployments", supabase: "read and manage projects and databases", composio: "access the requested connected service",
   };
   return { toolkit, mode, accountId, label: labels[slug] || toolkit, description: descriptions[slug] || "access the requested connected service", iconUrl: `https://cdn.simpleicons.org/${slug}` };
 }

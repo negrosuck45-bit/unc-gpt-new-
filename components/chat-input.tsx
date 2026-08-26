@@ -619,7 +619,7 @@ export function ChatInput({
           {attachments.length > 0 && (
             <motion.div initial={{ opacity: 0, height: 0 }} animate={{ opacity: 1, height: 'auto' }} exit={{ opacity: 0, height: 0 }} className="mb-3 px-3 space-y-2 max-h-56 overflow-y-auto">
               {imageAttachments.length > 0 && (
-                <div className="flex flex-wrap gap-2">
+                <div className="flex flex-wrap gap-2" aria-label="Attached images">
                   {imageAttachments.map((att) => {
                     const status = uploadStatus.get(att.id)
                     const isUploading = status?.status === 'uploading'
@@ -627,8 +627,20 @@ export function ChatInput({
                     const progress = status?.progress || 0
 
                     return (
-                      <div key={att.id} className="relative group w-20 h-20 rounded-lg overflow-hidden border border-border">
-                        <img src={att.url} alt={att.name} className="w-full h-full object-cover" />
+                      <div key={att.id} className="group relative h-20 w-20 overflow-hidden rounded-xl border border-border bg-muted/40">
+                        <img
+                          src={String((att as any).permanentUrl || att.url || '')}
+                          alt={att.name || 'Attached image'}
+                          className="h-full w-full object-cover transition-transform duration-200 group-hover:scale-[1.03]"
+                          onError={(event) => {
+                            event.currentTarget.style.display = 'none';
+                            const fallback = event.currentTarget.parentElement?.querySelector('[data-composer-image-fallback]') as HTMLElement | null;
+                            if (fallback) fallback.classList.remove('hidden');
+                          }}
+                        />
+                        <div data-composer-image-fallback className="absolute inset-0 hidden flex-col items-center justify-center px-1 text-center text-[9px] text-muted-foreground">
+                          <span className="font-medium text-foreground">Preview unavailable</span>
+                        </div>
 
                         {isUploading && (
                           <div className="absolute inset-0 bg-black/50 flex flex-col items-center justify-center">
