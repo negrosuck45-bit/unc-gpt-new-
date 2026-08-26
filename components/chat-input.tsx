@@ -789,10 +789,6 @@ export function ChatInput({
               </div>
 
               <div className="flex items-center gap-1.5">
-                <div className="task-composer-pill flex h-8 items-center gap-1.5 rounded-full px-3 text-[12px] font-medium" aria-label="Automatic model routing">
-                  <span className="h-1.5 w-1.5 rounded-full bg-emerald-300/85" />
-                  <span>uncgpt</span>
-                </div>
                 {isStreaming ? (
                   <Button onClick={onStop} size="icon" variant="destructive" className="h-10 w-10 rounded-full">
                     <Square className="h-4 w-4" />
