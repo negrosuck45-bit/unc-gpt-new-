@@ -832,10 +832,16 @@ export function ChatInput({
                 <X className="h-7 w-7" strokeWidth={1.75} />
               </button>
               <div className="absolute inset-x-0 top-7 flex items-center justify-center gap-3">
-                <span className="voice-live-wave" aria-label="Recording waveform">
-                  {[0.42, 0.7, 1, 0.68, 0.95, 0.62, 0.42].map((base, index) => <i key={index} style={{ transform: `scaleY(${Math.min(1.75, base + voiceLevel * (1.15 - index * 0.07))})`, '--voice-wave-index': index } as React.CSSProperties} />)}
+                <span className="voice-live-wave voice-live-wave-left" aria-label="Recording waveform">
+                  {[0.36, 0.63, 0.48, 0.8, 0.55, 0.92, 0.66, 1].map((base, index) => {
+                    const distance = 7 - index
+                    return <i key={`left-${index}`} style={{ height: `${Math.round(13 + (base + voiceLevel * 0.9) * 19)}px`, '--voice-wave-distance': distance } as React.CSSProperties} />
+                  })}
                 </span>
                 <span className="text-[18px] font-medium tabular-nums text-white/62">{Math.floor(voiceDuration / 60)}:{String(voiceDuration % 60).padStart(2, '0')}</span>
+                <span className="voice-live-wave voice-live-wave-right" aria-hidden="true">
+                  {[1, 0.66, 0.92, 0.55, 0.8, 0.48, 0.63, 0.36].map((base, index) => <i key={`right-${index}`} style={{ height: `${Math.round(13 + (base + voiceLevel * 0.9) * 19)}px`, '--voice-wave-distance': index } as React.CSSProperties} />)}
+                </span>
               </div>
               <button type="button" onClick={confirmVoiceRecording} disabled={disabled || isStreaming} aria-label="Send recognized voice text" className="voice-draft-confirm absolute bottom-5 right-5 flex h-11 w-11 items-center justify-center rounded-2xl">
                 <Check className="h-7 w-7" strokeWidth={1.9} />
