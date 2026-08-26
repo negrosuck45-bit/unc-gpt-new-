@@ -4,7 +4,7 @@ import { cn } from '@/lib/utils';
 import { formatCalendarEventPresentation } from '@/lib/calendar-event-presentation';
 import { CodeBlock } from './code-block';
 import { TerminalBlock } from './terminal-block';
-import { Download, ExternalLink, Loader2, Tag, Mail, ChevronDown, CalendarDays, CheckCircle2, Clock3 } from 'lucide-react';
+import { Download, ExternalLink, Loader2, Tag, Mail, ChevronDown, CalendarDays, Clock3 } from 'lucide-react';
 import { toast } from 'sonner';
 
 interface MessageContentProps {
@@ -408,32 +408,25 @@ function ActionStatusCard({ status }: { status: ActionStatus }) {
 
 function GoogleCalendarAppIcon() {
   const [failed, setFailed] = useState(false);
-  return (
-    <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl border border-white/10 bg-white p-1.5 shadow-[0_6px_18px_rgba(66,133,244,0.18)]">
-      {!failed ? <img src="https://www.gstatic.com/images/branding/product/1x/calendar_2020q4_48dp.png" alt="Google Calendar" className="h-full w-full object-contain" onError={() => setFailed(true)} /> : <CalendarDays className="h-5 w-5 text-[#4285f4]" aria-hidden="true" />}
-    </div>
-  );
+  return !failed
+    ? <img src="https://www.gstatic.com/images/branding/product/1x/calendar_2020q4_48dp.png" alt="Google Calendar" className="h-9 w-9 shrink-0 object-contain" onError={() => setFailed(true)} />
+    : <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-[#4285f4]/15 text-[#8ab4f8]"><CalendarDays className="h-5 w-5" aria-hidden="true" /></div>;
 }
 
 function CalendarEventCard({ event }: { event: CalendarEvent }) {
   const timing = formatCalendarEventPresentation(event.start, event.end);
   return (
-    <section className="my-1 w-full max-w-md overflow-hidden rounded-[22px] border border-[#8ab4f8]/25 bg-[#0d1117] shadow-[0_18px_45px_rgba(0,0,0,0.28)]">
-      <div className="flex items-center gap-3 border-b border-white/[0.08] px-4 py-3.5">
+    <section className="my-1 w-full max-w-md rounded-2xl border border-white/[0.09] bg-white/[0.035] px-4 py-4 shadow-none">
+      <div className="flex items-start gap-3">
         <GoogleCalendarAppIcon />
-        <div className="min-w-0 flex-1">
-          <p className="text-sm font-semibold tracking-[-0.01em] text-white">Google Calendar</p>
-          <p className="mt-0.5 text-xs text-white/55">Saved to your connected account</p>
+        <div className="min-w-0 flex-1 pt-0.5">
+          <p className="truncate text-[15px] font-semibold leading-5 tracking-[-0.01em] text-white">{event.title}</p>
+          <p className="mt-1 text-xs font-medium text-white/45">Google Calendar · Added</p>
+          {(timing.dateLabel || timing.timeLabel) && <div className="mt-3 flex items-center gap-2 text-sm text-white/65"><Clock3 className="h-4 w-4 shrink-0 text-white/40" aria-hidden="true" /><span className="min-w-0">{[timing.dateLabel, timing.timeLabel, timing.durationLabel].filter(Boolean).join(' · ')}</span></div>}
         </div>
-        <div className="inline-flex shrink-0 items-center gap-1 rounded-full border border-emerald-400/25 bg-emerald-400/10 px-2 py-1 text-[10px] font-semibold uppercase tracking-[0.08em] text-emerald-300"><CheckCircle2 className="h-3 w-3" aria-hidden="true" />Saved</div>
+        <a href={event.url} target="_blank" rel="noopener noreferrer" aria-label="Open event in Google Calendar" className="mt-0.5 inline-flex h-9 w-9 shrink-0 items-center justify-center rounded-lg text-white/45 transition-colors hover:bg-white/[0.08] hover:text-white focus:outline-none focus:ring-2 focus:ring-white/30 active:scale-95"><ExternalLink className="h-[18px] w-[18px]" aria-hidden="true" /></a>
       </div>
-      <div className="space-y-4 px-4 py-4">
-        <div>
-          <p className="text-[17px] font-semibold leading-snug tracking-[-0.02em] text-white">{event.title}</p>
-          {(timing.dateLabel || timing.timeLabel) && <div className="mt-3 flex items-center gap-2 text-sm text-white/65"><Clock3 className="h-4 w-4 shrink-0 text-[#8ab4f8]" aria-hidden="true" /><span className="min-w-0">{[timing.dateLabel, timing.timeLabel, timing.durationLabel].filter(Boolean).join(' · ')}</span></div>}
-        </div>
-        <a href={event.url} target="_blank" rel="noopener noreferrer" className="inline-flex w-full items-center justify-center gap-2 rounded-xl bg-[#8ab4f8] px-4 py-3 text-sm font-bold text-[#062e6f] shadow-[0_8px_22px_rgba(66,133,244,0.22)] transition duration-150 hover:bg-[#a8c7fa] focus:outline-none focus:ring-2 focus:ring-[#8ab4f8] focus:ring-offset-2 focus:ring-offset-[#0d1117] active:scale-[0.98]">View event <ExternalLink className="h-4 w-4" aria-hidden="true" /></a>
-      </div>
+      <a href={event.url} target="_blank" rel="noopener noreferrer" className="mt-4 inline-flex text-sm font-medium text-[#8ab4f8] transition-colors hover:text-[#aecbfa] focus:outline-none focus:underline">Open in Google Calendar <span className="ml-1.5 text-white/35" aria-hidden="true">→</span></a>
     </section>
   );
 }
