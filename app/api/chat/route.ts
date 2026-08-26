@@ -1672,7 +1672,61 @@ function escapeTemplateHtml(value: string) {
   return value.replace(/[&<>"']/g, (character) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", "\\\"": "&quot;", "'": "&#39;" } as Record<string, string>)[character] || character);
 }
 
+function buildGtaPresentationFiles() {
+  return {
+    "index.html": `<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="description" content="An unofficial Grand Theft Auto VI visual presentation created by uncgpt.">
+  <title>Grand Theft Auto VI — Unofficial Showcase</title>
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+  <div class="film-grain" aria-hidden="true"></div>
+  <header class="topbar"><a class="wordmark" href="#top">UNC<span>/</span>SHOWCASE</a><p>Unofficial concept presentation</p></header>
+  <main id="top">
+    <section class="slide hero" aria-labelledby="hero-title">
+      <p class="kicker"><span>01</span> The next escape</p>
+      <h1 id="hero-title">GRAND<br><strong>THEFT</strong><br>AUTO <em>VI</em></h1>
+      <p class="intro">A neon-drenched, high-velocity presentation inspired by the promise of an open road, a coastal skyline, and one more unforgettable score.</p>
+      <div class="hero-actions"><a class="button button-primary" href="#city">Enter the presentation</a><button id="sound-toggle" class="button button-quiet" type="button" aria-pressed="false">Soundtrack off</button></div>
+      <p class="disclaimer">Fan-made visual concept · Not affiliated with Rockstar Games</p>
+      <a class="scroll-cue" href="#city" aria-label="Scroll to the city section">SCROLL <span>↓</span></a>
+    </section>
+
+    <section id="city" class="slide city" aria-labelledby="city-title">
+      <div class="section-heading"><p class="kicker"><span>02</span> After dark</p><p class="index">01 / 04</p></div>
+      <div class="city-grid"><div><h2 id="city-title">A CITY<br>THAT NEVER<br><i>LOOKS AWAY.</i></h2><p class="body-copy">Pastel heat meets midnight chrome. This is a fictional showcase of ambition, excess, and the strange calm before everything goes loud.</p></div><div class="poster poster-city"><span class="poster-tag">VICE // AFTER HOURS</span><span class="sun" aria-hidden="true"></span><span class="palm palm-one" aria-hidden="true">✦</span><span class="palm palm-two" aria-hidden="true">✦</span><span class="poster-caption">COASTAL
+STATIC</span></div></div>
+    </section>
+
+    <section class="slide moments" aria-labelledby="moments-title">
+      <div class="section-heading"><p class="kicker"><span>03</span> The rhythm</p><p class="index">02 / 04</p></div>
+      <h2 id="moments-title">FOUR WAYS<br>TO LOSE THE MAP.</h2>
+      <div class="moment-grid"><article><span>01</span><h3>Neon pursuit</h3><p>Every shortcut leaves a trace of pink light in the rear-view mirror.</p></article><article><span>02</span><h3>Open water</h3><p>A clean horizon, a fast engine, and nowhere you have to be.</p></article><article><span>03</span><h3>Bad timing</h3><p>The plan was simple—right until the city started answering back.</p></article><article><span>04</span><h3>New rules</h3><p>Make the score, own the moment, disappear before sunrise.</p></article></div>
+    </section>
+
+    <section class="slide finale" aria-labelledby="finale-title">
+      <p class="kicker"><span>04</span> One more run</p>
+      <h2 id="finale-title">THE CITY<br>IS <i>CALLING.</i></h2>
+      <p>Grand Theft Auto VI, reimagined here as a one-page visual teaser. Built specifically as a presentation experience—not a personal portfolio.</p>
+      <a class="button button-primary" href="#top">Replay from the top</a>
+    </section>
+  </main>
+  <footer><span>UNC GPT · 2026</span><span>UNOFFICIAL FAN CONCEPT</span></footer>
+  <script src="script.js"></script>
+</body>
+</html>
+`,
+    "style.css": `:root{--ink:#0d0712;--cream:#f7eadb;--pink:#ff3d8f;--orange:#ff7655;--violet:#6f43ff;--line:rgba(247,234,219,.2)}*{box-sizing:border-box}html{scroll-behavior:smooth}body{margin:0;background:var(--ink);color:var(--cream);font:500 16px/1.45 Arial,Helvetica,sans-serif;overflow-x:hidden}.film-grain{position:fixed;inset:0;pointer-events:none;z-index:3;opacity:.08;background-image:url("data:image/svg+xml,%3Csvg viewBox='0 0 220 220' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='.8' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)' opacity='.7'/%3E%3C/svg%3E")}.topbar{position:fixed;z-index:4;top:0;left:0;right:0;display:flex;justify-content:space-between;align-items:center;padding:22px clamp(20px,4vw,56px);mix-blend-mode:screen;pointer-events:none}.topbar>*{pointer-events:auto}.wordmark{color:var(--cream);font-weight:900;letter-spacing:.02em;text-decoration:none;font-size:.82rem}.wordmark span{color:var(--pink)}.topbar p{margin:0;color:rgba(247,234,219,.65);font-size:.67rem;letter-spacing:.1em;text-transform:uppercase}.slide{position:relative;min-height:100svh;padding:clamp(112px,16vw,180px) clamp(20px,7vw,112px) clamp(54px,8vw,108px);overflow:hidden}.hero{display:flex;flex-direction:column;justify-content:center;isolation:isolate;background:radial-gradient(circle at 78% 17%,rgba(255,119,86,.96) 0 6%,rgba(255,61,143,.76) 17%,transparent 43%),radial-gradient(circle at 18% 84%,rgba(111,67,255,.72),transparent 35%),linear-gradient(145deg,#1a0920,#090611 73%)}.hero:after{content:'';position:absolute;z-index:-1;width:min(60vw,680px);height:min(60vw,680px);right:-12%;bottom:-28%;border:1px solid rgba(247,234,219,.22);border-radius:48% 52% 41% 59% / 58% 41% 59% 42%;transform:rotate(24deg);box-shadow:inset 0 0 0 38px rgba(255,61,143,.09)}.kicker{margin:0 0 24px;color:rgba(247,234,219,.74);font-size:.69rem;font-weight:800;letter-spacing:.18em;text-transform:uppercase}.kicker span{display:inline-grid;place-items:center;width:25px;height:25px;margin-right:9px;border-radius:50%;background:var(--pink);color:var(--ink);font-size:.62rem;letter-spacing:0}.hero h1,.city h2,.moments h2,.finale h2{margin:0;font-family:Impact,Arial Black,sans-serif;font-weight:900;line-height:.78;letter-spacing:-.065em;text-transform:uppercase}.hero h1{max-width:980px;font-size:clamp(4.5rem,14vw,12rem);text-shadow:4px 5px 0 rgba(13,7,18,.22)}.hero h1 strong{color:var(--pink);font:inherit}.hero h1 em{color:var(--orange);font:italic 1.12em Georgia,serif;letter-spacing:-.12em}.intro{max-width:570px;margin:32px 0 0;color:rgba(247,234,219,.78);font-size:clamp(1rem,2vw,1.22rem)}.hero-actions{display:flex;flex-wrap:wrap;gap:12px;margin-top:32px}.button{display:inline-flex;align-items:center;justify-content:center;border:1px solid var(--line);border-radius:0;padding:14px 18px;color:var(--cream);background:transparent;font:800 .74rem/1 Arial,sans-serif;letter-spacing:.08em;text-decoration:none;text-transform:uppercase;cursor:pointer;transition:transform .16s ease,background .16s ease}.button:hover{transform:translate(-3px,-3px);background:rgba(247,234,219,.12)}.button-primary{border-color:var(--cream);background:var(--cream);color:var(--ink)}.button-primary:hover{background:var(--pink);border-color:var(--pink)}.disclaimer{margin:19px 0 0;color:rgba(247,234,219,.46);font-size:.67rem;letter-spacing:.04em}.scroll-cue{position:absolute;bottom:28px;left:clamp(20px,7vw,112px);color:var(--cream);font-size:.66rem;font-weight:800;letter-spacing:.15em;text-decoration:none}.scroll-cue span{display:inline-block;margin-left:8px;color:var(--pink);font-size:1.1rem}.section-heading{display:flex;align-items:center;justify-content:space-between;border-bottom:1px solid var(--line)}.section-heading .kicker{margin:0 0 16px}.index{margin:0 0 16px;color:rgba(247,234,219,.5);font-size:.7rem;letter-spacing:.12em}.city{background:linear-gradient(160deg,#ff6a58 0%,#ec2d78 34%,#321243 72%,#0e0716 100%)}.city-grid{display:grid;grid-template-columns:1fr .9fr;gap:clamp(32px,8vw,130px);align-items:end;margin-top:clamp(52px,10vw,120px)}.city h2,.moments h2,.finale h2{font-size:clamp(3.2rem,9vw,8rem)}.city h2 i,.finale h2 i{color:#251233;font:italic 1em Georgia,serif;letter-spacing:-.1em}.body-copy{max-width:420px;margin:28px 0 0;color:#300f35;font-size:1.12rem;font-weight:700}.poster{position:relative;min-height:440px;overflow:hidden;border:1px solid rgba(13,7,18,.55);background:linear-gradient(180deg,#3b286d 0 40%,#ff8272 40% 43%,#242143 43% 62%,#172023 62%);box-shadow:14px 16px 0 rgba(13,7,18,.27)}.poster:after{content:'';position:absolute;inset:0;background:repeating-linear-gradient(0deg,transparent 0 7px,rgba(247,234,219,.07) 8px 9px);mix-blend-mode:screen}.poster-tag,.poster-caption{position:absolute;z-index:1;font-weight:900;letter-spacing:.12em}.poster-tag{top:19px;left:19px;font-size:.62rem}.poster-caption{bottom:22px;left:21px;font:900 clamp(2rem,5vw,4rem)/.78 Impact,Arial Black,sans-serif}.sun{position:absolute;right:9%;top:13%;width:48%;aspect-ratio:1;border-radius:50%;background:repeating-linear-gradient(0deg,#ffd06d 0 6px,#ff705f 7px 12px);box-shadow:0 0 70px #ff8b65}.palm{position:absolute;z-index:2;color:#1d1735;font-size:10rem;line-height:1;transform:rotate(-26deg)}.palm-one{bottom:6%;left:-4%}.palm-two{top:18%;right:-8%;transform:rotate(25deg)}.moments{background:#151018}.moments h2{max-width:780px;margin-top:clamp(48px,9vw,100px)}.moment-grid{display:grid;grid-template-columns:repeat(4,1fr);gap:1px;margin-top:clamp(48px,8vw,88px);background:var(--line);border:1px solid var(--line)}.moment-grid article{min-height:260px;padding:22px;background:#151018;transition:background .18s ease}.moment-grid article:hover{background:#2b1531}.moment-grid span{color:var(--pink);font:900 .72rem Arial,sans-serif;letter-spacing:.13em}.moment-grid h3{margin:72px 0 12px;font:900 1.5rem/1 Impact,Arial Black,sans-serif;letter-spacing:.01em;text-transform:uppercase}.moment-grid p{margin:0;color:rgba(247,234,219,.62);font-size:.88rem}.finale{display:flex;flex-direction:column;justify-content:center;background:radial-gradient(circle at 85% 65%,#ff466d 0 14%,transparent 35%),linear-gradient(135deg,#291743,#11111e 60%,#07070c)}.finale h2{margin-top:10px}.finale p:not(.kicker){max-width:460px;margin:28px 0;color:rgba(247,234,219,.7);font-size:1.05rem}.finale .button{align-self:flex-start}footer{display:flex;justify-content:space-between;gap:16px;padding:21px clamp(20px,7vw,112px);background:#08050b;color:rgba(247,234,219,.48);font-size:.62rem;font-weight:800;letter-spacing:.12em;text-transform:uppercase}@media(max-width:720px){.topbar{padding:18px 20px}.topbar p{display:none}.slide{padding:118px 20px 54px}.hero{min-height:100svh}.city-grid{grid-template-columns:1fr;gap:42px}.poster{min-height:360px}.moment-grid{grid-template-columns:1fr 1fr}.moment-grid article{min-height:205px}.moment-grid h3{margin-top:42px}footer{padding:18px 20px;flex-direction:column}.hero-actions{max-width:340px}.button{flex:1}}@media(max-width:390px){.hero h1{font-size:4rem}.moment-grid{grid-template-columns:1fr}.poster{min-height:300px}}\n`,
+    "script.js": `const button=document.getElementById('sound-toggle');button?.addEventListener('click',()=>{const on=button.getAttribute('aria-pressed')!=='true';button.setAttribute('aria-pressed',String(on));button.textContent=on?'Soundtrack on':'Soundtrack off'});\n`,
+  };
+}
+
 function buildPortfolioFiles(userText: string) {
+  if (/\b(?:gta\s*(?:6|vi)|grand\s+theft\s+auto)\b/i.test(userText)) return buildGtaPresentationFiles();
   const forwardCountdown = userText.match(/\bcount\s*down[\s\S]{0,48}?(?:from\s*)?(\d{1,6})\s*(?:to|down\s+to)\s*(\d{1,6})\b/i);
   const reverseCountdown = userText.match(/\bcount\s*down[\s\S]{0,48}?to\s*(\d{1,6})[\s\S]{0,48}?from\s*(\d{1,6})\b/i);
   if (forwardCountdown || reverseCountdown) {

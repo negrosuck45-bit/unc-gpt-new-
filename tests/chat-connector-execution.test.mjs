@@ -365,3 +365,41 @@ test('creates a new unique repository for a fresh website request even when a pr
   assert.ok(calls.some((call) => call.slug === 'GITHUB_CREATE_A_REPOSITORY_FOR_THE_AUTHENTICATED_USER'));
   assert.doesNotMatch(JSON.stringify(calls), /old-site/);
 });
+
+
+test('builds a GTA VI presentation instead of the generic personal portfolio fallback', async () => {
+  const calls = [];
+  let repositoryCreated = false;
+  const connectorSession = {
+    async search() { return githubWebsiteSchemas(); },
+    async execute(slug, args) {
+      calls.push({ slug, args });
+      if (slug === 'GITHUB_GET_THE_AUTHENTICATED_USER') return { successful: true, data: { login: 'test-owner' } };
+      if (slug === 'GITHUB_CREATE_OR_UPDATE_FILE_CONTENTS' && !repositoryCreated) return { successful: false, error: 'Repository not found' };
+      if (slug === 'GITHUB_CREATE_A_REPOSITORY_FOR_THE_AUTHENTICATED_USER') {
+        repositoryCreated = true;
+        return { successful: true, data: { name: 'uncgpt-site-12345678', default_branch: 'main' } };
+      }
+      if (slug === 'GITHUB_CREATE_OR_UPDATE_FILE_CONTENTS') return { successful: true, data: { content: { sha: 'file-sha' } } };
+      if (slug === 'GITHUB_CREATE_OR_UPDATE_GITHUB_PAGES_SITE') return { successful: true, data: { status: 'building' } };
+      if (slug === 'GITHUB_GET_FILE_CONTENTS') return { successful: true, data: { content: pagesWorkflowReadBack } };
+      if (slug === 'GITHUB_CREATE_A_WORKFLOW_DISPATCH_EVENT') return { successful: true, data: {} };
+      if (slug === 'GITHUB_LIST_WORKFLOW_RUNS_FOR_A_WORKFLOW') return { successful: true, data: { workflow_runs: calls.some((call) => call.slug === 'GITHUB_CREATE_A_WORKFLOW_DISPATCH_EVENT') ? [{ id: 77, event: 'workflow_dispatch', status: 'queued' }] : [] } };
+      if (slug === 'GITHUB_GET_LATEST_PAGES_BUILD') return { successful: true, data: { status: 'building' } };
+      throw new Error(`Unexpected GitHub tool: ${slug}`);
+    },
+  };
+  const { POST } = createRoute({ connectorSession, enabledToolkits: ['github'] });
+  const response = await POST(createRequest({
+    messages: [{ role: 'user', content: 'Create me a GitHub repo and a live website showing a GTA 6 presentation.' }],
+    computerUse: false,
+    mcpConnectors: [{ source: 'composio', provider: 'github', enabled: true }],
+  }));
+  await responseSseText(response);
+  const indexWrite = calls.find((call) => call.slug === 'GITHUB_CREATE_OR_UPDATE_FILE_CONTENTS' && /index\.html/.test(JSON.stringify(call.args)) && String(call.args.content || '').includes('GRAND'));
+
+  assert.ok(indexWrite, JSON.stringify(calls));
+  assert.match(String(indexWrite.args.content), /GRAND[\s\S]*THEFT[\s\S]*AUTO/);
+  assert.match(String(indexWrite.args.content), /Unofficial concept presentation/);
+  assert.doesNotMatch(String(indexWrite.args.content), /Your Name|Designer, developer, and creative problem solver/);
+});
