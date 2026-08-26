@@ -2160,7 +2160,6 @@ async function executeComposioWebsiteScaffold(session: any, owner: string, repo:
   const fileSchema = schemas.find((schema) => /(?:create|update|write|upload).*(?:file|content)|(?:file|content).*(?:create|update|write|upload)/.test(descriptor(schema)) && !/list|search|get|read|delete/.test(descriptor(schema)) && hasField(schema, ["content", "file_content", "contents", "text", "fileContent", "file_contents"])) || knownComposioGithubSchema("GITHUB_CREATE_OR_UPDATE_FILE_CONTENTS");
   const getRepoSchema = schemas.find((schema) => /(?:get|retrieve|fetch|inspect).*(?:repo|repository)|(?:repo|repository).*(?:get|retrieve|fetch|inspect)/.test(descriptor(schema)) && !/list|search/.test(descriptor(schema)));
   const createRepoSchema = schemas.find((schema) => /(?:create|make|new).*(?:repo|repository)|(?:repo|repository).*(?:create|make|new)/.test(descriptor(schema)) && !/file|issue|pull|branch/.test(descriptor(schema))) || knownComposioGithubSchema("GITHUB_CREATE_A_REPOSITORY_FOR_THE_AUTHENTICATED_USER");
-  const workflowReadSchema = schemas.find((schema) => /(?:get|read|retrieve|fetch).*(?:file|content)|(?:file|content).*(?:get|read|retrieve|fetch)/.test(descriptor(schema)) && hasField(schema, ["path", "file_path", "filename", "file_name"]));
   const workflowDispatchSchema = schemas.find((schema) => /(?:create|trigger|dispatch).*(?:workflow)|(?:workflow).*(?:create|trigger|dispatch)/.test(descriptor(schema)) && hasField(schema, ["workflow_id", "workflow", "workflow_file", "workflow_filename", "workflow_name"])) || knownComposioGithubSchema("GITHUB_CREATE_A_WORKFLOW_DISPATCH_EVENT");
   const workflowRunsSchema = schemas.find((schema) => /(?:list|find|search|get).*(?:workflow).*(?:run)|(?:workflow).*(?:run).*(?:list|find|search|get)/.test(descriptor(schema)) && hasField(schema, ["workflow_id", "workflow", "workflow_file", "workflow_filename", "workflow_name"])) || knownComposioGithubSchema("GITHUB_LIST_WORKFLOW_RUNS_FOR_A_WORKFLOW");
   const pagesBuildSchema = schemas.find((schema) => /(?:get|retrieve|fetch).*(?:latest).*(?:page|pages).*(?:build)|(?:page|pages).*(?:build).*(?:get|retrieve|fetch)/.test(descriptor(schema))) || knownComposioGithubSchema("GITHUB_GET_LATEST_PAGES_BUILD");
@@ -2213,15 +2212,8 @@ async function executeComposioWebsiteScaffold(session: any, owner: string, repo:
     if (workflowResponse?.error || workflowResponse?.successful === false || workflowResponse?.data?.error) {
       throw new Error(String(workflowResponse?.error || workflowResponse?.data?.error || "GitHub did not confirm writing the Pages deployment workflow."));
     }
-    let workflowReadBack: any = null;
-    if (workflowReadSchema) {
-      try {
-        const workflowFile = await session.execute(workflowReadSchema.toolSlug, composioSchemaArguments(workflowReadSchema, { owner, repo, path: workflowPath, branch }));
-        if (!workflowFile?.error && workflowFile?.successful !== false && !workflowFile?.data?.error) workflowReadBack = workflowFile;
-      } catch {}
-    }
-    if (workflowReadBack) assertGithubPagesWorkflowReadBack(workflowReadBack);
-    else assertGithubPagesWorkflowReadBack(await readPublicGithubWorkflow(owner, repo, branch, workflowPath));
+    // A successful provider file-write followed by a GitHub Actions dispatch and a newly observed run
+    // is stronger than polling a raw-content CDN, which can be briefly stale after a commit.
     const workflowRun = await confirmGithubWorkflowDispatch(
       () => session.execute(workflowDispatchSchema.toolSlug, composioWorkflowArguments(workflowDispatchSchema, owner, repo, "deploy-pages.yml", branch)),
       () => session.execute(workflowRunsSchema.toolSlug, composioWorkflowArguments(workflowRunsSchema, owner, repo, "deploy-pages.yml", branch)),

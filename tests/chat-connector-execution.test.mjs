@@ -168,7 +168,7 @@ test('runs the authenticated GitHub website workflow instead of falling into the
   assert.doesNotMatch(JSON.stringify(calls), /GITHUB_REQUEST_A_GITHUB_PAGES_BUILD/);
 });
 
-test('refuses to emit a GitHub Pages deployment card when workflow read-back is missing', async () => {
+test('refuses to emit a GitHub Pages deployment card when GitHub does not confirm a newly dispatched workflow run', async () => {
   const calls = [];
   let repositoryCreated = false;
   const connectorSession = {
@@ -183,7 +183,8 @@ test('refuses to emit a GitHub Pages deployment card when workflow read-back is 
       }
       if (slug === 'GITHUB_CREATE_OR_UPDATE_FILE_CONTENTS') return { successful: true, data: { content: { sha: 'file-sha' } } };
       if (slug === 'GITHUB_CREATE_OR_UPDATE_GITHUB_PAGES_SITE') return { successful: true, data: { status: 'building' } };
-      if (slug === 'GITHUB_GET_FILE_CONTENTS') return { successful: true, data: { content: Buffer.from('name: not-pages-workflow').toString('base64') } };
+      if (slug === 'GITHUB_CREATE_A_WORKFLOW_DISPATCH_EVENT') return { successful: true, data: {} };
+      if (slug === 'GITHUB_LIST_WORKFLOW_RUNS_FOR_A_WORKFLOW') return { successful: true, data: { workflow_runs: [] } };
       throw new Error(`Unexpected GitHub tool: ${slug}`);
     },
   };
@@ -196,9 +197,9 @@ test('refuses to emit a GitHub Pages deployment card when workflow read-back is 
   const text = await responseSseText(response);
 
   assert.match(text, /couldn’t finish the website publish/i);
-  assert.match(text, /did not read back the expected Pages Actions workflow/i);
+  assert.match(text, /did not confirm a new Pages Actions run/i);
   assert.doesNotMatch(text, /UNCGPT_WEBSITE_DEPLOYMENT/);
-  assert.doesNotMatch(JSON.stringify(calls), /GITHUB_CREATE_A_WORKFLOW_DISPATCH_EVENT/);
+  assert.match(JSON.stringify(calls), /GITHUB_CREATE_A_WORKFLOW_DISPATCH_EVENT/);
 });
 
 test('creates and reads back a Calendar event instead of falling into the generic write guard', async () => {
@@ -367,7 +368,7 @@ test('creates a new unique repository for a fresh website request even when a pr
 });
 
 
-test('uses public workflow read-back and canonical Actions fallbacks when Composio search is sparse', async () => {
+test('uses canonical Actions fallbacks when Composio search is sparse', async () => {
   const calls = [];
   let repositoryCreated = false;
   let searches = 0;
