@@ -1845,6 +1845,22 @@ function calendarEventResultCard(value: any) {
   return `[[UNCGPT_CALENDAR_EVENT:${JSON.stringify(calendarEventCardPayload(value))}]]`;
 }
 
+async function executeVerifiedGoogleCalendarCreate(composioSession: any, args: Record<string, unknown>) {
+  const result: any = await composioSession.execute('GOOGLECALENDAR_CREATE_EVENT', args);
+  if (result?.error || result?.successful === false || result?.data?.error) {
+    throw new Error(String(result?.error || result?.data?.error || 'Google Calendar did not confirm the event creation.'));
+  }
+  const created = calendarEventCardPayload(result?.data ?? result);
+  if (!created.eventId) throw new Error('Google Calendar did not return an event ID, so the event could not be verified.');
+  const verification: any = await composioSession.execute('GOOGLECALENDAR_EVENTS_GET', { event_id: created.eventId, calendar_id: 'primary' });
+  if (verification?.error || verification?.successful === false || verification?.data?.error) {
+    throw new Error(String(verification?.error || verification?.data?.error || 'Google Calendar did not confirm the created event.'));
+  }
+  const verified = calendarEventCardPayload(verification?.data ?? verification);
+  if (!verified.eventId || verified.eventId !== created.eventId) throw new Error('Google Calendar could not verify the created event.');
+  return calendarEventResultCard({ ...created, ...verified, url: verified.url || created.url });
+}
+
 function getComposioInputSchema(schema: any) {
   const candidates = [schema?.inputSchema, schema?.input_schema, schema?.inputParameters, schema?.input_parameters, schema?.parameters];
   for (const candidate of candidates) {
@@ -3372,7 +3388,11 @@ export async function POST(req: NextRequest) {
               query: userText,
               toolkits: [matchedToolkit!],
             });
-            const discoveredSchemas = normalizeComposioSearchSchemas(search);
+            const calendarSearch = calendarSchedulingIntent
+              ? await composioSession.search({ query: 'Create a Google Calendar event using an exact ISO start date and duration.', toolkits: [matchedToolkit!] })
+              : null;
+            const discoveredSchemas = [...normalizeComposioSearchSchemas(search), ...normalizeComposioSearchSchemas(calendarSearch)]
+              .filter((schema: any, index: number, all: any[]) => all.findIndex((candidate: any) => candidate?.toolSlug === schema?.toolSlug) === index);
             composioTools = discoveredSchemas
               .slice(0, 8)
               .map((schema: any) => ({
@@ -3384,23 +3404,24 @@ export async function POST(req: NextRequest) {
                 },
                 _composioSlug: schema.toolSlug,
                 _exec: async (args: any) => {
+                  if (/GOOGLECALENDAR.*CREATE.*EVENT/i.test(String(schema.toolSlug))) return executeVerifiedGoogleCalendarCreate(composioSession, args || {});
                   const result = await composioSession.execute(schema.toolSlug, args || {});
                   if (result?.error || result?.successful === false || result?.data?.error) throw new Error(String(result?.error || result?.data?.error || 'The connected service did not confirm the action.'));
-                  const rawResult = result?.data ?? result;
-                  if (/GOOGLECALENDAR.*CREATE.*EVENT/i.test(String(schema.toolSlug))) {
-                    const created = calendarEventCardPayload(rawResult);
-                    if (!created.eventId) throw new Error('Google Calendar did not return an event ID, so the event could not be verified.');
-                    const verification: any = await composioSession.execute('GOOGLECALENDAR_EVENTS_GET', { event_id: created.eventId, calendar_id: 'primary' });
-                    if (verification?.error || verification?.successful === false || verification?.data?.error) {
-                      throw new Error(String(verification?.error || verification?.data?.error || 'Google Calendar did not confirm the created event.'));
-                    }
-                    const verified = calendarEventCardPayload(verification?.data ?? verification);
-                    if (!verified.eventId || verified.eventId !== created.eventId) throw new Error('Google Calendar could not verify the created event.');
-                    return calendarEventResultCard({ ...created, ...verified, url: verified.url || created.url });
-                  }
-                  return normalizeConnectorResult(rawResult, schema.toolSlug);
+                  return normalizeConnectorResult(result?.data ?? result, schema.toolSlug);
                 },
               }));
+            if (calendarSchedulingIntent && !composioTools.some((tool: any) => /GOOGLECALENDAR.*CREATE.*EVENT/i.test(String(tool?._composioSlug || tool?.function?.name || '')))) {
+              composioTools.push({
+                type: 'function',
+                function: {
+                  name: 'composio__GOOGLECALENDAR_CREATE_EVENT',
+                  description: 'Create a real event in the connected Google Calendar. Use only when the user supplied an event title, concrete date, start time, and duration. Datetimes must be exact ISO values in the user time zone.',
+                  parameters: { type: 'object', properties: { summary: { type: 'string' }, start_datetime: { type: 'string', description: 'ISO local date-time, for example 2026-08-27T15:00:00' }, timezone: { type: 'string' }, event_duration_hour: { type: 'integer' }, event_duration_minutes: { type: 'integer' }, description: { type: 'string' }, calendar_id: { type: 'string' } }, required: ['summary', 'start_datetime'] },
+                },
+                _composioSlug: 'GOOGLECALENDAR_CREATE_EVENT',
+                _exec: async (args: Record<string, unknown>) => executeVerifiedGoogleCalendarCreate(composioSession, args),
+              });
+            }
             if (githubCreateRequest && requestedConnectorKey === "github" && composioSession && !oauthConnected.has("github")) {
               const createTool = composioTools.find((tool: any) => {
                 const descriptor = `${tool?.function?.name || ""} ${tool?.function?.description || ""}`.toLowerCase();
