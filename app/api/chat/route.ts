@@ -6,7 +6,7 @@ import { Composio } from "@composio/core";
 import { chooseUncGptRoute } from "@/lib/uncgpt-router";
 import { executeAgentGateway, gatewayResultText } from "@/lib/agent-gateway";
 import { normalizeConnectorResult } from "@/lib/connector-results";
-import { composioToolkitSlug, connectorKeysMatch, isCalendarSchedulingIntent, isConnectorWriteIntent, parseDeterministicCalendarCreate } from "@/lib/connector-action-safety";
+import { composioToolkitSlug, connectorKeysMatch, isCalendarSchedulingIntent, isConnectorWriteIntent, normalizeConnectorKeyForRouting, parseDeterministicCalendarCreate } from "@/lib/connector-action-safety";
 
 export const runtime = "nodejs";
 
