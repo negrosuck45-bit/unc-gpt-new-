@@ -3377,7 +3377,17 @@ export async function POST(req: NextRequest) {
                   const result = await composioSession.execute(schema.toolSlug, args || {});
                   if (result?.error || result?.successful === false || result?.data?.error) throw new Error(String(result?.error || result?.data?.error || 'The connected service did not confirm the action.'));
                   const rawResult = result?.data ?? result;
-                  if (/GOOGLECALENDAR.*CREATE.*EVENT/i.test(String(schema.toolSlug))) return calendarEventResultCard(rawResult);
+                  if (/GOOGLECALENDAR.*CREATE.*EVENT/i.test(String(schema.toolSlug))) {
+                    const created = calendarEventCardPayload(rawResult);
+                    if (!created.eventId) throw new Error('Google Calendar did not return an event ID, so the event could not be verified.');
+                    const verification: any = await composioSession.execute('GOOGLECALENDAR_EVENTS_GET', { event_id: created.eventId, calendar_id: 'primary' });
+                    if (verification?.error || verification?.successful === false || verification?.data?.error) {
+                      throw new Error(String(verification?.error || verification?.data?.error || 'Google Calendar did not confirm the created event.'));
+                    }
+                    const verified = calendarEventCardPayload(verification?.data ?? verification);
+                    if (!verified.eventId || verified.eventId !== created.eventId) throw new Error('Google Calendar could not verify the created event.');
+                    return calendarEventResultCard({ ...created, ...verified, url: verified.url || created.url });
+                  }
                   return normalizeConnectorResult(rawResult, schema.toolSlug);
                 },
               }));
@@ -3439,11 +3449,6 @@ export async function POST(req: NextRequest) {
         : [];
       availableTools = combinedTools;
 
-      const createdCalendarEvent = toolSteps.find((step) => /\[\[UNCGPT_CALENDAR_EVENT:/.test(String(step?.result || '')));
-      if (createdCalendarEvent) {
-        return directTextResponse(String(createdCalendarEvent.result), "Google Calendar", "connected-action");
-      }
-
       if (githubCreateRequest && !oauthConnected.has("github") && !composioSession) {
         return directTextResponse("I couldn’t load GitHub’s create-repository action. Reconnect GitHub in Settings → Connectors and try again.", "GitHub", "connector-error");
       }
@@ -3468,6 +3473,14 @@ export async function POST(req: NextRequest) {
           baseUrl,
           (s) => toolSteps.push(s)
         );
+      }
+
+      const calendarStep = toolSteps.find((step) => /GOOGLECALENDAR.*CREATE.*EVENT/i.test(String(step?.tool || '')));
+      if (calendarStep) {
+        const resultText = String(calendarStep.result || '');
+        if (/\[\[UNCGPT_CALENDAR_EVENT:/.test(resultText)) return directTextResponse(resultText, 'Google Calendar', 'connected-action');
+        const safeError = resultText.replace(/^Tool error:\s*/i, '').replace(/https?:\/\/\S+/g, '').slice(0, 260);
+        return directTextResponse(`I couldn’t schedule that event because Google Calendar did not verify it. ${safeError || 'Please try again after reconnecting Google Calendar.'}`, 'Google Calendar', 'connector-error');
       }
     } catch (e: any) {
       console.error("Tool loop error:", e.message);
