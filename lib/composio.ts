@@ -1,4 +1,17 @@
 import { Composio } from "@composio/core";
+import { connectorKeysMatch, normalizeConnectorKeyForRouting } from "@/lib/connector-action-safety";
+
+export type LiveComposioAccount = {
+  id: string;
+  toolkit: string;
+  normalizedToolkit: string;
+  status: string;
+  enabled: boolean;
+  connected: boolean;
+  alias?: string | null;
+  statusReason?: string | null;
+  updatedAt?: string | null;
+};
 
 /**
  * Composio user IDs must remain stable and scoped to the authenticated Clerk user.
@@ -12,9 +25,8 @@ export function getComposioUserIds(authenticatedUserId: string) {
   return [...new Set([getComposioUserId(authenticatedUserId), authenticatedUserId].filter(Boolean))];
 }
 
-function isActiveConnectedAccount(account: any) {
-  const status = String(account?.status || "").toLowerCase();
-  return !account?.isDisabled && ["active", "connected", "success"].includes(status);
+function isActiveConnectedAccount(account: Pick<LiveComposioAccount, 'status' | 'enabled'>) {
+  return account.enabled && ["active", "connected", "success"].includes(account.status);
 }
 
 function uniqueToolkitSlugs(toolkits: string[]) {
@@ -25,11 +37,30 @@ function uniqueToolkitSlugs(toolkits: string[]) {
   )];
 }
 
+function normalizeAccount(account: any): LiveComposioAccount | null {
+  const toolkit = String(account?.toolkit?.slug || "").trim().toLowerCase();
+  const id = String(account?.id || "").trim();
+  if (!toolkit || !id) return null;
+  const status = String(account?.status || "").trim().toLowerCase();
+  const enabled = !Boolean(account?.isDisabled);
+  return {
+    id,
+    toolkit,
+    normalizedToolkit: normalizeConnectorKeyForRouting(toolkit),
+    status,
+    enabled,
+    connected: isActiveConnectedAccount({ status, enabled }),
+    alias: account?.alias || null,
+    statusReason: account?.statusReason || null,
+    updatedAt: account?.updatedAt || null,
+  };
+}
+
 /**
- * Reads the user’s live, enabled Composio accounts. This is the source of truth
- * for chat; browser localStorage is treated only as a UI cache.
+ * Loads every account belonging to one authenticated user. This is the server-side
+ * source of truth; browser storage is only a transient transport cache for the UI.
  */
-export async function getEnabledComposioToolkits(userId: string): Promise<string[]> {
+export async function getLiveComposioAccounts(userId: string): Promise<LiveComposioAccount[]> {
   const apiKey = process.env.COMPOSIO_API_KEY;
   if (!apiKey || !userId) return [];
 
@@ -38,12 +69,20 @@ export async function getEnabledComposioToolkits(userId: string): Promise<string
     userIds: getComposioUserIds(userId),
     limit: 1000,
   });
+  return (response?.items || []).map(normalizeAccount).filter(Boolean) as LiveComposioAccount[];
+}
 
-  return uniqueToolkitSlugs(
-    (response?.items || [])
-      .filter(isActiveConnectedAccount)
-      .map((account: any) => account?.toolkit?.slug)
-  );
+export function findEnabledComposioAccount(accounts: LiveComposioAccount[], requestedToolkit: unknown) {
+  return accounts.find((account) => account.connected && connectorKeysMatch(account.toolkit, requestedToolkit)) || null;
+}
+
+/**
+ * Reads the user’s live, enabled Composio accounts. This is the source of truth
+ * for chat; browser localStorage is treated only as a UI cache.
+ */
+export async function getEnabledComposioToolkits(userId: string): Promise<string[]> {
+  const accounts = await getLiveComposioAccounts(userId);
+  return uniqueToolkitSlugs(accounts.filter((account) => account.connected).map((account) => account.toolkit));
 }
 
 /**

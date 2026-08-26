@@ -22,9 +22,12 @@ const {
   parseDeterministicCalendarCreate,
 } = module.exports;
 
-test('treats Google Calendar aliases as the same live connector', () => {
+test('treats Google connector aliases as the same live account', () => {
   assert.equal(connectorKeysMatch('google_calendar', 'googlecalendar'), true);
   assert.equal(connectorKeysMatch('Google Calendar', 'google-calendar'), true);
+  assert.equal(connectorKeysMatch('google_drive', 'googledrive'), true);
+  assert.equal(connectorKeysMatch('gmail', 'google_mail'), true);
+  assert.equal(connectorKeysMatch('gmail', 'googlemail'), true);
   assert.equal(composioToolkitSlug('google_calendar'), 'googlecalendar');
   assert.equal(connectorKeysMatch('gmail', 'googlecalendar'), false);
 });

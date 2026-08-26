@@ -92,6 +92,8 @@ function createRoute({ connectorSession, enabledToolkits }) {
       getComposioUserId: (value) => value,
       getComposioUserIds: (value) => [value],
       getEnabledComposioToolkits: async () => enabledToolkits,
+      getLiveComposioAccounts: async () => enabledToolkits.map((toolkit, index) => ({ id: `account-${index + 1}`, toolkit, normalizedToolkit: toolkit, status: 'active', enabled: true, connected: true })),
+      findEnabledComposioAccount: (accounts, requestedToolkit) => accounts.find((account) => connectorSafety.connectorKeysMatch(account.toolkit, requestedToolkit)) || null,
     },
     '@composio/core': { Composio: class { constructor() { throw new Error('Live account lookup should not be needed in this test'); } } },
     '@/lib/uncgpt-router': { chooseUncGptRoute: () => ({ provider: 'openai', model: 'test-model' }) },
@@ -191,4 +193,38 @@ test('creates and reads back a Calendar event instead of falling into the generi
     },
     { slug: 'GOOGLECALENDAR_EVENTS_GET', args: { event_id: 'event-123', calendar_id: 'primary' } },
   ]);
+});
+
+
+test('discovers and reads from a live connected Composio app outside the built-in provider list', async () => {
+  const calls = [];
+  const connectorSession = {
+    async search() {
+      return {
+        toolSchemas: [{
+          toolSlug: 'AIRTABLE_LIST_BASES',
+          toolkit: 'airtable',
+          description: 'List Airtable bases available to the connected account.',
+          inputSchema: { type: 'object', properties: {} },
+        }],
+      };
+    },
+    async execute(slug, args) {
+      calls.push({ slug, args });
+      if (slug === 'AIRTABLE_LIST_BASES') return { successful: true, data: { bases: [{ id: 'app-1', name: 'Projects' }] } };
+      throw new Error(`Unexpected Airtable tool: ${slug}`);
+    },
+  };
+  const { POST } = createRoute({ connectorSession, enabledToolkits: ['airtable'] });
+  const response = await POST(createRequest({
+    messages: [{ role: 'user', content: 'List my Airtable bases' }],
+    computerUse: false,
+    mcpConnectors: [],
+  }));
+  const text = await responseSseText(response);
+
+  assert.match(text, /Projects/);
+  assert.doesNotMatch(text, /Connect Airtable to continue/i);
+  assert.doesNotMatch(text, /could not verify the connected-app write action/i);
+  assert.deepEqual(JSON.parse(JSON.stringify(calls)), [{ slug: 'AIRTABLE_LIST_BASES', args: {} }]);
 });

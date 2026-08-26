@@ -2,8 +2,23 @@ export function normalizeConnectorKeyForRouting(value: unknown) {
   return String(value || '').toLowerCase().replace(/[- ]/g, '_').replace(/[^a-z0-9_]/g, '');
 }
 
+const CONNECTOR_KEY_ALIASES: Record<string, string> = {
+  google_calendar: 'googlecalendar',
+  googlecalendar: 'googlecalendar',
+  google_drive: 'googledrive',
+  googledrive: 'googledrive',
+  google_mail: 'gmail',
+  googlemail: 'gmail',
+  gmail: 'gmail',
+};
+
+function canonicalComparableConnectorKey(value: unknown) {
+  const normalized = normalizeConnectorKeyForRouting(value);
+  return CONNECTOR_KEY_ALIASES[normalized] || normalized.replace(/_/g, '');
+}
+
 export function connectorKeysMatch(left: unknown, right: unknown) {
-  return normalizeConnectorKeyForRouting(left).replace(/_/g, '') === normalizeConnectorKeyForRouting(right).replace(/_/g, '');
+  return canonicalComparableConnectorKey(left) === canonicalComparableConnectorKey(right);
 }
 
 export function composioToolkitSlug(key: unknown) {

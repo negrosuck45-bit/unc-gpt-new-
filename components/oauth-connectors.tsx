@@ -91,7 +91,7 @@ const PROVIDERS = [
 interface ProviderStatus { connected: boolean; configured: boolean; }
 interface ComposioStatus { authenticated: boolean; configured: boolean; label: string; description: string; setupUrl: string; }
 interface ComposioCatalogItem { slug: string; name: string; description: string; logo?: string | null; categories?: string[]; }
-interface ComposioAccount { id: string; toolkit: string; status: string; statusReason?: string | null; enabled: boolean; alias?: string | null; updatedAt?: string | null; }
+interface ComposioAccount { id: string; toolkit: string; status: string; statusReason?: string | null; enabled: boolean; connected?: boolean; alias?: string | null; updatedAt?: string | null; }
 
 const COMPOSIO_STATE_KEY = 'composio-connector-state';
 
@@ -137,8 +137,8 @@ export function OAuthConnectors() {
 
   const syncChatConnectorState = (nextAccounts: ComposioAccount[]) => {
     try {
-      const state = nextAccounts.map((account) => ({ id: `composio:${account.toolkit}`, accountId: account.id, provider: account.toolkit, toolkit: account.toolkit, enabled: account.enabled, source: 'composio' }));
-      localStorage.setItem(accountStorageKey(COMPOSIO_STATE_KEY), JSON.stringify(Object.fromEntries(nextAccounts.map((account) => [account.toolkit, account.enabled]))));
+      const state = nextAccounts.map((account) => ({ id: `composio:${account.toolkit}`, accountId: account.id, provider: account.toolkit, toolkit: account.toolkit, enabled: account.enabled && account.connected !== false, source: 'composio' }));
+      localStorage.setItem(accountStorageKey(COMPOSIO_STATE_KEY), JSON.stringify(Object.fromEntries(nextAccounts.map((account) => [account.toolkit, account.enabled && account.connected !== false]))));
       localStorage.setItem(accountStorageKey('mcp-connectors'), JSON.stringify(state));
       window.dispatchEvent(new Event('mcp-connectors-changed'));
     } catch {}
@@ -152,11 +152,7 @@ export function OAuthConnectors() {
     ]).then(([oauth, composioStatus, accountStatus]) => {
       setStatus(oauth);
       setComposio(composioStatus);
-      let nextAccounts: ComposioAccount[] = accountStatus.accounts || [];
-      try {
-        const saved = JSON.parse(localStorage.getItem(accountStorageKey(COMPOSIO_STATE_KEY)) || '{}');
-        nextAccounts = nextAccounts.map((account) => ({ ...account, enabled: saved[account.toolkit] ?? account.enabled }));
-      } catch {}
+      const nextAccounts: ComposioAccount[] = accountStatus.accounts || [];
       setAccounts(nextAccounts);
       syncChatConnectorState(nextAccounts);
     }).finally(() => setLoading(false));
@@ -164,10 +160,6 @@ export function OAuthConnectors() {
   useEffect(() => {
     refresh();
     fetch('/api/connectors/composio/catalog').then((response) => response.json()).then((data) => setCatalog(data.items || [])).catch(() => setCatalog([]));
-    try {
-      const saved = JSON.parse(localStorage.getItem(accountStorageKey(COMPOSIO_STATE_KEY)) || '{}');
-      if (saved && typeof saved === 'object') setAccounts((current) => current.map((account) => ({ ...account, enabled: saved[account.toolkit] ?? account.enabled })));
-    } catch {}
     const params = new URLSearchParams(window.location.search);
     const error = params.get('mcp_error');
     if (error) {
@@ -210,15 +202,7 @@ export function OAuthConnectors() {
         body: JSON.stringify({ action, accountId: account.id, toolkit: account.toolkit }),
       });
       if (!response.ok) throw new Error((await response.json()).error || 'Unable to update connector');
-      if (action === 'disconnect') {
-        const nextAccounts = accounts.filter((item) => item.id !== account.id);
-        setAccounts(nextAccounts);
-        syncChatConnectorState(nextAccounts);
-      } else {
-        const nextAccounts = accounts.map((item) => item.id === account.id ? { ...item, enabled: action === 'enable' } : item);
-        setAccounts(nextAccounts);
-        syncChatConnectorState(nextAccounts);
-      }
+      await refresh();
     } catch (error: any) {
       setOauthError(error?.message || 'Unable to update connector');
     } finally { setAccountBusy(null); }

@@ -1,12 +1,12 @@
 import type { NextRequest } from "next/server";
 
 import { getSession } from "@/lib/auth";
-import { getComposioSession, getComposioUserId, getComposioUserIds, getEnabledComposioToolkits } from "@/lib/composio";
+import { findEnabledComposioAccount, getComposioSession, getComposioUserId, getComposioUserIds, getEnabledComposioToolkits, getLiveComposioAccounts } from "@/lib/composio";
 import { Composio } from "@composio/core";
 import { chooseUncGptRoute } from "@/lib/uncgpt-router";
 import { executeAgentGateway, gatewayResultText } from "@/lib/agent-gateway";
 import { normalizeConnectorResult } from "@/lib/connector-results";
-import { composioToolkitSlug, connectorKeysMatch, isCalendarSchedulingIntent, isConnectorWriteIntent, normalizeConnectorKeyForRouting, parseDeterministicCalendarCreate } from "@/lib/connector-action-safety";
+import { composioToolkitSlug, connectorKeysMatch, isCalendarSchedulingIntent, isConnectorWriteIntent, isWrappedConnectorFailure, normalizeConnectorKeyForRouting, parseDeterministicCalendarCreate } from "@/lib/connector-action-safety";
 
 export const runtime = "nodejs";
 
@@ -3293,8 +3293,24 @@ export async function POST(req: NextRequest) {
           const tokens = toolkit.replace(/[-_]/g, ' ').split(/\s+/).filter((token) => token.length > 2);
           return tokens.length > 0 && tokens.every((token) => new RegExp(`\\b${token.replace(/[.*+?^${}()|[\\]\\]/g, '\\$&')}\\b`, 'i').test(userText));
         });
-      const requestedConnectorKey = staticConnectorKey || dynamicConnectorKey;
+      let requestedConnectorKey = staticConnectorKey || dynamicConnectorKey;
       const connectorActionIntent = /\b(my|mine|latest|list|show|find|read|send|email|message|calendar|create|update|delete|open|search|manage|deploy|repository|repositories|repo|schedule|appointment|meeting|event|remind)\b/i.test(userText) || (connectorConfirmation && /\b(send|create|update|edit|delete|schedule|deploy|upload|move|write|add)\b/i.test(recentUserText));
+      let liveComposioAccounts: Awaited<ReturnType<typeof getLiveComposioAccounts>> | null = null;
+      if (!requestedConnectorKey && connectorActionIntent && process.env.COMPOSIO_API_KEY) {
+        try {
+          const liveSession = await getSession();
+          if (liveSession?.user?.sub) {
+            liveComposioAccounts = await getLiveComposioAccounts(liveSession.user.sub);
+            const mentionedAccount = liveComposioAccounts.find((account) => {
+              const tokens = account.normalizedToolkit.replace(/_/g, ' ').split(/\s+/).filter((token) => token.length > 2);
+              return account.connected && tokens.length > 0 && tokens.every((token) => new RegExp(`\\b${token.replace(/[.*+?^${}()|[\\]\\]/g, '\\$&')}\\b`, 'i').test(userText));
+            });
+            if (mentionedAccount) requestedConnectorKey = mentionedAccount.toolkit;
+          }
+        } catch (error) {
+          console.warn('Live connector discovery failed:', error);
+        }
+      }
       const connectorWriteIntent = isConnectorWriteIntent(userText, recentUserText, connectorConfirmation);
       const requestedConnector = requestedConnectorKey
         ? connectorHints[requestedConnectorKey] || {
@@ -3307,20 +3323,26 @@ export async function POST(req: NextRequest) {
       if (requestedConnectorKey && oauthConnected.has(requestedConnectorKey)) {
         requestedState = { source: 'oauth', provider: requestedConnectorKey, toolkit: requestedConnectorKey, enabled: true };
       }
-      // Client storage can be stale or empty. Resolve the live Composio account before deciding
-      // whether to ask for authorization, so the AI and connector panel see the same state.
-      if (requestedConnectorKey && process.env.COMPOSIO_API_KEY && (!requestedState || requestedState.enabled === false) && !oauthConnected.has(requestedConnectorKey)) {
+      // Client storage can be stale or empty. Resolve the live Composio account on every
+      // connector request, so Settings, permission cards, and chat share the same state.
+      if (requestedConnectorKey && process.env.COMPOSIO_API_KEY && !oauthConnected.has(requestedConnectorKey)) {
         try {
           const liveSession = await getSession();
           const liveUserId = liveSession?.user?.sub;
-          const composio = new Composio({ apiKey: process.env.COMPOSIO_API_KEY });
-          const liveAccounts: any = liveUserId ? await composio.connectedAccounts.list({ userIds: getComposioUserIds(liveUserId), limit: 1000 }) : null;
-          const liveAccount = (liveAccounts?.items || []).find((account: any) => {
-            const toolkit = String(account?.toolkit?.slug || '').toLowerCase().replace(/[- ]/g, '_');
-            const status = String(account?.status || '').toLowerCase();
-            return connectorKeysMatch(toolkit, requestedConnectorKey) && !account?.isDisabled && ['active', 'connected', 'success'].includes(status);
-          });
-          if (liveAccount) requestedState = { source: 'composio', provider: requestedConnectorKey, toolkit: requestedConnectorKey, accountId: liveAccount.id, enabled: true };
+          const liveAccounts = liveComposioAccounts || (liveUserId ? await getLiveComposioAccounts(liveUserId) : []);
+          liveComposioAccounts = liveAccounts;
+          const liveAccount = findEnabledComposioAccount(liveAccounts, requestedConnectorKey)
+            || liveAccounts.find((account) => connectorKeysMatch(account.toolkit, requestedConnectorKey))
+            || null;
+          if (liveAccount) {
+            requestedState = {
+              source: 'composio',
+              provider: requestedConnectorKey,
+              toolkit: liveAccount.toolkit,
+              accountId: liveAccount.id,
+              enabled: liveAccount.connected,
+            };
+          }
         } catch (error) {
           console.warn('Live connector state lookup failed:', error);
         }
@@ -3407,7 +3429,10 @@ export async function POST(req: NextRequest) {
                 _exec: async (args: any) => {
                   if (/GOOGLECALENDAR.*CREATE.*EVENT/i.test(String(schema.toolSlug))) return executeVerifiedGoogleCalendarCreate(composioSession, args || {});
                   const result = await composioSession.execute(schema.toolSlug, args || {});
-                  if (result?.error || result?.successful === false || result?.data?.error) throw new Error(String(result?.error || result?.data?.error || 'The connected service did not confirm the action.'));
+                  if (isWrappedConnectorFailure(result)) {
+                    const error = result?.error || result?.data?.error || result?.response_data?.error || 'The connected service did not confirm the action.';
+                    throw new Error(String(error));
+                  }
                   return normalizeConnectorResult(result?.data ?? result, schema.toolSlug);
                 },
               }));
@@ -3491,9 +3516,16 @@ export async function POST(req: NextRequest) {
       if (directReadTool) {
         const args = defaultReadToolArguments(directReadTool.function?.parameters);
         if (args) {
-          const result = await directReadTool._exec(args);
-          if (!String(result).startsWith("Tool error:")) {
-            return directTextResponse(String(result), requestedConnector?.label || requestedConnectorKey);
+          try {
+            const result = await directReadTool._exec(args);
+            if (!String(result).startsWith("Tool error:")) {
+              return directTextResponse(String(result), requestedConnector?.label || requestedConnectorKey);
+            }
+            const message = String(result).replace(/^Tool error:\s*/i, '').replace(/https?:\/\/\S+/g, '').slice(0, 240);
+            return directTextResponse(`${requestedConnector?.label || requestedConnectorKey} is connected, but it did not return verified data. ${message || 'Please try again after checking the connector status.'}`, requestedConnector?.label || requestedConnectorKey, 'connector-error');
+          } catch (error: any) {
+            const message = String(error?.message || 'The connected service did not confirm the read.').replace(/https?:\/\/\S+/g, '').slice(0, 240);
+            return directTextResponse(`${requestedConnector?.label || requestedConnectorKey} is connected, but it could not complete the read. ${message}`, requestedConnector?.label || requestedConnectorKey, 'connector-error');
           }
         }
       }
