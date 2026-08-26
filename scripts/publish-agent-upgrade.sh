@@ -46,6 +46,7 @@ files=(
   "tests/chat-connector-execution.test.mjs"
   "tests/calendar-event-presentation.test.mjs"
   "tests/github-pages-status.test.mjs"
+  "tests/uncgpt-router.test.mjs"
 )
 
 base_commit="$(gh api "repos/$repo/git/ref/heads/$branch" --jq '.object.sha')"

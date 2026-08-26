@@ -1212,6 +1212,26 @@ async function callChatWorkers(
   throw new Error("All Cloudflare chat workers failed");
 }
 
+function cloudflareModelFallbacks(model: string) {
+  const llama = "@cf/meta/llama-3.3-70b-instruct-fp8-fast";
+  if (model === "@cf/moonshotai/kimi-k2.5") return [model, "@cf/openai/gpt-oss-120b", llama];
+  if (model === "@cf/openai/gpt-oss-120b") return [model, llama];
+  return [model];
+}
+
+async function callCloudflareWithFallbacks(body: any, model: string, hasImage: boolean, tools: any[] = []) {
+  let lastError: unknown = null;
+  for (const candidate of cloudflareModelFallbacks(model)) {
+    try {
+      return await callChatWorkers(body, candidate, hasImage, tools);
+    } catch (error) {
+      lastError = error;
+      console.warn(`[Cloudflare] ${candidate} unavailable; trying the next compatible model.`, error);
+    }
+  }
+  throw lastError instanceof Error ? lastError : new Error("All compatible Cloudflare models failed");
+}
+
 async function fallbackChat(
   messages: any[],
   hasImage: boolean,
@@ -1278,9 +1298,9 @@ async function fallbackChat(
     errors.push(`OpenRouter: ${err.message}`);
   }
   try {
-    return await callChatWorkers(
+    return await callCloudflareWithFallbacks(
       { task: "chat", messages },
-      "@cf/meta/llama-3.3-70b-instruct-fp8-fast",
+      "@cf/openai/gpt-oss-120b",
       false,
       tools
     );
@@ -3658,7 +3678,7 @@ export async function POST(req: NextRequest) {
       } else if (resolvedProvider === "openrouter") {
         result = await callOpenRouter(messagesWithSystem, hasImage, availableTools);
       } else if (resolvedProvider === "cloudflare" || resolvedModel.startsWith("@cf/")) {
-        result = await callChatWorkers(
+        result = await callCloudflareWithFallbacks(
           { task: "chat", messages: messagesWithSystem },
           resolvedModel,
           hasImage,

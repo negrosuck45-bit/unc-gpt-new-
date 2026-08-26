@@ -19,29 +19,27 @@ export function chooseUncGptRoute(messages: any[], hasImage: boolean): UncGptRou
     return { provider: "openai", model: process.env.OPENAI_CHAT_MODEL || "gpt-4.1-mini", reason: hasImage ? "vision" : "general" };
   }
 
-  if (hasImage) {
-    return { provider: "groq", model: "meta-llama/llama-4-scout-17b-16e-instruct", reason: "vision" };
+  const agenticIntent = /\b(agent|browser|website|image|screenshot|research|analy[sz]e|long context|multi[- ]step|codebase|refactor|debug|typescript|javascript|python|sql|react|next\.js)\b/.test(text);
+  const connectedToolIntent = /\b(repository|pull request|github|notion|calendar|email|gmail|slack|drive|discord|vercel|mcp|connector|deploy|schedule)\b/.test(text);
+
+  // Kimi has native vision and multi-turn tool calling on Workers AI. If it is unavailable
+  // on the configured Cloudflare account, the chat route falls back to GPT-OSS then Llama.
+  if (hasImage || agenticIntent) {
+    return { provider: "cloudflare", model: "@cf/moonshotai/kimi-k2.5", reason: hasImage ? "vision" : "coding-and-connected-tools" };
   }
 
-  if (/\b(prove|derive|reason|logic|algorithm|math|step by step|think deeply|root cause|architecture)\b/.test(text)) {
-    return { provider: "groq", model: "deepseek-r1-distill-llama-70b", reason: "reasoning" };
-  }
-
-  if (/\b(code|debug|typescript|javascript|python|sql|react|next\.js|repository|pull request|github|notion|calendar|email|slack|drive)\b/.test(text)) {
-    return { provider: "groq", model: "llama-3.3-70b-versatile", reason: "coding-and-connected-tools" };
+  // Keep external writes and connected-account reads on a high-reasoning function-calling model.
+  if (connectedToolIntent || /\b(prove|derive|reason|logic|algorithm|math|step by step|think deeply|root cause|architecture)\b/.test(text)) {
+    return { provider: "cloudflare", model: "@cf/openai/gpt-oss-120b", reason: connectedToolIntent ? "coding-and-connected-tools" : "reasoning" };
   }
 
   if (/\b(quick|brief|short|one sentence|yes or no)\b/.test(text)) {
-    return { provider: "groq", model: "llama-3.1-8b-instant", reason: "fast" };
+    return { provider: "cloudflare", model: "@cf/meta/llama-3.3-70b-instruct-fp8-fast", reason: "fast" };
   }
 
   if (hasKey("OPENROUTER_API_KEY")) {
     return { provider: "openrouter", model: "meta-llama/llama-3.1-8b-instruct:free", reason: "general" };
   }
 
-  if (hasKey("CLOUDFLARE_API_TOKEN") && hasKey("CLOUDFLARE_ACCOUNT_ID")) {
-    return { provider: "cloudflare", model: "@cf/meta/llama-3.3-70b-instruct-fp8-fast", reason: "general" };
-  }
-
-  return { provider: "cloudflare", model: "@cf/meta/llama-3.3-70b-instruct-fp8-fast", reason: "general" };
+  return { provider: "cloudflare", model: "@cf/openai/gpt-oss-120b", reason: "general" };
 }
