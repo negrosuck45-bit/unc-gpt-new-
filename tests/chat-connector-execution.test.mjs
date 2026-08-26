@@ -84,6 +84,21 @@ async function responseSseText(response) {
   return response.text();
 }
 
+function githubWebsiteSchemas() {
+  return {
+    toolSchemas: [
+      { toolSlug: 'GITHUB_CREATE_OR_UPDATE_FILE_CONTENTS', description: 'Create or update file contents in a repository.', inputSchema: { type: 'object', properties: { owner: {}, repo: {}, path: {}, content: {}, message: {}, branch: {} } } },
+      { toolSlug: 'GITHUB_GET_FILE_CONTENTS', description: 'Get file contents from a repository.', inputSchema: { type: 'object', properties: { owner: {}, repo: {}, path: {}, ref: {} } } },
+      { toolSlug: 'GITHUB_CREATE_A_WORKFLOW_DISPATCH_EVENT', description: 'Create a workflow dispatch event.', inputSchema: { type: 'object', properties: { owner: {}, repo: {}, workflow_id: {}, ref: {} } } },
+      { toolSlug: 'GITHUB_LIST_WORKFLOW_RUNS_FOR_A_WORKFLOW', description: 'List workflow runs for a workflow.', inputSchema: { type: 'object', properties: { owner: {}, repo: {}, workflow_id: {}, ref: {} } } },
+      { toolSlug: 'GITHUB_CREATE_OR_UPDATE_GITHUB_PAGES_SITE', description: 'Configure a GitHub Pages site.', inputSchema: { type: 'object', properties: { owner: {}, repo: {}, build_type: {}, source_branch: {} } } },
+      { toolSlug: 'GITHUB_GET_LATEST_PAGES_BUILD', description: 'Get latest GitHub Pages build.', inputSchema: { type: 'object', properties: { owner: {}, repo: {} } } },
+    ],
+  };
+}
+
+const pagesWorkflowReadBack = Buffer.from('on:\n  workflow_dispatch:\njobs:\n  deploy:\n    steps:\n      - uses: actions/deploy-pages@v4\n').toString('base64');
+
 function createRoute({ connectorSession, enabledToolkits }) {
   return compileModule('../app/api/chat/route.ts', {
     '@/lib/auth': { getSession: async () => ({ user: { sub: 'clerk-user-1' } }) },
@@ -112,7 +127,7 @@ test('runs the authenticated GitHub website workflow instead of falling into the
   const calls = [];
   let repositoryCreated = false;
   const connectorSession = {
-    async search() { return {}; },
+    async search() { return githubWebsiteSchemas(); },
     async execute(slug, args) {
       calls.push({ slug, args });
       if (slug === 'GITHUB_GET_THE_AUTHENTICATED_USER') return { successful: true, data: { login: 'test-owner' } };
@@ -123,6 +138,10 @@ test('runs the authenticated GitHub website workflow instead of falling into the
       }
       if (slug === 'GITHUB_CREATE_OR_UPDATE_FILE_CONTENTS') return { successful: true, data: { content: { sha: 'file-sha' } } };
       if (slug === 'GITHUB_CREATE_OR_UPDATE_GITHUB_PAGES_SITE') return { successful: true, data: { status: 'building' } };
+      if (slug === 'GITHUB_GET_FILE_CONTENTS') return { successful: true, data: { content: pagesWorkflowReadBack } };
+      if (slug === 'GITHUB_CREATE_A_WORKFLOW_DISPATCH_EVENT') return { successful: true, data: {} };
+      if (slug === 'GITHUB_LIST_WORKFLOW_RUNS_FOR_A_WORKFLOW') return { successful: true, data: { workflow_runs: calls.some((call) => call.slug === 'GITHUB_CREATE_A_WORKFLOW_DISPATCH_EVENT') ? [{ id: 44, event: 'workflow_dispatch', status: 'queued' }] : [] } };
+      if (slug === 'GITHUB_GET_LATEST_PAGES_BUILD') return { successful: true, data: { status: 'building' } };
       if (slug === 'GITHUB_REQUEST_A_GITHUB_PAGES_BUILD') throw new Error('Legacy GitHub Pages build action must not be used');
       throw new Error(`Unexpected GitHub tool: ${slug}`);
     },
@@ -143,7 +162,43 @@ test('runs the authenticated GitHub website workflow instead of falling into the
   assert.equal(fileWrites.length, 5);
   assert.ok(fileWrites.some((call) => /\.github\/workflows\/deploy-pages\.yml/.test(JSON.stringify(call.args))));
   assert.ok(calls.some((call) => call.slug === 'GITHUB_CREATE_OR_UPDATE_GITHUB_PAGES_SITE'));
+  assert.ok(calls.some((call) => call.slug === 'GITHUB_GET_FILE_CONTENTS'));
+  assert.ok(calls.some((call) => call.slug === 'GITHUB_CREATE_A_WORKFLOW_DISPATCH_EVENT'));
+  assert.ok(calls.some((call) => call.slug === 'GITHUB_LIST_WORKFLOW_RUNS_FOR_A_WORKFLOW'));
   assert.doesNotMatch(JSON.stringify(calls), /GITHUB_REQUEST_A_GITHUB_PAGES_BUILD/);
+});
+
+test('refuses to emit a GitHub Pages deployment card when workflow read-back is missing', async () => {
+  const calls = [];
+  let repositoryCreated = false;
+  const connectorSession = {
+    async search() { return githubWebsiteSchemas(); },
+    async execute(slug, args) {
+      calls.push({ slug, args });
+      if (slug === 'GITHUB_GET_THE_AUTHENTICATED_USER') return { successful: true, data: { login: 'test-owner' } };
+      if (slug === 'GITHUB_CREATE_OR_UPDATE_FILE_CONTENTS' && !repositoryCreated) return { successful: false, error: 'Repository not found' };
+      if (slug === 'GITHUB_CREATE_A_REPOSITORY_FOR_THE_AUTHENTICATED_USER') {
+        repositoryCreated = true;
+        return { successful: true, data: { name: 'uncgpt-site-12345678', default_branch: 'main' } };
+      }
+      if (slug === 'GITHUB_CREATE_OR_UPDATE_FILE_CONTENTS') return { successful: true, data: { content: { sha: 'file-sha' } } };
+      if (slug === 'GITHUB_CREATE_OR_UPDATE_GITHUB_PAGES_SITE') return { successful: true, data: { status: 'building' } };
+      if (slug === 'GITHUB_GET_FILE_CONTENTS') return { successful: true, data: { content: Buffer.from('name: not-pages-workflow').toString('base64') } };
+      throw new Error(`Unexpected GitHub tool: ${slug}`);
+    },
+  };
+  const { POST } = createRoute({ connectorSession, enabledToolkits: ['github'] });
+  const response = await POST(createRequest({
+    messages: [{ role: 'user', content: 'Create me a GitHub repo and a live website' }],
+    computerUse: false,
+    mcpConnectors: [{ source: 'composio', provider: 'github', enabled: true }],
+  }));
+  const text = await responseSseText(response);
+
+  assert.match(text, /couldn’t finish the website publish/i);
+  assert.match(text, /did not read back the expected Pages Actions workflow/i);
+  assert.doesNotMatch(text, /UNCGPT_WEBSITE_DEPLOYMENT/);
+  assert.doesNotMatch(JSON.stringify(calls), /GITHUB_CREATE_A_WORKFLOW_DISPATCH_EVENT/);
 });
 
 test('creates and reads back a Calendar event instead of falling into the generic write guard', async () => {
@@ -235,11 +290,15 @@ test('discovers and reads from a live connected Composio app outside the built-i
 test('repairs a failed GitHub Pages deployment from prior repository context instead of falling into generic prose', async () => {
   const calls = [];
   const connectorSession = {
-    async search() { return {}; },
+    async search() { return githubWebsiteSchemas(); },
     async execute(slug, args) {
       calls.push({ slug, args });
       if (slug === 'GITHUB_CREATE_OR_UPDATE_GITHUB_PAGES_SITE') return { successful: true, data: { status: 'building' } };
       if (slug === 'GITHUB_CREATE_OR_UPDATE_FILE_CONTENTS') return { successful: true, data: { content: { sha: 'workflow-sha' } } };
+      if (slug === 'GITHUB_GET_FILE_CONTENTS') return { successful: true, data: { content: pagesWorkflowReadBack } };
+      if (slug === 'GITHUB_CREATE_A_WORKFLOW_DISPATCH_EVENT') return { successful: true, data: {} };
+      if (slug === 'GITHUB_LIST_WORKFLOW_RUNS_FOR_A_WORKFLOW') return { successful: true, data: { workflow_runs: calls.some((call) => call.slug === 'GITHUB_CREATE_A_WORKFLOW_DISPATCH_EVENT') ? [{ id: 55, event: 'workflow_dispatch', status: 'queued' }] : [] } };
+      if (slug === 'GITHUB_GET_LATEST_PAGES_BUILD') return { successful: true, data: { status: 'building' } };
       if (slug === 'GITHUB_REQUEST_A_GITHUB_PAGES_BUILD') throw new Error('Legacy GitHub Pages build action must not be used during repair');
       throw new Error(`Unexpected GitHub repair tool: ${slug}`);
     },
@@ -261,6 +320,8 @@ test('repairs a failed GitHub Pages deployment from prior repository context ins
   assert.doesNotMatch(text, /It seems that the GitHub Pages deployment failed/i);
   assert.ok(calls.some((call) => call.slug === 'GITHUB_CREATE_OR_UPDATE_GITHUB_PAGES_SITE'));
   assert.ok(calls.some((call) => call.slug === 'GITHUB_CREATE_OR_UPDATE_FILE_CONTENTS' && /\.github\/workflows\/deploy-pages\.yml/.test(JSON.stringify(call.args))));
+  assert.ok(calls.some((call) => call.slug === 'GITHUB_GET_FILE_CONTENTS'));
+  assert.ok(calls.some((call) => call.slug === 'GITHUB_CREATE_A_WORKFLOW_DISPATCH_EVENT'));
   assert.doesNotMatch(JSON.stringify(calls), /GITHUB_REQUEST_A_GITHUB_PAGES_BUILD/);
 });
 
@@ -269,7 +330,7 @@ test('creates a new unique repository for a fresh website request even when a pr
   const calls = [];
   let repositoryCreated = false;
   const connectorSession = {
-    async search() { return {}; },
+    async search() { return githubWebsiteSchemas(); },
     async execute(slug, args) {
       calls.push({ slug, args });
       if (slug === 'GITHUB_GET_THE_AUTHENTICATED_USER') return { successful: true, data: { login: 'test-owner' } };
@@ -280,6 +341,10 @@ test('creates a new unique repository for a fresh website request even when a pr
       }
       if (slug === 'GITHUB_CREATE_OR_UPDATE_FILE_CONTENTS') return { successful: true, data: { content: { sha: 'file-sha' } } };
       if (slug === 'GITHUB_CREATE_OR_UPDATE_GITHUB_PAGES_SITE') return { successful: true, data: { status: 'building' } };
+      if (slug === 'GITHUB_GET_FILE_CONTENTS') return { successful: true, data: { content: pagesWorkflowReadBack } };
+      if (slug === 'GITHUB_CREATE_A_WORKFLOW_DISPATCH_EVENT') return { successful: true, data: {} };
+      if (slug === 'GITHUB_LIST_WORKFLOW_RUNS_FOR_A_WORKFLOW') return { successful: true, data: { workflow_runs: calls.some((call) => call.slug === 'GITHUB_CREATE_A_WORKFLOW_DISPATCH_EVENT') ? [{ id: 66, event: 'workflow_dispatch', status: 'queued' }] : [] } };
+      if (slug === 'GITHUB_GET_LATEST_PAGES_BUILD') return { successful: true, data: { status: 'building' } };
       throw new Error(`Unexpected GitHub website tool: ${slug}`);
     },
   };

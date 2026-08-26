@@ -79,6 +79,21 @@ test('reports a confirmed GitHub Pages deployment error instead of leaving the c
   assert.match(data.reason, /Pages build failed/);
 });
 
+test('reports a workflow-configured Pages site with no Actions run as failed instead of publishing forever', async () => {
+  const GET = createHandler(async (url) => {
+    const value = String(url);
+    if (value.endsWith('/pages')) return { ok: true, json: async () => ({ build_type: 'workflow', status: null }) };
+    if (value.includes('/actions/workflows/deploy-pages.yml/runs')) return { ok: true, json: async () => ({ total_count: 0, workflow_runs: [] }) };
+    return { ok: false, status: 404 };
+  });
+  const response = await GET(createRequest('https://unc-gptt.vercel.app/api/github-pages/status?owner=test-owner&repo=demo-site', 'connected-github-token'));
+  const data = await response.json();
+
+  assert.equal(data.state, 'failed');
+  assert.equal(data.verified, false);
+  assert.match(data.reason, /did not report a Pages Actions workflow run/i);
+});
+
 test('reports a failed Pages build from a connected Composio GitHub account when native OAuth is absent', async () => {
   const GET = createHandler(async () => ({ ok: false, status: 404 }), {
     session: { user: { sub: 'clerk-user-1' } },

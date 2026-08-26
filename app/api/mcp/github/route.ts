@@ -14,6 +14,8 @@ import { NextRequest, NextResponse } from "next/server";
  *  - list_issues        { owner, repo, state? }
  *  - get_repo           { owner, repo }
  *  - create_repo        { name, description?, private? }
+ *  - dispatch_workflow  { owner, repo, workflow, ref? }
+ *  - list_workflow_runs { owner, repo, workflow, branch? }
  */
 
 const GH = "https://api.github.com";
@@ -29,8 +31,10 @@ async function gh(token: string, path: string, method = "GET", body?: unknown) {
     },
     ...(body ? { body: JSON.stringify(body) } : {}),
   });
-  const data = await res.json();
-  if (!res.ok) throw new Error(data.message || `GitHub API error ${res.status}`);
+  const text = await res.text();
+  let data: any = null;
+  try { data = text ? JSON.parse(text) : null; } catch { data = text; }
+  if (!res.ok) throw new Error(data?.message || `GitHub API error ${res.status}`);
   return data;
 }
 
@@ -141,6 +145,25 @@ export async function POST(request: NextRequest) {
       case "get_pages_build":
         result = await gh(token, `/repos/${params.owner}/${params.repo}/pages/builds/latest`);
         break;
+
+      case "dispatch_workflow": {
+        const workflow = String(params.workflow || params.workflow_id || "").trim();
+        if (!workflow) throw new Error("A workflow filename or ID is required");
+        result = await gh(token, `/repos/${encodeURIComponent(params.owner)}/${encodeURIComponent(params.repo)}/actions/workflows/${encodeURIComponent(workflow)}/dispatches`, "POST", {
+          ref: params.ref || params.branch || "main",
+          ...(params.inputs && typeof params.inputs === "object" ? { inputs: params.inputs } : {}),
+        });
+        break;
+      }
+
+      case "list_workflow_runs": {
+        const workflow = String(params.workflow || params.workflow_id || "").trim();
+        if (!workflow) throw new Error("A workflow filename or ID is required");
+        const query = new URLSearchParams({ event: "workflow_dispatch", per_page: "10" });
+        if (params.branch) query.set("branch", String(params.branch));
+        result = await gh(token, `/repos/${encodeURIComponent(params.owner)}/${encodeURIComponent(params.repo)}/actions/workflows/${encodeURIComponent(workflow)}/runs?${query.toString()}`);
+        break;
+      }
 
       case "create_issue":
         result = await gh(token, `/repos/${params.owner}/${params.repo}/issues`, "POST", {
