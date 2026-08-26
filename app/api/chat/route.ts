@@ -1909,11 +1909,24 @@ function decodedGithubFileContent(value: any) {
 }
 
 function assertGithubPagesWorkflowReadBack(value: any) {
-  const content = decodedGithubFileContent(value);
+  const direct = typeof value === "string" ? value : "";
+  const content = /workflow_dispatch:/i.test(direct) && /actions\/deploy-pages@v4/i.test(direct) ? direct : decodedGithubFileContent(value);
   if (!/workflow_dispatch:/i.test(content) || !/actions\/deploy-pages@v4/i.test(content)) {
     throw new Error("GitHub did not read back the expected Pages Actions workflow after it was written.");
   }
   return content;
+}
+
+async function readPublicGithubWorkflow(owner: string, repo: string, branch: string, path: string) {
+  const url = `https://raw.githubusercontent.com/${encodeURIComponent(owner)}/${encodeURIComponent(repo)}/${encodeURIComponent(branch)}/${path.split("/").map(encodeURIComponent).join("/")}`;
+  for (let attempt = 0; attempt < 3; attempt += 1) {
+    try {
+      const response = await fetch(url, { cache: "no-store", signal: AbortSignal.timeout(5000) });
+      if (response.ok) return response.text();
+    } catch {}
+    if (attempt < 2) await new Promise((resolve) => setTimeout(resolve, 700));
+  }
+  throw new Error("GitHub did not make the deployment workflow available for read-back.");
 }
 
 async function executeWebsiteScaffold(baseUrl: string, cookieHeader: string, owner: string, repo: string, userText: string, deployPages: boolean, deployVercel: boolean, repairOnly = false) {
@@ -2063,9 +2076,11 @@ function knownComposioGithubSchema(toolSlug: string) {
     ? { name: { type: "string" }, description: { type: "string" }, private: { type: "boolean" } }
     : toolSlug === "GITHUB_CREATE_OR_UPDATE_FILE_CONTENTS"
       ? { owner: { type: "string" }, repo: { type: "string" }, path: { type: "string" }, content: { type: "string", description: "Base64 encoded file content." }, message: { type: "string" }, branch: { type: "string" } }
-      : toolSlug === "GITHUB_CREATE_OR_UPDATE_GITHUB_PAGES_SITE" || toolSlug === "GITHUB_CREATE_A_GITHUB_PAGES_SITE"
-        ? { owner: { type: "string" }, repo: { type: "string" }, build_type: { type: "string" }, source_branch: { type: "string" } }
-        : { owner: { type: "string" }, repo: { type: "string" } };
+      : toolSlug === "GITHUB_CREATE_A_WORKFLOW_DISPATCH_EVENT" || toolSlug === "GITHUB_LIST_WORKFLOW_RUNS_FOR_A_WORKFLOW"
+        ? { owner: { type: "string" }, repo: { type: "string" }, workflow_id: { type: "string" }, ref: { type: "string" } }
+        : toolSlug === "GITHUB_CREATE_OR_UPDATE_GITHUB_PAGES_SITE" || toolSlug === "GITHUB_CREATE_A_GITHUB_PAGES_SITE"
+          ? { owner: { type: "string" }, repo: { type: "string" }, build_type: { type: "string" }, source_branch: { type: "string" } }
+          : { owner: { type: "string" }, repo: { type: "string" } };
   return { toolSlug, inputSchema: { type: "object", properties } };
 }
 
@@ -2123,13 +2138,18 @@ function composioWorkflowArguments(schema: any, owner: string, repo: string, wor
 
 async function executeComposioWebsiteScaffold(session: any, owner: string, repo: string, userText: string, deployPages: boolean, repairOnly = false) {
   const files = repairOnly ? {} : buildPortfolioFiles(userText);
-  let search: any = null;
-  try {
-    search = await session.search({ query: "create GitHub repository, get repository, create or update repository files, get repository file contents, configure GitHub Pages, create workflow dispatch event, and list workflow runs", toolkits: ["github"] });
-  } catch (error) {
-    console.warn("Composio GitHub tool search failed; using canonical slugs", error);
+  const searchResults: any[] = [];
+  const searchQueries = [
+    "create GitHub repository, get repository, create or update repository files, and configure GitHub Pages",
+    "get raw repository content for a GitHub file path",
+    "create a GitHub Actions workflow dispatch event",
+    "list GitHub Actions workflow runs for a workflow",
+  ];
+  for (const query of searchQueries) {
+    try { searchResults.push(await session.search({ query, toolkits: ["github"] })); }
+    catch (error) { console.warn("Composio GitHub tool search failed", error); }
   }
-  const schemas = normalizeComposioSearchSchemas(search);
+  const schemas = [...new Map(searchResults.flatMap(normalizeComposioSearchSchemas).map((schema) => [schema.toolSlug, schema])).values()];
   const descriptor = (schema: any) => `${schema?.toolSlug || ""} ${schema?.name || ""} ${schema?.displayName || ""} ${schema?.description || ""} ${schema?.humanDescription || ""}`.toLowerCase();
   const hasField = (schema: any, aliases: string[]) => {
     const inputSchema = getComposioInputSchema(schema);
@@ -2141,8 +2161,8 @@ async function executeComposioWebsiteScaffold(session: any, owner: string, repo:
   const getRepoSchema = schemas.find((schema) => /(?:get|retrieve|fetch|inspect).*(?:repo|repository)|(?:repo|repository).*(?:get|retrieve|fetch|inspect)/.test(descriptor(schema)) && !/list|search/.test(descriptor(schema)));
   const createRepoSchema = schemas.find((schema) => /(?:create|make|new).*(?:repo|repository)|(?:repo|repository).*(?:create|make|new)/.test(descriptor(schema)) && !/file|issue|pull|branch/.test(descriptor(schema))) || knownComposioGithubSchema("GITHUB_CREATE_A_REPOSITORY_FOR_THE_AUTHENTICATED_USER");
   const workflowReadSchema = schemas.find((schema) => /(?:get|read|retrieve|fetch).*(?:file|content)|(?:file|content).*(?:get|read|retrieve|fetch)/.test(descriptor(schema)) && hasField(schema, ["path", "file_path", "filename", "file_name"]));
-  const workflowDispatchSchema = schemas.find((schema) => /(?:create|trigger|dispatch).*(?:workflow)|(?:workflow).*(?:create|trigger|dispatch)/.test(descriptor(schema)) && hasField(schema, ["workflow_id", "workflow", "workflow_file", "workflow_filename", "workflow_name"]));
-  const workflowRunsSchema = schemas.find((schema) => /(?:list|find|search|get).*(?:workflow).*(?:run)|(?:workflow).*(?:run).*(?:list|find|search|get)/.test(descriptor(schema)) && hasField(schema, ["workflow_id", "workflow", "workflow_file", "workflow_filename", "workflow_name"]));
+  const workflowDispatchSchema = schemas.find((schema) => /(?:create|trigger|dispatch).*(?:workflow)|(?:workflow).*(?:create|trigger|dispatch)/.test(descriptor(schema)) && hasField(schema, ["workflow_id", "workflow", "workflow_file", "workflow_filename", "workflow_name"])) || knownComposioGithubSchema("GITHUB_CREATE_A_WORKFLOW_DISPATCH_EVENT");
+  const workflowRunsSchema = schemas.find((schema) => /(?:list|find|search|get).*(?:workflow).*(?:run)|(?:workflow).*(?:run).*(?:list|find|search|get)/.test(descriptor(schema)) && hasField(schema, ["workflow_id", "workflow", "workflow_file", "workflow_filename", "workflow_name"])) || knownComposioGithubSchema("GITHUB_LIST_WORKFLOW_RUNS_FOR_A_WORKFLOW");
   const pagesBuildSchema = schemas.find((schema) => /(?:get|retrieve|fetch).*(?:latest).*(?:page|pages).*(?:build)|(?:page|pages).*(?:build).*(?:get|retrieve|fetch)/.test(descriptor(schema))) || knownComposioGithubSchema("GITHUB_GET_LATEST_PAGES_BUILD");
   let repository: any = null;
   let createdRepository = false;
@@ -2182,9 +2202,6 @@ async function executeComposioWebsiteScaffold(session: any, owner: string, repo:
   }
   const result: any = { owner, repo, branch, createdRepository, repositoryUrl: repository?.html_url || repository?.htmlUrl || `https://github.com/${owner}/${repo}`, files: Object.keys(files) };
   if (deployPages) {
-    if (!workflowReadSchema || !workflowDispatchSchema || !workflowRunsSchema) {
-      throw new Error("The connected GitHub account did not provide the file read-back and workflow-dispatch tools required to verify a GitHub Pages deployment.");
-    }
     const pageSchema = schemas.find((schema) => /(?:enable|create|configure|setup).*(?:page|pages)|(?:page|pages).*(?:enable|create|configure|setup)/.test(descriptor(schema)) && !/list|search|get|build/.test(descriptor(schema))) || knownComposioGithubSchema("GITHUB_CREATE_OR_UPDATE_GITHUB_PAGES_SITE");
     const pageResponse = await session.execute(pageSchema.toolSlug, composioSchemaArguments(pageSchema, { owner, repo, branch, build_type: "workflow" }));
     if (pageResponse?.error || pageResponse?.successful === false || pageResponse?.data?.error) throw new Error(String(pageResponse?.error || pageResponse?.data?.error || "GitHub Pages was not configured for Actions deployment."));
@@ -2196,11 +2213,15 @@ async function executeComposioWebsiteScaffold(session: any, owner: string, repo:
     if (workflowResponse?.error || workflowResponse?.successful === false || workflowResponse?.data?.error) {
       throw new Error(String(workflowResponse?.error || workflowResponse?.data?.error || "GitHub did not confirm writing the Pages deployment workflow."));
     }
-    const workflowFile = await session.execute(workflowReadSchema.toolSlug, composioSchemaArguments(workflowReadSchema, { owner, repo, path: workflowPath, branch }));
-    if (workflowFile?.error || workflowFile?.successful === false || workflowFile?.data?.error) {
-      throw new Error(String(workflowFile?.error || workflowFile?.data?.error || "GitHub did not confirm reading the Pages deployment workflow."));
+    let workflowReadBack: any = null;
+    if (workflowReadSchema) {
+      try {
+        const workflowFile = await session.execute(workflowReadSchema.toolSlug, composioSchemaArguments(workflowReadSchema, { owner, repo, path: workflowPath, branch }));
+        if (!workflowFile?.error && workflowFile?.successful !== false && !workflowFile?.data?.error) workflowReadBack = workflowFile;
+      } catch {}
     }
-    assertGithubPagesWorkflowReadBack(workflowFile);
+    if (workflowReadBack) assertGithubPagesWorkflowReadBack(workflowReadBack);
+    else assertGithubPagesWorkflowReadBack(await readPublicGithubWorkflow(owner, repo, branch, workflowPath));
     const workflowRun = await confirmGithubWorkflowDispatch(
       () => session.execute(workflowDispatchSchema.toolSlug, composioWorkflowArguments(workflowDispatchSchema, owner, repo, "deploy-pages.yml", branch)),
       () => session.execute(workflowRunsSchema.toolSlug, composioWorkflowArguments(workflowRunsSchema, owner, repo, "deploy-pages.yml", branch)),
@@ -3461,7 +3482,13 @@ export async function POST(req: NextRequest) {
           }
           return directTextResponse(lines.join("\n"), wantsGithubPages && wantsVercel ? "GitHub + GitHub Pages + Vercel" : wantsGithubPages ? "GitHub Pages" : wantsVercel ? "Vercel" : "GitHub", "connected-action");
         } catch (error: any) {
-          return directTextResponse(`I couldn’t finish the website publish for **${websiteRepository.owner}/${websiteRepository.repo}**. ${String(error?.message || "The connected service did not confirm the requested write or deployment.").slice(0, 360)}`, "GitHub", "connector-error");
+          const detail = String(error?.message || "The connected service did not confirm the requested write or deployment.");
+          console.error("GitHub website publish failed", { owner: websiteRepository.owner, repo: websiteRepository.repo, detail });
+          const connectorCapabilityFailure = /workflow-dispatch|workflow dispatch|file read-back|did not provide.*tool|make the deployment workflow available/i.test(detail);
+          const message = connectorCapabilityFailure
+            ? `The repository **${websiteRepository.owner}/${websiteRepository.repo}** was created, but GitHub did not confirm its Pages deployment. I did not mark it live. Please retry once while I restore the connected GitHub deployment path.`
+            : `I couldn’t finish the website publish for **${websiteRepository.owner}/${websiteRepository.repo}**. ${detail.slice(0, 360)}`;
+          return directTextResponse(message, "GitHub", "connector-error");
         }
       }
       if (githubCreateRequest && oauthConnected.has("github")) {

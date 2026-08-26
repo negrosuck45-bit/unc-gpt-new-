@@ -99,7 +99,7 @@ function githubWebsiteSchemas() {
 
 const pagesWorkflowReadBack = Buffer.from('on:\n  workflow_dispatch:\njobs:\n  deploy:\n    steps:\n      - uses: actions/deploy-pages@v4\n').toString('base64');
 
-function createRoute({ connectorSession, enabledToolkits }) {
+function createRoute({ connectorSession, enabledToolkits, fetchImpl }) {
   return compileModule('../app/api/chat/route.ts', {
     '@/lib/auth': { getSession: async () => ({ user: { sub: 'clerk-user-1' } }) },
     '@/lib/composio': {
@@ -116,10 +116,10 @@ function createRoute({ connectorSession, enabledToolkits }) {
     '@/lib/connector-results': { normalizeConnectorResult: (value) => typeof value === 'string' ? value : JSON.stringify(value) },
     '@/lib/connector-action-safety': connectorSafety,
   }, {
-    fetch: async (url) => {
+    fetch: fetchImpl || (async (url) => {
       if (String(url).includes('github.io')) return { ok: true, status: 200 };
       throw new Error(`Unexpected network call in connector test: ${url}`);
-    },
+    }),
   });
 }
 
@@ -366,6 +366,54 @@ test('creates a new unique repository for a fresh website request even when a pr
   assert.doesNotMatch(JSON.stringify(calls), /old-site/);
 });
 
+
+test('uses public workflow read-back and canonical Actions fallbacks when Composio search is sparse', async () => {
+  const calls = [];
+  let repositoryCreated = false;
+  let searches = 0;
+  const sparseSchemas = {
+    toolSchemas: [
+      { toolSlug: 'GITHUB_CREATE_OR_UPDATE_FILE_CONTENTS', description: 'Create or update file contents in a repository.', inputSchema: { type: 'object', properties: { owner: {}, repo: {}, path: {}, content: {}, message: {}, branch: {} } } },
+      { toolSlug: 'GITHUB_CREATE_OR_UPDATE_GITHUB_PAGES_SITE', description: 'Configure a GitHub Pages site.', inputSchema: { type: 'object', properties: { owner: {}, repo: {}, build_type: {}, source_branch: {} } } },
+    ],
+  };
+  const connectorSession = {
+    async search() { searches += 1; return searches === 1 ? sparseSchemas : {}; },
+    async execute(slug, args) {
+      calls.push({ slug, args });
+      if (slug === 'GITHUB_GET_THE_AUTHENTICATED_USER') return { successful: true, data: { login: 'test-owner' } };
+      if (slug === 'GITHUB_CREATE_OR_UPDATE_FILE_CONTENTS' && !repositoryCreated) return { successful: false, error: 'Repository not found' };
+      if (slug === 'GITHUB_CREATE_A_REPOSITORY_FOR_THE_AUTHENTICATED_USER') { repositoryCreated = true; return { successful: true, data: { name: 'uncgpt-site-12345678', default_branch: 'main' } }; }
+      if (slug === 'GITHUB_CREATE_OR_UPDATE_FILE_CONTENTS') return { successful: true, data: { content: { sha: 'file-sha' } } };
+      if (slug === 'GITHUB_CREATE_OR_UPDATE_GITHUB_PAGES_SITE') return { successful: true, data: { status: 'building' } };
+      if (slug === 'GITHUB_CREATE_A_WORKFLOW_DISPATCH_EVENT') return { successful: true, data: {} };
+      if (slug === 'GITHUB_LIST_WORKFLOW_RUNS_FOR_A_WORKFLOW') return { successful: true, data: { workflow_runs: calls.some((call) => call.slug === 'GITHUB_CREATE_A_WORKFLOW_DISPATCH_EVENT') ? [{ id: 91, event: 'workflow_dispatch', status: 'queued' }] : [] } };
+      if (slug === 'GITHUB_GET_LATEST_PAGES_BUILD') return { successful: true, data: { status: 'building' } };
+      throw new Error(`Unexpected sparse-schema GitHub tool: ${slug}`);
+    },
+  };
+  const { POST } = createRoute({
+    connectorSession,
+    enabledToolkits: ['github'],
+    fetchImpl: async (url) => {
+      const value = String(url);
+      if (value.includes('raw.githubusercontent.com')) return { ok: true, status: 200, text: async () => 'on:\\n  workflow_dispatch:\\njobs:\\n  deploy:\\n    steps:\\n      - uses: actions/deploy-pages@v4\\n' };
+      if (value.includes('github.io')) return { ok: true, status: 200 };
+      throw new Error(`Unexpected network call in sparse-schema test: ${url}`);
+    },
+  });
+  const response = await POST(createRequest({
+    messages: [{ role: 'user', content: 'Create me a GitHub repo and a live website showing a GTA 6 presentation.' }],
+    computerUse: false,
+    mcpConnectors: [{ source: 'composio', provider: 'github', enabled: true }],
+  }));
+  const text = await responseSseText(response);
+
+  assert.match(text, /UNCGPT_WEBSITE_DEPLOYMENT/);
+  assert.ok(calls.some((call) => call.slug === 'GITHUB_CREATE_A_WORKFLOW_DISPATCH_EVENT'));
+  assert.ok(calls.some((call) => call.slug === 'GITHUB_LIST_WORKFLOW_RUNS_FOR_A_WORKFLOW'));
+  assert.doesNotMatch(text, /did not provide the file read-back/i);
+});
 
 test('builds a GTA VI presentation instead of the generic personal portfolio fallback', async () => {
   const calls = [];
