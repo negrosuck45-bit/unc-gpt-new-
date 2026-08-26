@@ -513,3 +513,32 @@ textarea {
     background: linear-gradient(180deg, rgba(22, 22, 22, 0) 0%, rgba(22, 22, 22, 0.94) 28%, #161616 58%);
   }
 }
+
+/* Final minimal chat shell: flat header controls over an uninterrupted canvas. */
+.task-header {
+  border: 0 !important;
+  background: transparent !important;
+  backdrop-filter: none !important;
+  -webkit-backdrop-filter: none !important;
+}
+
+.task-header-icon,
+.task-header-icon:hover {
+  border: 0 !important;
+  background: transparent !important;
+  box-shadow: none !important;
+  color: rgba(255, 255, 255, 0.64) !important;
+}
+
+.task-header-icon:hover {
+  color: #fff !important;
+}
+
+.task-welcome-back {
+  font-family: Georgia, "Times New Roman", serif;
+  font-size: clamp(2.5rem, 7vw, 4.75rem);
+  font-weight: 400;
+  letter-spacing: -0.045em;
+  line-height: 1;
+  color: rgba(255, 255, 255, 0.92);
+}
