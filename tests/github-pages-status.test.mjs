@@ -7,6 +7,10 @@ import { createRequire } from 'node:module';
 const require = createRequire(import.meta.url);
 const ts = require('../node_modules/.pnpm/typescript@5.7.3/node_modules/typescript');
 
+function createRequest(url, githubToken) {
+  return { url, cookies: { get: (name) => name === 'mcp_oauth_github' && githubToken ? { value: githubToken } : undefined } };
+}
+
 function createHandler(fetchImpl) {
   const source = fs.readFileSync(new URL('../app/api/github-pages/status/route.ts', import.meta.url), 'utf8');
   const compiled = ts.transpileModule(source, {
@@ -35,7 +39,7 @@ test('reports a GitHub Pages site as live only after its public URL responds suc
     calls.push(String(url));
     return { ok: true, status: 200 };
   });
-  const response = await GET({ url: 'https://unc-gptt.vercel.app/api/github-pages/status?owner=test-owner&repo=demo-site' });
+  const response = await GET(createRequest('https://unc-gptt.vercel.app/api/github-pages/status?owner=test-owner&repo=demo-site'));
   const data = await response.json();
 
   assert.equal(data.state, 'live');
@@ -46,7 +50,7 @@ test('reports a GitHub Pages site as live only after its public URL responds suc
 
 test('keeps a GitHub Pages site in building state when the public URL is not ready', async () => {
   const GET = createHandler(async () => ({ ok: false, status: 404 }));
-  const response = await GET({ url: 'https://unc-gptt.vercel.app/api/github-pages/status?owner=test-owner&repo=demo-site' });
+  const response = await GET(createRequest('https://unc-gptt.vercel.app/api/github-pages/status?owner=test-owner&repo=demo-site'));
   const data = await response.json();
 
   assert.equal(data.state, 'building');
@@ -54,8 +58,23 @@ test('keeps a GitHub Pages site in building state when the public URL is not rea
   assert.equal(data.statusCode, 404);
 });
 
+test('reports a confirmed GitHub Pages deployment error instead of leaving the card on publishing', async () => {
+  const GET = createHandler(async (url) => {
+    const value = String(url);
+    if (value.endsWith('/pages')) return { ok: true, json: async () => ({ status: 'errored' }) };
+    if (value.endsWith('/pages/builds/latest')) return { ok: true, json: async () => ({ status: 'errored', error: { message: 'Pages build failed' } }) };
+    return { ok: false, status: 404 };
+  });
+  const response = await GET(createRequest('https://unc-gptt.vercel.app/api/github-pages/status?owner=test-owner&repo=demo-site', 'connected-github-token'));
+  const data = await response.json();
+
+  assert.equal(data.state, 'failed');
+  assert.equal(data.verified, false);
+  assert.match(data.reason, /Pages build failed/);
+});
+
 test('rejects invalid repository identifiers instead of probing arbitrary URLs', async () => {
   const GET = createHandler(async () => { throw new Error('fetch should not run'); });
-  const response = await GET({ url: 'https://unc-gptt.vercel.app/api/github-pages/status?owner=bad%2Fowner&repo=demo' });
+  const response = await GET(createRequest('https://unc-gptt.vercel.app/api/github-pages/status?owner=bad%2Fowner&repo=demo'));
   assert.equal(response.status, 400);
 });

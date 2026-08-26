@@ -384,8 +384,9 @@ function WebsiteDeploymentCard({ deployment }: { deployment: WebsiteDeployment }
     const parts = String(deployment.repository || '').split('/').map((part) => part.trim()).filter(Boolean);
     return parts.length === 2 ? { owner: parts[0], repo: parts[1] } : null;
   }, [deployment.repository]);
-  const [liveState, setLiveState] = useState<'checking' | 'building' | 'live'>(deployment.verified ? 'live' : 'checking');
+  const [liveState, setLiveState] = useState<'checking' | 'building' | 'live' | 'failed'>(deployment.verified ? 'live' : 'checking');
   const [liveUrl, setLiveUrl] = useState(deployment.url);
+  const [failureReason, setFailureReason] = useState('');
 
   useEffect(() => {
     if (deployment.verified || !repository) return;
@@ -400,6 +401,11 @@ function WebsiteDeploymentCard({ deployment }: { deployment: WebsiteDeployment }
         if (typeof data.url === 'string' && /^https:\/\//i.test(data.url)) setLiveUrl(data.url);
         if (data.verified === true && data.state === 'live') {
           setLiveState('live');
+          return;
+        }
+        if (data.state === 'failed') {
+          setFailureReason(typeof data.reason === 'string' ? data.reason : 'GitHub Pages reported a failed deployment.');
+          setLiveState('failed');
           return;
         }
         setLiveState('building');
@@ -417,8 +423,15 @@ function WebsiteDeploymentCard({ deployment }: { deployment: WebsiteDeployment }
   }, [deployment.verified, repository]);
 
   const isLive = liveState === 'live';
-  const statusLabel = isLive ? 'Live' : liveState === 'checking' ? 'Checking status' : 'Publishing';
-  const statusDescription = isLive ? 'Your website is live' : liveState === 'checking' ? 'Checking GitHub Pages' : 'GitHub Pages is publishing your website';
+  const isFailed = liveState === 'failed';
+  const statusLabel = isLive ? 'Live' : isFailed ? 'Deployment failed' : liveState === 'checking' ? 'Checking status' : 'Publishing';
+  const statusDescription = isLive
+    ? 'Your website is live'
+    : isFailed
+      ? (failureReason || 'GitHub Pages reported a deployment problem')
+      : liveState === 'checking'
+        ? 'Checking GitHub Pages'
+        : 'GitHub Pages is publishing your website';
   return (
     <section className="my-1 w-full max-w-md rounded-2xl border border-white/[0.09] bg-white/[0.035] px-4 py-3.5 shadow-none">
       <div className="flex items-start gap-3">
@@ -430,7 +443,7 @@ function WebsiteDeploymentCard({ deployment }: { deployment: WebsiteDeployment }
         <a href={liveUrl} target="_blank" rel="noopener noreferrer" aria-label="Open website" className="mt-0.5 inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-lg text-white/45 transition-colors duration-150 hover:bg-white/[0.08] hover:text-white focus:outline-none focus:ring-2 focus:ring-white/30 active:scale-95"><ExternalLink className="h-[17px] w-[17px]" aria-hidden="true" /></a>
       </div>
       {deployment.repository && <div className="mt-3 flex min-w-0 items-center gap-1.5 text-xs text-white/55"><GitBranch className="h-3.5 w-3.5 shrink-0 text-white/35" aria-hidden="true" /><span className="truncate">{deployment.repository}</span></div>}
-      <div className="mt-3 inline-flex items-center gap-1.5 text-xs font-medium text-white/50"><span className={cn('h-1.5 w-1.5 rounded-full', isLive ? 'bg-emerald-300/80' : 'bg-amber-300/80')} aria-hidden="true" />{statusLabel}</div>
+      <div className={cn('mt-3 inline-flex max-w-full items-center gap-1.5 text-xs font-medium', isFailed ? 'text-rose-200/80' : 'text-white/50')}><span className={cn('h-1.5 w-1.5 rounded-full', isLive ? 'bg-emerald-300/80' : isFailed ? 'bg-rose-300/90' : 'bg-amber-300/80')} aria-hidden="true" />{statusLabel}</div>
     </section>
   );
 }

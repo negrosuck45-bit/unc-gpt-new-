@@ -123,7 +123,7 @@ test('runs the authenticated GitHub website workflow instead of falling into the
       }
       if (slug === 'GITHUB_CREATE_OR_UPDATE_FILE_CONTENTS') return { successful: true, data: { content: { sha: 'file-sha' } } };
       if (slug === 'GITHUB_CREATE_OR_UPDATE_GITHUB_PAGES_SITE') return { successful: true, data: { status: 'building' } };
-      if (slug === 'GITHUB_REQUEST_A_GITHUB_PAGES_BUILD') return { successful: true, data: { status: 'building' } };
+      if (slug === 'GITHUB_REQUEST_A_GITHUB_PAGES_BUILD') throw new Error('Legacy GitHub Pages build action must not be used');
       throw new Error(`Unexpected GitHub tool: ${slug}`);
     },
   };
@@ -139,9 +139,11 @@ test('runs the authenticated GitHub website workflow instead of falling into the
   assert.match(text, /UNCGPT_WEBSITE_DEPLOYMENT/);
   assert.doesNotMatch(text, /could not verify the connected-app write action/i);
   assert.ok(calls.some((call) => call.slug === 'GITHUB_CREATE_A_REPOSITORY_FOR_THE_AUTHENTICATED_USER'));
-  assert.equal(calls.filter((call) => call.slug === 'GITHUB_CREATE_OR_UPDATE_FILE_CONTENTS').length, 4);
+  const fileWrites = calls.filter((call) => call.slug === 'GITHUB_CREATE_OR_UPDATE_FILE_CONTENTS');
+  assert.equal(fileWrites.length, 5);
+  assert.ok(fileWrites.some((call) => /\.github\/workflows\/deploy-pages\.yml/.test(JSON.stringify(call.args))));
   assert.ok(calls.some((call) => call.slug === 'GITHUB_CREATE_OR_UPDATE_GITHUB_PAGES_SITE'));
-  assert.ok(calls.some((call) => call.slug === 'GITHUB_REQUEST_A_GITHUB_PAGES_BUILD'));
+  assert.doesNotMatch(JSON.stringify(calls), /GITHUB_REQUEST_A_GITHUB_PAGES_BUILD/);
 });
 
 test('creates and reads back a Calendar event instead of falling into the generic write guard', async () => {

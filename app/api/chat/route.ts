@@ -1737,6 +1737,10 @@ function buildPortfolioFiles(userText: string) {
   };
 }
 
+function githubPagesWorkflow(branch: string) {
+  return `name: Deploy GitHub Pages\n\non:\n  push:\n    branches: [${JSON.stringify(branch)}]\n  workflow_dispatch:\n\npermissions:\n  contents: read\n  pages: write\n  id-token: write\n\nconcurrency:\n  group: pages\n  cancel-in-progress: false\n\njobs:\n  build:\n    runs-on: ubuntu-latest\n    steps:\n      - name: Checkout\n        uses: actions/checkout@v6\n      - name: Configure Pages\n        uses: actions/configure-pages@v5\n      - name: Upload site\n        uses: actions/upload-pages-artifact@v4\n        with:\n          path: .\n  deploy:\n    needs: build\n    runs-on: ubuntu-latest\n    environment:\n      name: github-pages\n      url: \${{ steps.deployment.outputs.page_url }}\n    steps:\n      - name: Deploy\n        id: deployment\n        uses: actions/deploy-pages@v4\n`;
+}
+
 function canonicalGithubPagesUrl(owner: string, repo: string, candidate?: unknown) {
   const fallback = repo.toLowerCase() === `${owner.toLowerCase()}.github.io`
     ? `https://${owner}.github.io/`
@@ -1774,7 +1778,6 @@ async function waitForGithubPages(getPages: () => Promise<any>, getBuild: () => 
 
 async function executeWebsiteScaffold(baseUrl: string, cookieHeader: string, owner: string, repo: string, userText: string, deployPages: boolean, deployVercel: boolean) {
   const files = buildPortfolioFiles(userText);
-  const paths = Object.keys(files);
   let repository: any;
   let createdRepository = false;
   try {
@@ -1789,15 +1792,19 @@ async function executeWebsiteScaffold(baseUrl: string, cookieHeader: string, own
     createdRepository = true;
   }
   const branch = String(repository?.default_branch || "main");
+  const filesWithDeployment = {
+    ...files,
+    ".github/workflows/deploy-pages.yml": githubPagesWorkflow(branch),
+  };
+  const paths = Object.keys(filesWithDeployment);
   for (const path of paths) {
     await executeOAuthGithubAction(baseUrl, cookieHeader, "create_or_update_file", {
-      owner, repo, path, content: files[path as keyof typeof files], message: `Create portfolio website: ${path}`, branch,
+      owner, repo, path, content: filesWithDeployment[path as keyof typeof filesWithDeployment], message: `Create portfolio website: ${path}`, branch,
     });
   }
   const result: any = { owner, repo, branch, createdRepository, repositoryUrl: repository?.html_url || `https://github.com/${owner}/${repo}`, files: paths };
   if (deployPages) {
-    const pages = await executeOAuthGithubAction(baseUrl, cookieHeader, "enable_pages", { owner, repo, branch, path: "/", build_type: "legacy" });
-    try { await executeOAuthGithubAction(baseUrl, cookieHeader, "build_pages", { owner, repo }); } catch (error) { console.warn("GitHub Pages build request failed after enable", error); }
+    const pages = await executeOAuthGithubAction(baseUrl, cookieHeader, "enable_pages", { owner, repo, branch, path: "/", build_type: "workflow" });
     const readiness = await waitForGithubPages(
       () => executeOAuthGithubAction(baseUrl, cookieHeader, "get_pages", { owner, repo }),
       () => executeOAuthGithubAction(baseUrl, cookieHeader, "get_pages_build", { owner, repo }),
@@ -1914,7 +1921,7 @@ function knownComposioGithubSchema(toolSlug: string) {
   return { toolSlug, inputSchema: { type: "object", properties } };
 }
 
-function composioSchemaArguments(schema: any, base: { owner: string; repo: string; name?: string; description?: string; private?: boolean; path?: string; content?: string; message?: string; branch?: string }) {
+function composioSchemaArguments(schema: any, base: { owner: string; repo: string; name?: string; description?: string; private?: boolean; path?: string; content?: string; message?: string; branch?: string; build_type?: string }) {
   const inputSchema = getComposioInputSchema(schema) || schema?.inputSchema || {};
   const properties = inputSchema?.properties && typeof inputSchema.properties === "object" ? inputSchema.properties : {};
   const required = Array.isArray(inputSchema?.required) ? inputSchema.required : [];
@@ -1936,6 +1943,7 @@ function composioSchemaArguments(schema: any, base: { owner: string; repo: strin
   }
   put(["path", "file_path", "filename", "file_name"], base.path);
   put(["branch", "branch_name", "ref", "source_branch"], base.branch || "main");
+  put(["build_type", "buildType"], base.build_type);
   put(["message", "commit_message", "commitMessage"], base.message);
   if (base.content !== undefined) {
     const contentAliases = ["content", "file_content", "contents", "text", "fileContent", "file_contents"];
@@ -2004,11 +2012,18 @@ async function executeComposioWebsiteScaffold(session: any, owner: string, repo:
   const result: any = { owner, repo, branch, createdRepository, repositoryUrl: repository?.html_url || repository?.htmlUrl || `https://github.com/${owner}/${repo}`, files: Object.keys(files) };
   if (deployPages) {
     const pageSchema = schemas.find((schema) => /(?:enable|create|configure|setup).*(?:page|pages)|(?:page|pages).*(?:enable|create|configure|setup)/.test(descriptor(schema)) && !/list|search|get|build/.test(descriptor(schema))) || knownComposioGithubSchema("GITHUB_CREATE_OR_UPDATE_GITHUB_PAGES_SITE");
-    const buildSchema = schemas.find((schema) => /(?:build|publish|deploy|request).*(?:page|pages)|(?:page|pages).*(?:build|publish|deploy)/.test(descriptor(schema))) || knownComposioGithubSchema("GITHUB_REQUEST_A_GITHUB_PAGES_BUILD");
-    const pageResponse = await session.execute(pageSchema.toolSlug, composioSchemaArguments(pageSchema, { owner, repo, branch }));
-    if (pageResponse?.error || pageResponse?.successful === false || pageResponse?.data?.error) throw new Error(String(pageResponse?.error || pageResponse?.data?.error || "GitHub Pages was not enabled."));
-    const buildResponse = await session.execute(buildSchema.toolSlug, composioSchemaArguments(buildSchema, { owner, repo, branch }));
-    if (buildResponse?.error || buildResponse?.successful === false || buildResponse?.data?.error) throw new Error(String(buildResponse?.error || buildResponse?.data?.error || "GitHub Pages build was not confirmed."));
+    const pageResponse = await session.execute(pageSchema.toolSlug, composioSchemaArguments(pageSchema, { owner, repo, branch, build_type: "workflow" }));
+    if (pageResponse?.error || pageResponse?.successful === false || pageResponse?.data?.error) throw new Error(String(pageResponse?.error || pageResponse?.data?.error || "GitHub Pages was not configured for Actions deployment."));
+
+    // Commit the workflow after Pages is configured so this write reliably triggers deploy-pages.
+    const workflowPath = ".github/workflows/deploy-pages.yml";
+    const workflowResponse = await session.execute(fileSchema.toolSlug, composioSchemaArguments(fileSchema, {
+      owner, repo, path: workflowPath, content: githubPagesWorkflow(branch), message: "Configure GitHub Pages deployment", branch,
+    }));
+    if (workflowResponse?.error || workflowResponse?.successful === false || workflowResponse?.data?.error) {
+      throw new Error(String(workflowResponse?.error || workflowResponse?.data?.error || "GitHub did not confirm writing the Pages deployment workflow."));
+    }
+    result.files.push(workflowPath);
     const readiness = await waitForGithubPages(
       async () => ({}),
       async () => ({}),
