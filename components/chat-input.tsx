@@ -268,7 +268,6 @@ export function ChatInput({
   const [showLinkInput, setShowLinkInput] = useState(false)
   const [linkUrl, setLinkUrl] = useState('')
   const [isRecording, setIsRecording] = useState(false)
-  const [voiceDraft, setVoiceDraft] = useState<{ transcript: string; duration: number } | null>(null)
   const [voiceDuration, setVoiceDuration] = useState(0)
   const [voiceLevel, setVoiceLevel] = useState(0)
   const [voiceTranscript, setVoiceTranscript] = useState('')
@@ -509,27 +508,11 @@ export function ChatInput({
     mediaStreamRef.current = null
   }, [])
 
-  const prepareVoiceDraft = useCallback((transcript: string, duration: number) => {
-    const cleanTranscript = transcript.replace(/\s+/g, ' ').trim()
-    if (!cleanTranscript) {
-      setToast('No speech was detected, so nothing was sent. Please try again and speak clearly.')
-      return
-    }
-    setVoiceDraft({ transcript: cleanTranscript, duration })
-  }, [])
-
-  const discardVoiceDraft = useCallback(() => {
-    setVoiceDraft(null)
+  const clearVoiceCapture = useCallback(() => {
     setVoiceTranscript('')
     voiceTranscriptRef.current = ''
     setVoiceDuration(0)
   }, [])
-
-  const sendVoiceDraft = useCallback(() => {
-    if (!voiceDraft || isStreaming || disabled) return
-    onSend(voiceDraft.transcript)
-    discardVoiceDraft()
-  }, [disabled, discardVoiceDraft, isStreaming, onSend, voiceDraft])
 
   const startVoiceMeter = useCallback((stream: MediaStream) => {
     const AudioContextConstructor = window.AudioContext || (window as any).webkitAudioContext
@@ -585,24 +568,41 @@ export function ChatInput({
     }
   }, [])
 
-  const stopVoiceMessage = useCallback(() => {
+  const cancelVoiceRecording = useCallback(() => {
     if (!isRecording) return
-    const completedDuration = voiceDuration
+    setIsRecording(false)
+    try { recognitionRef.current?.abort() } catch {}
+    stopVoiceMeter()
+    releaseVoiceStream()
+    clearVoiceCapture()
+  }, [clearVoiceCapture, isRecording, releaseVoiceStream, stopVoiceMeter])
+
+  const confirmVoiceRecording = useCallback(() => {
+    if (!isRecording || disabled || isStreaming) return
     setIsRecording(false)
     if (recognitionRunningRef.current) {
       try { recognitionRef.current?.stop() } catch {}
     }
     stopVoiceMeter()
     releaseVoiceStream()
-    // Give the browser speech engine a brief moment to flush its last phrase
-    // before showing the explicit review composer.
-    window.setTimeout(() => prepareVoiceDraft(voiceTranscriptRef.current, completedDuration), 260)
-  }, [isRecording, prepareVoiceDraft, releaseVoiceStream, stopVoiceMeter, voiceDuration])
+    // Speech recognition delivers final words on its end event. Wait briefly,
+    // then send only the text the browser has actually recognized.
+    window.setTimeout(() => {
+      const transcript = voiceTranscriptRef.current.replace(/\s+/g, ' ').trim()
+      if (!transcript) {
+        setToast('No speech was detected, so nothing was sent. Please try again and speak clearly.')
+        clearVoiceCapture()
+        return
+      }
+      onSend(transcript)
+      clearVoiceCapture()
+    }, 260)
+  }, [clearVoiceCapture, disabled, isRecording, isStreaming, onSend, releaseVoiceStream, stopVoiceMeter])
 
   const toggleVoiceInput = useCallback(async () => {
-    if (disabled || isStreaming || voiceDraft) return
+    if (disabled || isStreaming) return
     if (isRecording) {
-      stopVoiceMessage()
+      confirmVoiceRecording()
       return
     }
     if (typeof window === 'undefined' || !navigator.mediaDevices?.getUserMedia) {
@@ -634,7 +634,7 @@ export function ChatInput({
       stopVoiceMeter()
       setToast('Microphone access was denied. Allow microphone access and try again.')
     }
-  }, [disabled, isRecording, isStreaming, releaseVoiceStream, startVoiceMeter, startVoiceRecognition, stopVoiceMessage, stopVoiceMeter, voiceDraft])
+  }, [confirmVoiceRecording, disabled, isRecording, isStreaming, releaseVoiceStream, startVoiceMeter, startVoiceRecognition, stopVoiceMeter])
 
   useEffect(() => {
     if (!isRecording) return
@@ -825,43 +825,26 @@ export function ChatInput({
               initial={{ opacity: 0, y: 8 }}
               animate={{ opacity: 1, y: 0 }}
               exit={{ opacity: 0, y: 8 }}
-              transition={{ duration: 0.16, ease: [0.23, 1, 0.32, 1] }}
-              className="voice-recording-status mx-3 mb-2 flex items-center gap-2.5 rounded-2xl px-3 py-2"
-            >
-              <span className="voice-recording-dot" />
-              <span className="shrink-0 text-xs font-medium text-white/78">{Math.floor(voiceDuration / 60)}:{String(voiceDuration % 60).padStart(2, '0')}</span>
-              <span className="min-w-0 flex-1 truncate text-xs text-white/48">{voiceTranscript || 'Listening…'}</span>
-              <button type="button" onClick={stopVoiceMessage} className="rounded-lg px-2 py-1 text-xs font-medium text-white/70 transition hover:bg-white/[0.08] hover:text-white">Done</button>
-            </motion.div>
-          )}
-        </AnimatePresence>
-
-        <AnimatePresence>
-          {voiceDraft && (
-            <motion.div
-              initial={{ opacity: 0, y: 8 }}
-              animate={{ opacity: 1, y: 0 }}
-              exit={{ opacity: 0, y: 8 }}
               transition={{ duration: 0.18, ease: [0.23, 1, 0.32, 1] }}
-              className="voice-draft-composer relative mx-3 min-h-[146px] overflow-hidden rounded-[34px]"
+              className="voice-live-composer relative mx-3 min-h-[146px] overflow-hidden rounded-[34px]"
             >
-              <button type="button" onClick={discardVoiceDraft} aria-label="Discard voice draft" className="voice-draft-action absolute bottom-5 left-5 flex h-11 w-11 items-center justify-center rounded-2xl">
+              <button type="button" onClick={cancelVoiceRecording} aria-label="Discard voice recording" className="voice-draft-action absolute bottom-5 left-5 flex h-11 w-11 items-center justify-center rounded-2xl">
                 <X className="h-7 w-7" strokeWidth={1.75} />
               </button>
               <div className="absolute inset-x-0 top-7 flex items-center justify-center gap-3">
-                <span className="voice-draft-wave" aria-hidden="true">
-                  {[0.42, 0.7, 1, 0.68, 0.95, 0.62, 0.42].map((base, index) => <i key={index} style={{ transform: `scaleY(${base})` }} />)}
+                <span className="voice-live-wave" aria-label="Recording waveform">
+                  {[0.42, 0.7, 1, 0.68, 0.95, 0.62, 0.42].map((base, index) => <i key={index} style={{ transform: `scaleY(${Math.min(1.75, base + voiceLevel * (1.15 - index * 0.07))})` }} />)}
                 </span>
-                <span className="text-[18px] font-medium tabular-nums text-white/62">{Math.floor(voiceDraft.duration / 60)}:{String(voiceDraft.duration % 60).padStart(2, '0')}</span>
+                <span className="text-[18px] font-medium tabular-nums text-white/62">{Math.floor(voiceDuration / 60)}:{String(voiceDuration % 60).padStart(2, '0')}</span>
               </div>
-              <button type="button" onClick={sendVoiceDraft} disabled={disabled || isStreaming} aria-label="Send recognized voice text" className="voice-draft-confirm absolute bottom-5 right-5 flex h-11 w-11 items-center justify-center rounded-2xl">
+              <button type="button" onClick={confirmVoiceRecording} disabled={disabled || isStreaming} aria-label="Send recognized voice text" className="voice-draft-confirm absolute bottom-5 right-5 flex h-11 w-11 items-center justify-center rounded-2xl">
                 <Check className="h-7 w-7" strokeWidth={1.9} />
               </button>
             </motion.div>
           )}
         </AnimatePresence>
 
-        <div className={cn("px-3", voiceDraft && "hidden")}>
+        <div className={cn("px-3", isRecording && "hidden")}>
           <div className="task-composer rounded-[34px] border transition-all duration-200">
             <textarea
               ref={textareaRef}
@@ -976,7 +959,7 @@ export function ChatInput({
                       onClick={toggleVoiceInput}
                       size="icon"
                       variant="ghost"
-                      disabled={disabled || Boolean(voiceDraft)}
+                      disabled={disabled}
                       className={cn("voice-record-control h-10 w-10 rounded-full", isRecording && "is-recording")}
                       aria-label={isRecording ? "Finish voice recording" : "Record a voice message"}
                       title={isRecording ? "Finish voice recording" : "Record a voice message"}
