@@ -1595,6 +1595,14 @@ function isWebsiteFollowUpRequest(text: string, conversationText: string) {
   return followUpIntent && websiteContext && repositoryContext;
 }
 
+function isGithubPagesRepairRequest(text: string, conversationText: string) {
+  const failureIntent = /\b(?:it|that|website|site|page|deployment|github\s*pages)\b[\s\S]{0,36}\b(?:failed|fail|broken|stuck|404|not\s+working|did(?:n['’]t| not)\s+work|does(?:n['’]t| not)\s+work)\b/i.test(text)
+    || /\b(?:failed|broken|stuck|404|not\s+working|did(?:n['’]t| not)\s+work|does(?:n['’]t| not)\s+work)\b/i.test(text.trim());
+  const websiteContext = /\b(?:github\s*pages|github\.io|website|web\s*site|live\s+page)\b/i.test(conversationText);
+  const repositoryContext = /\b[A-Za-z0-9][A-Za-z0-9-]{0,38}\/[A-Za-z0-9][A-Za-z0-9._-]{0,99}\b/.test(conversationText);
+  return failureIntent && websiteContext && repositoryContext;
+}
+
 async function executeOAuthGithubAction(baseUrl: string, cookieHeader: string, action: string, params: Record<string, unknown>) {
   const response = await fetch(`${baseUrl}/api/mcp/github`, {
     method: "POST",
@@ -1776,8 +1784,8 @@ async function waitForGithubPages(getPages: () => Promise<any>, getBuild: () => 
   return { url, status: status || "building", verified: false, httpStatus: 404 };
 }
 
-async function executeWebsiteScaffold(baseUrl: string, cookieHeader: string, owner: string, repo: string, userText: string, deployPages: boolean, deployVercel: boolean) {
-  const files = buildPortfolioFiles(userText);
+async function executeWebsiteScaffold(baseUrl: string, cookieHeader: string, owner: string, repo: string, userText: string, deployPages: boolean, deployVercel: boolean, repairOnly = false) {
+  const files = repairOnly ? {} : buildPortfolioFiles(userText);
   let repository: any;
   let createdRepository = false;
   try {
@@ -1792,19 +1800,20 @@ async function executeWebsiteScaffold(baseUrl: string, cookieHeader: string, own
     createdRepository = true;
   }
   const branch = String(repository?.default_branch || "main");
-  const filesWithDeployment = {
-    ...files,
-    ".github/workflows/deploy-pages.yml": githubPagesWorkflow(branch),
-  };
-  const paths = Object.keys(filesWithDeployment);
+  const paths = Object.keys(files);
   for (const path of paths) {
     await executeOAuthGithubAction(baseUrl, cookieHeader, "create_or_update_file", {
-      owner, repo, path, content: filesWithDeployment[path as keyof typeof filesWithDeployment], message: `Create portfolio website: ${path}`, branch,
+      owner, repo, path, content: files[path as keyof typeof files], message: `Create portfolio website: ${path}`, branch,
     });
   }
-  const result: any = { owner, repo, branch, createdRepository, repositoryUrl: repository?.html_url || `https://github.com/${owner}/${repo}`, files: paths };
+  const result: any = { owner, repo, branch, createdRepository, repositoryUrl: repository?.html_url || `https://github.com/${owner}/${repo}`, files: [...paths] };
   if (deployPages) {
     const pages = await executeOAuthGithubAction(baseUrl, cookieHeader, "enable_pages", { owner, repo, branch, path: "/", build_type: "workflow" });
+    const workflowPath = ".github/workflows/deploy-pages.yml";
+    await executeOAuthGithubAction(baseUrl, cookieHeader, "create_or_update_file", {
+      owner, repo, path: workflowPath, content: githubPagesWorkflow(branch), message: "Configure GitHub Pages deployment", branch,
+    });
+    result.files.push(workflowPath);
     const readiness = await waitForGithubPages(
       () => executeOAuthGithubAction(baseUrl, cookieHeader, "get_pages", { owner, repo }),
       () => executeOAuthGithubAction(baseUrl, cookieHeader, "get_pages_build", { owner, repo }),
@@ -1954,8 +1963,8 @@ function composioSchemaArguments(schema: any, base: { owner: string; repo: strin
   return args;
 }
 
-async function executeComposioWebsiteScaffold(session: any, owner: string, repo: string, userText: string, deployPages: boolean) {
-  const files = buildPortfolioFiles(userText);
+async function executeComposioWebsiteScaffold(session: any, owner: string, repo: string, userText: string, deployPages: boolean, repairOnly = false) {
+  const files = repairOnly ? {} : buildPortfolioFiles(userText);
   let search: any = null;
   try {
     search = await session.search({ query: "create GitHub repository, get repository, create or update repository files, enable GitHub Pages, and build Pages", toolkits: ["github"] });
@@ -3198,7 +3207,8 @@ export async function POST(req: NextRequest) {
       const oauthBundle = buildOAuthTools(req, baseUrl);
       const oauthConnected = new Set((oauthBundle.connected || []).map((provider: string) => String(provider).toLowerCase().replace(/[- ]/g, '_')));
       const githubCreateRequest = isGithubCreateRepositoryRequest(userText);
-      const websiteBuildRequest = isWebsiteBuildRequest(userText) || isWebsiteFollowUpRequest(userText, recentConversationText);
+      const githubPagesRepairRequest = isGithubPagesRepairRequest(userText, recentConversationText);
+      const websiteBuildRequest = isWebsiteBuildRequest(userText) || isWebsiteFollowUpRequest(userText, recentConversationText) || githubPagesRepairRequest;
       let websiteRepository = extractGithubRepositoryRef(userText) || extractGithubRepositoryRef(recentConversationText);
       const websiteConversationText = `${recentConversationText}\n${userText}`;
       // A request to create a GitHub website should be publishable by default.
@@ -3260,9 +3270,11 @@ export async function POST(req: NextRequest) {
         if (wantsVercel && !oauthConnected.has("vercel")) return connectorPermissionResponse("vercel", "Vercel", "deploy the committed GitHub website", "https://cdn.simpleicons.org/vercel");
         try {
           const result = websiteComposioSession && !oauthConnected.has("github")
-            ? await executeComposioWebsiteScaffold(websiteComposioSession, websiteRepository.owner, websiteRepository.repo, userText, wantsGithubPages)
-            : await executeWebsiteScaffold(baseUrl, req.headers.get("cookie") || "", websiteRepository.owner, websiteRepository.repo, userText, wantsGithubPages, wantsVercel);
-          const lines = [`Created and committed the website files in **${websiteRepository.owner}/${websiteRepository.repo}**: ${result.files.join(", ")}.`];
+            ? await executeComposioWebsiteScaffold(websiteComposioSession, websiteRepository.owner, websiteRepository.repo, userText, wantsGithubPages, githubPagesRepairRequest)
+            : await executeWebsiteScaffold(baseUrl, req.headers.get("cookie") || "", websiteRepository.owner, websiteRepository.repo, userText, wantsGithubPages, wantsVercel, githubPagesRepairRequest);
+          const lines = [githubPagesRepairRequest
+            ? `Reconfigured GitHub Pages deployment for **${websiteRepository.owner}/${websiteRepository.repo}** and committed the deployment workflow.`
+            : `Created and committed the website files in **${websiteRepository.owner}/${websiteRepository.repo}**: ${result.files.join(", ")}.`];
           const launchUrl = result.githubPagesUrl || result.vercelUrl;
           const launchStatus = result.githubPagesUrl ? result.githubPagesStatus : result.vercelState;
           const launchVerified = result.githubPagesUrl ? result.githubPagesVerified === true : Boolean(result.vercelUrl && /ready|success/i.test(String(result.vercelState || "")));

@@ -230,3 +230,36 @@ test('discovers and reads from a live connected Composio app outside the built-i
   assert.doesNotMatch(text, /could not verify the connected-app write action/i);
   assert.deepEqual(JSON.parse(JSON.stringify(calls)), [{ slug: 'AIRTABLE_LIST_BASES', args: {} }]);
 });
+
+
+test('repairs a failed GitHub Pages deployment from prior repository context instead of falling into generic prose', async () => {
+  const calls = [];
+  const connectorSession = {
+    async search() { return {}; },
+    async execute(slug, args) {
+      calls.push({ slug, args });
+      if (slug === 'GITHUB_CREATE_OR_UPDATE_GITHUB_PAGES_SITE') return { successful: true, data: { status: 'building' } };
+      if (slug === 'GITHUB_CREATE_OR_UPDATE_FILE_CONTENTS') return { successful: true, data: { content: { sha: 'workflow-sha' } } };
+      if (slug === 'GITHUB_REQUEST_A_GITHUB_PAGES_BUILD') throw new Error('Legacy GitHub Pages build action must not be used during repair');
+      throw new Error(`Unexpected GitHub repair tool: ${slug}`);
+    },
+  };
+  const { POST } = createRoute({ connectorSession, enabledToolkits: ['github'] });
+  const response = await POST(createRequest({
+    messages: [
+      { role: 'user', content: 'Create a GitHub repo and a live website' },
+      { role: 'assistant', content: 'Created website files in test-owner/uncgpt-site-previous. [[UNCGPT_WEBSITE_DEPLOYMENT:{"repository":"test-owner/uncgpt-site-previous"}]]' },
+      { role: 'user', content: 'It failed' },
+    ],
+    computerUse: false,
+    mcpConnectors: [{ source: 'composio', provider: 'github', enabled: true }],
+  }));
+  const text = await responseSseText(response);
+
+  assert.match(text, /Reconfigured GitHub Pages deployment for \*\*test-owner\/uncgpt-site-previous\*\*/);
+  assert.match(text, /UNCGPT_WEBSITE_DEPLOYMENT/);
+  assert.doesNotMatch(text, /It seems that the GitHub Pages deployment failed/i);
+  assert.ok(calls.some((call) => call.slug === 'GITHUB_CREATE_OR_UPDATE_GITHUB_PAGES_SITE'));
+  assert.ok(calls.some((call) => call.slug === 'GITHUB_CREATE_OR_UPDATE_FILE_CONTENTS' && /\.github\/workflows\/deploy-pages\.yml/.test(JSON.stringify(call.args))));
+  assert.doesNotMatch(JSON.stringify(calls), /GITHUB_REQUEST_A_GITHUB_PAGES_BUILD/);
+});
