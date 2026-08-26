@@ -3,7 +3,7 @@ import { useMemo, useState, useCallback } from 'react';
 import { cn } from '@/lib/utils';
 import { CodeBlock } from './code-block';
 import { TerminalBlock } from './terminal-block';
-import { Download, ExternalLink, Loader2, Tag, Mail, ChevronDown } from 'lucide-react';
+import { Download, ExternalLink, Loader2, Tag, Mail, ChevronDown, CalendarDays, CheckCircle2 } from 'lucide-react';
 import { toast } from 'sonner';
 
 interface MessageContentProps {
@@ -32,6 +32,16 @@ type WebsiteDeployment = {
   verified?: boolean;
 };
 
+type CalendarEvent = {
+  title: string;
+  start?: string;
+  end?: string;
+  eventId?: string;
+  url: string;
+};
+
+type ActionStatus = { label: string; state: 'complete' | 'error' };
+
 type NormalizedEmail = {
   sender?: string;
   senderPhoto?: string;
@@ -57,6 +67,38 @@ function parseWebsiteDeployment(content: string | undefined | null): WebsiteDepl
       url,
       status: parsed?.status ? String(parsed.status).slice(0, 80) : undefined,
       verified: parsed?.verified === true,
+    };
+  } catch {
+    return null;
+  }
+}
+
+function parseActionStatus(content: string | undefined | null): ActionStatus | null {
+  if (!content) return null;
+  const match = content.match(/\[\[UNCGPT_ACTION_STATUS:([\s\S]*?)\]\]/);
+  if (!match?.[1]) return null;
+  try {
+    const parsed = JSON.parse(match[1]);
+    const state = parsed?.state === 'error' ? 'error' : 'complete';
+    const label = String(parsed?.label || (state === 'error' ? 'Connected action failed' : 'Connected action completed')).slice(0, 180);
+    return { label, state };
+  } catch { return null; }
+}
+
+function parseCalendarEvent(content: string | undefined | null): CalendarEvent | null {
+  if (!content) return null;
+  const match = content.match(/\[\[UNCGPT_CALENDAR_EVENT:([\s\S]*?)\]\]/);
+  if (!match?.[1]) return null;
+  try {
+    const parsed = JSON.parse(match[1]);
+    const url = String(parsed?.url || '').trim();
+    if (!/^https:\/\/[^\s]+$/i.test(url)) return null;
+    return {
+      title: String(parsed?.title || 'Calendar event').slice(0, 160),
+      start: parsed?.start ? String(parsed.start).slice(0, 100) : undefined,
+      end: parsed?.end ? String(parsed.end).slice(0, 100) : undefined,
+      eventId: parsed?.eventId ? String(parsed.eventId).slice(0, 160) : undefined,
+      url,
     };
   } catch {
     return null;
@@ -353,6 +395,27 @@ function WebsiteDeploymentCard({ deployment }: { deployment: WebsiteDeployment }
           <span>{isBuilding ? 'Open website when ready' : 'Open live website'}</span><ExternalLink className="h-4 w-4" aria-hidden="true" />
         </a>
         {deployment.status && <p className="text-center text-[11px] text-muted-foreground">Status: {deployment.status}</p>}
+      </div>
+    </section>
+  );
+}
+
+function ActionStatusCard({ status }: { status: ActionStatus }) {
+  const failed = status.state === 'error';
+  return <div className={cn('my-1 inline-flex max-w-full items-center gap-2 rounded-full border px-3 py-2 text-xs font-medium shadow-sm', failed ? 'border-rose-500/25 bg-rose-500/10 text-rose-200' : 'border-emerald-500/25 bg-emerald-500/10 text-emerald-200')}><span className={cn('h-1.5 w-1.5 shrink-0 rounded-full', failed ? 'bg-rose-400' : 'bg-emerald-400')} />{status.label}</div>;
+}
+
+function CalendarEventCard({ event }: { event: CalendarEvent }) {
+  const timeText = [event.start, event.end].filter(Boolean).join(' → ');
+  return (
+    <section className="my-1 w-full max-w-xl overflow-hidden rounded-2xl border border-sky-500/20 bg-gradient-to-br from-sky-500/[0.13] via-card to-card shadow-sm">
+      <div className="flex items-start gap-3 border-b border-sky-500/15 px-4 py-3.5">
+        <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-sky-500/15 text-sky-300"><CalendarDays className="h-5 w-5" aria-hidden="true" /></div>
+        <div className="min-w-0"><p className="flex items-center gap-1.5 text-sm font-semibold text-foreground"><CheckCircle2 className="h-4 w-4 text-emerald-400" aria-hidden="true" />Event scheduled</p><p className="mt-0.5 text-xs text-muted-foreground">Saved to your connected Google Calendar.</p></div>
+      </div>
+      <div className="space-y-3 px-4 py-4">
+        <div><p className="text-base font-semibold text-foreground">{event.title}</p>{timeText && <p className="mt-1 text-xs text-muted-foreground">{timeText}</p>}</div>
+        <a href={event.url} target="_blank" rel="noopener noreferrer" className="inline-flex w-full items-center justify-center gap-2 rounded-xl bg-sky-400 px-4 py-3 text-sm font-bold text-slate-950 shadow-sm transition hover:bg-sky-300 focus:outline-none focus:ring-2 focus:ring-sky-300 focus:ring-offset-2 focus:ring-offset-card active:scale-[0.98]">Open in Google Calendar <ExternalLink className="h-4 w-4" aria-hidden="true" /></a>
       </div>
     </section>
   );
@@ -695,6 +758,8 @@ function ImagePreview({ src, alt, compact = false }: { src: string; alt?: string
 
 export function MessageContent({ content }: MessageContentProps) {
   const websiteDeployment = useMemo(() => parseWebsiteDeployment(content), [content]);
+  const actionStatus = useMemo(() => parseActionStatus(content), [content]);
+  const calendarEvent = useMemo(() => parseCalendarEvent(content), [content]);
   const emails = useMemo(() => parseEmailPayload(content), [content]);
   const connectorText = useMemo(() => genericConnectorText(content || ''), [content]);
   const connectorBrandInfo = useMemo(() => connectorText ? connectorBrand(content || '') : null, [connectorText, content]);
@@ -703,6 +768,8 @@ export function MessageContent({ content }: MessageContentProps) {
   const otherParts = useMemo(() => parts.filter(p => p.type !== 'image'), [parts]);
 
   if (websiteDeployment) return <WebsiteDeploymentCard deployment={websiteDeployment} />;
+  if (actionStatus) return <ActionStatusCard status={actionStatus} />;
+  if (calendarEvent) return <CalendarEventCard event={calendarEvent} />;
   if (emails) return <EmailCards emails={emails} />;
   if (connectorText && connectorBrandInfo) return <ConnectorResultCard text={connectorText} brand={connectorBrandInfo} />;
 

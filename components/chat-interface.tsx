@@ -20,6 +20,20 @@ interface ChatInterfaceProps {
   isSidebarOpen?: boolean;
 }
 
+function describeToolActivity(step: any) {
+  const tool = String(step?.tool || step?.name || step?.action || '').replace(/^composio__/, '').toUpperCase();
+  const result = String(step?.result || '');
+  const failed = /tool error|\berror\b|\bfailed\b/i.test(result);
+  const state = failed ? 'error' : 'complete';
+  if (/GOOGLECALENDAR.*CREATE.*EVENT/.test(tool)) return { label: failed ? 'Google Calendar could not create the event' : 'Google Calendar event created', state };
+  if (/GOOGLECALENDAR/.test(tool)) return { label: failed ? 'Google Calendar action failed' : 'Google Calendar action completed', state };
+  if (/GITHUB.*CREATE.*REPOSITORY/.test(tool)) return { label: failed ? 'GitHub could not create the repository' : 'GitHub repository created', state };
+  if (/GITHUB.*(?:CREATE|UPDATE).*FILE/.test(tool)) return { label: failed ? 'GitHub could not write a file' : 'GitHub files committed', state };
+  if (/GITHUB.*PAGES/.test(tool)) return { label: failed ? 'GitHub Pages update failed' : 'GitHub Pages update completed', state };
+  if (/VERCEL.*DEPLOY/.test(tool)) return { label: failed ? 'Vercel deployment failed' : 'Vercel deployment requested', state };
+  return { label: failed ? 'Connected action failed' : 'Connected action completed', state };
+}
+
 async function persistNeuralMemory(chatId: string, messages: any[], responseContent: string | undefined) {
   const latestUser = [...messages].reverse().find((message) => message.role === 'user')
   if (!latestUser && !responseContent) return
@@ -329,8 +343,14 @@ export function ChatInterface({ onSwitchToImagine, onOpenSidebar, isSidebarOpen 
                 assistantMsgId = addMessage(chatId, { role: "assistant", content: "", connectorPermission: request });
               }
             } else if (parsed.tool_step) {
-              const toolName = String(parsed.tool_step.tool || parsed.tool_step.name || parsed.tool_step.action || '');
-              // Tool activity stays behind the scenes; only the final answer is shown.
+              const activity = describeToolActivity(parsed.tool_step);
+              const activityContent = `[[UNCGPT_ACTION_STATUS:${JSON.stringify(activity)}]]`;
+              setIsThinking(false);
+              if (!assistantMsgId) {
+                assistantMsgId = addMessage(chatId, { role: 'assistant', content: activityContent });
+              } else {
+                updateMessage(chatId, assistantMsgId, activityContent);
+              }
               continue;
             } else if (parsed.content) {
               fullContent += parsed.content;

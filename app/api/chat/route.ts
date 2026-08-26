@@ -1542,6 +1542,10 @@ function normalizeConnectorKeyForRouting(value: unknown) {
   return String(value || '').toLowerCase().replace(/[- ]/g, '_').replace(/[^a-z0-9_]/g, '');
 }
 
+function connectorKeysMatch(left: unknown, right: unknown) {
+  return normalizeConnectorKeyForRouting(left).replace(/_/g, '') === normalizeConnectorKeyForRouting(right).replace(/_/g, '');
+}
+
 function isGithubCreateRepositoryRequest(text: string) {
   return /\b(?:create|make|new|set\s+up)\b[\s\S]{0,100}\b(?:github\s+)?(?:repo|repository)\b/i.test(text) || /\b(?:github\s+)?(?:repo|repository)\b[\s\S]{0,100}\b(?:create|make|new)\b/i.test(text);
 }
@@ -1812,6 +1816,26 @@ function parseComposioObject(value: any) {
     try { return JSON.parse(value); } catch { return null; }
   }
   return null;
+}
+
+function calendarEventCardPayload(value: any) {
+  const root = parseComposioObject(value) || value || {};
+  const responseData = parseComposioObject(root?.response_data) || root?.responseData || root?.data?.response_data || root?.data?.responseData || root?.data || root;
+  const event = parseComposioObject(responseData) || responseData || {};
+  const start = event?.start?.dateTime || event?.start_datetime || event?.start || root?.start_datetime || '';
+  const end = event?.end?.dateTime || event?.end_datetime || event?.end || root?.end_datetime || '';
+  const rawUrl = String(event?.htmlLink || event?.html_link || event?.webViewLink || event?.url || root?.htmlLink || root?.html_link || '').trim();
+  return {
+    title: String(event?.summary || event?.title || root?.summary || root?.title || 'Calendar event').slice(0, 160),
+    start: String(start || '').slice(0, 80),
+    end: String(end || '').slice(0, 80),
+    eventId: String(event?.id || event?.event_id || root?.id || root?.event_id || '').slice(0, 160),
+    url: /^https:\/\/[^\s]+$/i.test(rawUrl) ? rawUrl : 'https://calendar.google.com/calendar/u/0/r',
+  };
+}
+
+function calendarEventResultCard(value: any) {
+  return `[[UNCGPT_CALENDAR_EVENT:${JSON.stringify(calendarEventCardPayload(value))}]]`;
 }
 
 function getComposioInputSchema(schema: any) {
@@ -3090,6 +3114,7 @@ export async function POST(req: NextRequest) {
       systemContent,
       `\n\n${UNCGPT_IDENTITY_PROMPT}`,
       `\n\n${buildRuntimeContextMessage({ clientTimeZone, clientLocale, clientCountry, clientCountryCode })}`,
+      `\n\nConnected calendar rule: when the user asks to schedule, add, create, move, or cancel a Google Calendar event and a Google Calendar tool is available, use that tool. Create an event only when the title plus a concrete date and start time are clear; otherwise ask one concise follow-up for the missing detail. Convert natural-language dates using the user’s runtime time zone and pass the calendar tool an exact ISO date-time. Never say an event was scheduled unless the provider tool confirms success. For confirmed events, keep the final reply concise because the interface renders the verified event card.`,
     ];
     if (projectInstructions) {
       systemParts.push(`\n\nProject Instructions:\n${projectInstructions}`);
@@ -3242,12 +3267,13 @@ export async function POST(req: NextRequest) {
         jira: { label: 'Jira', description: 'read and manage issues and projects', iconUrl: 'https://cdn.simpleicons.org/jira' },
         supabase: { label: 'Supabase', description: 'read and manage projects and databases', iconUrl: 'https://cdn.simpleicons.org/supabase' },
       };
+      const calendarSchedulingIntent = /\b(?:schedule|appointment|meeting|calendar\s+event|set\s+up\s+(?:a\s+)?reminder)\b/i.test(userText);
       const staticConnectorKey = Object.keys(connectorHints).find((key) => {
         const pattern = key.replace(/_/g, '[ _-]?');
         const directMatch = new RegExp(`\\b${pattern}\\b`, 'i').test(userText);
-        const aliasMatch = key === 'gmail' && /\b(email|emails|mail|inbox)\b/i.test(userText);
+        const aliasMatch = key === 'gmail' && /\\b(email|emails|mail|inbox)\\b/i.test(userText);
         return directMatch || aliasMatch;
-      });
+      }) || (calendarSchedulingIntent ? 'google_calendar' : undefined);
       const dynamicConnectorKey = connectorPreferences
         .filter((connector: any) => connector?.source === 'composio' && connector?.enabled !== false)
         .map((connector: any) => String(connector.provider || connector.toolkit || '').toLowerCase())
@@ -3256,7 +3282,7 @@ export async function POST(req: NextRequest) {
           return tokens.length > 0 && tokens.every((token) => new RegExp(`\\b${token.replace(/[.*+?^${}()|[\\]\\]/g, '\\$&')}\\b`, 'i').test(userText));
         });
       const requestedConnectorKey = staticConnectorKey || dynamicConnectorKey;
-      const connectorActionIntent = /\b(my|mine|latest|list|show|find|read|send|email|message|calendar|create|update|delete|open|search|manage|deploy|repository|repositories|repo)\b/i.test(userText);
+      const connectorActionIntent = /\b(my|mine|latest|list|show|find|read|send|email|message|calendar|create|update|delete|open|search|manage|deploy|repository|repositories|repo|schedule|appointment|meeting|event|remind)\b/i.test(userText);
       const requestedConnector = requestedConnectorKey
         ? connectorHints[requestedConnectorKey] || {
             label: requestedConnectorKey.replace(/[_-]/g, ' ').replace(/\b\w/g, (letter) => letter.toUpperCase()),
@@ -3264,7 +3290,7 @@ export async function POST(req: NextRequest) {
             iconUrl: `https://cdn.simpleicons.org/${requestedConnectorKey.replace(/[^a-z0-9-]/g, '')}` ,
           }
         : null;
-      let requestedState = requestedConnectorKey ? connectorPreferences.find((connector: any) => normalizeConnectorKeyForRouting(connector.provider || connector.toolkit || connector.name) === requestedConnectorKey) : null;
+      let requestedState = requestedConnectorKey ? connectorPreferences.find((connector: any) => connectorKeysMatch(connector.provider || connector.toolkit || connector.name, requestedConnectorKey)) : null;
       if (requestedConnectorKey && oauthConnected.has(requestedConnectorKey)) {
         requestedState = { source: 'oauth', provider: requestedConnectorKey, toolkit: requestedConnectorKey, enabled: true };
       }
@@ -3279,7 +3305,7 @@ export async function POST(req: NextRequest) {
           const liveAccount = (liveAccounts?.items || []).find((account: any) => {
             const toolkit = String(account?.toolkit?.slug || '').toLowerCase().replace(/[- ]/g, '_');
             const status = String(account?.status || '').toLowerCase();
-            return toolkit === requestedConnectorKey && !account?.isDisabled && ['active', 'connected', 'success'].includes(status);
+            return connectorKeysMatch(toolkit, requestedConnectorKey) && !account?.isDisabled && ['active', 'connected', 'success'].includes(status);
           });
           if (liveAccount) requestedState = { source: 'composio', provider: requestedConnectorKey, toolkit: requestedConnectorKey, accountId: liveAccount.id, enabled: true };
         } catch (error) {
@@ -3307,7 +3333,7 @@ export async function POST(req: NextRequest) {
           if (session?.user?.sub && requestedConnectorKey) {
             const enabledToolkits = await getEnabledComposioToolkits(session.user.sub);
             matchedToolkit = enabledToolkits.find(
-              (toolkit) => toolkit.replace(/[- ]/g, "_") === requestedConnectorKey
+              (toolkit) => connectorKeysMatch(toolkit, requestedConnectorKey)
             );
             if (matchedToolkit) {
               composioSession = await Promise.race([
@@ -3349,8 +3375,10 @@ export async function POST(req: NextRequest) {
                 _composioSlug: schema.toolSlug,
                 _exec: async (args: any) => {
                   const result = await composioSession.execute(schema.toolSlug, args || {});
-                  if (result?.error) throw new Error(result.error);
-                  return normalizeConnectorResult(result?.data ?? result, schema.toolSlug);
+                  if (result?.error || result?.successful === false || result?.data?.error) throw new Error(String(result?.error || result?.data?.error || 'The connected service did not confirm the action.'));
+                  const rawResult = result?.data ?? result;
+                  if (/GOOGLECALENDAR.*CREATE.*EVENT/i.test(String(schema.toolSlug))) return calendarEventResultCard(rawResult);
+                  return normalizeConnectorResult(rawResult, schema.toolSlug);
                 },
               }));
             if (githubCreateRequest && requestedConnectorKey === "github" && composioSession && !oauthConnected.has("github")) {
@@ -3410,6 +3438,11 @@ export async function POST(req: NextRequest) {
           ]
         : [];
       availableTools = combinedTools;
+
+      const createdCalendarEvent = toolSteps.find((step) => /\[\[UNCGPT_CALENDAR_EVENT:/.test(String(step?.result || '')));
+      if (createdCalendarEvent) {
+        return directTextResponse(String(createdCalendarEvent.result), "Google Calendar", "connected-action");
+      }
 
       if (githubCreateRequest && !oauthConnected.has("github") && !composioSession) {
         return directTextResponse("I couldn’t load GitHub’s create-repository action. Reconnect GitHub in Settings → Connectors and try again.", "GitHub", "connector-error");
