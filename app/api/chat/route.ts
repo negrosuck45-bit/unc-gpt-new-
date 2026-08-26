@@ -1546,6 +1546,13 @@ function connectorKeysMatch(left: unknown, right: unknown) {
   return normalizeConnectorKeyForRouting(left).replace(/_/g, '') === normalizeConnectorKeyForRouting(right).replace(/_/g, '');
 }
 
+function composioToolkitSlug(key: unknown) {
+  const normalized = normalizeConnectorKeyForRouting(key).replace(/_/g, '');
+  if (normalized === 'googlecalendar') return 'googlecalendar';
+  if (normalized === 'googledrive') return 'googledrive';
+  return normalized;
+}
+
 function isGithubCreateRepositoryRequest(text: string) {
   return /\b(?:create|make|new|set\s+up)\b[\s\S]{0,100}\b(?:github\s+)?(?:repo|repository)\b/i.test(text) || /\b(?:github\s+)?(?:repo|repository)\b[\s\S]{0,100}\b(?:create|make|new)\b/i.test(text);
 }
@@ -3312,9 +3319,12 @@ export async function POST(req: NextRequest) {
           console.warn('Live connector state lookup failed:', error);
         }
       }
+      if (calendarSchedulingIntent && (!requestedState || requestedState.enabled === false)) {
+        return connectorPermissionResponse('googlecalendar', 'Google Calendar', 'create and manage calendar events', 'https://cdn.simpleicons.org/googlecalendar');
+      }
       if (requestedConnector && connectorActionIntent && (!requestedState || requestedState.enabled === false) && !isGithubRepositoryRequest) {
         const mode = requestedState ? 'enable' : 'connect';
-        const permission = { toolkit: requestedConnectorKey, label: requestedConnector.label, description: requestedConnector.description, iconUrl: requestedConnector.iconUrl, accountId: requestedState?.accountId, mode };
+        const permission = { toolkit: composioToolkitSlug(requestedConnectorKey), label: requestedConnector.label, description: requestedConnector.description, iconUrl: requestedConnector.iconUrl, accountId: requestedState?.accountId, mode };
         const encoder = new TextEncoder();
         const stream = new ReadableStream({ start(controller) {
           controller.enqueue(encoder.encode(`data: ${JSON.stringify({ provider: requestedConnector.label, model: 'connector-permission' })}\n\n`));
@@ -3473,6 +3483,10 @@ export async function POST(req: NextRequest) {
           baseUrl,
           (s) => toolSteps.push(s)
         );
+      }
+
+      if (calendarSchedulingIntent && !composioSession) {
+        return connectorPermissionResponse('googlecalendar', 'Google Calendar', 'create and manage calendar events', 'https://cdn.simpleicons.org/googlecalendar');
       }
 
       const calendarStep = toolSteps.find((step) => /GOOGLECALENDAR.*CREATE.*EVENT/i.test(String(step?.tool || '')));
