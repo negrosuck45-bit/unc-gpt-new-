@@ -728,3 +728,37 @@ textarea {
   background: rgba(255, 255, 255, 0.86);
   transition: transform 90ms linear;
 }
+
+/* A travelling emphasis wave crosses the microphone-reactive bars from left to right. */
+.voice-live-wave i {
+  animation: voice-wave-travel 1.18s cubic-bezier(0.45, 0, 0.25, 1) infinite;
+  animation-delay: calc(var(--voice-wave-index) * 0.11s);
+  will-change: opacity, filter;
+}
+
+@keyframes voice-wave-travel {
+  0%, 100% {
+    opacity: 0.34;
+    filter: brightness(0.72);
+  }
+  20% {
+    opacity: 0.5;
+    filter: brightness(0.88);
+  }
+  44% {
+    opacity: 1;
+    filter: brightness(1.35);
+  }
+  66% {
+    opacity: 0.56;
+    filter: brightness(0.92);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .voice-live-wave i {
+    animation: none;
+    opacity: 0.82;
+    filter: none;
+  }
+}

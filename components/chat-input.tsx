@@ -833,7 +833,7 @@ export function ChatInput({
               </button>
               <div className="absolute inset-x-0 top-7 flex items-center justify-center gap-3">
                 <span className="voice-live-wave" aria-label="Recording waveform">
-                  {[0.42, 0.7, 1, 0.68, 0.95, 0.62, 0.42].map((base, index) => <i key={index} style={{ transform: `scaleY(${Math.min(1.75, base + voiceLevel * (1.15 - index * 0.07))})` }} />)}
+                  {[0.42, 0.7, 1, 0.68, 0.95, 0.62, 0.42].map((base, index) => <i key={index} style={{ transform: `scaleY(${Math.min(1.75, base + voiceLevel * (1.15 - index * 0.07))})`, '--voice-wave-index': index } as React.CSSProperties} />)}
                 </span>
                 <span className="text-[18px] font-medium tabular-nums text-white/62">{Math.floor(voiceDuration / 60)}:{String(voiceDuration % 60).padStart(2, '0')}</span>
               </div>
