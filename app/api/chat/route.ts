@@ -1845,6 +1845,35 @@ function calendarEventResultCard(value: any) {
   return `[[UNCGPT_CALENDAR_EVENT:${JSON.stringify(calendarEventCardPayload(value))}]]`;
 }
 
+function parseDeterministicCalendarCreate(text: string, requestedTimeZone?: string) {
+  const timezone = requestedTimeZone && (() => { try { Intl.DateTimeFormat('en-US', { timeZone: requestedTimeZone }); return true; } catch { return false; } })() ? requestedTimeZone : 'UTC';
+  const explicitDate = text.match(/\b(20\d{2}-\d{2}-\d{2})\b/)?.[1];
+  let date = explicitDate;
+  if (!date && /\btomorrow\b/i.test(text)) {
+    const parts = new Intl.DateTimeFormat('en-CA', { timeZone: timezone, year: 'numeric', month: '2-digit', day: '2-digit' }).formatToParts(new Date());
+    const part = (type: string) => Number(parts.find((item) => item.type === type)?.value || 0);
+    const tomorrow = new Date(Date.UTC(part('year'), part('month') - 1, part('day') + 1));
+    date = tomorrow.toISOString().slice(0, 10);
+  }
+  const timeMatch = text.match(/\b(?:at\s+)?(1[0-2]|0?[1-9])(?::([0-5]\d))?\s*(am|pm)\b/i);
+  const title = text.match(/\b(?:called|named|titled)\s+["“”']?(.+?)["“”']?\s*$/i)?.[1]?.trim();
+  if (!date || !timeMatch || !title) return null;
+  let hour = Number(timeMatch[1]);
+  const minute = Number(timeMatch[2] || 0);
+  const period = timeMatch[3].toLowerCase();
+  if (period === 'pm' && hour !== 12) hour += 12;
+  if (period === 'am' && hour === 12) hour = 0;
+  const durationMinutes = Number(text.match(/\b(\d{1,3})\s*(?:minutes?|mins?)\b/i)?.[1] || 60);
+  return {
+    summary: title.slice(0, 160),
+    start_datetime: `${date}T${String(hour).padStart(2, '0')}:${String(minute).padStart(2, '0')}:00`,
+    timezone,
+    event_duration_hour: Math.floor(durationMinutes / 60),
+    event_duration_minutes: durationMinutes % 60,
+    calendar_id: 'primary',
+  };
+}
+
 async function executeVerifiedGoogleCalendarCreate(composioSession: any, args: Record<string, unknown>) {
   const result: any = await composioSession.execute('GOOGLECALENDAR_CREATE_EVENT', args);
   if (result?.error || result?.successful === false || result?.data?.error) {
@@ -2963,6 +2992,7 @@ export async function POST(req: NextRequest) {
 
     const lastMsg = messages[messages.length - 1];
     const recentConversationText = messages.slice(-8).map((message: any) => Array.isArray(message?.content) ? message.content.find((content: any) => content.type === "text")?.text || "" : String(message?.content || "")).join("\n");
+    const recentUserText = messages.filter((message: any) => message?.role === 'user').slice(-5).map((message: any) => Array.isArray(message?.content) ? message.content.find((content: any) => content.type === 'text')?.text || '' : String(message?.content || '')).join('\n');
     const userText = Array.isArray(lastMsg?.content)
       ? lastMsg.content.find((c: any) => c.type === "text")?.text || ""
       : lastMsg?.content || "";
@@ -3290,13 +3320,16 @@ export async function POST(req: NextRequest) {
         jira: { label: 'Jira', description: 'read and manage issues and projects', iconUrl: 'https://cdn.simpleicons.org/jira' },
         supabase: { label: 'Supabase', description: 'read and manage projects and databases', iconUrl: 'https://cdn.simpleicons.org/supabase' },
       };
-      const calendarSchedulingIntent = /\b(?:schedule|appointment|meeting|calendar\s+event|set\s+up\s+(?:a\s+)?reminder)\b/i.test(userText);
-      const staticConnectorKey = Object.keys(connectorHints).find((key) => {
+      const connectorConfirmation = /^(?:yes|yeah|yep|i\s+(?:do\s+)?have\s+(?:it|that|the\s+(?:app|connector|calendar))\s+connected|it(?:'s|\s+is)\s+connected|already\s+connected)\b/i.test(userText.trim());
+      const historicalCalendarRequest = /\b(?:schedule|appointment|meeting|calendar\s+event|set\s+up\s+(?:a\s+)?reminder)\b/i.test(recentUserText);
+      const calendarSchedulingIntent = /\b(?:schedule|appointment|meeting|calendar\s+event|set\s+up\s+(?:a\s+)?reminder)\b/i.test(userText) || (connectorConfirmation && historicalCalendarRequest);
+      const resolveMentionedConnector = (text: string) => Object.keys(connectorHints).find((key) => {
         const pattern = key.replace(/_/g, '[ _-]?');
-        const directMatch = new RegExp(`\\b${pattern}\\b`, 'i').test(userText);
-        const aliasMatch = key === 'gmail' && /\\b(email|emails|mail|inbox)\\b/i.test(userText);
+        const directMatch = new RegExp(`\\b${pattern}\\b`, 'i').test(text);
+        const aliasMatch = key === 'gmail' && /\\b(email|emails|mail|inbox)\\b/i.test(text);
         return directMatch || aliasMatch;
-      }) || (calendarSchedulingIntent ? 'google_calendar' : undefined);
+      });
+      const staticConnectorKey = resolveMentionedConnector(userText) || (connectorConfirmation ? resolveMentionedConnector(recentUserText) : undefined) || (calendarSchedulingIntent ? 'google_calendar' : undefined);
       const dynamicConnectorKey = connectorPreferences
         .filter((connector: any) => connector?.source === 'composio' && connector?.enabled !== false)
         .map((connector: any) => String(connector.provider || connector.toolkit || '').toLowerCase())
@@ -3305,7 +3338,8 @@ export async function POST(req: NextRequest) {
           return tokens.length > 0 && tokens.every((token) => new RegExp(`\\b${token.replace(/[.*+?^${}()|[\\]\\]/g, '\\$&')}\\b`, 'i').test(userText));
         });
       const requestedConnectorKey = staticConnectorKey || dynamicConnectorKey;
-      const connectorActionIntent = /\b(my|mine|latest|list|show|find|read|send|email|message|calendar|create|update|delete|open|search|manage|deploy|repository|repositories|repo|schedule|appointment|meeting|event|remind)\b/i.test(userText);
+      const connectorActionIntent = /\b(my|mine|latest|list|show|find|read|send|email|message|calendar|create|update|delete|open|search|manage|deploy|repository|repositories|repo|schedule|appointment|meeting|event|remind)\b/i.test(userText) || (connectorConfirmation && /\b(send|create|update|edit|delete|schedule|deploy|upload|move|write|add)\b/i.test(recentUserText));
+      const connectorWriteIntent = /\b(send|create|update|edit|delete|schedule|deploy|upload|move|write|add|publish|commit)\b/i.test(userText) || (connectorConfirmation && /\b(send|create|update|edit|delete|schedule|deploy|upload|move|write|add|publish|commit)\b/i.test(recentUserText));
       const requestedConnector = requestedConnectorKey
         ? connectorHints[requestedConnectorKey] || {
             label: requestedConnectorKey.replace(/[_-]/g, ' ').replace(/\b\w/g, (letter) => letter.toUpperCase()),
@@ -3366,6 +3400,17 @@ export async function POST(req: NextRequest) {
                 getComposioSession(session.user.sub, [matchedToolkit]),
                 new Promise((_, reject) => setTimeout(() => reject(new Error('Connector lookup timed out')), 10000)),
               ]);
+            }
+          }
+          const deterministicCalendarCreate = calendarSchedulingIntent && requestedConnectorKey === 'google_calendar'
+            ? parseDeterministicCalendarCreate(userText, clientTimeZone)
+            : null;
+          if (composioSession && deterministicCalendarCreate) {
+            try {
+              return directTextResponse(await executeVerifiedGoogleCalendarCreate(composioSession, deterministicCalendarCreate), 'Google Calendar', 'connected-action');
+            } catch (error: any) {
+              const message = String(error?.message || 'Google Calendar did not verify the event.').replace(/https?:\/\/\S+/g, '').slice(0, 300);
+              return directTextResponse(`I couldn’t schedule that event because Google Calendar did not verify it. ${message}`, 'Google Calendar', 'connector-error');
             }
           }
           if (composioSession && requestedConnectorKey === "gmail" && isReadOnlyConnectorRequest(userText)) {
@@ -3511,14 +3556,31 @@ export async function POST(req: NextRequest) {
       }
 
       const calendarStep = toolSteps.find((step) => /GOOGLECALENDAR.*CREATE.*EVENT/i.test(String(step?.tool || '')));
-      if (calendarStep) {
+      if (calendarSchedulingIntent) {
+        if (!calendarStep) return directTextResponse('I could not verify a Google Calendar create action, so no event was created. Please retry the schedule request; do not rely on any earlier text response.', 'Google Calendar', 'connector-error');
         const resultText = String(calendarStep.result || '');
         if (/\[\[UNCGPT_CALENDAR_EVENT:/.test(resultText)) return directTextResponse(resultText, 'Google Calendar', 'connected-action');
         const safeError = resultText.replace(/^Tool error:\s*/i, '').replace(/https?:\/\/\S+/g, '').slice(0, 260);
         return directTextResponse(`I couldn’t schedule that event because Google Calendar did not verify it. ${safeError || 'Please try again after reconnecting Google Calendar.'}`, 'Google Calendar', 'connector-error');
       }
+
+      if (requestedConnectorKey && connectorWriteIntent) {
+        const verifiedWriteStep = toolSteps.find((step) => {
+          const toolName = String(step?.tool || '').toLowerCase();
+          const resultText = String(step?.result || '');
+          return !/^tool error:/i.test(resultText) && /(?:create|update|edit|delete|send|write|upload|deploy|publish|commit|move|insert|add)/.test(toolName) && !/(?:list|search|get|read|find)/.test(toolName);
+        });
+        if (!verifiedWriteStep) {
+          const label = requestedConnector?.label || requestedConnectorKey.replace(/[_-]/g, ' ');
+          return directTextResponse(`I could not verify a ${label} write action, so no change was made. Please retry after checking the connector status.`, label, 'connector-error');
+        }
+      }
     } catch (e: any) {
       console.error("Tool loop error:", e.message);
+      const connectorWriteAfterFailure = /\b(send|create|update|edit|delete|schedule|deploy|upload|move|write|add|publish|commit)\b/i.test(`${userText}\n${recentUserText}`);
+      const calendarAfterFailure = /\b(schedule|appointment|meeting|calendar\s+event|set\s+up\s+(?:a\s+)?reminder)\b/i.test(`${userText}\n${recentUserText}`);
+      if (calendarAfterFailure) return directTextResponse('I could not verify a Google Calendar action, so no event was created. Please retry after checking the Calendar connection.', 'Google Calendar', 'connector-error');
+      if (connectorWriteAfterFailure) return directTextResponse('I could not verify the connected-app write action, so no change was made. Please retry after checking the connector status.', 'Connector', 'connector-error');
     }
 
     // ==================== VERIFIED GITHUB READS ====================
