@@ -1999,18 +1999,43 @@ function parseComposioObject(value: any) {
   return null;
 }
 
-function calendarEventCardPayload(value: any) {
+function findCalendarEventRecord(value: any, expectedEventId = ''): any {
+  const seen = new Set<any>();
+  const visit = (candidate: any, depth = 0): any => {
+    if (candidate === null || candidate === undefined || depth > 5) return null;
+    const parsed = parseComposioObject(candidate) || candidate;
+    if (typeof parsed !== 'object' || seen.has(parsed)) return null;
+    seen.add(parsed);
+    if (Array.isArray(parsed)) {
+      for (const item of parsed) {
+        const match = visit(item, depth + 1);
+        if (match) return match;
+      }
+      return null;
+    }
+    const id = String(parsed?.id || parsed?.event_id || '').trim();
+    const hasEventShape = Boolean(id && (parsed?.summary || parsed?.title || parsed?.start || parsed?.start_datetime));
+    if (hasEventShape && (!expectedEventId || id === expectedEventId)) return parsed;
+    for (const key of ['data', 'response_data', 'responseData', 'result', 'event', 'events', 'items', 'body']) {
+      const match = visit(parsed?.[key], depth + 1);
+      if (match) return match;
+    }
+    return null;
+  };
+  return visit(value) || {};
+}
+
+function calendarEventCardPayload(value: any, expectedEventId = '') {
   const root = parseComposioObject(value) || value || {};
-  const responseData = parseComposioObject(root?.response_data) || root?.responseData || root?.data?.response_data || root?.data?.responseData || root?.data || root;
-  const event = parseComposioObject(responseData) || responseData || {};
-  const start = event?.start?.dateTime || event?.start_datetime || event?.start || root?.start_datetime || '';
-  const end = event?.end?.dateTime || event?.end_datetime || event?.end || root?.end_datetime || '';
+  const event = findCalendarEventRecord(root, expectedEventId) || root;
+  const start = event?.start?.dateTime || event?.start?.date || event?.start_datetime || event?.start || root?.start_datetime || '';
+  const end = event?.end?.dateTime || event?.end?.date || event?.end_datetime || event?.end || root?.end_datetime || '';
   const rawUrl = String(event?.htmlLink || event?.html_link || event?.webViewLink || event?.url || root?.htmlLink || root?.html_link || '').trim();
   return {
     title: String(event?.summary || event?.title || root?.summary || root?.title || 'Calendar event').slice(0, 160),
     start: String(start || '').slice(0, 80),
     end: String(end || '').slice(0, 80),
-    eventId: String(event?.id || event?.event_id || root?.id || root?.event_id || '').slice(0, 160),
+    eventId: String(event?.id || event?.event_id || event?.eventId || root?.id || root?.event_id || root?.eventId || '').slice(0, 160),
     url: /^https:\/\/[^\s]+$/i.test(rawUrl) ? rawUrl : 'https://calendar.google.com/calendar/u/0/r',
   };
 }
@@ -2020,18 +2045,54 @@ function calendarEventResultCard(value: any) {
 }
 
 async function executeVerifiedGoogleCalendarCreate(composioSession: any, args: Record<string, unknown>) {
+  const calendarId = String(args.calendar_id || args.calendarId || 'primary').trim() || 'primary';
+  const timezone = String(args.timezone || args.timeZone || 'UTC').trim() || 'UTC';
   const result: any = await composioSession.execute('GOOGLECALENDAR_CREATE_EVENT', args);
-  if (result?.error || result?.successful === false || result?.data?.error) {
-    throw new Error(String(result?.error || result?.data?.error || 'Google Calendar did not confirm the event creation.'));
+  if (isWrappedConnectorFailure(result)) {
+    throw new Error(String(result?.error || result?.data?.error || result?.response_data?.error || 'Google Calendar did not confirm the event creation.'));
   }
   const created = calendarEventCardPayload(result?.data ?? result);
   if (!created.eventId) throw new Error('Google Calendar did not return an event ID, so the event could not be verified.');
-  const verification: any = await composioSession.execute('GOOGLECALENDAR_EVENTS_GET', { event_id: created.eventId, calendar_id: 'primary' });
-  if (verification?.error || verification?.successful === false || verification?.data?.error) {
-    throw new Error(String(verification?.error || verification?.data?.error || 'Google Calendar did not confirm the created event.'));
+
+  let verified: ReturnType<typeof calendarEventCardPayload> | null = null;
+  let directVerificationError = '';
+  for (let attempt = 0; attempt < 4; attempt += 1) {
+    try {
+      const verification: any = await composioSession.execute('GOOGLECALENDAR_EVENTS_GET', { event_id: created.eventId, calendar_id: calendarId, time_zone: timezone });
+      if (!isWrappedConnectorFailure(verification)) {
+        const candidate = calendarEventCardPayload(verification?.data ?? verification, created.eventId);
+        if (candidate.eventId === created.eventId) { verified = candidate; break; }
+      } else {
+        directVerificationError = String(verification?.error || verification?.data?.error || verification?.response_data?.error || '');
+        if (/unauthorized|forbidden|invalid[_ -]?grant|permission/i.test(directVerificationError)) throw new Error(directVerificationError);
+      }
+    } catch (error: any) {
+      directVerificationError = String(error?.message || error || '');
+      if (/unauthorized|forbidden|invalid[_ -]?grant|permission/i.test(directVerificationError)) throw error;
+    }
+    if (attempt < 3) await new Promise((resolve) => setTimeout(resolve, 750));
   }
-  const verified = calendarEventCardPayload(verification?.data ?? verification);
-  if (!verified.eventId || verified.eventId !== created.eventId) throw new Error('Google Calendar could not verify the created event.');
+
+  if (!verified) {
+    try {
+      const listed: any = await composioSession.execute('GOOGLECALENDAR_EVENTS_LIST', {
+        calendarId,
+        q: created.title,
+        timeZone: timezone,
+        singleEvents: true,
+        orderBy: 'startTime',
+        maxResults: 25,
+      });
+      if (!isWrappedConnectorFailure(listed)) {
+        const candidate = calendarEventCardPayload(listed?.data ?? listed, created.eventId);
+        if (candidate.eventId === created.eventId) verified = candidate;
+      }
+    } catch {}
+  }
+
+  if (!verified) {
+    throw new Error(`Google Calendar created an unconfirmed event response${directVerificationError ? ` (${directVerificationError.slice(0, 120)})` : ''}; it was not reported as scheduled.`);
+  }
   return calendarEventResultCard({ ...created, ...verified, url: verified.url || created.url });
 }
 
@@ -3631,8 +3692,11 @@ export async function POST(req: NextRequest) {
             try {
               return directTextResponse(await executeVerifiedGoogleCalendarCreate(composioSession, deterministicCalendarCreate), 'Google Calendar', 'connected-action');
             } catch (error: any) {
-              const message = String(error?.message || 'Google Calendar did not verify the event.').replace(/https?:\/\/\S+/g, '').slice(0, 300);
-              return directTextResponse(`I couldn’t schedule that event because Google Calendar did not verify it. ${message}`, 'Google Calendar', 'connector-error');
+              const detail = String(error?.message || 'Google Calendar did not verify the event.').replace(/https?:\/\/\S+/g, '').slice(0, 300);
+              const providerState = /unconfirmed event response/i.test(detail)
+                ? 'Google Calendar accepted a response, but did not let me confirm the exact event yet. I did not mark it scheduled or create another one.'
+                : 'Google Calendar did not confirm the event creation, so I did not mark it scheduled.';
+              return directTextResponse(`${providerState} ${detail}`, 'Google Calendar', 'connector-error');
             }
           }
           if (composioSession && requestedConnectorKey === "gmail" && isReadOnlyConnectorRequest(userText)) {

@@ -48,6 +48,22 @@ test('parses an explicit Calendar schedule deterministically in the user time zo
   });
 });
 
+test('parses a spoken month date and trailing event title without falling back to model-generated arguments', () => {
+  const event = parseDeterministicCalendarCreate(
+    'Can you schedule me on 28 August at 5pm rest',
+    'Europe/Amsterdam',
+    new Date('2026-08-26T10:00:00.000Z'),
+  );
+  assert.deepEqual(JSON.parse(JSON.stringify(event)), {
+    summary: 'rest',
+    start_datetime: '2026-08-28T17:00:00',
+    timezone: 'Europe/Amsterdam',
+    event_duration_hour: 1,
+    event_duration_minutes: 0,
+    calendar_id: 'primary',
+  });
+});
+
 test('does not manufacture incomplete Calendar create arguments', () => {
   assert.equal(parseDeterministicCalendarCreate('Schedule something tomorrow called Unspecified', 'UTC', new Date('2026-08-26T10:00:00.000Z')), null);
   assert.equal(parseDeterministicCalendarCreate('Schedule a meeting at 3 PM', 'UTC', new Date('2026-08-26T10:00:00.000Z')), null);

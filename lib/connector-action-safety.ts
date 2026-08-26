@@ -41,16 +41,43 @@ export function isCalendarSchedulingIntent(userText: string, recentUserText = ''
 
 export function parseDeterministicCalendarCreate(text: string, requestedTimeZone?: string, now = new Date()) {
   const timezone = requestedTimeZone && (() => { try { Intl.DateTimeFormat('en-US', { timeZone: requestedTimeZone }); return true; } catch { return false; } })() ? requestedTimeZone : 'UTC';
+  const parts = new Intl.DateTimeFormat('en-CA', { timeZone: timezone, year: 'numeric', month: '2-digit', day: '2-digit' }).formatToParts(now);
+  const part = (type: string) => Number(parts.find((item) => item.type === type)?.value || 0);
+  const currentYear = part('year');
+  const currentDate = `${currentYear}-${String(part('month')).padStart(2, '0')}-${String(part('day')).padStart(2, '0')}`;
   const explicitDate = text.match(/\b(20\d{2}-\d{2}-\d{2})\b/)?.[1];
   let date = explicitDate;
   if (!date && /\btomorrow\b/i.test(text)) {
-    const parts = new Intl.DateTimeFormat('en-CA', { timeZone: timezone, year: 'numeric', month: '2-digit', day: '2-digit' }).formatToParts(now);
-    const part = (type: string) => Number(parts.find((item) => item.type === type)?.value || 0);
-    const tomorrow = new Date(Date.UTC(part('year'), part('month') - 1, part('day') + 1));
+    const tomorrow = new Date(Date.UTC(currentYear, part('month') - 1, part('day') + 1));
     date = tomorrow.toISOString().slice(0, 10);
   }
+  if (!date) {
+    const monthNames = ['january', 'february', 'march', 'april', 'may', 'june', 'july', 'august', 'september', 'october', 'november', 'december'];
+    const dayFirst = text.match(/\b(?:on\s+)?(\d{1,2})(?:st|nd|rd|th)?\s+(january|february|march|april|may|june|july|august|september|october|november|december)\b/i);
+    const monthFirst = text.match(/\b(?:on\s+)?(january|february|march|april|may|june|july|august|september|october|november|december)\s+(\d{1,2})(?:st|nd|rd|th)?\b/i);
+    const day = Number(dayFirst?.[1] || monthFirst?.[2] || 0);
+    const monthName = String(dayFirst?.[2] || monthFirst?.[1] || '').toLowerCase();
+    const monthIndex = monthNames.indexOf(monthName);
+    if (day && monthIndex >= 0) {
+      let year = currentYear;
+      const candidate = new Date(Date.UTC(year, monthIndex, day));
+      if (candidate.getUTCMonth() !== monthIndex || candidate.getUTCDate() !== day) return null;
+      let candidateDate = candidate.toISOString().slice(0, 10);
+      if (candidateDate < currentDate) {
+        year += 1;
+        const nextYearCandidate = new Date(Date.UTC(year, monthIndex, day));
+        if (nextYearCandidate.getUTCMonth() !== monthIndex || nextYearCandidate.getUTCDate() !== day) return null;
+        candidateDate = nextYearCandidate.toISOString().slice(0, 10);
+      }
+      date = candidateDate;
+    }
+  }
   const timeMatch = text.match(/\b(?:at\s+)?(1[0-2]|0?[1-9])(?::([0-5]\d))?\s*(am|pm)\b/i);
-  const title = text.match(/\b(?:called|named|titled)\s+["“”']?(.+?)["“”']?\s*$/i)?.[1]?.trim();
+  const namedTitle = text.match(/\b(?:called|named|titled)\s+["“”']?(.+?)["“”']?\s*$/i)?.[1]?.trim();
+  const trailingTitle = timeMatch && typeof timeMatch.index === 'number'
+    ? text.slice(timeMatch.index + timeMatch[0].length).replace(/^[\s,:;\-–—]*(?:for\s+)?/i, '').trim()
+    : '';
+  const title = namedTitle || trailingTitle;
   if (!date || !timeMatch || !title) return null;
   let hour = Number(timeMatch[1]);
   const minute = Number(timeMatch[2] || 0);
@@ -59,7 +86,7 @@ export function parseDeterministicCalendarCreate(text: string, requestedTimeZone
   if (period === 'am' && hour === 12) hour = 0;
   const durationMinutes = Number(text.match(/\b(\d{1,3})\s*(?:minutes?|mins?)\b/i)?.[1] || 60);
   return {
-    summary: title.slice(0, 160),
+    summary: title.replace(/[.]+$/, '').slice(0, 160),
     start_datetime: `${date}T${String(hour).padStart(2, '0')}:${String(minute).padStart(2, '0')}:00`,
     timezone,
     event_duration_hour: Math.floor(durationMinutes / 60),

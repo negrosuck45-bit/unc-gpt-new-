@@ -241,7 +241,7 @@ test('creates and reads back a Calendar event instead of falling into the generi
     {
       slug: 'GOOGLECALENDAR_CREATE_EVENT',
       args: {
-        summary: 'UncGPT Calendar Verify Final.',
+        summary: 'UncGPT Calendar Verify Final',
         start_datetime: `${tomorrow}T15:00:00`,
         timezone: 'Europe/Amsterdam',
         event_duration_hour: 0,
@@ -249,10 +249,48 @@ test('creates and reads back a Calendar event instead of falling into the generi
         calendar_id: 'primary',
       },
     },
-    { slug: 'GOOGLECALENDAR_EVENTS_GET', args: { event_id: 'event-123', calendar_id: 'primary' } },
+    { slug: 'GOOGLECALENDAR_EVENTS_GET', args: { event_id: 'event-123', calendar_id: 'primary', time_zone: 'Europe/Amsterdam' } },
   ]);
 });
 
+
+test('verifies a delayed nested Calendar event response without creating a duplicate', async () => {
+  const calls = [];
+  const event = {
+    id: 'event-delayed',
+    summary: 'rest',
+    start: { dateTime: '2026-08-28T17:00:00' },
+    end: { dateTime: '2026-08-28T18:00:00' },
+    htmlLink: 'https://calendar.google.com/calendar/event?eid=event-delayed',
+  };
+  let reads = 0;
+  const connectorSession = {
+    async search() { return {}; },
+    async execute(slug, args) {
+      calls.push({ slug, args });
+      if (slug === 'GOOGLECALENDAR_CREATE_EVENT') return { successful: true, data: { response_data: JSON.stringify({ event }) } };
+      if (slug === 'GOOGLECALENDAR_EVENTS_GET') {
+        reads += 1;
+        return reads < 2 ? { successful: false, error: 'Event not found yet' } : { successful: true, data: { result: { event } } };
+      }
+      throw new Error(`Unexpected delayed Calendar tool: ${slug}`);
+    },
+  };
+  const { POST } = createRoute({ connectorSession, enabledToolkits: ['googlecalendar'] });
+  const response = await POST(createRequest({
+    messages: [{ role: 'user', content: 'Can you schedule me on 28 August at 5pm rest' }],
+    computerUse: false,
+    clientTimeZone: 'Europe/Amsterdam',
+    mcpConnectors: [{ source: 'composio', provider: 'google_calendar', enabled: true }],
+  }));
+  const text = await responseSseText(response);
+
+  assert.match(text, /UNCGPT_CALENDAR_EVENT/);
+  assert.match(text, /rest/);
+  assert.equal(calls.filter((call) => call.slug === 'GOOGLECALENDAR_CREATE_EVENT').length, 1);
+  assert.equal(calls.filter((call) => call.slug === 'GOOGLECALENDAR_EVENTS_GET').length, 2);
+  assert.doesNotMatch(text, /couldn’t schedule/i);
+});
 
 test('discovers and reads from a live connected Composio app outside the built-in provider list', async () => {
   const calls = [];
