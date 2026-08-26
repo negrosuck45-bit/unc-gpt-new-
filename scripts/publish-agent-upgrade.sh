@@ -31,6 +31,7 @@ files=(
   "app/api/connectors/composio/status/route.ts"
   "lib/connector-results.ts"
   "lib/connector-action-safety.ts"
+  "lib/calendar-event-presentation.ts"
   "lib/composio.ts"
   "lib/auth.ts"
   "lib/chat-store.ts"
@@ -42,6 +43,7 @@ files=(
   "tests/connector-results.test.mjs"
   "tests/connector-action-safety.test.mjs"
   "tests/chat-connector-execution.test.mjs"
+  "tests/calendar-event-presentation.test.mjs"
 )
 
 base_commit="$(gh api "repos/$repo/git/ref/heads/$branch" --jq '.object.sha')"
