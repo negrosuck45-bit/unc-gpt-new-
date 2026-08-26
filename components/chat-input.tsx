@@ -843,28 +843,26 @@ export function ChatInput({
               animate={{ opacity: 1, y: 0 }}
               exit={{ opacity: 0, y: 8 }}
               transition={{ duration: 0.18, ease: [0.23, 1, 0.32, 1] }}
-              className="voice-draft-composer mx-3 mb-2 flex items-center gap-3 rounded-[26px] px-4 py-3"
+              className="voice-draft-composer relative mx-3 min-h-[146px] overflow-hidden rounded-[34px]"
             >
-              <button type="button" onClick={discardVoiceDraft} aria-label="Discard voice draft" className="voice-draft-action flex h-9 w-9 shrink-0 items-center justify-center rounded-xl">
-                <X className="h-5 w-5" strokeWidth={1.9} />
+              <button type="button" onClick={discardVoiceDraft} aria-label="Discard voice draft" className="voice-draft-action absolute bottom-5 left-5 flex h-11 w-11 items-center justify-center rounded-2xl">
+                <X className="h-7 w-7" strokeWidth={1.75} />
               </button>
-              <div className="min-w-0 flex-1">
-                <div className="flex items-center justify-center gap-2.5">
-                  <span className="voice-draft-wave" aria-hidden="true">
-                    {[0.42, 0.7, 1, 0.68, 0.95, 0.62, 0.42].map((base, index) => <i key={index} style={{ transform: `scaleY(${base})` }} />)}
-                  </span>
-                  <span className="text-sm font-medium tabular-nums text-white/62">{Math.floor(voiceDraft.duration / 60)}:{String(voiceDraft.duration % 60).padStart(2, '0')}</span>
-                </div>
+              <div className="absolute inset-x-0 top-7 flex items-center justify-center gap-3">
+                <span className="voice-draft-wave" aria-hidden="true">
+                  {[0.42, 0.7, 1, 0.68, 0.95, 0.62, 0.42].map((base, index) => <i key={index} style={{ transform: `scaleY(${base})` }} />)}
+                </span>
+                <span className="text-[18px] font-medium tabular-nums text-white/62">{Math.floor(voiceDraft.duration / 60)}:{String(voiceDraft.duration % 60).padStart(2, '0')}</span>
               </div>
-              <button type="button" onClick={sendVoiceDraft} disabled={disabled || isStreaming} aria-label="Send recognized voice text" className="voice-draft-confirm flex h-9 w-9 shrink-0 items-center justify-center rounded-xl">
-                <Check className="h-5 w-5" strokeWidth={2} />
+              <button type="button" onClick={sendVoiceDraft} disabled={disabled || isStreaming} aria-label="Send recognized voice text" className="voice-draft-confirm absolute bottom-5 right-5 flex h-11 w-11 items-center justify-center rounded-2xl">
+                <Check className="h-7 w-7" strokeWidth={1.9} />
               </button>
             </motion.div>
           )}
         </AnimatePresence>
 
-        <div className="px-3">
-          <div className="task-composer rounded-[30px] border transition-all duration-200">
+        <div className={cn("px-3", voiceDraft && "hidden")}>
+          <div className="task-composer rounded-[34px] border transition-all duration-200">
             <textarea
               ref={textareaRef}
               value={input}

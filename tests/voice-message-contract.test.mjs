@@ -17,14 +17,18 @@ test('voice input creates a review draft and sends only recognized text into cha
   assert.match(input, /prepareVoiceDraft/);
   assert.match(input, /setVoiceDraft\(\{ transcript: cleanTranscript, duration \}\)/);
   assert.match(input, /onSend\(voiceDraft\.transcript\)/);
-  assert.match(input, /voice-draft-composer/);
+  assert.match(input, /voice-draft-composer relative mx-3 min-h-\[146px\]/);
+  assert.match(input, /voiceDraft && "hidden"/);
   assert.match(input, /voice-draft-wave/);
+  assert.match(input, /absolute bottom-5 left-5/);
+  assert.match(input, /absolute bottom-5 right-5/);
   assert.match(input, /Discard voice draft/);
   assert.match(input, /Send recognized voice text/);
   assert.doesNotMatch(voiceLifecycle, /Voice message transcript:/);
   assert.doesNotMatch(voiceLifecycle, /\/api\/storage\/upload/);
   assert.doesNotMatch(voiceLifecycle, /type: 'audio'/);
-  assert.match(styles, /voice-draft-composer/);
+  assert.match(styles, /min-height: 146px/);
+  assert.match(styles, /voice-draft-wave/);
   assert.match(messages, /attachment\.type === 'audio'/);
 });
 
