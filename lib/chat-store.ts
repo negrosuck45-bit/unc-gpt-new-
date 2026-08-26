@@ -9,7 +9,7 @@ import { scopedStorage } from "./account-scope";
 // ---------------------------------------------------------------------------
 export interface Attachment {
   id: string;
-  type: "image" | "video" | "file" | "link";
+  type: "image" | "video" | "audio" | "file" | "link";
   name: string;
   url: string;
   /** Local compressed data URL retained as a fallback for vision or offline preview. */

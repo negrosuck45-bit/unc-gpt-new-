@@ -11,6 +11,7 @@ import {
   X,
   FileText,
   AudioWaveform,
+  Mic,
   Eye,
   Plus,
   ChevronDown,
@@ -267,6 +268,10 @@ export function ChatInput({
   const [showLinkInput, setShowLinkInput] = useState(false)
   const [linkUrl, setLinkUrl] = useState('')
   const [isRecording, setIsRecording] = useState(false)
+  const [isSendingVoice, setIsSendingVoice] = useState(false)
+  const [voiceDuration, setVoiceDuration] = useState(0)
+  const [voiceLevel, setVoiceLevel] = useState(0)
+  const [voiceTranscript, setVoiceTranscript] = useState('')
   const [isUploading, setIsUploading] = useState(false)
   const [attachMenuOpen, setAttachMenuOpen] = useState(false)
   const [sheetExpanded, setSheetExpanded] = useState(false)
@@ -281,6 +286,13 @@ export function ChatInput({
   const imageInputRef = useRef<HTMLInputElement>(null)
   const cameraInputRef = useRef<HTMLInputElement>(null)
   const recognitionRef = useRef<any>(null)
+  const recognitionRunningRef = useRef(false)
+  const mediaRecorderRef = useRef<MediaRecorder | null>(null)
+  const mediaStreamRef = useRef<MediaStream | null>(null)
+  const audioChunksRef = useRef<BlobPart[]>([])
+  const voiceTranscriptRef = useRef('')
+  const audioContextRef = useRef<AudioContext | null>(null)
+  const audioFrameRef = useRef<number | null>(null)
 
   const { settings, updateSettings, getCurrentChat, updateChatModel } = useChatStore()
   const currentChat = getCurrentChat()
@@ -482,36 +494,200 @@ export function ChatInput({
     }
   }, [input, attachments, uploadStatus, isStreaming, disabled, onSend])
 
-  useEffect(() => {
-    if (typeof window === 'undefined') return
-    const SR = (window as any).SpeechRecognition || (window as any).webkitSpeechRecognition
-    if (!SR) return
-    const rec = new SR()
-    rec.continuous = false
-    rec.interimResults = true
-    rec.lang = 'en-US'
-    rec.onstart = () => setIsRecording(true)
-    rec.onresult = (ev: any) => {
-      let final = ''
-      for (let i = ev.resultIndex; i < ev.results.length; i++) {
-        if (ev.results[i].isFinal) final += ev.results[i][0].transcript
-      }
-      if (final) setInput((prev) => (prev.trim() ? prev + ' ' + final : final))
+  const stopVoiceMeter = useCallback(() => {
+    if (audioFrameRef.current !== null) {
+      cancelAnimationFrame(audioFrameRef.current)
+      audioFrameRef.current = null
     }
-    rec.onend = () => setIsRecording(false)
-    recognitionRef.current = rec
-    return () => rec.abort()
+    if (audioContextRef.current) {
+      void audioContextRef.current.close().catch(() => {})
+      audioContextRef.current = null
+    }
+    setVoiceLevel(0)
   }, [])
 
-  const toggleVoiceInput = async () => {
-    const rec = recognitionRef.current
-    if (!rec) return alert('Speech recognition not supported.')
-    if (isRecording) return rec.stop()
+  const releaseVoiceStream = useCallback(() => {
+    mediaStreamRef.current?.getTracks().forEach((track) => track.stop())
+    mediaStreamRef.current = null
+  }, [])
+
+  const uploadVoiceMessage = useCallback(async (blob: Blob, transcript: string) => {
+    const cleanTranscript = transcript.replace(/\s+/g, ' ').trim()
+    if (!cleanTranscript) {
+      setToast('No speech was detected, so the voice message was not sent. Please try again and speak clearly.')
+      return
+    }
+    if (!blob.size) {
+      setToast('The recording was empty, so no voice message was sent.')
+      return
+    }
+
+    const extension = blob.type.includes('ogg') ? 'ogg' : blob.type.includes('mp4') ? 'm4a' : 'webm'
+    const recording = new File([blob], `voice-message-${Date.now()}.${extension}`, { type: blob.type || 'audio/webm' })
+    const formData = new FormData()
+    formData.append('file', recording)
+    formData.append('chatId', currentChat?.id || '')
+    setIsSendingVoice(true)
+
     try {
-      await navigator.mediaDevices.getUserMedia({ audio: true })
-      rec.start()
-    } catch { alert('Microphone access denied') }
-  }
+      const response = await fetch('/api/storage/upload', { method: 'POST', body: formData })
+      const payload = await response.json().catch(() => ({}))
+      if (!response.ok || typeof payload?.url !== 'string' || !payload.url) {
+        throw new Error(payload?.error || 'Voice upload failed')
+      }
+
+      const voiceAttachment: Attachment = {
+        id: crypto.randomUUID(),
+        type: 'audio',
+        name: 'Voice message',
+        url: payload.url,
+        permanentUrl: payload.url,
+        uploaded: true,
+        size: recording.size,
+        mimeType: recording.type,
+      }
+      onSend(`Voice message transcript: ${cleanTranscript}`, [voiceAttachment])
+      setToast('Voice message sent')
+    } catch (error) {
+      setToast(error instanceof Error ? error.message : 'Voice message upload failed')
+    } finally {
+      setIsSendingVoice(false)
+    }
+  }, [currentChat?.id, onSend])
+
+  const startVoiceMeter = useCallback((stream: MediaStream) => {
+    const AudioContextConstructor = window.AudioContext || (window as any).webkitAudioContext
+    if (!AudioContextConstructor) return
+    try {
+      const context = new AudioContextConstructor()
+      const analyser = context.createAnalyser()
+      analyser.fftSize = 32
+      const source = context.createMediaStreamSource(stream)
+      source.connect(analyser)
+      const samples = new Uint8Array(analyser.fftSize)
+      audioContextRef.current = context
+      const update = () => {
+        analyser.getByteTimeDomainData(samples)
+        const average = samples.reduce((sum, value) => sum + Math.abs(value - 128), 0) / samples.length
+        setVoiceLevel(Math.min(1, average / 32))
+        audioFrameRef.current = requestAnimationFrame(update)
+      }
+      update()
+    } catch {
+      setVoiceLevel(0.2)
+    }
+  }, [])
+
+  const startVoiceRecognition = useCallback(() => {
+    const SpeechRecognition = (window as any).SpeechRecognition || (window as any).webkitSpeechRecognition
+    if (!SpeechRecognition) return false
+    const recognition = new SpeechRecognition()
+    recognition.continuous = true
+    recognition.interimResults = true
+    recognition.lang = navigator.language || 'en-US'
+    recognition.onstart = () => { recognitionRunningRef.current = true }
+    recognition.onresult = (event: any) => {
+      let finalText = voiceTranscriptRef.current
+      let interimText = ''
+      for (let index = event.resultIndex; index < event.results.length; index++) {
+        const phrase = String(event.results[index][0]?.transcript || '').trim()
+        if (!phrase) continue
+        if (event.results[index].isFinal) finalText = `${finalText} ${phrase}`.trim()
+        else interimText = `${interimText} ${phrase}`.trim()
+      }
+      voiceTranscriptRef.current = finalText
+      setVoiceTranscript([finalText, interimText].filter(Boolean).join(' '))
+    }
+    recognition.onerror = () => { recognitionRunningRef.current = false }
+    recognition.onend = () => { recognitionRunningRef.current = false }
+    recognitionRef.current = recognition
+    try {
+      recognition.start()
+      return true
+    } catch {
+      return false
+    }
+  }, [])
+
+  const stopVoiceMessage = useCallback(() => {
+    if (!isRecording) return
+    setIsRecording(false)
+    if (recognitionRunningRef.current) {
+      try { recognitionRef.current?.stop() } catch {}
+    }
+    if (mediaRecorderRef.current?.state === 'recording') {
+      try { mediaRecorderRef.current.stop() } catch {}
+    }
+  }, [isRecording])
+
+  const toggleVoiceInput = useCallback(async () => {
+    if (isSendingVoice || disabled || isStreaming) return
+    if (isRecording) {
+      stopVoiceMessage()
+      return
+    }
+    if (typeof window === 'undefined' || !navigator.mediaDevices?.getUserMedia || typeof MediaRecorder === 'undefined') {
+      setToast('Voice messages are not supported in this browser.')
+      return
+    }
+    const SpeechRecognition = (window as any).SpeechRecognition || (window as any).webkitSpeechRecognition
+    if (!SpeechRecognition) {
+      setToast('Speech transcription is not available in this browser, so I cannot send an AI-readable voice message yet.')
+      return
+    }
+
+    try {
+      const stream = await navigator.mediaDevices.getUserMedia({ audio: true })
+      const preferredType = ['audio/webm;codecs=opus', 'audio/webm', 'audio/ogg;codecs=opus'].find((type) => MediaRecorder.isTypeSupported(type))
+      const recorder = preferredType ? new MediaRecorder(stream, { mimeType: preferredType }) : new MediaRecorder(stream)
+      mediaStreamRef.current = stream
+      mediaRecorderRef.current = recorder
+      audioChunksRef.current = []
+      voiceTranscriptRef.current = ''
+      setVoiceTranscript('')
+      setVoiceDuration(0)
+      recorder.ondataavailable = (event) => {
+        if (event.data.size > 0) audioChunksRef.current.push(event.data)
+      }
+      recorder.onstop = () => {
+        const recording = new Blob(audioChunksRef.current, { type: recorder.mimeType || 'audio/webm' })
+        stopVoiceMeter()
+        releaseVoiceStream()
+        // Allow the browser speech engine to flush its final phrase before the
+        // transcript is committed to the AI-visible chat message.
+        window.setTimeout(() => void uploadVoiceMessage(recording, voiceTranscriptRef.current), 260)
+      }
+      recorder.start(250)
+      setIsRecording(true)
+      startVoiceMeter(stream)
+      if (!startVoiceRecognition()) {
+        recorder.stop()
+        releaseVoiceStream()
+        stopVoiceMeter()
+        setIsRecording(false)
+        setToast('Speech transcription could not start, so the voice message was not sent.')
+      }
+    } catch {
+      releaseVoiceStream()
+      stopVoiceMeter()
+      setToast('Microphone access was denied. Allow microphone access and try again.')
+    }
+  }, [disabled, isRecording, isSendingVoice, isStreaming, releaseVoiceStream, startVoiceMeter, startVoiceRecognition, stopVoiceMessage, stopVoiceMeter])
+
+  useEffect(() => {
+    if (!isRecording) return
+    const interval = window.setInterval(() => setVoiceDuration((seconds) => seconds + 1), 1000)
+    return () => window.clearInterval(interval)
+  }, [isRecording])
+
+  useEffect(() => () => {
+    try { recognitionRef.current?.abort() } catch {}
+    if (mediaRecorderRef.current?.state === 'recording') {
+      try { mediaRecorderRef.current.stop() } catch {}
+    }
+    releaseVoiceStream()
+    stopVoiceMeter()
+  }, [releaseVoiceStream, stopVoiceMeter])
 
   const handleKeyDown = (e: React.KeyboardEvent) => {
     if (e.key === 'Enter' && !e.shiftKey && sendOnEnter) {
@@ -684,6 +860,23 @@ export function ChatInput({
           )}
         </AnimatePresence>
 
+        <AnimatePresence>
+          {isRecording && (
+            <motion.div
+              initial={{ opacity: 0, y: 8 }}
+              animate={{ opacity: 1, y: 0 }}
+              exit={{ opacity: 0, y: 8 }}
+              transition={{ duration: 0.16, ease: [0.23, 1, 0.32, 1] }}
+              className="voice-recording-status mx-3 mb-2 flex items-center gap-2.5 rounded-2xl px-3 py-2"
+            >
+              <span className="voice-recording-dot" />
+              <span className="shrink-0 text-xs font-medium text-white/78">{Math.floor(voiceDuration / 60)}:{String(voiceDuration % 60).padStart(2, '0')}</span>
+              <span className="min-w-0 flex-1 truncate text-xs text-white/48">{voiceTranscript || 'Listening…'}</span>
+              <button type="button" onClick={stopVoiceMessage} className="rounded-lg px-2 py-1 text-xs font-medium text-white/70 transition hover:bg-white/[0.08] hover:text-white">Send</button>
+            </motion.div>
+          )}
+        </AnimatePresence>
+
         <div className="px-3">
           <div className="task-composer rounded-[30px] border transition-all duration-200">
             <textarea
@@ -798,11 +991,23 @@ export function ChatInput({
                     <Button
                       onClick={toggleVoiceInput}
                       size="icon"
-                      variant={isRecording ? "destructive" : "ghost"}
-                      className="task-composer-action h-9 w-9 rounded-full"
-                      aria-label={isRecording ? "Stop dictation" : "Start dictation"}
+                      variant="ghost"
+                      disabled={isSendingVoice || disabled}
+                      className={cn("voice-record-control h-10 w-10 rounded-full", isRecording && "is-recording")}
+                      aria-label={isRecording ? "Finish and send voice message" : "Record a voice message"}
+                      title={isRecording ? "Finish and send voice message" : "Record a voice message"}
                     >
-                      <AudioWaveform className="h-[18px] w-[18px]" strokeWidth={1.8} />
+                      {isSendingVoice ? (
+                        <Loader2 className="h-[18px] w-[18px] animate-spin" />
+                      ) : isRecording ? (
+                        <span className="voice-recording-wave" aria-hidden="true">
+                          {[0.42, 0.68, 1, 0.68, 0.42].map((base, index) => (
+                            <i key={index} style={{ transform: `scaleY(${Math.min(1.7, base + voiceLevel * (1.15 - index * 0.08))})` }} />
+                          ))}
+                        </span>
+                      ) : (
+                        <Mic className="h-[18px] w-[18px]" strokeWidth={1.8} />
+                      )}
                     </Button>
                     <Button
                       onClick={handleSubmit}

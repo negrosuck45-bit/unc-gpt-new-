@@ -26,6 +26,7 @@ import {
   WifiOff,
   RotateCcw,
   AlertCircle,
+  AudioWaveform,
 } from 'lucide-react';
 import { MessageContent } from './message-content';
 import { ComputerUseSteps } from './computer-use-steps';
@@ -201,6 +202,20 @@ function AttachmentPreview({ attachment, onView, compact = false }: { attachment
     return (
       <motion.div initial={{ opacity: 0, scale: 0.9 }} animate={{ opacity: 1, scale: 1 }} className="mt-2 rounded-lg overflow-hidden max-w-sm">
         <video src={attachment.url} controls className="w-full h-auto rounded-lg bg-muted" />
+      </motion.div>
+    );
+  }
+
+  if (attachment.type === 'audio') {
+    return (
+      <motion.div initial={{ opacity: 0, y: 5 }} animate={{ opacity: 1, y: 0 }} className="voice-message-card mt-2 flex min-w-0 items-center gap-3 rounded-2xl px-3 py-2.5">
+        <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-white/[0.08] text-white/72">
+          <AudioWaveform className="h-[18px] w-[18px]" strokeWidth={1.8} />
+        </span>
+        <div className="min-w-0 flex-1">
+          <p className="mb-1 text-xs font-medium text-white/68">Voice message</p>
+          <audio src={attachment.url} controls preload="metadata" className="voice-message-player h-7 w-full min-w-0" />
+        </div>
       </motion.div>
     );
   }

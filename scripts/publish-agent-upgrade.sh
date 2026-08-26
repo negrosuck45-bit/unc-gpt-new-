@@ -33,6 +33,8 @@ files=(
   "app/api/connectors/composio/manage/route.ts"
   "app/api/connectors/composio/status/route.ts"
   "app/api/github-pages/status/route.ts"
+  "app/api/storage/upload/route.ts"
+  "lib/attachment-processor.ts"
   "lib/connector-results.ts"
   "lib/connector-action-safety.ts"
   "lib/calendar-event-presentation.ts"
@@ -50,6 +52,7 @@ files=(
   "tests/calendar-event-presentation.test.mjs"
   "tests/github-pages-status.test.mjs"
   "tests/uncgpt-router.test.mjs"
+  "tests/voice-message-contract.test.mjs"
 )
 
 base_commit="$(gh api "repos/$repo/git/ref/heads/$branch" --jq '.object.sha')"

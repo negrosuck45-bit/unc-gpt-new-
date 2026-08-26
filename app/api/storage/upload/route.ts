@@ -27,12 +27,15 @@ export async function POST(request: NextRequest) {
   const file = formData.get('file')
   const chatId = String(formData.get('chatId') || '')
   if (!(file instanceof File)) return Response.json({ error: 'Missing file' }, { status: 400 })
-  if (!file.type.startsWith('image/')) return Response.json({ error: 'Only images are supported' }, { status: 415 })
-  if (file.size > 15 * 1024 * 1024) return Response.json({ error: 'Image must be 15 MB or smaller' }, { status: 413 })
+  const isImage = file.type.startsWith('image/')
+  const isAudio = file.type.startsWith('audio/')
+  if (!isImage && !isAudio) return Response.json({ error: 'Only image and audio uploads are supported' }, { status: 415 })
+  if (file.size > 15 * 1024 * 1024) return Response.json({ error: 'Uploads must be 15 MB or smaller' }, { status: 413 })
 
   const userId = safeSegment(session?.user?.sub || 'anonymous')
   const extension = file.name.split('.').pop()?.toLowerCase() || 'jpg'
-  const path = `users/${userId}/images/${Date.now()}-${crypto.randomUUID()}.${extension}`
+  const folder = isAudio ? 'audio' : 'images'
+  const path = `users/${userId}/${folder}/${Date.now()}-${crypto.randomUUID()}.${extension}`
   const buffer = Buffer.from(await file.arrayBuffer())
 
   const { error: uploadError } = await storage.upload(path, buffer, {

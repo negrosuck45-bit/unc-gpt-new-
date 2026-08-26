@@ -199,7 +199,7 @@ export function ChatInterface({ onSwitchToImagine, onOpenSidebar, isSidebarOpen 
           if (a.type === "image") {
             const imageUrl = a.permanentUrl || a.url || a.visionUrl;
             if (imageUrl) contentParts.push({ type: "image_url", image_url: { url: imageUrl } });
-          } else if (a.type === "file" || a.type === "link") {
+          } else if (a.type === "file" || a.type === "link" || a.type === "audio") {
             contentParts[0].text += `\n\n[Attached ${a.type}: ${a.name}](${a.url})`;
           }
         });

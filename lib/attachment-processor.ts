@@ -108,6 +108,15 @@ export async function processAttachment(
       break;
     }
 
+    case "audio": {
+      summary = `🎙️ **${attachment.name}** (Voice message)`;
+      if (includeMetadata && attachment.size) {
+        summary += ` - ${(attachment.size / 1024).toFixed(2)}KB`;
+      }
+      content = `[Voice message attached: ${attachment.name}] The accompanying chat message contains the verified speech transcript for this recording.`;
+      break;
+    }
+
     default: {
       summary = `📎 **${attachment.name}**`;
       content = attachment.url;
