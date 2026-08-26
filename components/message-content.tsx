@@ -422,7 +422,7 @@ function CalendarEventCard({ event }: { event: CalendarEvent }) {
         <div className="min-w-0 flex-1 pt-0.5">
           <p className="truncate text-[15px] font-semibold leading-5 tracking-[-0.01em] text-white">{event.title}</p>
           <p className="mt-0.5 text-xs font-medium text-white/45">Google Calendar · Added</p>
-          {(timing.dateLabel || timing.timeLabel) && <div className="mt-2 flex items-center gap-1.5 whitespace-nowrap text-sm text-white/65"><Clock3 className="h-4 w-4 shrink-0 text-white/40" aria-hidden="true" /><span>{[timing.dateLabel, timing.timeLabel, timing.durationLabel].filter(Boolean).join(' · ')}</span></div>}
+          {(timing.dateLabel || timing.timeLabel) && <div className="mt-2 flex min-w-0 items-center gap-1.5 text-sm leading-5 text-white/65"><Clock3 className="h-4 w-4 shrink-0 text-white/40" aria-hidden="true" /><span className="min-w-0">{[timing.dateLabel, timing.timeLabel].filter(Boolean).join(' · ')}</span></div>}
         </div>
         <a href={event.url} target="_blank" rel="noopener noreferrer" aria-label="Open event in Google Calendar" className="mt-0.5 inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-lg text-white/45 transition-colors hover:bg-white/[0.08] hover:text-white focus:outline-none focus:ring-2 focus:ring-white/30 active:scale-95"><ExternalLink className="h-[17px] w-[17px]" aria-hidden="true" /></a>
       </div>
