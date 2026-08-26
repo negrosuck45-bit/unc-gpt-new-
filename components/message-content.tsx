@@ -416,17 +416,16 @@ function GoogleCalendarAppIcon() {
 function CalendarEventCard({ event }: { event: CalendarEvent }) {
   const timing = formatCalendarEventPresentation(event.start, event.end);
   return (
-    <section className="my-1 w-full max-w-md rounded-2xl border border-white/[0.09] bg-white/[0.035] px-4 py-4 shadow-none">
+    <section className="my-1 w-full max-w-md rounded-2xl border border-white/[0.09] bg-white/[0.035] px-4 py-3 shadow-none">
       <div className="flex items-start gap-3">
         <GoogleCalendarAppIcon />
         <div className="min-w-0 flex-1 pt-0.5">
           <p className="truncate text-[15px] font-semibold leading-5 tracking-[-0.01em] text-white">{event.title}</p>
-          <p className="mt-1 text-xs font-medium text-white/45">Google Calendar · Added</p>
-          {(timing.dateLabel || timing.timeLabel) && <div className="mt-3 flex items-center gap-2 text-sm text-white/65"><Clock3 className="h-4 w-4 shrink-0 text-white/40" aria-hidden="true" /><span className="min-w-0">{[timing.dateLabel, timing.timeLabel, timing.durationLabel].filter(Boolean).join(' · ')}</span></div>}
+          <p className="mt-0.5 text-xs font-medium text-white/45">Google Calendar · Added</p>
         </div>
-        <a href={event.url} target="_blank" rel="noopener noreferrer" aria-label="Open event in Google Calendar" className="mt-0.5 inline-flex h-9 w-9 shrink-0 items-center justify-center rounded-lg text-white/45 transition-colors hover:bg-white/[0.08] hover:text-white focus:outline-none focus:ring-2 focus:ring-white/30 active:scale-95"><ExternalLink className="h-[18px] w-[18px]" aria-hidden="true" /></a>
+        <a href={event.url} target="_blank" rel="noopener noreferrer" aria-label="Open event in Google Calendar" className="mt-0.5 inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-lg text-white/45 transition-colors hover:bg-white/[0.08] hover:text-white focus:outline-none focus:ring-2 focus:ring-white/30 active:scale-95"><ExternalLink className="h-[17px] w-[17px]" aria-hidden="true" /></a>
       </div>
-      <a href={event.url} target="_blank" rel="noopener noreferrer" className="mt-4 inline-flex text-sm font-medium text-[#8ab4f8] transition-colors hover:text-[#aecbfa] focus:outline-none focus:underline">Open in Google Calendar <span className="ml-1.5 text-white/35" aria-hidden="true">→</span></a>
+      {(timing.dateLabel || timing.timeLabel) && <div className="mt-2.5 flex items-center gap-2 pl-[52px] text-sm text-white/65"><Clock3 className="h-4 w-4 shrink-0 text-white/40" aria-hidden="true" /><span className="min-w-0">{[timing.dateLabel, timing.timeLabel, timing.durationLabel].filter(Boolean).join(' · ')}</span></div>}
     </section>
   );
 }
