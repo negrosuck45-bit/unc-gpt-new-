@@ -415,7 +415,7 @@ export function ChatInterface({ onSwitchToImagine, onOpenSidebar, isSidebarOpen 
   const hasMessages = currentChat && currentChat.messages.length > 0;
 
   return (
-    <div className="relative flex h-full flex-col overflow-hidden bg-background text-foreground transition-colors duration-200">
+    <div className="task-chat-surface relative flex h-full flex-col overflow-hidden bg-background text-foreground">
       <ChatHeader
         project={currentProject}
         chat={currentChat}
@@ -437,8 +437,8 @@ export function ChatInterface({ onSwitchToImagine, onOpenSidebar, isSidebarOpen 
             />
           </div>
 
-          <div className="w-full flex-shrink-0 bg-background/95 pb-5 pt-3 transition-colors duration-200">
-            <div className="mx-auto w-full max-w-4xl px-2 sm:px-4">
+          <div className="task-composer-dock w-full flex-shrink-0 pb-[max(1rem,env(safe-area-inset-bottom))] pt-3 sm:pb-6">
+            <div className="mx-auto w-full max-w-3xl px-3 sm:px-5">
               <ChatInput
                 onSend={handleSend}
                 onStop={() => abortControllerRef.current?.abort()}
@@ -450,12 +450,12 @@ export function ChatInterface({ onSwitchToImagine, onOpenSidebar, isSidebarOpen 
         </div>
       ) : (
         <div className="flex-1 flex flex-col min-h-0 overflow-hidden">
-          <div className="flex-1 min-h-0 flex flex-col items-center justify-center px-4 pb-4">
+          <div className="flex-1 min-h-0 flex flex-col items-center justify-center px-5 pb-4 pt-4 sm:px-8">
             <WelcomeScreen onSelectPrompt={(p) => handleSend(p)} project={currentProject} />
           </div>
 
-          <div className="flex-shrink-0 pb-5 sm:pb-8">
-            <div className="mx-auto w-full max-w-4xl px-2 sm:px-4">
+          <div className="task-composer-dock flex-shrink-0 pb-[max(1rem,env(safe-area-inset-bottom))] sm:pb-7">
+            <div className="mx-auto w-full max-w-3xl px-3 sm:px-5">
               <ChatInput
                 onSend={handleSend}
                 onStop={() => abortControllerRef.current?.abort()}

@@ -685,15 +685,15 @@ export function ChatInput({
         </AnimatePresence>
 
         <div className="px-3">
-          <div className="rounded-[26px] border border-border bg-card shadow-md transition-all duration-200 focus-within:border-ring focus-within:bg-card focus-within:shadow-lg">
+          <div className="task-composer rounded-[30px] border transition-all duration-200">
             <textarea
               ref={textareaRef}
               value={input}
               onChange={(e) => setInput(e.target.value)}
               onPaste={handlePasteEvent}
               onKeyDown={handleKeyDown}
-              placeholder="Write a message... (paste images directly!)"
-              className="w-full bg-transparent px-5 pt-3.5 pb-1.5 resize-none text-[15px] leading-6 placeholder:text-muted-foreground focus:outline-none min-h-[50px]"
+              placeholder="Assign a task or type / for more"
+              className="w-full min-h-[54px] resize-none bg-transparent px-5 pb-1.5 pt-4 text-[16px] leading-6 text-white placeholder:text-white/34 focus:outline-none sm:px-6"
               disabled={disabled}
               rows={1}
             />
@@ -705,7 +705,7 @@ export function ChatInput({
                   onClick={handlePlusPress}
                   disabled={isStreaming || disabled}
                   aria-label="Add photos, files, or links"
-                  className="group flex h-8 w-8 items-center justify-center rounded-full border border-border bg-secondary text-muted-foreground shadow-sm backdrop-blur-xl transition-all hover:bg-accent hover:text-foreground active:scale-[0.94] disabled:opacity-40"
+                  className="task-composer-action group flex h-9 w-9 items-center justify-center rounded-full transition-all active:scale-[0.94] disabled:opacity-40"
                 >
                   <Plus className="h-5 w-5" />
                 </button>
@@ -788,30 +788,36 @@ export function ChatInput({
                 )}
               </div>
 
-              <div className="flex items-center gap-1">
-                <div className="flex h-8 items-center gap-1.5 rounded-full border border-border bg-secondary px-3 text-[12px] font-medium text-muted-foreground" aria-label="Automatic model routing">
+              <div className="flex items-center gap-1.5">
+                <div className="task-composer-pill flex h-8 items-center gap-1.5 rounded-full px-3 text-[12px] font-medium" aria-label="Automatic model routing">
+                  <span className="h-1.5 w-1.5 rounded-full bg-emerald-300/85" />
                   <span>uncgpt</span>
                 </div>
-
                 {isStreaming ? (
-                  <Button onClick={onStop} size="icon" variant="destructive" className="h-9 w-9 rounded-full">
+                  <Button onClick={onStop} size="icon" variant="destructive" className="h-10 w-10 rounded-full">
                     <Square className="h-4 w-4" />
                   </Button>
                 ) : (
-                  (input.trim() || attachments.length > 0) ? (
-                    <Button 
-                      onClick={handleSubmit} 
-                      disabled={isStreaming || disabled || hasUploadingImages} 
-                      size="icon" 
-                      className="h-9 w-9 rounded-full bg-primary text-primary-foreground shadow-lg shadow-black/20 hover:bg-primary/90"
+                  <>
+                    <Button
+                      onClick={toggleVoiceInput}
+                      size="icon"
+                      variant={isRecording ? "destructive" : "ghost"}
+                      className="task-composer-action h-9 w-9 rounded-full"
+                      aria-label={isRecording ? "Stop dictation" : "Start dictation"}
                     >
-                      {hasUploadingImages ? <Loader2 className="h-4 w-4 animate-spin" /> : <ArrowUp className="h-4 w-4" />}
+                      <AudioWaveform className="h-[18px] w-[18px]" strokeWidth={1.8} />
                     </Button>
-                  ) : (
-                    <Button onClick={toggleVoiceInput} size="icon" variant={isRecording ? "destructive" : "ghost"} className="h-8 w-8 rounded-full">
-                      <AudioWaveform className="h-4 w-4" />
+                    <Button
+                      onClick={handleSubmit}
+                      disabled={isStreaming || disabled || hasUploadingImages || (!input.trim() && attachments.length === 0)}
+                      size="icon"
+                      className="task-composer-send h-10 w-10 rounded-full"
+                      aria-label="Send message"
+                    >
+                      {hasUploadingImages ? <Loader2 className="h-4 w-4 animate-spin" /> : <ArrowUp className="h-[19px] w-[19px]" strokeWidth={2.2} />}
                     </Button>
-                  )
+                  </>
                 )}
               </div>
             </div>

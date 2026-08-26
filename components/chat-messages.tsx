@@ -659,7 +659,7 @@ export function ChatMessages({ messages, isStreaming, isThinking, onRegenerate, 
       </AnimatePresence>
       <div className="min-w-0 flex-1 overflow-x-hidden overflow-y-auto scroll-smooth">
         <div className={cn(
-          "mx-auto min-w-0 max-w-4xl overflow-x-hidden px-4 py-5 sm:px-6 md:px-8",
+          "mx-auto min-w-0 max-w-3xl overflow-x-hidden px-4 pb-8 pt-4 sm:px-6 sm:pt-6",
           preferences.messageDensity === 'compact' ? 'space-y-3' : preferences.messageDensity === 'comfortable' ? 'space-y-8' : 'space-y-6'
         )} style={{ fontSize: `${preferences.fontSize}px` }}>
           {processedMessages.map((message, index) => {
@@ -684,7 +684,7 @@ export function ChatMessages({ messages, isStreaming, isThinking, onRegenerate, 
 
                   {/* Assistant Avatar - Left side */}
                   {isAssistant && (
-                    <div className="w-7 h-7 rounded-full flex items-center justify-center flex-shrink-0 overflow-hidden mt-0">
+                    <div className="mt-0 flex h-7 w-7 flex-shrink-0 items-center justify-center overflow-hidden rounded-full border border-white/[0.08] bg-white/[0.03]">
                       <MarsAvatar size={28} family={messageFamily} useSimpleIcon />
                     </div>
                   )}
@@ -714,8 +714,8 @@ export function ChatMessages({ messages, isStreaming, isThinking, onRegenerate, 
                       <div className={cn(
                         'text-[15px] sm:text-base leading-7',
                         isAssistant
-                          ? 'rounded-2xl border border-border/60 bg-card/35 px-3.5 py-3 text-foreground shadow-sm sm:px-4'
-                          : 'rounded-[20px] border border-border bg-secondary px-4 py-2.5 text-foreground shadow-sm'
+                          ? 'task-assistant-message rounded-[22px] px-4 py-3.5 text-foreground sm:px-5'
+                          : 'task-user-message rounded-[22px] px-4 py-3 text-foreground shadow-sm'
                       )}>
                         <MessageContent content={message.content} />
                       </div>
@@ -760,7 +760,7 @@ export function ChatMessages({ messages, isStreaming, isThinking, onRegenerate, 
 
                   {/* User Avatar - Right side */}
                   {!isAssistant && (
-                    <div className="mt-0 flex h-8 w-8 flex-shrink-0 items-center justify-center overflow-hidden rounded-full text-foreground ring-1 ring-border">
+                    <div className="mt-0 flex h-8 w-8 flex-shrink-0 items-center justify-center overflow-hidden rounded-full text-foreground ring-1 ring-white/[0.12]">
                       {preferences.profilePicture ? <img src={preferences.profilePicture} alt={preferences.profileName || 'You'} className="h-full w-full object-cover" /> : <span className="flex h-full w-full items-center justify-center bg-emerald-500/80 text-sm font-medium text-white">{(preferences.profileName || 'U').slice(0, 1).toUpperCase()}</span>}
                     </div>
                   )}
@@ -777,7 +777,7 @@ export function ChatMessages({ messages, isStreaming, isThinking, onRegenerate, 
             <motion.div 
               initial={{ opacity: 0, y: 10 }} 
               animate={{ opacity: 1, y: 0 }} 
-              className="flex gap-3 items-start"
+              className="flex items-start gap-3"
             >
               <div className="flex h-7 w-7 flex-shrink-0 items-center justify-center overflow-hidden mt-0">
                 <MarsAvatar size={28} family={streamingFamily} useSimpleIcon />
@@ -793,7 +793,7 @@ export function ChatMessages({ messages, isStreaming, isThinking, onRegenerate, 
             <motion.div 
               initial={{ opacity: 0, y: 10 }} 
               animate={{ opacity: 1, y: 0 }} 
-              className="flex gap-3 items-start"
+              className="flex items-start gap-3"
             >
               <div className="flex h-7 w-7 flex-shrink-0 items-center justify-center overflow-hidden mt-0">
                 <MarsAvatar size={28} family={streamingFamily} useSimpleIcon />
