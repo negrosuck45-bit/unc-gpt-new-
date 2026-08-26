@@ -268,7 +268,7 @@ export function ChatInput({
   const [showLinkInput, setShowLinkInput] = useState(false)
   const [linkUrl, setLinkUrl] = useState('')
   const [isRecording, setIsRecording] = useState(false)
-  const [isSendingVoice, setIsSendingVoice] = useState(false)
+  const [voiceDraft, setVoiceDraft] = useState<{ transcript: string; duration: number } | null>(null)
   const [voiceDuration, setVoiceDuration] = useState(0)
   const [voiceLevel, setVoiceLevel] = useState(0)
   const [voiceTranscript, setVoiceTranscript] = useState('')
@@ -287,9 +287,7 @@ export function ChatInput({
   const cameraInputRef = useRef<HTMLInputElement>(null)
   const recognitionRef = useRef<any>(null)
   const recognitionRunningRef = useRef(false)
-  const mediaRecorderRef = useRef<MediaRecorder | null>(null)
   const mediaStreamRef = useRef<MediaStream | null>(null)
-  const audioChunksRef = useRef<BlobPart[]>([])
   const voiceTranscriptRef = useRef('')
   const audioContextRef = useRef<AudioContext | null>(null)
   const audioFrameRef = useRef<number | null>(null)
@@ -511,49 +509,27 @@ export function ChatInput({
     mediaStreamRef.current = null
   }, [])
 
-  const uploadVoiceMessage = useCallback(async (blob: Blob, transcript: string) => {
+  const prepareVoiceDraft = useCallback((transcript: string, duration: number) => {
     const cleanTranscript = transcript.replace(/\s+/g, ' ').trim()
     if (!cleanTranscript) {
-      setToast('No speech was detected, so the voice message was not sent. Please try again and speak clearly.')
+      setToast('No speech was detected, so nothing was sent. Please try again and speak clearly.')
       return
     }
-    if (!blob.size) {
-      setToast('The recording was empty, so no voice message was sent.')
-      return
-    }
+    setVoiceDraft({ transcript: cleanTranscript, duration })
+  }, [])
 
-    const extension = blob.type.includes('ogg') ? 'ogg' : blob.type.includes('mp4') ? 'm4a' : 'webm'
-    const recording = new File([blob], `voice-message-${Date.now()}.${extension}`, { type: blob.type || 'audio/webm' })
-    const formData = new FormData()
-    formData.append('file', recording)
-    formData.append('chatId', currentChat?.id || '')
-    setIsSendingVoice(true)
+  const discardVoiceDraft = useCallback(() => {
+    setVoiceDraft(null)
+    setVoiceTranscript('')
+    voiceTranscriptRef.current = ''
+    setVoiceDuration(0)
+  }, [])
 
-    try {
-      const response = await fetch('/api/storage/upload', { method: 'POST', body: formData })
-      const payload = await response.json().catch(() => ({}))
-      if (!response.ok || typeof payload?.url !== 'string' || !payload.url) {
-        throw new Error(payload?.error || 'Voice upload failed')
-      }
-
-      const voiceAttachment: Attachment = {
-        id: crypto.randomUUID(),
-        type: 'audio',
-        name: 'Voice message',
-        url: payload.url,
-        permanentUrl: payload.url,
-        uploaded: true,
-        size: recording.size,
-        mimeType: recording.type,
-      }
-      onSend(`Voice message transcript: ${cleanTranscript}`, [voiceAttachment])
-      setToast('Voice message sent')
-    } catch (error) {
-      setToast(error instanceof Error ? error.message : 'Voice message upload failed')
-    } finally {
-      setIsSendingVoice(false)
-    }
-  }, [currentChat?.id, onSend])
+  const sendVoiceDraft = useCallback(() => {
+    if (!voiceDraft || isStreaming || disabled) return
+    onSend(voiceDraft.transcript)
+    discardVoiceDraft()
+  }, [disabled, discardVoiceDraft, isStreaming, onSend, voiceDraft])
 
   const startVoiceMeter = useCallback((stream: MediaStream) => {
     const AudioContextConstructor = window.AudioContext || (window as any).webkitAudioContext
@@ -611,22 +587,25 @@ export function ChatInput({
 
   const stopVoiceMessage = useCallback(() => {
     if (!isRecording) return
+    const completedDuration = voiceDuration
     setIsRecording(false)
     if (recognitionRunningRef.current) {
       try { recognitionRef.current?.stop() } catch {}
     }
-    if (mediaRecorderRef.current?.state === 'recording') {
-      try { mediaRecorderRef.current.stop() } catch {}
-    }
-  }, [isRecording])
+    stopVoiceMeter()
+    releaseVoiceStream()
+    // Give the browser speech engine a brief moment to flush its last phrase
+    // before showing the explicit review composer.
+    window.setTimeout(() => prepareVoiceDraft(voiceTranscriptRef.current, completedDuration), 260)
+  }, [isRecording, prepareVoiceDraft, releaseVoiceStream, stopVoiceMeter, voiceDuration])
 
   const toggleVoiceInput = useCallback(async () => {
-    if (isSendingVoice || disabled || isStreaming) return
+    if (disabled || isStreaming || voiceDraft) return
     if (isRecording) {
       stopVoiceMessage()
       return
     }
-    if (typeof window === 'undefined' || !navigator.mediaDevices?.getUserMedia || typeof MediaRecorder === 'undefined') {
+    if (typeof window === 'undefined' || !navigator.mediaDevices?.getUserMedia) {
       setToast('Voice messages are not supported in this browser.')
       return
     }
@@ -638,41 +617,24 @@ export function ChatInput({
 
     try {
       const stream = await navigator.mediaDevices.getUserMedia({ audio: true })
-      const preferredType = ['audio/webm;codecs=opus', 'audio/webm', 'audio/ogg;codecs=opus'].find((type) => MediaRecorder.isTypeSupported(type))
-      const recorder = preferredType ? new MediaRecorder(stream, { mimeType: preferredType }) : new MediaRecorder(stream)
       mediaStreamRef.current = stream
-      mediaRecorderRef.current = recorder
-      audioChunksRef.current = []
       voiceTranscriptRef.current = ''
       setVoiceTranscript('')
       setVoiceDuration(0)
-      recorder.ondataavailable = (event) => {
-        if (event.data.size > 0) audioChunksRef.current.push(event.data)
-      }
-      recorder.onstop = () => {
-        const recording = new Blob(audioChunksRef.current, { type: recorder.mimeType || 'audio/webm' })
-        stopVoiceMeter()
-        releaseVoiceStream()
-        // Allow the browser speech engine to flush its final phrase before the
-        // transcript is committed to the AI-visible chat message.
-        window.setTimeout(() => void uploadVoiceMessage(recording, voiceTranscriptRef.current), 260)
-      }
-      recorder.start(250)
       setIsRecording(true)
       startVoiceMeter(stream)
       if (!startVoiceRecognition()) {
-        recorder.stop()
         releaseVoiceStream()
         stopVoiceMeter()
         setIsRecording(false)
-        setToast('Speech transcription could not start, so the voice message was not sent.')
+        setToast('Speech transcription could not start, so no voice draft was created.')
       }
     } catch {
       releaseVoiceStream()
       stopVoiceMeter()
       setToast('Microphone access was denied. Allow microphone access and try again.')
     }
-  }, [disabled, isRecording, isSendingVoice, isStreaming, releaseVoiceStream, startVoiceMeter, startVoiceRecognition, stopVoiceMessage, stopVoiceMeter])
+  }, [disabled, isRecording, isStreaming, releaseVoiceStream, startVoiceMeter, startVoiceRecognition, stopVoiceMessage, stopVoiceMeter, voiceDraft])
 
   useEffect(() => {
     if (!isRecording) return
@@ -682,9 +644,6 @@ export function ChatInput({
 
   useEffect(() => () => {
     try { recognitionRef.current?.abort() } catch {}
-    if (mediaRecorderRef.current?.state === 'recording') {
-      try { mediaRecorderRef.current.stop() } catch {}
-    }
     releaseVoiceStream()
     stopVoiceMeter()
   }, [releaseVoiceStream, stopVoiceMeter])
@@ -872,7 +831,34 @@ export function ChatInput({
               <span className="voice-recording-dot" />
               <span className="shrink-0 text-xs font-medium text-white/78">{Math.floor(voiceDuration / 60)}:{String(voiceDuration % 60).padStart(2, '0')}</span>
               <span className="min-w-0 flex-1 truncate text-xs text-white/48">{voiceTranscript || 'Listening…'}</span>
-              <button type="button" onClick={stopVoiceMessage} className="rounded-lg px-2 py-1 text-xs font-medium text-white/70 transition hover:bg-white/[0.08] hover:text-white">Send</button>
+              <button type="button" onClick={stopVoiceMessage} className="rounded-lg px-2 py-1 text-xs font-medium text-white/70 transition hover:bg-white/[0.08] hover:text-white">Done</button>
+            </motion.div>
+          )}
+        </AnimatePresence>
+
+        <AnimatePresence>
+          {voiceDraft && (
+            <motion.div
+              initial={{ opacity: 0, y: 8 }}
+              animate={{ opacity: 1, y: 0 }}
+              exit={{ opacity: 0, y: 8 }}
+              transition={{ duration: 0.18, ease: [0.23, 1, 0.32, 1] }}
+              className="voice-draft-composer mx-3 mb-2 flex items-center gap-3 rounded-[26px] px-4 py-3"
+            >
+              <button type="button" onClick={discardVoiceDraft} aria-label="Discard voice draft" className="voice-draft-action flex h-9 w-9 shrink-0 items-center justify-center rounded-xl">
+                <X className="h-5 w-5" strokeWidth={1.9} />
+              </button>
+              <div className="min-w-0 flex-1">
+                <div className="flex items-center justify-center gap-2.5">
+                  <span className="voice-draft-wave" aria-hidden="true">
+                    {[0.42, 0.7, 1, 0.68, 0.95, 0.62, 0.42].map((base, index) => <i key={index} style={{ transform: `scaleY(${base})` }} />)}
+                  </span>
+                  <span className="text-sm font-medium tabular-nums text-white/62">{Math.floor(voiceDraft.duration / 60)}:{String(voiceDraft.duration % 60).padStart(2, '0')}</span>
+                </div>
+              </div>
+              <button type="button" onClick={sendVoiceDraft} disabled={disabled || isStreaming} aria-label="Send recognized voice text" className="voice-draft-confirm flex h-9 w-9 shrink-0 items-center justify-center rounded-xl">
+                <Check className="h-5 w-5" strokeWidth={2} />
+              </button>
             </motion.div>
           )}
         </AnimatePresence>
@@ -992,14 +978,12 @@ export function ChatInput({
                       onClick={toggleVoiceInput}
                       size="icon"
                       variant="ghost"
-                      disabled={isSendingVoice || disabled}
+                      disabled={disabled || Boolean(voiceDraft)}
                       className={cn("voice-record-control h-10 w-10 rounded-full", isRecording && "is-recording")}
-                      aria-label={isRecording ? "Finish and send voice message" : "Record a voice message"}
-                      title={isRecording ? "Finish and send voice message" : "Record a voice message"}
+                      aria-label={isRecording ? "Finish voice recording" : "Record a voice message"}
+                      title={isRecording ? "Finish voice recording" : "Record a voice message"}
                     >
-                      {isSendingVoice ? (
-                        <Loader2 className="h-[18px] w-[18px] animate-spin" />
-                      ) : isRecording ? (
+                      {isRecording ? (
                         <span className="voice-recording-wave" aria-hidden="true">
                           {[0.42, 0.68, 1, 0.68, 0.42].map((base, index) => (
                             <i key={index} style={{ transform: `scaleY(${Math.min(1.7, base + voiceLevel * (1.15 - index * 0.08))})` }} />
