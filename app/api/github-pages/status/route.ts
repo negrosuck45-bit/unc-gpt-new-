@@ -1,4 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
+import { getSession } from "@/lib/auth";
+import { getComposioSession, getEnabledComposioToolkits } from "@/lib/composio";
 
 export const runtime = "nodejs";
 
@@ -8,14 +10,21 @@ function githubPagesUrl(owner: string, repo: string) {
     : `https://${owner}.github.io/${encodeURIComponent(repo)}/`;
 }
 
+function parseProviderObject(value: any): any {
+  if (!value || typeof value !== "string") return value;
+  try { return JSON.parse(value); } catch { return value; }
+}
+
 function providerState(pages: any, build: any) {
-  const buildStatus = String(build?.status || "").toLowerCase();
-  const pagesStatus = String(pages?.status || "").toLowerCase();
-  const reason = String(build?.error?.message || pages?.error?.message || "").trim().slice(0, 220);
-  if ([buildStatus, pagesStatus].some((status) => ["errored", "error", "failed"].includes(status))) {
+  const pageData = parseProviderObject(pages?.data ?? pages) || {};
+  const buildData = parseProviderObject(build?.data ?? build) || {};
+  const buildStatus = String(buildData?.status || "").toLowerCase();
+  const pagesStatus = String(pageData?.status || "").toLowerCase();
+  const reason = String(buildData?.error?.message || buildData?.error || pageData?.error?.message || pageData?.error || "").trim().slice(0, 220);
+  if ([buildStatus, pagesStatus].some((status) => ["errored", "error", "failed", "deployment_failed", "deployment_content_failed", "deployment_attempt_error", "deployment_lost"].includes(status))) {
     return { state: "failed" as const, reason: reason || "GitHub Pages reported a failed deployment." };
   }
-  if ([buildStatus, pagesStatus].some((status) => ["building", "queued", "pending", "in_progress"].includes(status))) {
+  if ([buildStatus, pagesStatus].some((status) => ["building", "queued", "pending", "in_progress", "deployment_in_progress", "syncing_files", "updating_pages", "purging_cdn"].includes(status))) {
     return { state: "building" as const, reason: "" };
   }
   return { state: "unknown" as const, reason: "" };
@@ -42,6 +51,25 @@ async function githubProviderStatus(token: string | undefined, owner: string, re
   }
 }
 
+async function composioProviderStatus(owner: string, repo: string) {
+  try {
+    const session = await getSession();
+    const userId = session?.user?.sub;
+    if (!userId) return null;
+    const enabled = await getEnabledComposioToolkits(userId);
+    if (!enabled.some((toolkit) => String(toolkit).replace(/[-_ ]/g, "").toLowerCase() === "github")) return null;
+    const github = await getComposioSession(userId, ["github"]);
+    const build = await github.execute("GITHUB_GET_LATEST_PAGES_BUILD", { owner, repo });
+    const payload = parseProviderObject(build?.data ?? build) || {};
+    // A Pages build with `status: errored` legitimately contains an error object.
+    // Preserve that provider-confirmed state; only discard an execution error with no build status.
+    if (build?.successful === false || build?.error || (payload?.error && !payload?.status)) return null;
+    return providerState(null, payload);
+  } catch {
+    return null;
+  }
+}
+
 export async function GET(request: NextRequest) {
   const { searchParams } = new URL(request.url);
   const owner = String(searchParams.get("owner") || "").trim();
@@ -51,7 +79,8 @@ export async function GET(request: NextRequest) {
   }
 
   const url = githubPagesUrl(owner, repo);
-  const provider = await githubProviderStatus(request.cookies.get("mcp_oauth_github")?.value, owner, repo);
+  const oauthProvider = await githubProviderStatus(request.cookies.get("mcp_oauth_github")?.value, owner, repo);
+  const provider = oauthProvider || await composioProviderStatus(owner, repo);
   try {
     const response = await fetch(url, {
       method: "GET",

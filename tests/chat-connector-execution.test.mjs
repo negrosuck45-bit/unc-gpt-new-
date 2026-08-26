@@ -263,3 +263,40 @@ test('repairs a failed GitHub Pages deployment from prior repository context ins
   assert.ok(calls.some((call) => call.slug === 'GITHUB_CREATE_OR_UPDATE_FILE_CONTENTS' && /\.github\/workflows\/deploy-pages\.yml/.test(JSON.stringify(call.args))));
   assert.doesNotMatch(JSON.stringify(calls), /GITHUB_REQUEST_A_GITHUB_PAGES_BUILD/);
 });
+
+
+test('creates a new unique repository for a fresh website request even when a prior website appears in chat history', async () => {
+  const calls = [];
+  let repositoryCreated = false;
+  const connectorSession = {
+    async search() { return {}; },
+    async execute(slug, args) {
+      calls.push({ slug, args });
+      if (slug === 'GITHUB_GET_THE_AUTHENTICATED_USER') return { successful: true, data: { login: 'test-owner' } };
+      if (slug === 'GITHUB_CREATE_OR_UPDATE_FILE_CONTENTS' && !repositoryCreated) return { successful: false, error: 'Repository not found' };
+      if (slug === 'GITHUB_CREATE_A_REPOSITORY_FOR_THE_AUTHENTICATED_USER') {
+        repositoryCreated = true;
+        return { successful: true, data: { name: 'uncgpt-site-12345678', default_branch: 'main', html_url: 'https://github.com/test-owner/uncgpt-site-12345678' } };
+      }
+      if (slug === 'GITHUB_CREATE_OR_UPDATE_FILE_CONTENTS') return { successful: true, data: { content: { sha: 'file-sha' } } };
+      if (slug === 'GITHUB_CREATE_OR_UPDATE_GITHUB_PAGES_SITE') return { successful: true, data: { status: 'building' } };
+      throw new Error(`Unexpected GitHub website tool: ${slug}`);
+    },
+  };
+  const { POST } = createRoute({ connectorSession, enabledToolkits: ['github'] });
+  const response = await POST(createRequest({
+    messages: [
+      { role: 'user', content: 'Create a GitHub repo and live website' },
+      { role: 'assistant', content: 'Created website files in test-owner/old-site. [[UNCGPT_WEBSITE_DEPLOYMENT:{"repository":"test-owner/old-site"}]]' },
+      { role: 'user', content: 'Create me a GitHub and website live showing a GTA 6 presentation' },
+    ],
+    computerUse: false,
+    mcpConnectors: [{ source: 'composio', provider: 'github', enabled: true }],
+  }));
+  const text = await responseSseText(response);
+
+  assert.match(text, /test-owner\/uncgpt-site-12345678/);
+  assert.doesNotMatch(text, /test-owner\/old-site/);
+  assert.ok(calls.some((call) => call.slug === 'GITHUB_CREATE_A_REPOSITORY_FOR_THE_AUTHENTICATED_USER'));
+  assert.doesNotMatch(JSON.stringify(calls), /old-site/);
+});

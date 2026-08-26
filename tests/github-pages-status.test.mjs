@@ -11,7 +11,7 @@ function createRequest(url, githubToken) {
   return { url, cookies: { get: (name) => name === 'mcp_oauth_github' && githubToken ? { value: githubToken } : undefined } };
 }
 
-function createHandler(fetchImpl) {
+function createHandler(fetchImpl, composio = {}) {
   const source = fs.readFileSync(new URL('../app/api/github-pages/status/route.ts', import.meta.url), 'utf8');
   const compiled = ts.transpileModule(source, {
     compilerOptions: { module: ts.ModuleKind.CommonJS, target: ts.ScriptTarget.ES2022, esModuleInterop: true },
@@ -20,9 +20,15 @@ function createHandler(fetchImpl) {
   vm.runInNewContext(compiled, {
     module,
     exports: module.exports,
-    require: (specifier) => specifier === 'next/server'
-      ? { NextResponse: { json: (body, init) => Response.json(body, init) } }
-      : require(specifier),
+    require: (specifier) => {
+      if (specifier === 'next/server') return { NextResponse: { json: (body, init) => Response.json(body, init) } };
+      if (specifier === '@/lib/auth') return { getSession: async () => composio.session || null };
+      if (specifier === '@/lib/composio') return {
+        getEnabledComposioToolkits: async () => composio.enabled || [],
+        getComposioSession: async () => composio.connectorSession,
+      };
+      return require(specifier);
+    },
     Response,
     URL,
     AbortSignal,
@@ -71,6 +77,21 @@ test('reports a confirmed GitHub Pages deployment error instead of leaving the c
   assert.equal(data.state, 'failed');
   assert.equal(data.verified, false);
   assert.match(data.reason, /Pages build failed/);
+});
+
+test('reports a failed Pages build from a connected Composio GitHub account when native OAuth is absent', async () => {
+  const GET = createHandler(async () => ({ ok: false, status: 404 }), {
+    session: { user: { sub: 'clerk-user-1' } },
+    enabled: ['github'],
+    connectorSession: {
+      execute: async () => ({ successful: true, data: { status: 'errored', error: { message: 'Workflow had no runnable jobs' } } }),
+    },
+  });
+  const response = await GET(createRequest('https://unc-gptt.vercel.app/api/github-pages/status?owner=test-owner&repo=demo-site'));
+  const data = await response.json();
+
+  assert.equal(data.state, 'failed', JSON.stringify(data));
+  assert.match(data.reason, /Workflow had no runnable jobs/);
 });
 
 test('rejects invalid repository identifiers instead of probing arbitrary URLs', async () => {

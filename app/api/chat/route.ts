@@ -3208,8 +3208,12 @@ export async function POST(req: NextRequest) {
       const oauthConnected = new Set((oauthBundle.connected || []).map((provider: string) => String(provider).toLowerCase().replace(/[- ]/g, '_')));
       const githubCreateRequest = isGithubCreateRepositoryRequest(userText);
       const githubPagesRepairRequest = isGithubPagesRepairRequest(userText, recentConversationText);
-      const websiteBuildRequest = isWebsiteBuildRequest(userText) || isWebsiteFollowUpRequest(userText, recentConversationText) || githubPagesRepairRequest;
-      let websiteRepository = extractGithubRepositoryRef(userText) || extractGithubRepositoryRef(recentConversationText);
+      const explicitNewWebsiteRequest = isWebsiteBuildRequest(userText);
+      const websiteBuildRequest = explicitNewWebsiteRequest || isWebsiteFollowUpRequest(userText, recentConversationText) || githubPagesRepairRequest;
+      // A fresh creation request must never reuse the previous website's repository.
+      // Prior repository context is reserved for explicit follow-ups and deployment repair.
+      let websiteRepository = extractGithubRepositoryRef(userText)
+        || (explicitNewWebsiteRequest ? null : extractGithubRepositoryRef(recentConversationText));
       const websiteConversationText = `${recentConversationText}\n${userText}`;
       // A request to create a GitHub website should be publishable by default.
       // Users can explicitly opt out when they only want repository files.
