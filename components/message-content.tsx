@@ -1,5 +1,5 @@
 'use client';
-import { useMemo, useState, useCallback } from 'react';
+import { useMemo, useState, useCallback, useEffect } from 'react';
 import { cn } from '@/lib/utils';
 import { formatCalendarEventPresentation } from '@/lib/calendar-event-presentation';
 import { CodeBlock } from './code-block';
@@ -380,23 +380,57 @@ function connectorBrand(content: string): { label: string; iconUrl: string } | n
 }
 
 function WebsiteDeploymentCard({ deployment }: { deployment: WebsiteDeployment }) {
-  const isBuilding = !deployment.verified;
-  const stateLabel = isBuilding ? 'Building' : 'Live';
+  const repository = useMemo(() => {
+    const parts = String(deployment.repository || '').split('/').map((part) => part.trim()).filter(Boolean);
+    return parts.length === 2 ? { owner: parts[0], repo: parts[1] } : null;
+  }, [deployment.repository]);
+  const [liveState, setLiveState] = useState<'checking' | 'building' | 'live'>(deployment.verified ? 'live' : 'checking');
+  const [liveUrl, setLiveUrl] = useState(deployment.url);
+
+  useEffect(() => {
+    if (deployment.verified || !repository) return;
+    let cancelled = false;
+    let timer: ReturnType<typeof setTimeout> | undefined;
+    let attempts = 0;
+    const refresh = async () => {
+      try {
+        const response = await fetch(`/api/github-pages/status?owner=${encodeURIComponent(repository.owner)}&repo=${encodeURIComponent(repository.repo)}`, { cache: 'no-store' });
+        const data = await response.json().catch(() => null);
+        if (cancelled || !response.ok || !data) return;
+        if (typeof data.url === 'string' && /^https:\/\//i.test(data.url)) setLiveUrl(data.url);
+        if (data.verified === true && data.state === 'live') {
+          setLiveState('live');
+          return;
+        }
+        setLiveState('building');
+      } catch {
+        if (!cancelled) setLiveState('building');
+      }
+      attempts += 1;
+      if (!cancelled && attempts < 15) timer = setTimeout(refresh, 4000);
+    };
+    void refresh();
+    return () => {
+      cancelled = true;
+      if (timer) clearTimeout(timer);
+    };
+  }, [deployment.verified, repository]);
+
+  const isLive = liveState === 'live';
+  const statusLabel = isLive ? 'Live' : liveState === 'checking' ? 'Checking status' : 'Publishing';
+  const statusDescription = isLive ? 'Your website is live' : liveState === 'checking' ? 'Checking GitHub Pages' : 'GitHub Pages is publishing your website';
   return (
     <section className="my-1 w-full max-w-md rounded-2xl border border-white/[0.09] bg-white/[0.035] px-4 py-3.5 shadow-none">
       <div className="flex items-start gap-3">
         <Github className="mt-0.5 h-8 w-8 shrink-0 text-white/85" aria-hidden="true" />
         <div className="min-w-0 flex-1">
           <p className="truncate text-[15px] font-semibold leading-5 tracking-[-0.01em] text-white">GitHub Pages</p>
-          <p className="mt-0.5 text-xs font-medium text-white/45">{isBuilding ? 'Publishing your website' : 'Website published'}</p>
+          <p className="mt-0.5 text-xs font-medium text-white/45">{statusDescription}</p>
         </div>
-        <a href={deployment.url} target="_blank" rel="noopener noreferrer" aria-label="Open website" className="mt-0.5 inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-lg text-white/45 transition-colors duration-150 hover:bg-white/[0.08] hover:text-white focus:outline-none focus:ring-2 focus:ring-white/30 active:scale-95"><ExternalLink className="h-[17px] w-[17px]" aria-hidden="true" /></a>
+        <a href={liveUrl} target="_blank" rel="noopener noreferrer" aria-label="Open website" className="mt-0.5 inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-lg text-white/45 transition-colors duration-150 hover:bg-white/[0.08] hover:text-white focus:outline-none focus:ring-2 focus:ring-white/30 active:scale-95"><ExternalLink className="h-[17px] w-[17px]" aria-hidden="true" /></a>
       </div>
       {deployment.repository && <div className="mt-3 flex min-w-0 items-center gap-1.5 text-xs text-white/55"><GitBranch className="h-3.5 w-3.5 shrink-0 text-white/35" aria-hidden="true" /><span className="truncate">{deployment.repository}</span></div>}
-      <div className="mt-3 flex items-center justify-between gap-3">
-        <span className="inline-flex items-center gap-1.5 text-xs font-medium text-white/50"><span className={cn('h-1.5 w-1.5 rounded-full', isBuilding ? 'bg-amber-300/80' : 'bg-emerald-300/80')} aria-hidden="true" />{stateLabel}</span>
-        <a href={deployment.url} target="_blank" rel="noopener noreferrer" className="inline-flex h-9 shrink-0 items-center gap-1.5 rounded-lg border border-white/12 bg-white/[0.06] px-3 text-xs font-semibold text-white transition-[background-color,transform] duration-150 hover:bg-white/[0.12] focus:outline-none focus:ring-2 focus:ring-white/30 active:scale-[0.98]">{isBuilding ? 'Open when ready' : 'Open website'}<ExternalLink className="h-3.5 w-3.5" aria-hidden="true" /></a>
-      </div>
+      <div className="mt-3 inline-flex items-center gap-1.5 text-xs font-medium text-white/50"><span className={cn('h-1.5 w-1.5 rounded-full', isLive ? 'bg-emerald-300/80' : 'bg-amber-300/80')} aria-hidden="true" />{statusLabel}</div>
     </section>
   );
 }
