@@ -27,6 +27,7 @@ files=(
   "next.config.mjs"
   "app/layout.tsx"
   "app/chat-workspace.tsx"
+  "components/first-open-onboarding.tsx"
   "app/api/mcp/github/route.ts"
   "app/api/mcp/vercel/route.ts"
   "app/api/mcp/oauth/status/route.ts"
@@ -67,6 +68,7 @@ files=(
   "lib/chat-store.ts"
   "lib/client-runtime-context.ts"
   "lib/language-preferences.ts"
+  "lib/user-preferences.ts"
   "lib/agents/auto-detection.ts"
   "lib/uncgpt-router.ts"
   "scripts/publish-agent-upgrade.sh"
@@ -80,6 +82,7 @@ files=(
   "tests/voice-message-contract.test.mjs"
   "tests/chat-appearance-contract.test.mjs"
   "tests/backend-security-contract.test.mjs"
+  "tests/first-open-onboarding-contract.test.mjs"
 )
 
 base_commit="$(gh api "repos/$repo/git/ref/heads/$branch" --jq '.object.sha')"

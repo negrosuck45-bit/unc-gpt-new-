@@ -26,6 +26,8 @@ export interface UserPreferences {
   customCursorHeight: number
   profileCardOffsetX: number
   profileCardOffsetY: number
+  onboardingComplete: boolean
+  onboardingVersion: number
 }
 
 export const DEFAULT_USER_PREFERENCES: UserPreferences = {
@@ -52,6 +54,8 @@ export const DEFAULT_USER_PREFERENCES: UserPreferences = {
   customCursorHeight: 0,
   profileCardOffsetX: 0,
   profileCardOffsetY: 0,
+  onboardingComplete: false,
+  onboardingVersion: 1,
 }
 
 const STORAGE_KEY = 'user-preferences'

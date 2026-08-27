@@ -6,6 +6,7 @@ import { ChatSidebar } from "@/components/chat-sidebar"
 import { SettingsPage } from "@/components/settings-page"
 import { ChatInterface } from "@/components/chat-interface"
 import Imagine from "@/components/imagine"
+import { FirstOpenOnboarding, shouldShowFirstOpenOnboarding } from "@/components/first-open-onboarding"
 
 function useIsMobile() {
   const [isMobile, setIsMobile] = useState(false)
@@ -92,10 +93,19 @@ function useSidebarSwipe({
 export default function Home({ accountScope }: { accountScope: string }) {
   setActiveAccountScope(accountScope)
   const isMobile = useIsMobile()
+  const [onboardingOpen, setOnboardingOpen] = useState(false)
+  const [onboardingReady, setOnboardingReady] = useState(false)
   useEffect(() => {
+    let mounted = true
     setActiveAccountScope(accountScope)
     dispatchAccountScopeChanged()
-    void useChatStore.persist.rehydrate()
+    void (async () => {
+      await useChatStore.persist.rehydrate()
+      if (!mounted) return
+      setOnboardingOpen(shouldShowFirstOpenOnboarding())
+      setOnboardingReady(true)
+    })()
+    return () => { mounted = false }
   }, [accountScope])
   const [isSidebarOpen, setIsSidebarOpen] = useState(false)
   const [currentMode, setCurrentMode] = useState<"text" | "imagine">("text")
@@ -200,7 +210,14 @@ export default function Home({ accountScope }: { accountScope: string }) {
         {renderMainContent()}
       </main>
 
-      {settingsOpen && (
+      {onboardingReady && onboardingOpen && (
+        <FirstOpenOnboarding onComplete={() => {
+          setOnboardingOpen(false)
+          setSettingsOpen(false)
+        }} />
+      )}
+
+      {settingsOpen && !onboardingOpen && (
         <div
           className="fixed inset-0 z-[200] flex items-start justify-center overflow-y-auto bg-[rgba(41,41,41,0.62)] p-0 backdrop-blur-md sm:items-center sm:p-6 lg:p-8"
           role="dialog"
