@@ -1,10 +1,9 @@
 'use client'
 
 import { AnimatePresence, motion } from 'framer-motion'
-import { ArrowLeft, ArrowRight, Globe2, Loader2 } from 'lucide-react'
+import { ArrowLeft, ArrowRight, ChevronDown, Globe2, Loader2 } from 'lucide-react'
 import { useEffect, useMemo, useState } from 'react'
 import { Button } from '@/components/ui/button'
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { LANGUAGE_OPTIONS, getLanguageOption, normalizeLanguagePreference } from '@/lib/language-preferences'
 import { readUserPreferences, writeUserPreferences } from '@/lib/user-preferences'
 
@@ -127,12 +126,12 @@ export function FirstOpenOnboarding({ onComplete }: FirstOpenOnboardingProps) {
           <h1 className="text-center text-[29px] font-medium tracking-[-0.045em] text-foreground">Choose your language</h1>
           <div className="mt-9 flex items-center justify-between gap-5 border-b border-foreground/[0.22] pb-3">
             <span className="text-[16px] text-foreground/58">Language</span>
-            <Select value={language} onValueChange={(value) => setLanguage(normalizeLanguagePreference(value))}>
-              <SelectTrigger className="h-auto w-[216px] border-0 bg-transparent px-0 py-0 text-right text-[16px] text-foreground shadow-none focus:ring-0"><SelectValue placeholder="Automatic (device language)" /></SelectTrigger>
-              <SelectContent className="max-h-[min(52dvh,420px)]">
-                {LANGUAGE_OPTIONS.map((option) => <SelectItem key={option.code} value={option.code}>{option.label}</SelectItem>)}
-              </SelectContent>
-            </Select>
+            <div className="relative w-[216px] shrink-0">
+              <select aria-label="Language" value={language} onChange={(event) => setLanguage(normalizeLanguagePreference(event.target.value))} className="h-11 w-full appearance-none bg-transparent py-0 pl-2 pr-7 text-right text-[16px] text-foreground outline-none">
+                {LANGUAGE_OPTIONS.map((option) => <option key={option.code} value={option.code}>{option.label}</option>)}
+              </select>
+              <ChevronDown aria-hidden="true" className="pointer-events-none absolute right-0 top-1/2 h-4 w-4 -translate-y-1/2 text-foreground/55" />
+            </div>
           </div>
           <p className="mt-3 text-center text-[12px] text-foreground/35">{language === 'auto' ? 'Automatic uses your device language.' : `Selected: ${selectedLanguage.label}`}</p>
         </div>
