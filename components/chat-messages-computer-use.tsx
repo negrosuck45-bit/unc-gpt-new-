@@ -152,10 +152,10 @@ export function ChatMessages({
             
             <div
               className={cn(
-                'max-w-2xl rounded-lg px-4 py-3',
+                'max-w-2xl',
                 message.role === 'user'
-                  ? 'bg-blue-600 text-white rounded-br-none'
-                  : 'bg-muted text-foreground rounded-bl-none'
+                  ? 'rounded-lg bg-blue-600 px-4 py-3 text-white rounded-br-none'
+                  : 'rounded-none bg-transparent px-0 py-1 text-foreground'
               )}
             >
               {message.role === 'assistant' ? (
@@ -188,7 +188,7 @@ export function ChatMessages({
             className="flex gap-3 justify-start"
           >
             <MarsAvatar className="h-8 w-8 flex-shrink-0 mt-1" />
-            <div className="bg-muted rounded-lg px-4 py-3 rounded-bl-none">
+            <div className="bg-transparent px-0 py-1">
               <div className="flex gap-2 items-center">
                 <div className="w-2 h-2 bg-gray-400 rounded-full animate-bounce" />
                 <div className="w-2 h-2 bg-gray-400 rounded-full animate-bounce" style={{ animationDelay: '0.2s' }} />
@@ -210,7 +210,7 @@ export function ChatMessages({
 function useIsDarkMode() {
   const [isDark, setIsDark] = useState(false);
   useEffect(() => {
-    const check = () => setIsDark(document.documentElement.classList.contains('dark'));
+    const check = () => setIsDark(document.documentElement.classList.contains('dark') || document.documentElement.classList.contains('dark-gray'));
     check();
     const observer = new MutationObserver(check);
     observer.observe(document.documentElement, { attributes: true, attributeFilter: ['class'] });

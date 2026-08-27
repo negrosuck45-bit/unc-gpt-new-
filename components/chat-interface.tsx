@@ -13,6 +13,7 @@ import { connectorPermissionIdentity } from "@/components/connector-permission-c
 import { accountStorageKey } from "@/lib/account-scope";
 import { ConnectionStatusBanner, type ConnectionIssue } from "@/components/connection-status-banner";
 import { getClientRuntimeContext } from "@/lib/client-runtime-context";
+import { getStoredLanguagePreference } from "@/lib/language-preferences";
 
 interface ChatInterfaceProps {
   onSwitchToImagine?: () => void;
@@ -219,6 +220,7 @@ export function ChatInterface({ onSwitchToImagine, onOpenSidebar, isSidebarOpen 
       clientLocale: runtimeContext.locale,
       clientCountry: runtimeContext.country,
       clientCountryCode: runtimeContext.countryCode,
+      clientLanguage: getStoredLanguagePreference(),
     };
 
     try {

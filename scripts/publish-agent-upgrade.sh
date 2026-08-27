@@ -15,10 +15,17 @@ git diff --check
 
 files=(
   "app/api/chat/route.ts"
+  "app/layout.tsx"
   "app/api/mcp/github/route.ts"
   "app/api/mcp/vercel/route.ts"
   "app/api/mcp/oauth/status/route.ts"
   "components/chat-interface.tsx"
+  "components/chat-messages-computer-use.tsx"
+  "components/settings-page.tsx"
+  "components/theme-chrome.tsx"
+  "components/notifications-page.tsx"
+  "components/messages-page.tsx"
+  "components/message-thread-page.tsx"
   "components/chat-header.tsx"
   "components/welcome-screen.tsx"
   "app/globals.css"
@@ -42,6 +49,7 @@ files=(
   "lib/auth.ts"
   "lib/chat-store.ts"
   "lib/client-runtime-context.ts"
+  "lib/language-preferences.ts"
   "lib/agents/auto-detection.ts"
   "lib/uncgpt-router.ts"
   "scripts/publish-agent-upgrade.sh"
@@ -53,6 +61,7 @@ files=(
   "tests/github-pages-status.test.mjs"
   "tests/uncgpt-router.test.mjs"
   "tests/voice-message-contract.test.mjs"
+  "tests/chat-appearance-contract.test.mjs"
 )
 
 base_commit="$(gh api "repos/$repo/git/ref/heads/$branch" --jq '.object.sha')"

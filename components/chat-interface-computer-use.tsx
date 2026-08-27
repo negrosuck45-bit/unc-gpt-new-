@@ -8,6 +8,7 @@ import { WelcomeScreen } from "@/components/welcome-screen";
 import { ChatHeader } from "@/components/chat-header";
 import detectComputerUseNeeded from "@/lib/agents/auto-detection";
 import { getClientRuntimeContext } from "@/lib/client-runtime-context";
+import { getStoredLanguagePreference } from "@/lib/language-preferences";
 import { accountStorageKey } from "@/lib/account-scope";
 
 interface ChatInterfaceProps {
@@ -171,6 +172,7 @@ export function ChatInterface({ onSwitchToImagine, onOpenSidebar, isSidebarOpen 
       clientLocale: runtimeContext.locale,
       clientCountry: runtimeContext.country,
       clientCountryCode: runtimeContext.countryCode,
+      clientLanguage: getStoredLanguagePreference(),
     };
 
     if (selectedProvider === "anthropic" && settings.anthropicApiKey) {

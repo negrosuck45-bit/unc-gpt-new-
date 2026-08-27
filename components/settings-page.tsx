@@ -24,14 +24,27 @@ import { SkillsPanel } from './skills-panel';
 import { DEFAULT_USER_PREFERENCES, readUserPreferences, writeUserPreferences, type MessageDensity } from '@/lib/user-preferences';
 import { playReplySound, unlockReplySound } from '@/lib/notifications';
 import { SignOutButton } from './sign-out-button';
+import { LANGUAGE_OPTIONS, normalizeLanguagePreference } from '@/lib/language-preferences';
 
 interface SettingsPageProps { onClose?: () => void; }
 
 type SettingsTab = string;
 
+const APPEARANCE_OPTIONS = [
+  { value: 'light', label: 'Light', icon: Sun },
+  { value: 'dark', label: 'Dark', icon: Moon },
+  { value: 'gray', label: 'Gray', icon: Palette },
+] as const;
+
 export function SettingsPage({ onClose }: SettingsPageProps) {
   const { settings, updateSettings, clearAllChats, getCurrentChat, projects, chats } = useChatStore();
   const { theme, setTheme } = useTheme();
+  const selectedAppearance = theme === 'system' || theme === 'dark-gray' ? 'gray' : theme === 'white' ? 'light' : theme;
+
+  useEffect(() => {
+    if (theme === 'system' || theme === 'dark-gray') setTheme('gray');
+    if (theme === 'white') setTheme('light');
+  }, [setTheme, theme]);
 
   const [activeTab, setActiveTab] = useState<SettingsTab>('general');
   const [model, setModel] = useState<string>(settings.model);
@@ -64,7 +77,7 @@ export function SettingsPage({ onClose }: SettingsPageProps) {
   const [cursorStatus, setCursorStatus] = useState('');
   const [profileCardOffsetX, setProfileCardOffsetX] = useState(0);
   const [profileCardOffsetY, setProfileCardOffsetY] = useState(0);
-  const [language, setLanguage] = useState('system');
+  const [language, setLanguage] = useState('auto');
 
   const currentChat = getCurrentChat();
   const isLocked = false;
@@ -164,7 +177,7 @@ export function SettingsPage({ onClose }: SettingsPageProps) {
   };
 
   useEffect(() => {
-    try { setLanguage(localStorage.getItem('uncgpt-language') || 'system') } catch {}
+    try { setLanguage(normalizeLanguagePreference(localStorage.getItem('uncgpt-language'))) } catch {}
     fetch('/api/auth/me', { cache: 'no-store' }).then((response) => response.ok ? response.json() : null).then((payload) => setAuthUser(payload?.user ?? null)).catch(() => setAuthUser(null));
     const p = readUserPreferences();
     setStreamingEnabled(p.streaming);
@@ -302,29 +315,30 @@ export function SettingsPage({ onClose }: SettingsPageProps) {
                   <div className="space-y-3">
                     <Label>Theme</Label>
                     <div className="grid grid-cols-3 gap-3">
-                      {(['light', 'dark', 'system'] as const).map((t) => (
-                        <button key={t} type="button" onClick={() => setTheme(t)} className={cn(
+                      {APPEARANCE_OPTIONS.map(({ value, label, icon: Icon }) => (
+                        <button key={value} type="button" onClick={() => setTheme(value)} className={cn(
                           'flex min-h-[112px] flex-col items-center justify-center gap-3 rounded-[22px] border transition-all',
-                          theme === t ? 'border-border/25 bg-muted/[0.18] shadow-[inset_0_1px_0_rgba(255,255,255,0.12)]' : 'border-border/[0.12] bg-muted/[0.035] hover:bg-muted/[0.08]'
+                          selectedAppearance === value ? 'border-border/25 bg-muted/[0.18] shadow-[inset_0_1px_0_rgba(255,255,255,0.12)]' : 'border-border/[0.12] bg-muted/[0.035] hover:bg-muted/[0.08]'
                         )}>
-                          {t === 'light' && <Sun className="h-6 w-6" />}
-                          {t === 'dark' && <Moon className="h-6 w-6" />}
-                          {t === 'system' && <Smartphone className="h-6 w-6" />}
-                          <span className="text-base capitalize">{t}</span>
+                          <Icon className="h-6 w-6" />
+                          <span className="text-base">{label}</span>
                         </button>
                       ))}
                     </div>
                   </div>
                   <div className="flex items-center justify-between gap-4">
-                    <Label>Language</Label>
-                    <Select value={language} onValueChange={(value) => { setLanguage(value); try { localStorage.setItem('uncgpt-language', value) } catch {} }}>
-                      <SelectTrigger className="w-[150px] rounded-full border-border/10 bg-muted/[0.08] px-4"><SelectValue /></SelectTrigger>
-                      <SelectContent>
-                        <SelectItem value="system">System</SelectItem>
-                        <SelectItem value="en">English</SelectItem>
-                        <SelectItem value="es">Español</SelectItem>
-                        <SelectItem value="fr">Français</SelectItem>
-                        <SelectItem value="de">Deutsch</SelectItem>
+                    <div className="min-w-0">
+                      <Label>AI language</Label>
+                      <p className="mt-1 text-xs leading-5 text-muted-foreground">The AI receives this preference with every chat request.</p>
+                    </div>
+                    <Select value={language} onValueChange={(value) => {
+                      const nextLanguage = normalizeLanguagePreference(value);
+                      setLanguage(nextLanguage);
+                      try { localStorage.setItem('uncgpt-language', nextLanguage) } catch {}
+                    }}>
+                      <SelectTrigger className="w-[190px] shrink-0 rounded-full border-border/10 bg-muted/[0.08] px-4"><SelectValue /></SelectTrigger>
+                      <SelectContent className="max-h-[min(50dvh,420px)]">
+                        {LANGUAGE_OPTIONS.map((option) => <SelectItem key={option.code} value={option.code}>{option.label}</SelectItem>)}
                       </SelectContent>
                     </Select>
                   </div>
@@ -562,15 +576,13 @@ export function SettingsPage({ onClose }: SettingsPageProps) {
                   <div className="space-y-3">
                     <Label>Theme</Label>
                     <div className="grid grid-cols-3 gap-3">
-                      {(['light', 'dark', 'system'] as const).map(t => (
-                        <button key={t} onClick={() => setTheme(t)} className={cn(
+                      {APPEARANCE_OPTIONS.map(({ value, label, icon: Icon }) => (
+                        <button key={value} onClick={() => setTheme(value)} className={cn(
                           'p-4 rounded-lg border-2 transition-colors flex flex-col items-center gap-2',
-                          theme === t ? 'border-primary bg-primary/10' : 'border-border hover:border-primary/50'
+                          selectedAppearance === value ? 'border-primary bg-primary/10' : 'border-border hover:border-primary/50'
                         )}>
-                          {t === 'light' && <Sun className="h-5 w-5" />}
-                          {t === 'dark' && <Moon className="h-5 w-5" />}
-                          {t === 'system' && <Smartphone className="h-5 w-5" />}
-                          <span className="text-sm capitalize">{t}</span>
+                          <Icon className="h-5 w-5" />
+                          <span className="text-sm">{label}</span>
                         </button>
                       ))}
                     </div>

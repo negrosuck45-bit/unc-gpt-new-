@@ -2,16 +2,140 @@
 
 import { useEffect, useState } from 'react'
 import Link from 'next/link'
-import { ArrowLeft, Bell, Check, MessageCircle, UserPlus } from 'lucide-react'
+import { ArrowLeft, Check, MessageCircle } from 'lucide-react'
 
-type Notification = { id: string; kind: 'follow' | 'message'; username: string; text: string; time: string; added?: boolean }
+type Notification = {
+  id: string
+  kind: 'follow' | 'message'
+  username: string
+  text: string
+  time: string
+}
 
 const seed: Notification[] = []
 
 export function NotificationsPage() {
   const [items, setItems] = useState<Notification[]>(seed)
   const [suggestions, setSuggestions] = useState<{ username: string; profile_picture?: string | null }[]>([])
-  useEffect(() => { let active = true; const load = async () => { try { const response = await fetch('/api/social', { cache: 'no-store' }); const data = response.ok ? await response.json() : null; if (!active || !data) return; setItems((data.notifications || []).filter((item: any) => item?.sender_username?.toLowerCase() !== 'uncgpt').map((item: any) => ({ id: item.id, kind: item.kind === 'follow' ? 'follow' : 'message', username: item.sender_username, text: item.body, time: item.created_at ? new Date(item.created_at).toLocaleDateString([], { month: 'short', day: 'numeric' }) : 'now' }))); setSuggestions(data.suggestions || []) } catch { try { const saved = localStorage.getItem('uncgpt-notifications'); if (saved && active) setItems(JSON.parse(saved).filter((item: Notification) => item?.username?.toLowerCase() !== 'uncgpt')) } catch {} } }; void load(); const interval = window.setInterval(load, 8000); return () => { active = false; window.clearInterval(interval) } }, [])
-  const update = (next: Notification[]) => { setItems(next); try { localStorage.setItem('uncgpt-notifications', JSON.stringify(next)) } catch {} }
-  return <main className="social-scroll-page min-h-screen bg-[#050505] px-4 py-6 text-white sm:px-8 sm:py-10"><div className="mx-auto w-full max-w-3xl"><div className="mb-8 flex items-center gap-4"><Link href="/" aria-label="Back to workspace" className="rounded-full p-2 text-white/55 transition hover:bg-white/10 hover:text-white"><ArrowLeft className="h-5 w-5" /></Link><div><p className="text-xs uppercase tracking-[0.22em] text-white/35">uncgpt</p><h1 className="mt-1 text-3xl font-semibold tracking-tight">Notifications</h1></div></div><div className="mb-5 flex gap-2"><Link href="/notifications" className="rounded-full bg-white/12 px-4 py-2 text-sm text-white">Notifications</Link><Link href="/messages" className="rounded-full px-4 py-2 text-sm text-white/50 transition hover:bg-white/10 hover:text-white">Messages</Link></div><section className="overflow-hidden rounded-[22px] border border-white/10 bg-white/[0.035] shadow-2xl shadow-black/30">{items.map((item) => <article key={item.id} className="animate-in fade-in slide-in-from-bottom-1 duration-300 border-b border-white/[0.08] px-5 py-5 last:border-b-0 sm:px-7"><div className="flex gap-4"><div className="flex h-11 w-11 shrink-0 items-center justify-center overflow-hidden rounded-full bg-white/[0.09] text-white/75"><img src={`/api/profile/avatar?username=${encodeURIComponent(item.username)}`} alt={`@${item.username}`} className="h-full w-full object-cover" onError={(event) => { event.currentTarget.src = '/uncgpt.png' }} /></div><div className="min-w-0 flex-1"><div className="flex items-start justify-between gap-3"><p className="text-[16px] leading-6"><strong className="font-semibold">{item.username}</strong> <span className="text-white/55">{item.kind === 'follow' ? 'wants to follow you' : 'sent you a message'}</span></p><span className="shrink-0 text-xs text-white/35">{item.time}</span></div><p className="mt-1 text-sm leading-6 text-white/60">{item.text}</p>{item.kind === 'follow' ? <div className="mt-4 flex justify-end"><button onClick={async () => { const response = await fetch('/api/social', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ action: 'accept_follow', username: item.username, notificationId: item.id }) }); if (response.ok) setItems((current) => current.filter((entry) => entry.id !== item.id)); }} className="inline-flex items-center gap-2 rounded-full bg-indigo-500 px-4 py-2 text-sm font-medium transition hover:bg-indigo-400"><Check className="h-4 w-4" />Add back</button></div> : item.username.toLowerCase() === 'uncgpt' ? <span className="mt-4 inline-flex items-center gap-2 rounded-full border border-white/10 px-4 py-2 text-sm text-white/45">Official account cannot be messaged</span> : <Link href={`/messages/${encodeURIComponent(item.username)}`} className="mt-4 inline-flex items-center gap-2 rounded-full bg-indigo-500 px-4 py-2 text-sm font-medium transition hover:bg-indigo-400"><MessageCircle className="h-4 w-4" />Open message</Link>}</div></div></article>)}{items.length === 0 && <div className="px-6 py-16 text-center text-sm text-white/45">You’re all caught up.</div>}</section>{suggestions.length > 0 && <section className="mt-6 rounded-[22px] border border-white/10 bg-white/[0.035] p-5"><h2 className="text-sm font-medium text-white/75">People you may know</h2><div className="mt-3 grid gap-2 sm:grid-cols-2">{suggestions.map((person) => <div key={person.username} className="flex min-w-0 items-center gap-3 rounded-2xl bg-white/[0.04] p-3"><img src={person.profile_picture || `/api/profile/avatar?username=${encodeURIComponent(person.username)}`} alt={`@${person.username}`} className="h-10 w-10 shrink-0 rounded-full object-cover" /><span className="min-w-0 flex-1 truncate text-sm">@{person.username}</span><button onClick={async () => { const response = await fetch('/api/social', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ action: 'follow', username: person.username }) }); if (response.ok) setSuggestions((current) => current.filter((entry) => entry.username !== person.username)); }} className="shrink-0 rounded-full bg-indigo-500 px-3 py-1.5 text-xs font-medium">Add</button></div>)}</div></section>}</div></main>
+
+  useEffect(() => {
+    let active = true
+    const load = async () => {
+      try {
+        const response = await fetch('/api/social', { cache: 'no-store' })
+        const data = response.ok ? await response.json() : null
+        if (!active || !data) return
+        setItems((data.notifications || [])
+          .filter((item: any) => item?.sender_username?.toLowerCase() !== 'uncgpt')
+          .map((item: any) => ({
+            id: item.id,
+            kind: item.kind === 'follow' ? 'follow' : 'message',
+            username: item.sender_username,
+            text: item.body,
+            time: item.created_at ? new Date(item.created_at).toLocaleDateString([], { month: 'short', day: 'numeric' }) : 'now',
+          })))
+        setSuggestions(data.suggestions || [])
+      } catch {
+        try {
+          const saved = localStorage.getItem('uncgpt-notifications')
+          if (saved && active) setItems(JSON.parse(saved).filter((item: Notification) => item?.username?.toLowerCase() !== 'uncgpt'))
+        } catch {}
+      }
+    }
+
+    void load()
+    const interval = window.setInterval(load, 8000)
+    return () => {
+      active = false
+      window.clearInterval(interval)
+    }
+  }, [])
+
+  return (
+    <main className="social-scroll-page min-h-screen bg-background px-4 py-6 text-foreground sm:px-8 sm:py-10">
+      <div className="mx-auto w-full max-w-3xl">
+        <header className="mb-8 flex items-center gap-4">
+          <Link href="/" aria-label="Back to workspace" className="rounded-full p-2 text-muted-foreground transition hover:bg-accent hover:text-foreground">
+            <ArrowLeft className="h-5 w-5" />
+          </Link>
+          <div>
+            <p className="text-xs uppercase tracking-[0.22em] text-muted-foreground">uncgpt</p>
+            <h1 className="mt-1 text-3xl font-semibold tracking-tight">Notifications</h1>
+          </div>
+        </header>
+
+        <nav className="mb-5 flex gap-2">
+          <Link href="/notifications" className="rounded-full bg-primary px-4 py-2 text-sm text-primary-foreground">Notifications</Link>
+          <Link href="/messages" className="rounded-full px-4 py-2 text-sm text-muted-foreground transition hover:bg-accent hover:text-foreground">Messages</Link>
+        </nav>
+
+        <section className="overflow-hidden rounded-[22px] border border-border bg-card shadow-xl shadow-black/10">
+          {items.map((item) => (
+            <article key={item.id} className="animate-in fade-in slide-in-from-bottom-1 border-b border-border px-5 py-5 duration-300 last:border-b-0 sm:px-7">
+              <div className="flex gap-4">
+                <div className="flex h-11 w-11 shrink-0 items-center justify-center overflow-hidden rounded-full bg-muted">
+                  <img
+                    src={`/api/profile/avatar?username=${encodeURIComponent(item.username)}`}
+                    alt={`@${item.username}`}
+                    className="h-full w-full object-cover"
+                    onError={(event) => { event.currentTarget.src = '/uncgpt.png' }}
+                  />
+                </div>
+                <div className="min-w-0 flex-1">
+                  <div className="flex items-start justify-between gap-3">
+                    <p className="text-[16px] leading-6"><strong className="font-semibold">{item.username}</strong> <span className="text-muted-foreground">{item.kind === 'follow' ? 'wants to follow you' : 'sent you a message'}</span></p>
+                    <span className="shrink-0 text-xs text-muted-foreground">{item.time}</span>
+                  </div>
+                  <p className="mt-1 text-sm leading-6 text-muted-foreground">{item.text}</p>
+                  {item.kind === 'follow' ? (
+                    <div className="mt-4 flex justify-end">
+                      <button
+                        onClick={async () => {
+                          const response = await fetch('/api/social', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ action: 'accept_follow', username: item.username, notificationId: item.id }) })
+                          if (response.ok) setItems((current) => current.filter((entry) => entry.id !== item.id))
+                        }}
+                        className="inline-flex items-center gap-2 rounded-full bg-indigo-500 px-4 py-2 text-sm font-medium text-white transition hover:bg-indigo-400"
+                      >
+                        <Check className="h-4 w-4" /> Add back
+                      </button>
+                    </div>
+                  ) : item.username.toLowerCase() === 'uncgpt' ? (
+                    <span className="mt-4 inline-flex items-center gap-2 rounded-full border border-border px-4 py-2 text-sm text-muted-foreground">Official account cannot be messaged</span>
+                  ) : (
+                    <Link href={`/messages/${encodeURIComponent(item.username)}`} className="mt-4 inline-flex items-center gap-2 rounded-full bg-indigo-500 px-4 py-2 text-sm font-medium text-white transition hover:bg-indigo-400">
+                      <MessageCircle className="h-4 w-4" /> Open message
+                    </Link>
+                  )}
+                </div>
+              </div>
+            </article>
+          ))}
+          {items.length === 0 && <div className="px-6 py-16 text-center text-sm text-muted-foreground">You’re all caught up.</div>}
+        </section>
+
+        {suggestions.length > 0 && (
+          <section className="mt-6 rounded-[22px] border border-border bg-card p-5">
+            <h2 className="text-sm font-medium">People you may know</h2>
+            <div className="mt-3 grid gap-2 sm:grid-cols-2">
+              {suggestions.map((person) => (
+                <div key={person.username} className="flex min-w-0 items-center gap-3 rounded-2xl bg-muted p-3">
+                  <img src={person.profile_picture || `/api/profile/avatar?username=${encodeURIComponent(person.username)}`} alt={`@${person.username}`} className="h-10 w-10 shrink-0 rounded-full object-cover" />
+                  <span className="min-w-0 flex-1 truncate text-sm">@{person.username}</span>
+                  <button
+                    onClick={async () => {
+                      const response = await fetch('/api/social', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ action: 'follow', username: person.username }) })
+                      if (response.ok) setSuggestions((current) => current.filter((entry) => entry.username !== person.username))
+                    }}
+                    className="shrink-0 rounded-full bg-indigo-500 px-3 py-1.5 text-xs font-medium text-white"
+                  >
+                    Add
+                  </button>
+                </div>
+              ))}
+            </div>
+          </section>
+        )}
+      </div>
+    </main>
+  )
 }

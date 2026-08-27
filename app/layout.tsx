@@ -5,6 +5,7 @@ import { getSession } from "@/lib/auth"
 import { Toaster } from "sonner"
 import { ThemeProvider } from "@/components/theme-provider"
 import { CustomCursor } from "@/components/custom-cursor"
+import { ThemeChrome } from "@/components/theme-chrome"
 import "./globals.css"
 
 // Google Fonts disabled for build compatibility
@@ -26,7 +27,7 @@ export const viewport: Viewport = {
   initialScale: 1,
   maximumScale: 1,
   userScalable: false,
-  themeColor: "#0a0a0a",
+  themeColor: "#242424",
   viewportFit: "cover",
 }
 
@@ -43,8 +44,16 @@ export default async function RootLayout({
       <html lang="en" suppressHydrationWarning>
         <body className="font-sans antialiased">
         <script dangerouslySetInnerHTML={{ __html: `window.__UNCGPT_ACCOUNT_SCOPE__ = ${JSON.stringify(accountScope)};` }} />
-        <ThemeProvider attribute="class" defaultTheme="dark" enableSystem disableTransitionOnChange>
+        <ThemeProvider
+          attribute="class"
+          defaultTheme="gray"
+          enableSystem={false}
+          disableTransitionOnChange
+          themes={["light", "dark", "gray"]}
+          value={{ light: "white", dark: "dark", gray: "dark-gray" }}
+        >
           {children}
+          <ThemeChrome />
           <CustomCursor />
           <Toaster position="bottom-center" theme="system" />
           {process.env.NODE_ENV === "production" && <Analytics />}

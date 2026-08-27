@@ -7,6 +7,7 @@ import { chooseUncGptRoute } from "@/lib/uncgpt-router";
 import { executeAgentGateway, gatewayResultText } from "@/lib/agent-gateway";
 import { normalizeConnectorResult } from "@/lib/connector-results";
 import { composioToolkitSlug, connectorKeysMatch, isCalendarSchedulingIntent, isConnectorWriteIntent, isWrappedConnectorFailure, normalizeConnectorKeyForRouting, parseDeterministicCalendarCreate } from "@/lib/connector-action-safety";
+import { languagePreferenceInstruction } from "@/lib/language-preferences";
 
 export const runtime = "nodejs";
 
@@ -3229,6 +3230,7 @@ export async function POST(req: NextRequest) {
       clientLocale,
       clientCountry,
       clientCountryCode,
+      clientLanguage,
     } = body;
 
     // The replacement release exposes one model only; old client model values are ignored.
@@ -3416,6 +3418,7 @@ export async function POST(req: NextRequest) {
       systemContent,
       `\n\n${UNCGPT_IDENTITY_PROMPT}`,
       `\n\n${buildRuntimeContextMessage({ clientTimeZone, clientLocale, clientCountry, clientCountryCode })}`,
+      `\n\n${languagePreferenceInstruction(clientLanguage, clientLocale)}`,
       `\n\nConnected calendar rule: when the user asks to schedule, add, create, move, or cancel a Google Calendar event and a Google Calendar tool is available, use that tool. Create an event only when the title plus a concrete date and start time are clear; otherwise ask one concise follow-up for the missing detail. Convert natural-language dates using the user’s runtime time zone and pass the calendar tool an exact ISO date-time. Never say an event was scheduled unless the provider tool confirms success. For confirmed events, keep the final reply concise because the interface renders the verified event card.`,
     ];
     if (projectInstructions) {
