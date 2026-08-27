@@ -16,10 +16,12 @@ git diff --check
 files=(
   "app/api/chat/route.ts"
   "app/layout.tsx"
+  "app/chat-workspace.tsx"
   "app/api/mcp/github/route.ts"
   "app/api/mcp/vercel/route.ts"
   "app/api/mcp/oauth/status/route.ts"
   "components/chat-interface.tsx"
+  "components/chat-sidebar.tsx"
   "components/chat-messages-computer-use.tsx"
   "components/settings-page.tsx"
   "components/theme-chrome.tsx"

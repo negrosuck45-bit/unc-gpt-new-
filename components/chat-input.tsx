@@ -778,7 +778,7 @@ export function ChatInput({
                         </div>
 
                         {isUploading && (
-                          <div className="absolute inset-0 bg-black/50 flex flex-col items-center justify-center">
+                          <div className="absolute inset-0 bg-[rgba(36,36,36,0.72)] flex flex-col items-center justify-center">
                             <Loader2 className="h-5 w-5 text-white animate-spin mb-1" />
                             <span className="text-[10px] text-white">{progress}%</span>
                           </div>
@@ -881,7 +881,7 @@ export function ChatInput({
                       initial={{ opacity: 0 }}
                       animate={{ opacity: 1 }}
                       exit={{ opacity: 0 }}
-                      className="fixed inset-0 z-[80] bg-black/[0.70] backdrop-blur-[10px]"
+                      className="fixed inset-0 z-[80] bg-[rgba(36,36,36,0.78)] backdrop-blur-[10px]"
                       onClick={() => { setAttachMenuOpen(false); setSheetExpanded(false) }}
                     >
                       <motion.div

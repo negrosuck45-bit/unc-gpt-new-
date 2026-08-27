@@ -29,6 +29,7 @@ test('Settings keeps a comprehensive AI language list while the app is locked to
   const chat = read('./components/chat-interface.tsx');
   const api = read('./app/api/chat/route.ts');
   const publisher = read('./scripts/publish-agent-upgrade.sh');
+  const workspace = read('./app/chat-workspace.tsx');
 
   assert.doesNotMatch(settings, /<Label>Theme<\/Label>/);
   assert.doesNotMatch(settings, /APPEARANCE_OPTIONS/);
@@ -49,6 +50,11 @@ test('Settings keeps a comprehensive AI language list while the app is locked to
   assert.match(chrome, /activeTheme === "light" \|\| activeTheme === "white" \? "light" : "dark"/);
   assert.match(chrome, /meta\[name="theme-color"\]/);
   assert.match(styles, /--task-send-disabled-bg/);
+  assert.match(styles, /--sidebar: oklch\(0\.20 0 0\)/);
+  assert.match(styles, /--task-chrome: #242424/);
+  assert.match(styles, /--task-composer-surface: #242424/);
+  assert.match(styles, /background: rgba\(36, 36, 36, 0\.72\)/);
+  assert.match(workspace, /bg-\[rgba\(36,36,36,0\.62\)\]/);
   assert.match(styles, /\.task-composer-send[\s\S]*var\(--task-send-disabled-color\)/);
   assert.match(input, /task-composer-send h-10 w-10 rounded-full/);
   assert.match(notifications, /social-scroll-page min-h-screen bg-background/);
@@ -67,7 +73,7 @@ test('Settings keeps a comprehensive AI language list while the app is locked to
   assert.match(chat, /clientLanguage: getStoredLanguagePreference\(\)/);
   assert.match(api, /clientLanguage,/);
   assert.match(api, /languagePreferenceInstruction\(clientLanguage, clientLocale\)/);
-  for (const requiredFile of ['app/layout.tsx', 'components/settings-page.tsx', 'components/theme-chrome.tsx', 'components/notifications-page.tsx', 'components/messages-page.tsx', 'components/message-thread-page.tsx', 'lib/language-preferences.ts']) {
+  for (const requiredFile of ['app/layout.tsx', 'app/chat-workspace.tsx', 'components/chat-sidebar.tsx', 'components/settings-page.tsx', 'components/theme-chrome.tsx', 'components/notifications-page.tsx', 'components/messages-page.tsx', 'components/message-thread-page.tsx', 'lib/language-preferences.ts']) {
     assert.match(publisher, new RegExp(`"${requiredFile.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}"`));
   }
 });

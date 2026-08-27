@@ -202,7 +202,7 @@ export default function Home({ accountScope }: { accountScope: string }) {
 
       {settingsOpen && (
         <div
-          className="fixed inset-0 z-[200] flex items-start justify-center overflow-y-auto bg-black/45 p-0 backdrop-blur-md sm:items-center sm:p-6 lg:p-8"
+          className="fixed inset-0 z-[200] flex items-start justify-center overflow-y-auto bg-[rgba(36,36,36,0.62)] p-0 backdrop-blur-md sm:items-center sm:p-6 lg:p-8"
           role="dialog"
           aria-modal="true"
           aria-label="Settings"
