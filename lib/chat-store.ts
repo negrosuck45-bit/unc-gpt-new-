@@ -104,8 +104,8 @@ export interface ModelInfo {
 // ====================== MODEL DEFINITIONS ======================
 export const MODELS: ModelInfo[] = [
   {
-    value: "uncgpt",
-    label: "uncgpt",
+    value: "lunar",
+    label: "Lunar",
     provider: "auto",
     family: "auto",
     free: true,
@@ -240,7 +240,7 @@ export const useChatStore = create<ChatStore>()(
       streamingChatId: null,
       settings: {
         provider: "auto",
-        model: "uncgpt",
+        model: "lunar",
       },
       setCurrentChat: (id) => set({ currentChatId: id }),
       createNewChat: (type = "text", projectId, model, provider) => {
@@ -251,7 +251,7 @@ export const useChatStore = create<ChatStore>()(
           messages: [],
           createdAt: new Date(),
           projectId: projectId ?? get().currentProjectId ?? null,
-          model: "uncgpt",
+          model: "lunar",
           provider: "auto",
         };
         set((state) => ({
@@ -332,7 +332,7 @@ export const useChatStore = create<ChatStore>()(
       updateChatModel: (chatId) => {
         set((state) => ({
           chats: state.chats.map((chat) =>
-            chat.id === chatId ? { ...chat, model: "uncgpt", provider: "auto" } : chat,
+            chat.id === chatId ? { ...chat, model: "lunar", provider: "auto" } : chat,
           ),
         }));
       },

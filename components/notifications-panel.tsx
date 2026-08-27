@@ -6,7 +6,7 @@ import { Check, MessageCircle, UserPlus, X } from 'lucide-react'
 type Notification = { id: string; kind: 'follow' | 'message'; username: string; text: string; thumbnail?: string; time: string; added?: boolean }
 
 const initialNotifications: Notification[] = [
-  { id: 'welcome', kind: 'message', username: 'uncgpt', text: 'Welcome to uncgpt.', time: 'now' },
+  { id: 'welcome', kind: 'message', username: 'Lunar', text: 'Welcome to Lunar.', time: 'now' },
 ]
 
 export function NotificationsPanel({ open, onClose }: { open: boolean; onClose: () => void }) {

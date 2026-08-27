@@ -15,8 +15,8 @@ test('persists one-time first-open onboarding state with user settings', () => {
 
 test('renders a logo-first onboarding sequence that saves profile and language choices', () => {
   const onboarding = source('components/first-open-onboarding.tsx')
-  assert.match(onboarding, /src="\/uncgpt\.png"/)
-  assert.match(onboarding, /UncGPT/)
+  assert.match(onboarding, /src="\/lunar\.png"/)
+  assert.match(onboarding, /Lunar/)
   assert.match(onboarding, /ONBOARDING_VERSION = 2/)
   assert.match(onboarding, /Get started/)
   assert.match(onboarding, /Create account/)

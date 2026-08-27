@@ -13,12 +13,12 @@ import "./globals.css"
 // const geistMono = Geist_Mono({ subsets: ["latin"], variable: "--font-geist-mono" })
 
 export const metadata: Metadata = {
-  title: "uncgpt",
+  title: "Lunar",
   description: "A clean AI workspace with chat, projects, and memory.",
   icons: {
-    icon: "/uncgpt.png",
-    shortcut: "/uncgpt.png",
-    apple: "/uncgpt.png",
+    icon: "/lunar.png",
+    shortcut: "/lunar.png",
+    apple: "/lunar.png",
   },
 }
 

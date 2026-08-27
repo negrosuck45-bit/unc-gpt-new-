@@ -237,7 +237,7 @@ export function OAuthConnectors() {
                 {composio.configured ? 'Ready' : 'Needs setup'}
               </span>
             </div>
-            <p className="mt-1 text-xs leading-relaxed text-zinc-400">Connect the apps you use and control what uncgpt can access.</p>
+            <p className="mt-1 text-xs leading-relaxed text-zinc-400">Connect the apps you use and control what Lunar can access.</p>
             <p className="mt-1 text-[11px] leading-relaxed text-zinc-500">Choose an app below and finish its secure sign-in once.</p>
             <div className="mt-3 flex flex-wrap items-center gap-2">
               <select value={composioToolkit} onChange={(event) => setComposioToolkit(event.target.value)} className="h-8 rounded-lg border border-white/10 bg-black/20 px-2 text-xs text-zinc-200 outline-none">
@@ -263,13 +263,13 @@ export function OAuthConnectors() {
         <div className="rounded-2xl border border-dashed border-white/10 bg-white/[0.025] px-4 py-5 text-center">
           <div className="mx-auto flex h-10 w-10 items-center justify-center rounded-xl border border-violet-300/15 bg-violet-300/10 text-violet-200"><Network className="h-5 w-5" /></div>
           <p className="mt-3 text-sm font-medium text-zinc-200">No apps connected yet</p>
-          <p className="mx-auto mt-1 max-w-sm text-xs leading-relaxed text-zinc-500">Connect an app, then use its switch to control whether uncgpt can act through it.</p>
+          <p className="mx-auto mt-1 max-w-sm text-xs leading-relaxed text-zinc-500">Connect an app, then use its switch to control whether Lunar can act through it.</p>
         </div>
       )}
       {composio?.configured && accounts.length > 0 && (
         <section className="space-y-3">
           <div className="flex items-center justify-between gap-3 px-1">
-            <div><h3 className="text-sm font-medium text-zinc-100">Connected apps</h3><p className="mt-1 text-xs text-zinc-500">Only enabled apps are available to uncgpt.</p></div>
+            <div><h3 className="text-sm font-medium text-zinc-100">Connected apps</h3><p className="mt-1 text-xs text-zinc-500">Only enabled apps are available to Lunar.</p></div>
             <button type="button" onClick={() => refresh()} className="inline-flex h-8 w-8 items-center justify-center rounded-full border border-white/10 bg-white/[0.04] text-zinc-400 transition hover:bg-white/[0.08] hover:text-white" aria-label="Refresh connector status"><RefreshCw className="h-3.5 w-3.5" /></button>
           </div>
           <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
@@ -285,7 +285,7 @@ export function OAuthConnectors() {
                     </div>
                     <div className="min-w-0 flex-1">
                       <div className="flex items-center gap-2"><span className="truncate text-sm font-medium text-zinc-100">{meta?.name || account.toolkit}</span><span className={cn('h-1.5 w-1.5 rounded-full', connected ? 'bg-emerald-400 shadow-[0_0_10px_rgba(52,211,153,.8)]' : 'bg-amber-400')} /></div>
-                      <p className="mt-1 truncate text-[11px] text-zinc-500">{connected ? (account.enabled ? 'Connected · enabled for uncgpt' : 'Connected · paused') : (account.statusReason || 'Needs attention')}</p>
+                      <p className="mt-1 truncate text-[11px] text-zinc-500">{connected ? (account.enabled ? 'Connected · enabled for Lunar' : 'Connected · paused') : (account.statusReason || 'Needs attention')}</p>
                     </div>
                     <button type="button" onClick={() => manageAccount(account, account.enabled ? 'disable' : 'enable')} disabled={busy || !connected} aria-label={`${account.enabled ? 'Disable' : 'Enable'} ${meta?.name || account.toolkit}`} className={cn('relative h-7 w-12 shrink-0 rounded-full p-1 transition', account.enabled && connected ? 'bg-emerald-400/90' : 'bg-white/10', (busy || !connected) && 'opacity-50')}>
                       <span className={cn('block h-5 w-5 rounded-full bg-white shadow-sm transition-transform', account.enabled && connected ? 'translate-x-5' : 'translate-x-0')} />

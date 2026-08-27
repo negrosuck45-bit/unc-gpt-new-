@@ -9,7 +9,7 @@ import { type ModelFamily } from "@/lib/chat-store";
 
 // ----- Texture mapping by model family -----
 const TEXTURE_MAP: Record<ModelFamily | string, string> = {
-  auto: "/uncgpt.png",
+  auto: "/lunar.png",
   claude: "/claude-icon.svg",
   llama: "/llama.png",
   qwen: "/qwen.png",
@@ -18,7 +18,7 @@ const TEXTURE_MAP: Record<ModelFamily | string, string> = {
   gemma: "/gemma.png",
   glm: "/glm.png",
   "gpt-oss": "/gpt-oss.png",
-  default: "/uncgpt.png",
+  default: "/lunar.png",
 };
 
 // ----- Sphere with texture loading + fallback -----
@@ -96,7 +96,7 @@ export function MarsAvatar({ model, family, size = 32, useSimpleIcon = false }: 
   // Simple icon mode (faster, no 3D rendering)
   if (useSimpleIcon) {
     const iconMap: Record<ModelFamily, string> = {
-      auto: "/uncgpt.png",
+      auto: "/lunar.png",
       claude: "/claude-icon.svg",
       llama: "/llama.png",
       qwen: "/qwen.png",

@@ -26,7 +26,7 @@ export function NotificationsPage() {
         const data = response.ok ? await response.json() : null
         if (!active || !data) return
         setItems((data.notifications || [])
-          .filter((item: any) => item?.sender_username?.toLowerCase() !== 'uncgpt')
+          .filter((item: any) => item?.sender_username?.toLowerCase() !== 'lunar')
           .map((item: any) => ({
             id: item.id,
             kind: item.kind === 'follow' ? 'follow' : 'message',
@@ -38,7 +38,7 @@ export function NotificationsPage() {
       } catch {
         try {
           const saved = localStorage.getItem('uncgpt-notifications')
-          if (saved && active) setItems(JSON.parse(saved).filter((item: Notification) => item?.username?.toLowerCase() !== 'uncgpt'))
+          if (saved && active) setItems(JSON.parse(saved).filter((item: Notification) => item?.username?.toLowerCase() !== 'lunar'))
         } catch {}
       }
     }
@@ -59,7 +59,7 @@ export function NotificationsPage() {
             <ArrowLeft className="h-5 w-5" />
           </Link>
           <div>
-            <p className="text-xs uppercase tracking-[0.22em] text-muted-foreground">uncgpt</p>
+            <p className="text-xs uppercase tracking-[0.22em] text-muted-foreground">Lunar</p>
             <h1 className="mt-1 text-3xl font-semibold tracking-tight">Notifications</h1>
           </div>
         </header>
@@ -78,7 +78,7 @@ export function NotificationsPage() {
                     src={`/api/profile/avatar?username=${encodeURIComponent(item.username)}`}
                     alt={`@${item.username}`}
                     className="h-full w-full object-cover"
-                    onError={(event) => { event.currentTarget.src = '/uncgpt.png' }}
+                    onError={(event) => { event.currentTarget.src = '/lunar.png' }}
                   />
                 </div>
                 <div className="min-w-0 flex-1">
@@ -99,7 +99,7 @@ export function NotificationsPage() {
                         <Check className="h-4 w-4" /> Add back
                       </button>
                     </div>
-                  ) : item.username.toLowerCase() === 'uncgpt' ? (
+                  ) : item.username.toLowerCase() === 'lunar' ? (
                     <span className="mt-4 inline-flex items-center gap-2 rounded-full border border-border px-4 py-2 text-sm text-muted-foreground">Official account cannot be messaged</span>
                   ) : (
                     <Link href={`/messages/${encodeURIComponent(item.username)}`} className="mt-4 inline-flex items-center gap-2 rounded-full bg-indigo-500 px-4 py-2 text-sm font-medium text-white transition hover:bg-indigo-400">

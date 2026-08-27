@@ -39,7 +39,7 @@ function getAdminClient() {
 async function getProfile(username: string): Promise<Profile | null> {
   const normalized = username.trim().replace(/^@+/, "");
   if (!/^[A-Za-z0-9_]{1,24}$/.test(normalized)) return null;
-  if (normalized.toLowerCase() === "uncgpt") return { username: "uncgpt", bio: "The official uncgpt profile.", profile_picture: "/uncgpt.png", background_media: null, background_media_type: null, music_url: null, music_name: null, music_thumbnail: null, profile_views: 0, cursor_image: null, is_verified: true };
+  if (normalized.toLowerCase() === "lunar") return { username: "lunar", bio: "The official Lunar profile.", profile_picture: "/lunar.png", background_media: null, background_media_type: null, music_url: null, music_name: null, music_thumbnail: null, profile_views: 0, cursor_image: null, is_verified: true };
   const supabase = getAdminClient();
   if (!supabase) return null;
   const selectFields = "username,bio,profile_picture,background_media,background_media_type,music_url,music_name,music_thumbnail,profile_views,cursor_image";
@@ -63,10 +63,10 @@ async function getProfile(username: string): Promise<Profile | null> {
 export async function generateMetadata({ params }: { params: Promise<{ username: string }> }) {
   const { username } = await params;
   const profile = await getProfile(username);
-  if (!profile) return { title: "Profile not found · uncgpt" };
+  if (!profile) return { title: "Profile not found · Lunar" };
   return {
-    title: `@${profile.username} · uncgpt`,
-    description: profile.bio || `Public profile for @${profile.username} on uncgpt`,
+    title: `@${profile.username} · Lunar`,
+    description: profile.bio || `Public profile for @${profile.username} on Lunar`,
   };
 }
 
@@ -94,7 +94,7 @@ export default async function PublicProfilePage({ params }: { params: Promise<{ 
           musicName={profile.music_name}
           musicThumbnail={profile.music_thumbnail}
           profileViews={profile.profile_views ?? 0}
-          isVerified={profile.is_verified ?? profile.username.toLowerCase() === "uncgpt"}
+          isVerified={profile.is_verified ?? profile.username.toLowerCase() === "lunar"}
         />
       </section>
     </main>

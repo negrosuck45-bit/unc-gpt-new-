@@ -334,8 +334,8 @@ export default function FizPage() {
               <div id="profile-name" className={styles.profileName}></div>
               <div className={styles.badgeGroup}>
                 <div className={styles.badgeContainer}>
-                  <img src="/uncgpt.png" alt="uncgpt" className={styles.badge} />
-                  <span className={styles.tooltip}>owner of uncgpt</span>
+                  <img src="/lunar.png" alt="Lunar" className={styles.badge} />
+                  <span className={styles.tooltip}>owner of Lunar</span>
                 </div>
                 <div className={styles.badgeContainer}>
                   <img src="/owner.png" alt="Owner" className={styles.badge} />

@@ -401,7 +401,7 @@ export function SettingsPage({ onClose }: SettingsPageProps) {
                   <SectionTitle title="Data" description="Manage privacy and local chat data" />
                   <SettingRow label="Chat history" description={`${chats.reduce((a, c) => a + c.messages.length, 0)} messages stored in your workspace`}><span className="text-sm text-foreground/55">On device</span></SettingRow>
                   <SettingRow label="Neural memory" description="Persistent context stays under your control"><span className="text-sm text-emerald-300">Active</span></SettingRow>
-                  <div className="flex items-center justify-between border-t border-border/[0.10] pt-4"><div><p className="text-sm font-medium">Export data</p><p className="text-xs text-foreground/50">Download your account and chat history</p></div><Button variant="outline" size="sm" className="rounded-full border-border/15 bg-muted/[0.04]" onClick={() => { const data = { chats, projects, settings, exportedAt: new Date().toISOString() }; const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' }); const url = URL.createObjectURL(blob); const a = document.createElement('a'); a.href = url; a.download = `uncgpt-export-${new Date().toISOString().split('T')[0]}.json`; a.click(); URL.revokeObjectURL(url); }}>Export</Button></div>
+                  <div className="flex items-center justify-between border-t border-border/[0.10] pt-4"><div><p className="text-sm font-medium">Export data</p><p className="text-xs text-foreground/50">Download your account and chat history</p></div><Button variant="outline" size="sm" className="rounded-full border-border/15 bg-muted/[0.04]" onClick={() => { const data = { chats, projects, settings, exportedAt: new Date().toISOString() }; const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' }); const url = URL.createObjectURL(blob); const a = document.createElement('a'); a.href = url; a.download = `Lunar-export-${new Date().toISOString().split('T')[0]}.json`; a.click(); URL.revokeObjectURL(url); }}>Export</Button></div>
                   <div className="flex items-center justify-between border-t border-border/[0.10] pt-4"><div><p className="text-sm font-medium">Delete all chats</p><p className="text-xs text-foreground/50">This cannot be undone</p></div><Button variant="outline" size="sm" className="rounded-full border-red-300/50 text-red-200 hover:bg-red-400/10" onClick={() => { if (confirm('Delete all local chats?')) clearAllChats(); }}>Delete all</Button></div>
                 </div>
               )}
@@ -500,7 +500,7 @@ export function SettingsPage({ onClose }: SettingsPageProps) {
                       const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' });
                       const url = URL.createObjectURL(blob);
                       const a = document.createElement('a'); a.href = url;
-                      a.download = `uncgpt-export-${new Date().toISOString().split('T')[0]}.json`;
+                      a.download = `Lunar-export-${new Date().toISOString().split('T')[0]}.json`;
                       a.click(); URL.revokeObjectURL(url);
                     }}>
                       <Download className="h-4 w-4 mr-2" /> Export Data
@@ -543,7 +543,7 @@ export function SettingsPage({ onClose }: SettingsPageProps) {
               {/* ── Account ─────────────────────────────────────────────── */}
               {activeTab === 'account' && (
                 <div className="space-y-6">
-                  <SectionTitle title="Account" description="Manage your uncgpt session" />
+                  <SectionTitle title="Account" description="Manage your Lunar session" />
                   <div className="rounded-2xl border border-border/10 bg-muted/[0.045] p-4">
                     <div className="flex items-center gap-3">
                       <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-muted/10"><UserCircle className="h-5 w-5 text-foreground/70" /></div>

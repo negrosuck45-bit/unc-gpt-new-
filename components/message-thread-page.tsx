@@ -13,7 +13,7 @@ export function MessageThreadPage({ username }: { username: string }) {
   const [error, setError] = useState('')
   const endRef = useRef<HTMLDivElement>(null)
   const storageKey = `uncgpt-messages:${username.toLowerCase()}`
-  const isOfficial = username.toLowerCase() === 'uncgpt'
+  const isOfficial = username.toLowerCase() === 'lunar'
 
   useEffect(() => {
     let active = true
@@ -89,7 +89,7 @@ export function MessageThreadPage({ username }: { username: string }) {
           </div>
 
           {isOfficial ? (
-            <p className="border-t border-border px-5 py-4 text-center text-sm text-muted-foreground">Messaging is unavailable for the official @uncgpt account.</p>
+            <p className="border-t border-border px-5 py-4 text-center text-sm text-muted-foreground">Messaging is unavailable for the official @Lunar account.</p>
           ) : (
             <>
               <div className="min-h-5 px-5 text-center text-xs text-red-500">{error}</div>

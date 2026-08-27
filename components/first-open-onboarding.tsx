@@ -101,14 +101,14 @@ export function FirstOpenOnboarding({ onComplete }: FirstOpenOnboardingProps) {
       {step === 1 && (
         <>
           <h1 className="text-[29px] font-medium tracking-[-0.045em] text-foreground">Enter your email</h1>
-          <p className="mt-2 text-[15px] leading-6 text-foreground/52">For your UncGPT account and recovery.</p>
-          <div className="mt-9 border-b border-foreground/20 pb-3 text-[17px] text-foreground">{authUser?.email || 'Signed-in UncGPT account'}</div>
+          <p className="mt-2 text-[15px] leading-6 text-foreground/52">For your Lunar account and recovery.</p>
+          <div className="mt-9 border-b border-foreground/20 pb-3 text-[17px] text-foreground">{authUser?.email || 'Signed-in Lunar account'}</div>
         </>
       )}
       {step === 2 && (
         <>
           <h1 className="text-[29px] font-medium tracking-[-0.045em] text-foreground">What&apos;s your name?</h1>
-          <p className="mt-2 text-[15px] leading-6 text-foreground/52">This name will be shown in your UncGPT settings.</p>
+          <p className="mt-2 text-[15px] leading-6 text-foreground/52">This name will be shown in your Lunar settings.</p>
           <input autoFocus value={displayName} onChange={(event) => setDisplayName(event.target.value.slice(0, 60))} onKeyDown={(event) => { if (event.key === 'Enter') void continueSetup() }} placeholder="Your name" autoComplete="name" className="mt-9 h-12 w-full border-b border-foreground/25 bg-transparent px-0 text-[18px] text-foreground outline-none placeholder:text-foreground/30 focus:border-foreground/65" />
         </>
       )}
@@ -144,12 +144,12 @@ export function FirstOpenOnboarding({ onComplete }: FirstOpenOnboardingProps) {
       <div className="mx-auto flex min-h-[100dvh] w-full max-w-[390px] flex-col px-7 pb-[max(28px,env(safe-area-inset-bottom))] pt-[max(32px,env(safe-area-inset-top))] sm:max-w-[430px] sm:px-9">
         {step === 0 ? (
           <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} transition={{ duration: 0.28 }} className="flex flex-1 flex-col">
-            <div className="flex flex-1 items-center justify-center pb-12"><div className="flex items-center gap-3.5"><img src="/uncgpt.png" alt="UncGPT" className="h-14 w-14 rounded-full object-cover" /><span className="text-[28px] font-medium tracking-[-0.05em] text-foreground">UncGPT</span></div></div>
+            <div className="flex flex-1 items-center justify-center pb-12"><div className="flex items-center gap-3.5"><img src="/lunar.png" alt="Lunar" className="h-14 w-14 rounded-full object-cover" /><span className="text-[28px] font-medium tracking-[-0.05em] text-foreground">Lunar</span></div></div>
             <Button type="button" onClick={() => setStep(1)} className="h-[54px] w-full rounded-xl bg-foreground text-[16px] font-medium text-[#292929] hover:bg-foreground/90">Get started <ArrowRight className="ml-1 h-4 w-4" /></Button>
           </motion.div>
         ) : (
           <div className="flex min-h-0 flex-1 flex-col">
-            <div className="flex h-12 items-center justify-between"><button type="button" onClick={() => setStep((value) => Math.max(0, value - 1))} className="-ml-2 flex h-10 w-10 items-center justify-center text-foreground/65 transition hover:text-foreground" aria-label="Back"><ArrowLeft className="h-5 w-5" /></button>{step === 4 ? <span className="w-10" /> : <img src="/uncgpt.png" alt="UncGPT" className="h-8 w-8 rounded-full object-cover" />}<span className="w-10" /></div>
+            <div className="flex h-12 items-center justify-between"><button type="button" onClick={() => setStep((value) => Math.max(0, value - 1))} className="-ml-2 flex h-10 w-10 items-center justify-center text-foreground/65 transition hover:text-foreground" aria-label="Back"><ArrowLeft className="h-5 w-5" /></button>{step === 4 ? <span className="w-10" /> : <img src="/lunar.png" alt="Lunar" className="h-8 w-8 rounded-full object-cover" />}<span className="w-10" /></div>
             <AnimatePresence mode="wait"><motion.section key={step} initial={{ opacity: 0, x: 12 }} animate={{ opacity: 1, x: 0 }} exit={{ opacity: 0, x: -12 }} transition={{ duration: 0.18, ease: [0.23, 1, 0.32, 1] }} className={step === 4 ? 'flex min-h-0 flex-1 flex-col pb-4 pt-[7vh]' : 'flex flex-1 flex-col pt-[15vh] sm:pt-[17vh]'}>{stepContent}</motion.section></AnimatePresence>
             <Button type="button" disabled={!canContinue || saving || languageTransition} onClick={() => void continueSetup()} className="h-[54px] w-full shrink-0 rounded-xl bg-foreground text-[16px] font-medium text-[#292929] hover:bg-foreground/90 disabled:bg-foreground/25 disabled:text-foreground/45">{saving ? <Loader2 className="h-4 w-4 animate-spin" /> : step === 4 ? 'Continue' : step === 3 ? 'Create account' : 'Continue'} {!saving && <ArrowRight className="ml-1 h-4 w-4" />}</Button>
           </div>

@@ -201,7 +201,7 @@ export function addSourceAttributionToResponse(
  * Create a system prompt that encourages proper source attribution
  */
 export function createSearchAwareSystemPrompt(): string {
-  return `You are UncGPT, an AI assistant with access to real-time web search.
+  return `You are Lunar, an AI assistant with access to real-time web search.
 
 CORE PRINCIPLES FOR RESPONSES:
 1. ALWAYS cite sources when you reference the search results provided

@@ -245,8 +245,8 @@ export function ChatSidebar({
           className="group relative h-10 w-10 rounded-xl flex items-center justify-center text-sidebar-foreground/65 hover:bg-sidebar-accent hover:text-sidebar-foreground transition-all mb-1"
         >
           <Image
-            src="/uncgpt.png"
-            alt="uncgpt"
+            src="/lunar.png"
+            alt="Lunar"
             width={28}
             height={28}
             className="rounded-md transition-opacity duration-150 group-hover:opacity-0"
@@ -300,8 +300,8 @@ export function ChatSidebar({
             {/* Borderless sidebar identity row with the Mars logo restored. */}
             <div className="bg-transparent px-3.5 sm:px-4 pt-[max(0.875rem,env(safe-area-inset-top))] pb-3 flex items-center justify-between">
               <div className="flex items-center gap-2.5 min-w-0">
-                <Image src="/uncgpt.png" alt="uncgpt logo" width={34} height={34} className="h-[34px] w-[34px] rounded-full object-cover" />
-                <span className="font-semibold text-base truncate">uncgpt</span>
+                <Image src="/lunar.png" alt="Lunar logo" width={34} height={34} className="h-[34px] w-[34px] rounded-full object-cover" />
+                <span className="font-semibold text-base truncate">Lunar</span>
               </div>
               <div className="flex items-center gap-1">
                 <button

@@ -143,7 +143,7 @@ export default function TestIntroPage() {
     };
   }, []);
 
-  // Typing animation for "uncgpt"
+  // Typing animation for "Lunar"
   const textVariants = {
     hidden: { opacity: 0 },
     visible: (i: number) => ({
@@ -155,7 +155,7 @@ export default function TestIntroPage() {
     }),
   };
 
-  const text = "uncgpt";
+  const text = "Lunar";
 
   return (
     <div ref={containerRef} className="w-full h-screen bg-black overflow-hidden">

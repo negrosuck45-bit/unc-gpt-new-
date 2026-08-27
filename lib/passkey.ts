@@ -20,7 +20,7 @@ export async function registerFeedbackPasskey() {
   const credential = await navigator.credentials.create({
     publicKey: {
       challenge: crypto.getRandomValues(new Uint8Array(32)),
-      rp: { name: 'uncgpt', id: window.location.hostname },
+      rp: { name: 'Lunar', id: window.location.hostname },
       user: {
         id: crypto.getRandomValues(new Uint8Array(16)),
         name: 'feedback-owner',

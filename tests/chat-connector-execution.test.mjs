@@ -135,7 +135,7 @@ test('runs the authenticated GitHub website workflow instead of falling into the
       if (slug === 'GITHUB_CREATE_OR_UPDATE_FILE_CONTENTS' && !repositoryCreated) return { successful: false, error: 'Repository not found' };
       if (slug === 'GITHUB_CREATE_A_REPOSITORY_FOR_THE_AUTHENTICATED_USER') {
         repositoryCreated = true;
-        return { successful: true, data: { name: 'uncgpt-site-12345678', default_branch: 'main', html_url: 'https://github.com/test-owner/uncgpt-site-12345678' } };
+        return { successful: true, data: { name: 'lunar-site-12345678', default_branch: 'main', html_url: 'https://github.com/test-owner/lunar-site-12345678' } };
       }
       if (slug === 'GITHUB_CREATE_OR_UPDATE_FILE_CONTENTS') return { successful: true, data: { content: { sha: 'file-sha' } } };
       if (slug === 'GITHUB_CREATE_OR_UPDATE_GITHUB_PAGES_SITE') return { successful: true, data: { status: 'building' } };
@@ -155,7 +155,7 @@ test('runs the authenticated GitHub website workflow instead of falling into the
   }));
   const text = await responseSseText(response);
 
-  assert.match(text, /Created and committed the website files in \*\*test-owner\/uncgpt-site-12345678\*\*/);
+  assert.match(text, /Created and committed the website files in \*\*test-owner\/lunar-site-12345678\*\*/);
   assert.match(text, /UNCGPT_WEBSITE_DEPLOYMENT/);
   assert.doesNotMatch(text, /could not verify the connected-app write action/i);
   assert.ok(calls.some((call) => call.slug === 'GITHUB_CREATE_A_REPOSITORY_FOR_THE_AUTHENTICATED_USER'));
@@ -180,7 +180,7 @@ test('refuses to emit a GitHub Pages deployment card when GitHub does not confir
       if (slug === 'GITHUB_CREATE_OR_UPDATE_FILE_CONTENTS' && !repositoryCreated) return { successful: false, error: 'Repository not found' };
       if (slug === 'GITHUB_CREATE_A_REPOSITORY_FOR_THE_AUTHENTICATED_USER') {
         repositoryCreated = true;
-        return { successful: true, data: { name: 'uncgpt-site-12345678', default_branch: 'main' } };
+        return { successful: true, data: { name: 'lunar-site-12345678', default_branch: 'main' } };
       }
       if (slug === 'GITHUB_CREATE_OR_UPDATE_FILE_CONTENTS') return { successful: true, data: { content: { sha: 'file-sha' } } };
       if (slug === 'GITHUB_CREATE_OR_UPDATE_GITHUB_PAGES_SITE') return { successful: true, data: { status: 'building' } };
@@ -207,7 +207,7 @@ test('creates and reads back a Calendar event instead of falling into the generi
   const calls = [];
   const event = {
     id: 'event-123',
-    summary: 'UncGPT Calendar Verify Final',
+    summary: 'Lunar Calendar Verify Final',
     start: { dateTime: '2026-08-27T15:00:00' },
     end: { dateTime: '2026-08-27T15:30:00' },
     htmlLink: 'https://calendar.google.com/calendar/event?eid=event-123',
@@ -223,7 +223,7 @@ test('creates and reads back a Calendar event instead of falling into the generi
   };
   const { POST } = createRoute({ connectorSession, enabledToolkits: ['googlecalendar'] });
   const response = await POST(createRequest({
-    messages: [{ role: 'user', content: 'Schedule a 30 minute event tomorrow at 3 PM called UncGPT Calendar Verify Final.' }],
+    messages: [{ role: 'user', content: 'Schedule a 30 minute event tomorrow at 3 PM called Lunar Calendar Verify Final.' }],
     computerUse: false,
     clientTimeZone: 'Europe/Amsterdam',
     mcpConnectors: [{ source: 'composio', provider: 'google_calendar', enabled: true }],
@@ -231,7 +231,7 @@ test('creates and reads back a Calendar event instead of falling into the generi
   const text = await responseSseText(response);
 
   assert.match(text, /UNCGPT_CALENDAR_EVENT/);
-  assert.match(text, /UncGPT Calendar Verify Final/);
+  assert.match(text, /Lunar Calendar Verify Final/);
   assert.doesNotMatch(text, /could not verify a Google Calendar action/i);
   const dateParts = new Intl.DateTimeFormat('en-CA', {
     timeZone: 'Europe/Amsterdam', year: 'numeric', month: '2-digit', day: '2-digit',
@@ -242,7 +242,7 @@ test('creates and reads back a Calendar event instead of falling into the generi
     {
       slug: 'GOOGLECALENDAR_CREATE_EVENT',
       args: {
-        summary: 'UncGPT Calendar Verify Final',
+        summary: 'Lunar Calendar Verify Final',
         start_datetime: `${tomorrow}T15:00:00`,
         timezone: 'Europe/Amsterdam',
         event_duration_hour: 0,
@@ -422,7 +422,7 @@ test('repairs a failed GitHub Pages deployment from prior repository context ins
   const response = await POST(createRequest({
     messages: [
       { role: 'user', content: 'Create a GitHub repo and a live website' },
-      { role: 'assistant', content: 'Created website files in test-owner/uncgpt-site-previous. [[UNCGPT_WEBSITE_DEPLOYMENT:{"repository":"test-owner/uncgpt-site-previous"}]]' },
+      { role: 'assistant', content: 'Created website files in test-owner/lunar-site-previous. [[UNCGPT_WEBSITE_DEPLOYMENT:{"repository":"test-owner/lunar-site-previous"}]]' },
       { role: 'user', content: 'It failed' },
     ],
     computerUse: false,
@@ -430,7 +430,7 @@ test('repairs a failed GitHub Pages deployment from prior repository context ins
   }));
   const text = await responseSseText(response);
 
-  assert.match(text, /Reconfigured GitHub Pages deployment for \*\*test-owner\/uncgpt-site-previous\*\*/);
+  assert.match(text, /Reconfigured GitHub Pages deployment for \*\*test-owner\/lunar-site-previous\*\*/);
   assert.match(text, /UNCGPT_WEBSITE_DEPLOYMENT/);
   assert.doesNotMatch(text, /It seems that the GitHub Pages deployment failed/i);
   assert.ok(calls.some((call) => call.slug === 'GITHUB_CREATE_OR_UPDATE_GITHUB_PAGES_SITE'));
@@ -452,7 +452,7 @@ test('creates a new unique repository for a fresh website request even when a pr
       if (slug === 'GITHUB_CREATE_OR_UPDATE_FILE_CONTENTS' && !repositoryCreated) return { successful: false, error: 'Repository not found' };
       if (slug === 'GITHUB_CREATE_A_REPOSITORY_FOR_THE_AUTHENTICATED_USER') {
         repositoryCreated = true;
-        return { successful: true, data: { name: 'uncgpt-site-12345678', default_branch: 'main', html_url: 'https://github.com/test-owner/uncgpt-site-12345678' } };
+        return { successful: true, data: { name: 'lunar-site-12345678', default_branch: 'main', html_url: 'https://github.com/test-owner/lunar-site-12345678' } };
       }
       if (slug === 'GITHUB_CREATE_OR_UPDATE_FILE_CONTENTS') return { successful: true, data: { content: { sha: 'file-sha' } } };
       if (slug === 'GITHUB_CREATE_OR_UPDATE_GITHUB_PAGES_SITE') return { successful: true, data: { status: 'building' } };
@@ -475,7 +475,7 @@ test('creates a new unique repository for a fresh website request even when a pr
   }));
   const text = await responseSseText(response);
 
-  assert.match(text, /test-owner\/uncgpt-site-12345678/);
+  assert.match(text, /test-owner\/lunar-site-12345678/);
   assert.doesNotMatch(text, /test-owner\/old-site/);
   assert.ok(calls.some((call) => call.slug === 'GITHUB_CREATE_A_REPOSITORY_FOR_THE_AUTHENTICATED_USER'));
   assert.doesNotMatch(JSON.stringify(calls), /old-site/);
@@ -498,7 +498,7 @@ test('uses canonical Actions fallbacks when Composio search is sparse', async ()
       calls.push({ slug, args });
       if (slug === 'GITHUB_GET_THE_AUTHENTICATED_USER') return { successful: true, data: { login: 'test-owner' } };
       if (slug === 'GITHUB_CREATE_OR_UPDATE_FILE_CONTENTS' && !repositoryCreated) return { successful: false, error: 'Repository not found' };
-      if (slug === 'GITHUB_CREATE_A_REPOSITORY_FOR_THE_AUTHENTICATED_USER') { repositoryCreated = true; return { successful: true, data: { name: 'uncgpt-site-12345678', default_branch: 'main' } }; }
+      if (slug === 'GITHUB_CREATE_A_REPOSITORY_FOR_THE_AUTHENTICATED_USER') { repositoryCreated = true; return { successful: true, data: { name: 'lunar-site-12345678', default_branch: 'main' } }; }
       if (slug === 'GITHUB_CREATE_OR_UPDATE_FILE_CONTENTS') return { successful: true, data: { content: { sha: 'file-sha' } } };
       if (slug === 'GITHUB_CREATE_OR_UPDATE_GITHUB_PAGES_SITE') return { successful: true, data: { status: 'building' } };
       if (slug === 'GITHUB_CREATE_A_WORKFLOW_DISPATCH_EVENT') return { successful: true, data: {} };
@@ -541,7 +541,7 @@ test('builds a GTA VI presentation instead of the generic personal portfolio fal
       if (slug === 'GITHUB_CREATE_OR_UPDATE_FILE_CONTENTS' && !repositoryCreated) return { successful: false, error: 'Repository not found' };
       if (slug === 'GITHUB_CREATE_A_REPOSITORY_FOR_THE_AUTHENTICATED_USER') {
         repositoryCreated = true;
-        return { successful: true, data: { name: 'uncgpt-site-12345678', default_branch: 'main' } };
+        return { successful: true, data: { name: 'lunar-site-12345678', default_branch: 'main' } };
       }
       if (slug === 'GITHUB_CREATE_OR_UPDATE_FILE_CONTENTS') return { successful: true, data: { content: { sha: 'file-sha' } } };
       if (slug === 'GITHUB_CREATE_OR_UPDATE_GITHUB_PAGES_SITE') return { successful: true, data: { status: 'building' } };
