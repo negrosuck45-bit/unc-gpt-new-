@@ -1,7 +1,7 @@
 @import "tailwindcss";
 @import "tw-animate-css";
 
-@custom-variant dark (&:is(.dark *));
+@custom-variant dark (&:is(.dark *, .dark-gray *));
 
 :root {
   --background: oklch(0.985 0.004 260);
@@ -39,32 +39,33 @@
   --sidebar-ring: oklch(0.65 0.04 260);
 }
 
-.dark {
-  --background: oklch(0.06 0 0);
+.dark,
+.dark-gray {
+  --background: oklch(0.20 0 0);
   --foreground: oklch(0.95 0 0);
-  --card: oklch(0.10 0 0);
+  --card: oklch(0.065 0 0);
   --card-foreground: oklch(0.95 0 0);
-  --popover: oklch(0.10 0 0);
+  --popover: oklch(0.065 0 0);
   --popover-foreground: oklch(0.95 0 0);
   --primary: oklch(0.95 0 0);
   --primary-foreground: oklch(0.08 0 0);
-  --secondary: oklch(0.10 0 0);
+  --secondary: oklch(0.075 0 0);
   --secondary-foreground: oklch(0.95 0 0);
-  --muted: oklch(0.12 0 0);
+  --muted: oklch(0.095 0 0);
   --muted-foreground: oklch(0.6 0 0);
-  --accent: oklch(0.12 0 0);
+  --accent: oklch(0.11 0 0);
   --accent-foreground: oklch(0.95 0 0);
   --destructive: oklch(0.577 0.245 27.325);
   --destructive-foreground: oklch(0.95 0 0);
   --border: oklch(0.14 0 0);
-  --input: oklch(0.10 0 0);
+  --input: oklch(0.075 0 0);
   --ring: oklch(0.25 0 0);
   --chart-1: oklch(0.488 0.243 264.376);
   --chart-2: oklch(0.696 0.17 162.48);
   --chart-3: oklch(0.769 0.188 70.08);
   --chart-4: oklch(0.627 0.265 303.9);
   --chart-5: oklch(0.645 0.246 16.439);
-  --sidebar: oklch(0.06 0 0);
+  --sidebar: oklch(0.055 0 0);
   --sidebar-foreground: oklch(0.95 0 0);
   --sidebar-primary: oklch(0.95 0 0);
   --sidebar-primary-foreground: oklch(0.08 0 0);
@@ -72,6 +73,34 @@
   --sidebar-accent-foreground: oklch(0.95 0 0);
   --sidebar-border: oklch(0.18 0 0);
   --sidebar-ring: oklch(0.4 0 0);
+}
+
+.white {
+  --background: oklch(0.985 0.004 260);
+  --foreground: oklch(0.18 0.02 260);
+  --card: oklch(1 0 0);
+  --card-foreground: oklch(0.18 0.02 260);
+  --popover: oklch(1 0 0);
+  --popover-foreground: oklch(0.18 0.02 260);
+  --primary: oklch(0.22 0.03 260);
+  --primary-foreground: oklch(0.98 0 0);
+  --secondary: oklch(0.95 0.006 260);
+  --secondary-foreground: oklch(0.22 0.03 260);
+  --muted: oklch(0.94 0.008 260);
+  --muted-foreground: oklch(0.48 0.02 260);
+  --accent: oklch(0.93 0.012 260);
+  --accent-foreground: oklch(0.22 0.03 260);
+  --border: oklch(0.88 0.012 260);
+  --input: oklch(0.92 0.008 260);
+  --ring: oklch(0.65 0.04 260);
+  --sidebar: oklch(0.97 0.006 260);
+  --sidebar-foreground: oklch(0.22 0.03 260);
+  --sidebar-primary: oklch(0.22 0.03 260);
+  --sidebar-primary-foreground: oklch(0.98 0 0);
+  --sidebar-accent: oklch(0.92 0.012 260);
+  --sidebar-accent-foreground: oklch(0.22 0.03 260);
+  --sidebar-border: oklch(0.88 0.012 260);
+  --sidebar-ring: oklch(0.65 0.04 260);
 }
 
 @theme inline {
@@ -383,13 +412,13 @@ textarea {
 .task-chat-surface {
   background:
     radial-gradient(840px 500px at 50% -130px, rgba(255, 255, 255, 0.045), transparent 62%),
-    #161616;
+    #242424;
   color: #f5f5f5;
 }
 
 .task-header {
   border-bottom: 0;
-  background: rgba(22, 22, 22, 0.82);
+  background: rgba(10, 10, 11, 0.9);
   backdrop-filter: blur(18px);
   -webkit-backdrop-filter: blur(18px);
 }
@@ -424,12 +453,12 @@ textarea {
 }
 
 .task-composer-dock {
-  background: linear-gradient(180deg, rgba(22, 22, 22, 0) 0%, rgba(22, 22, 22, 0.88) 24%, #161616 62%);
+  background: linear-gradient(180deg, rgba(36, 36, 36, 0) 0%, rgba(10, 10, 11, 0.9) 28%, #0a0a0b 66%);
 }
 
 .task-composer {
   border-color: rgba(255, 255, 255, 0.11) !important;
-  background: rgba(33, 33, 33, 0.94);
+  background: rgba(12, 12, 13, 0.96);
   box-shadow:
     0 16px 40px rgba(0, 0, 0, 0.2),
     inset 0 1px 0 rgba(255, 255, 255, 0.035);
@@ -437,7 +466,7 @@ textarea {
 
 .task-composer:focus-within {
   border-color: rgba(255, 255, 255, 0.22) !important;
-  background: rgba(37, 37, 37, 0.98);
+  background: rgba(18, 18, 19, 0.99);
   box-shadow:
     0 18px 48px rgba(0, 0, 0, 0.28),
     inset 0 1px 0 rgba(255, 255, 255, 0.045);
@@ -479,12 +508,6 @@ textarea {
 
 .task-composer-send:disabled {
   opacity: 1 !important;
-}
-
-.task-assistant-message {
-  border: 1px solid rgba(255, 255, 255, 0.07);
-  background: rgba(255, 255, 255, 0.035);
-  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.028);
 }
 
 .task-user-message {

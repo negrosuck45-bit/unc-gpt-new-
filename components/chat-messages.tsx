@@ -71,7 +71,7 @@ function fromBase64(base64: string): string {
 function useIsDarkMode() {
   const [isDark, setIsDark] = useState(false);
   useEffect(() => {
-    const check = () => setIsDark(document.documentElement.classList.contains('dark'));
+    const check = () => setIsDark(document.documentElement.classList.contains('dark') || document.documentElement.classList.contains('dark-gray'));
     check();
     const observer = new MutationObserver(check);
     observer.observe(document.documentElement, { attributes: true, attributeFilter: ['class'] });
@@ -729,7 +729,7 @@ export function ChatMessages({ messages, isStreaming, isThinking, onRegenerate, 
                       <div className={cn(
                         'text-[15px] sm:text-base leading-7',
                         isAssistant
-                          ? 'task-assistant-message rounded-[22px] px-4 py-3.5 text-foreground sm:px-5'
+                          ? 'px-0 py-1 text-foreground'
                           : 'task-user-message rounded-[22px] px-4 py-3 text-foreground shadow-sm'
                       )}>
                         <MessageContent content={message.content} />

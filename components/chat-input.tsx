@@ -212,7 +212,7 @@ async function uploadToSupabase(file: File, fileName: string): Promise<string> {
 function useIsDarkMode() {
   const [dark, setDark] = useState(false)
   useEffect(() => {
-    const check = () => setDark(document.documentElement.classList.contains('dark'))
+    const check = () => setDark(document.documentElement.classList.contains('dark') || document.documentElement.classList.contains('dark-gray'))
     check()
     const obs = new MutationObserver(check)
     obs.observe(document.documentElement, { attributes: true, attributeFilter: ['class'] })
