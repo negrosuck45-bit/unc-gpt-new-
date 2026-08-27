@@ -255,6 +255,41 @@ test('creates and reads back a Calendar event instead of falling into the generi
 });
 
 
+test('creates the screenshot-style date-and-title Calendar request without a confirmation turn', async () => {
+  const calls = [];
+  const event = {
+    id: 'birthday-default-time-789',
+    summary: 'happy birthday',
+    start: { dateTime: '2026-08-28T09:00:00' },
+    end: { dateTime: '2026-08-28T10:00:00' },
+    htmlLink: 'https://calendar.google.com/calendar/event?eid=birthday-default-time-789',
+  };
+  const connectorSession = {
+    async search() { return {}; },
+    async execute(slug, args) {
+      calls.push({ slug, args });
+      if (slug === 'GOOGLECALENDAR_CREATE_EVENT') return { successful: true, data: event };
+      if (slug === 'GOOGLECALENDAR_EVENTS_GET') return { successful: true, data: event };
+      throw new Error(`Unexpected Calendar tool: ${slug}`);
+    },
+  };
+  const { POST } = createRoute({ connectorSession, enabledToolkits: ['googlecalendar'] });
+  const response = await POST(createRequest({
+    messages: [{ role: 'user', content: 'Create me an event on 28 August on my calendar that says happy birthday' }],
+    computerUse: false,
+    clientTimeZone: 'Europe/Amsterdam',
+    mcpConnectors: [{ source: 'composio', provider: 'google_calendar', enabled: true }],
+  }));
+  const text = await responseSseText(response);
+  assert.match(text, /UNCGPT_CALENDAR_EVENT/);
+  assert.match(text, /happy birthday/);
+  assert.doesNotMatch(text, /confirm|text-based AI assistant|don't have direct access/i);
+  assert.deepEqual(JSON.parse(JSON.stringify(calls)), [
+    { slug: 'GOOGLECALENDAR_CREATE_EVENT', args: { summary: 'happy birthday', start_datetime: '2026-08-28T09:00:00', timezone: 'Europe/Amsterdam', event_duration_hour: 1, event_duration_minutes: 0, calendar_id: 'primary' } },
+    { slug: 'GOOGLECALENDAR_EVENTS_GET', args: { event_id: 'birthday-default-time-789', calendar_id: 'primary', time_zone: 'Europe/Amsterdam' } },
+  ]);
+});
+
 test('uses the connected Calendar for a time-and-title follow-up instead of generic chat', async () => {
   const calls = [];
   const event = {

@@ -84,8 +84,25 @@ test('continues a Calendar request when the user supplies its missing time and t
   });
 });
 
-test('does not manufacture incomplete Calendar create arguments', () => {
-  assert.equal(parseDeterministicCalendarCreate('Schedule something tomorrow called Unspecified', 'UTC', new Date('2026-08-26T10:00:00.000Z')), null);
+test('creates a complete date-and-title request without asking for a time or confirmation', () => {
+  const request = 'Create me an event on 28 August on my calendar that says happy birthday';
+  assert.equal(isCalendarSchedulingIntent(request), true);
+  assert.deepEqual(JSON.parse(JSON.stringify(parseDeterministicCalendarCreate(
+    request,
+    'Europe/Amsterdam',
+    new Date('2026-08-26T10:00:00.000Z'),
+  ))), {
+    summary: 'happy birthday',
+    start_datetime: '2026-08-28T09:00:00',
+    timezone: 'Europe/Amsterdam',
+    event_duration_hour: 1,
+    event_duration_minutes: 0,
+    calendar_id: 'primary',
+  });
+});
+
+test('does not manufacture Calendar create arguments without both a date and title', () => {
+  assert.equal(parseDeterministicCalendarCreate('Schedule something tomorrow', 'UTC', new Date('2026-08-26T10:00:00.000Z')), null);
   assert.equal(parseDeterministicCalendarCreate('Schedule a meeting at 3 PM', 'UTC', new Date('2026-08-26T10:00:00.000Z')), null);
 });
 

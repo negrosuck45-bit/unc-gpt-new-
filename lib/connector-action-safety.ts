@@ -29,7 +29,7 @@ export function composioToolkitSlug(key: unknown) {
 }
 
 const CONNECTOR_WRITE_INTENT = /\b(send|create|update|edit|delete|schedule|deploy|upload|move|write|add|publish|commit)\b/i;
-const CALENDAR_SCHEDULING_INTENT = /\b(schedule|appointment|meeting|calendar\s+event|set\s+up\s+(?:a\s+)?reminder)\b/i;
+const CALENDAR_SCHEDULING_INTENT = /\b(?:schedule|appointment|meeting|calendar\s+event|set\s+up\s+(?:a\s+)?reminder|(?:create|add|make)\s+(?:me\s+)?(?:an?\s+)?(?:calendar\s+)?(?:event|reminder)|(?:add|put)\b.{0,80}\b(?:calendar|calender)\b)\b/i;
 const CALENDAR_DETAILS_FOLLOW_UP = /\b(?:at\s+)?(?:1[0-2]|0?[1-9])(?::[0-5]\d)?\s*(?:am|pm)\b|\b(?:event|title)\s+(?:is|will be)\b|\b(?:called|named|titled)\b/i;
 
 export function isConnectorWriteIntent(userText: string, recentUserText = '', connectorConfirmation = false) {
@@ -82,14 +82,17 @@ export function parseDeterministicCalendarCreate(text: string, requestedTimeZone
   const timeMatch = text.match(/\b(?:at\s+)?(1[0-2]|0?[1-9])(?::([0-5]\d))?\s*(am|pm)\b/i);
   const namedTitle = text.match(/\b(?:called|named|titled)\s+["“”']?(.+?)["“”']?\s*$/i)?.[1]?.trim();
   const conversationalTitle = text.match(/\b(?:event|title)\s+(?:is|will be)\s+(?:like\s+)?["“”']?(.+?)["“”']?\s*$/i)?.[1]?.trim();
+  const statedTitle = text.match(/\b(?:that|which)\s+(?:say|says|read|reads)\s+["“”']?(.+?)["“”']?\s*$/i)?.[1]?.trim();
   const trailingTitle = timeMatch && typeof timeMatch.index === 'number'
     ? text.slice(timeMatch.index + timeMatch[0].length).replace(/^[\s,:;\-–—]*(?:for\s+)?(?:and\s+the\s+)?(?:event|title)\s+(?:is|will be)\s+(?:like\s+)?/i, '').trim()
     : '';
-  const title = namedTitle || conversationalTitle || trailingTitle;
-  if (!date || !timeMatch || !title) return null;
-  let hour = Number(timeMatch[1]);
-  const minute = Number(timeMatch[2] || 0);
-  const period = timeMatch[3].toLowerCase();
+  const title = namedTitle || conversationalTitle || statedTitle || trailingTitle;
+  if (!date || !title) return null;
+  // A date and title are a complete scheduling instruction. If no time is
+  // supplied, create the event at 09:00 in the user's selected timezone.
+  let hour = timeMatch ? Number(timeMatch[1]) : 9;
+  const minute = timeMatch ? Number(timeMatch[2] || 0) : 0;
+  const period = timeMatch?.[3]?.toLowerCase();
   if (period === 'pm' && hour !== 12) hour += 12;
   if (period === 'am' && hour === 12) hour = 0;
   const durationMinutes = Number(text.match(/\b(\d{1,3})\s*(?:minutes?|mins?)\b/i)?.[1] || 60);
