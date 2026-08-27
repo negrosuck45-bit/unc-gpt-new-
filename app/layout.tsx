@@ -46,11 +46,11 @@ export default async function RootLayout({
         <script dangerouslySetInnerHTML={{ __html: `window.__UNCGPT_ACCOUNT_SCOPE__ = ${JSON.stringify(accountScope)};` }} />
         <ThemeProvider
           attribute="class"
-          defaultTheme="gray"
+          forcedTheme="gray"
           enableSystem={false}
           disableTransitionOnChange
-          themes={["light", "dark", "gray"]}
-          value={{ light: "white", dark: "dark", gray: "dark-gray" }}
+          themes={["gray"]}
+          value={{ gray: "dark-gray" }}
         >
           {children}
           <ThemeChrome />

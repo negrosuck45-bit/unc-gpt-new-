@@ -11,14 +11,13 @@ import {
   Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
 } from '@/components/ui/select';
 import {
-  Settings, Smartphone, Trash2, Sun, Moon, X,
-  Palette, Shield, Zap, Key, Download, RefreshCw, Sparkles,
+  Settings, Smartphone, Trash2, X,
+  Shield, Zap, Key, Download, RefreshCw, Sparkles,
   Eye, EyeOff, Puzzle, PlugZap,   Volume2, UserCircle, LogOut, Database, ChevronRight, Upload, Music2, ImagePlus, MousePointer2,
 
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { cn } from '@/lib/utils';
-import { useTheme } from 'next-themes';
 import { OAuthConnectors } from './oauth-connectors';
 import { SkillsPanel } from './skills-panel';
 import { DEFAULT_USER_PREFERENCES, readUserPreferences, writeUserPreferences, type MessageDensity } from '@/lib/user-preferences';
@@ -30,22 +29,8 @@ interface SettingsPageProps { onClose?: () => void; }
 
 type SettingsTab = string;
 
-const APPEARANCE_OPTIONS = [
-  { value: 'light', label: 'Light', icon: Sun },
-  { value: 'dark', label: 'Dark', icon: Moon },
-  { value: 'gray', label: 'Gray', icon: Palette },
-] as const;
-
 export function SettingsPage({ onClose }: SettingsPageProps) {
   const { settings, updateSettings, clearAllChats, getCurrentChat, projects, chats } = useChatStore();
-  const { theme, setTheme } = useTheme();
-  const selectedAppearance = theme === 'system' || theme === 'dark-gray' ? 'gray' : theme === 'white' ? 'light' : theme;
-
-  useEffect(() => {
-    if (theme === 'system' || theme === 'dark-gray') setTheme('gray');
-    if (theme === 'white') setTheme('light');
-  }, [setTheme, theme]);
-
   const [activeTab, setActiveTab] = useState<SettingsTab>('general');
   const [model, setModel] = useState<string>(settings.model);
   const [showApiKey, setShowApiKey] = useState(false);
@@ -312,20 +297,6 @@ export function SettingsPage({ onClose }: SettingsPageProps) {
               {activeTab === 'general' && (
                 <div className="space-y-6">
                   <SectionTitle title="General Settings" description="Basic app preferences" />
-                  <div className="space-y-3">
-                    <Label>Theme</Label>
-                    <div className="grid grid-cols-3 gap-3">
-                      {APPEARANCE_OPTIONS.map(({ value, label, icon: Icon }) => (
-                        <button key={value} type="button" onClick={() => setTheme(value)} className={cn(
-                          'flex min-h-[112px] flex-col items-center justify-center gap-3 rounded-[22px] border transition-all',
-                          selectedAppearance === value ? 'border-border/25 bg-muted/[0.18] shadow-[inset_0_1px_0_rgba(255,255,255,0.12)]' : 'border-border/[0.12] bg-muted/[0.035] hover:bg-muted/[0.08]'
-                        )}>
-                          <Icon className="h-6 w-6" />
-                          <span className="text-base">{label}</span>
-                        </button>
-                      ))}
-                    </div>
-                  </div>
                   <div className="flex items-center justify-between gap-4">
                     <div className="min-w-0">
                       <Label>AI language</Label>
@@ -565,42 +536,6 @@ export function SettingsPage({ onClose }: SettingsPageProps) {
                     }}>
                       <Trash2 className="h-4 w-4 mr-2" /> Delete All Chats
                     </Button>
-                  </div>
-                </div>
-              )}
-
-              {/* ── Appearance ──────────────────────────────────────────── */}
-              {activeTab === 'appearance' && (
-                <div className="space-y-6">
-                  <SectionTitle title="Appearance" description="Customize how the app looks" />
-                  <div className="space-y-3">
-                    <Label>Theme</Label>
-                    <div className="grid grid-cols-3 gap-3">
-                      {APPEARANCE_OPTIONS.map(({ value, label, icon: Icon }) => (
-                        <button key={value} onClick={() => setTheme(value)} className={cn(
-                          'p-4 rounded-lg border-2 transition-colors flex flex-col items-center gap-2',
-                          selectedAppearance === value ? 'border-primary bg-primary/10' : 'border-border hover:border-primary/50'
-                        )}>
-                          <Icon className="h-5 w-5" />
-                          <span className="text-sm">{label}</span>
-                        </button>
-                      ))}
-                    </div>
-                  </div>
-                  <div className="space-y-3">
-                    <Label>Font Size: {fontSize}px</Label>
-                    <Slider value={[fontSize]} onValueChange={([v]) => setFontSize(v)} min={12} max={20} step={1} />
-                  </div>
-                  <div className="space-y-3">
-                    <Label>Message Density</Label>
-                    <Select value={messageDensity} onValueChange={(v: any) => setMessageDensity(v)}>
-                      <SelectTrigger><SelectValue /></SelectTrigger>
-                      <SelectContent>
-                        <SelectItem value="compact">Compact</SelectItem>
-                        <SelectItem value="normal">Normal</SelectItem>
-                        <SelectItem value="comfortable">Comfortable</SelectItem>
-                      </SelectContent>
-                    </Select>
                   </div>
                 </div>
               )}

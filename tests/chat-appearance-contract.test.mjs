@@ -16,7 +16,7 @@ test('AI replies are bubbleless while user messages retain their bubble', () => 
   assert.match(computerMessages, /\? 'rounded-lg bg-blue-600 px-4 py-3 text-white rounded-br-none'/);
 });
 
-test('Settings exposes working Light, Dark, and Gray appearances with compatible theme tokens', () => {
+test('Settings keeps a comprehensive AI language list while the app is locked to its clean gray appearance', () => {
   const settings = read('./components/settings-page.tsx');
   const layout = read('./app/layout.tsx');
   const styles = read('./app/globals.css');
@@ -30,15 +30,11 @@ test('Settings exposes working Light, Dark, and Gray appearances with compatible
   const api = read('./app/api/chat/route.ts');
   const publisher = read('./scripts/publish-agent-upgrade.sh');
 
-  assert.match(settings, /value: 'light', label: 'Light'/);
-  assert.match(settings, /value: 'dark', label: 'Dark'/);
-  assert.match(settings, /value: 'gray', label: 'Gray'/);
-  assert.match(settings, /theme === 'system' \|\| theme === 'dark-gray' \? 'gray'/);
-  assert.match(settings, /setTheme\('gray'\)/);
-  assert.match(settings, /setTheme\(value\)/);
-  assert.match(layout, /defaultTheme="gray"/);
-  assert.match(layout, /themes=\{\["light", "dark", "gray"\]\}/);
+  assert.doesNotMatch(settings, /<Label>Theme<\/Label>/);
+  assert.doesNotMatch(settings, /APPEARANCE_OPTIONS/);
   assert.doesNotMatch(settings, /label: 'System'/);
+  assert.match(layout, /forcedTheme="gray"/);
+  assert.match(layout, /themes=\{\["gray"\]\}/);
   assert.match(layout, /gray: "dark-gray"/);
   assert.match(styles, /--task-chat-canvas/);
   assert.match(styles, /--task-chrome/);
