@@ -41,7 +41,6 @@
 
 .dark,
 .dark-gray {
-  --background: oklch(0.20 0 0);
   --foreground: oklch(0.95 0 0);
   --card: oklch(0.065 0 0);
   --card-foreground: oklch(0.95 0 0);
@@ -75,6 +74,14 @@
   --sidebar-ring: oklch(0.4 0 0);
 }
 
+.dark {
+  --background: oklch(0.06 0 0);
+}
+
+.dark-gray {
+  --background: oklch(0.20 0 0);
+}
+
 .white {
   --background: oklch(0.985 0.004 260);
   --foreground: oklch(0.18 0.02 260);
@@ -101,6 +108,55 @@
   --sidebar-accent-foreground: oklch(0.22 0.03 260);
   --sidebar-border: oklch(0.88 0.012 260);
   --sidebar-ring: oklch(0.65 0.04 260);
+}
+
+:root,
+.white {
+  --task-chat-canvas: #f4f4f5;
+  --task-chat-foreground: #1c1c1f;
+  --task-chrome: rgba(255, 255, 255, 0.94);
+  --task-composer-surface: rgba(255, 255, 255, 0.98);
+  --task-composer-focus: #ffffff;
+  --task-control-border: rgba(0, 0, 0, 0.12);
+  --task-control-bg: rgba(0, 0, 0, 0.03);
+  --task-control-hover: rgba(0, 0, 0, 0.075);
+  --task-control-color: rgba(0, 0, 0, 0.66);
+  --task-control-hover-color: #111113;
+  --task-user-message-bg: rgba(0, 0, 0, 0.09);
+  --task-user-message-border: rgba(0, 0, 0, 0.12);
+  --task-link: #1d4ed8;
+}
+
+.dark {
+  --task-chat-canvas: #101011;
+  --task-chat-foreground: #f5f5f5;
+  --task-chrome: rgba(3, 3, 4, 0.92);
+  --task-composer-surface: rgba(12, 12, 13, 0.98);
+  --task-composer-focus: rgba(19, 19, 20, 0.99);
+  --task-control-border: rgba(255, 255, 255, 0.085);
+  --task-control-bg: rgba(255, 255, 255, 0.028);
+  --task-control-hover: rgba(255, 255, 255, 0.075);
+  --task-control-color: rgba(255, 255, 255, 0.68);
+  --task-control-hover-color: #ffffff;
+  --task-user-message-bg: rgba(255, 255, 255, 0.095);
+  --task-user-message-border: rgba(255, 255, 255, 0.10);
+  --task-link: rgba(216, 244, 255, 0.9);
+}
+
+.dark-gray {
+  --task-chat-canvas: #242424;
+  --task-chat-foreground: #f5f5f5;
+  --task-chrome: rgba(10, 10, 11, 0.9);
+  --task-composer-surface: rgba(12, 12, 13, 0.96);
+  --task-composer-focus: rgba(18, 18, 19, 0.99);
+  --task-control-border: rgba(255, 255, 255, 0.085);
+  --task-control-bg: rgba(255, 255, 255, 0.028);
+  --task-control-hover: rgba(255, 255, 255, 0.075);
+  --task-control-color: rgba(255, 255, 255, 0.68);
+  --task-control-hover-color: #ffffff;
+  --task-user-message-bg: rgba(255, 255, 255, 0.095);
+  --task-user-message-border: rgba(255, 255, 255, 0.10);
+  --task-link: rgba(216, 244, 255, 0.9);
 }
 
 @theme inline {
@@ -411,30 +467,30 @@ textarea {
 /* ── Task-chat interface ── */
 .task-chat-surface {
   background:
-    radial-gradient(840px 500px at 50% -130px, rgba(255, 255, 255, 0.045), transparent 62%),
-    #242424;
-  color: #f5f5f5;
+    radial-gradient(840px 500px at 50% -130px, color-mix(in srgb, var(--task-chat-foreground) 5%, transparent), transparent 62%),
+    var(--task-chat-canvas);
+  color: var(--task-chat-foreground);
 }
 
 .task-header {
   border-bottom: 0;
-  background: rgba(10, 10, 11, 0.9);
+  background: var(--task-chrome);
   backdrop-filter: blur(18px);
   -webkit-backdrop-filter: blur(18px);
 }
 
 .task-header-icon {
-  border: 1px solid rgba(255, 255, 255, 0.085) !important;
-  background: rgba(255, 255, 255, 0.028) !important;
-  color: rgba(255, 255, 255, 0.68) !important;
-  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.035);
+  border: 1px solid var(--task-control-border) !important;
+  background: var(--task-control-bg) !important;
+  color: var(--task-control-color) !important;
+  box-shadow: inset 0 1px 0 color-mix(in srgb, var(--task-chat-foreground) 4%, transparent);
   transition: background-color 150ms var(--ease-out, ease-out), border-color 150ms var(--ease-out, ease-out), color 150ms var(--ease-out, ease-out), transform 150ms var(--ease-out, ease-out);
 }
 
 .task-header-icon:hover {
-  border-color: rgba(255, 255, 255, 0.17) !important;
-  background: rgba(255, 255, 255, 0.075) !important;
-  color: #fff !important;
+  border-color: var(--task-control-border) !important;
+  background: var(--task-control-hover) !important;
+  color: var(--task-control-hover-color) !important;
 }
 
 .task-header-icon:active,
@@ -449,39 +505,39 @@ textarea {
   font-weight: 400;
   letter-spacing: -0.045em;
   line-height: 1.02;
-  color: rgba(255, 255, 255, 0.94);
+  color: var(--task-chat-foreground);
 }
 
 .task-composer-dock {
-  background: linear-gradient(180deg, rgba(36, 36, 36, 0) 0%, rgba(10, 10, 11, 0.9) 28%, #0a0a0b 66%);
+  background: linear-gradient(180deg, color-mix(in srgb, var(--task-chat-canvas) 0%, transparent) 0%, var(--task-chrome) 28%, var(--task-chrome) 66%);
 }
 
 .task-composer {
-  border-color: rgba(255, 255, 255, 0.11) !important;
-  background: rgba(12, 12, 13, 0.96);
+  border-color: var(--task-control-border) !important;
+  background: var(--task-composer-surface);
   box-shadow:
     0 16px 40px rgba(0, 0, 0, 0.2),
     inset 0 1px 0 rgba(255, 255, 255, 0.035);
 }
 
 .task-composer:focus-within {
-  border-color: rgba(255, 255, 255, 0.22) !important;
-  background: rgba(18, 18, 19, 0.99);
+  border-color: var(--task-control-border) !important;
+  background: var(--task-composer-focus);
   box-shadow:
     0 18px 48px rgba(0, 0, 0, 0.28),
     inset 0 1px 0 rgba(255, 255, 255, 0.045);
 }
 
 .task-composer-action {
-  color: rgba(255, 255, 255, 0.58) !important;
+  color: var(--task-control-color) !important;
   background: transparent !important;
   border: 0 !important;
   box-shadow: none !important;
 }
 
 .task-composer-action:hover {
-  color: #fff !important;
-  background: rgba(255, 255, 255, 0.075) !important;
+  color: var(--task-control-hover-color) !important;
+  background: var(--task-control-hover) !important;
 }
 
 .task-composer-pill {
@@ -511,12 +567,12 @@ textarea {
 }
 
 .task-user-message {
-  border: 1px solid rgba(255, 255, 255, 0.1);
-  background: rgba(255, 255, 255, 0.095);
+  border: 1px solid var(--task-user-message-border);
+  background: var(--task-user-message-bg);
 }
 
 .task-chat-surface .message-content a {
-  color: rgba(216, 244, 255, 0.9);
+  color: var(--task-link);
 }
 
 @media (max-width: 640px) {

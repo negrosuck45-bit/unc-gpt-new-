@@ -857,7 +857,7 @@ export function ChatInput({
               onPaste={handlePasteEvent}
               onKeyDown={handleKeyDown}
               placeholder="Assign a task or type / for more"
-              className="w-full min-h-[54px] resize-none bg-transparent px-5 pb-1.5 pt-4 text-[16px] leading-6 text-white placeholder:text-white/34 focus:outline-none sm:px-6"
+              className="w-full min-h-[54px] resize-none bg-transparent px-5 pb-1.5 pt-4 text-[16px] leading-6 text-foreground placeholder:text-muted-foreground focus:outline-none sm:px-6"
               disabled={disabled}
               rows={1}
             />
