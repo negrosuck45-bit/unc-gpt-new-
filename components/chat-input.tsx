@@ -833,7 +833,11 @@ export function ChatInput({
               </button>
               <div className="absolute inset-x-0 top-7 flex items-center gap-3 px-7 sm:px-9">
                 <span className="voice-live-wave" aria-label="Recording waveform">
-                  {[0.26, 0.48, 0.35, 0.6, 0.28, 0.52, 0.38, 0.68, 0.42, 0.3, 0.55, 0.36, 0.62, 0.45, 0.31, 0.58, 0.4, 0.72, 0.5, 0.64, 0.82, 0.58, 0.44, 0.7, 0.36, 0.6, 0.29, 0.54, 0.41, 0.65, 0.34, 0.5, 0.26, 0.57, 0.39, 0.63, 0.32, 0.48, 0.28, 0.53].map((base, index) => <i key={index} style={{ height: `${Math.round(8 + (base + voiceLevel * (0.8 + (index % 5) * 0.06)) * 28)}px`, '--voice-wave-index': index } as React.CSSProperties} />)}
+                  {[0.26, 0.48, 0.35, 0.6, 0.28, 0.52, 0.38, 0.68, 0.42, 0.3, 0.55, 0.36, 0.62, 0.45, 0.31, 0.58, 0.4, 0.72, 0.5, 0.64, 0.82, 0.58, 0.44, 0.7, 0.36, 0.6, 0.29, 0.54, 0.41, 0.65, 0.34, 0.5, 0.26, 0.57, 0.39, 0.63, 0.32, 0.48, 0.28, 0.53].map((base, index) => {
+                    const signal = Math.min(1, voiceLevel * 2.4)
+                    const barSignal = Math.min(1, signal * (0.76 + (index % 7) * 0.055))
+                    return <i key={index} style={{ height: `${Math.round(8 + (base + voiceLevel * (0.8 + (index % 5) * 0.06)) * 28)}px`, '--voice-wave-index': index, opacity: 0.32 + barSignal * 0.68, background: `rgba(255, 255, 255, ${0.44 + barSignal * 0.54})`, filter: `brightness(${0.78 + barSignal * 0.72})`, boxShadow: `0 0 ${Math.round(1 + barSignal * 9)}px rgba(255, 255, 255, ${0.04 + barSignal * 0.4})` } as React.CSSProperties} />
+                  })}
                 </span>
                 <span className="shrink-0 text-[17px] font-medium tabular-nums text-white/62">{Math.floor(voiceDuration / 60)}:{String(voiceDuration % 60).padStart(2, '0')}</span>
               </div>

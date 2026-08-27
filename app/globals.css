@@ -732,7 +732,7 @@ textarea {
   transform-origin: center;
   border-radius: 999px;
   background: rgba(255, 255, 255, 0.84);
-  transition: height 86ms linear;
+  transition: height 86ms linear, opacity 70ms ease-out, background 70ms ease-out, filter 70ms ease-out, box-shadow 70ms ease-out;
   animation: voice-wave-flow 1.24s cubic-bezier(0.36, 0, 0.25, 1) infinite;
   animation-delay: calc(var(--voice-wave-index) * -0.038s);
   will-change: opacity, filter, transform;
@@ -740,23 +740,15 @@ textarea {
 
 @keyframes voice-wave-flow {
   0%, 100% {
-    opacity: 0.38;
-    filter: brightness(0.78);
     transform: scaleY(0.74);
   }
   28% {
-    opacity: 0.54;
-    filter: brightness(0.96);
     transform: scaleY(0.9);
   }
   50% {
-    opacity: 1;
-    filter: brightness(1.38);
     transform: scaleY(1.16);
   }
   72% {
-    opacity: 0.56;
-    filter: brightness(0.98);
     transform: scaleY(0.92);
   }
 }
