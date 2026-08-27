@@ -1,8 +1,9 @@
 import { NextResponse, type NextFetchEvent, type NextRequest } from "next/server"
-import { clerkMiddleware } from "@clerk/nextjs/server"
+import { getLunarSessionFromToken, LUNAR_SESSION_COOKIE } from "@/lib/lunar-auth"
 
 const PUBLIC_API_PATHS = new Set(["/api/profile/view", "/api/profile/avatar"])
-const OAUTH_CALLBACK_PATH = /^\/api\/mcp\/oauth\/[^/]+\/callback$/
+const MCP_OAUTH_CALLBACK_PATH = /^\/api\/mcp\/oauth\/[^/]+\/callback$/
+const LUNAR_OAUTH_PATH = /^\/api\/auth\/(google|discord|github)\/(start|callback)$/
 const STATE_CHANGING_METHODS = new Set(["POST", "PUT", "PATCH", "DELETE"])
 
 function hasTrustedOrigin(request: NextRequest) {
@@ -15,34 +16,25 @@ function hasTrustedOrigin(request: NextRequest) {
   }
 }
 
-const secureRequestBoundary = clerkMiddleware(async (auth, request) => {
+export async function proxy(request: NextRequest, _event: NextFetchEvent) {
   const { pathname } = request.nextUrl
   const isApiRequest = pathname.startsWith("/api/")
-  const isOAuthCallback = OAUTH_CALLBACK_PATH.test(pathname)
+  const isMcpOAuthCallback = MCP_OAUTH_CALLBACK_PATH.test(pathname)
+  const isLunarOAuthRoute = LUNAR_OAUTH_PATH.test(pathname)
 
-  if (isApiRequest && STATE_CHANGING_METHODS.has(request.method) && !isOAuthCallback && !hasTrustedOrigin(request)) {
+  if (isApiRequest && STATE_CHANGING_METHODS.has(request.method) && !isMcpOAuthCallback && !isLunarOAuthRoute && !hasTrustedOrigin(request)) {
     return NextResponse.json({ error: "Cross-site requests are not allowed." }, { status: 403 })
   }
 
-  if (isApiRequest && !isOAuthCallback && !PUBLIC_API_PATHS.has(pathname)) {
-    const { userId } = await auth()
-    if (!userId) return NextResponse.json({ error: "Sign in is required." }, { status: 401 })
+  if (isApiRequest && !isMcpOAuthCallback && !isLunarOAuthRoute && !PUBLIC_API_PATHS.has(pathname)) {
+    const token = request.cookies.get(LUNAR_SESSION_COOKIE)?.value
+    const session = await getLunarSessionFromToken(token)
+    if (!session) return NextResponse.json({ error: "Sign in is required." }, { status: 401 })
   }
 
   return NextResponse.next()
-})
-
-export async function proxy(request: NextRequest, event: NextFetchEvent) {
-  const url = new URL(request.url)
-  if (url.pathname === "/auth/callback" && url.searchParams.has("error")) {
-    const reason = url.searchParams.get("error_description") || url.searchParams.get("error") || "authorization_failed"
-    return NextResponse.redirect(new URL(`/auth/error?reason=${encodeURIComponent(reason)}`, url.origin))
-  }
-  return secureRequestBoundary(request, event)
 }
 
 export const config = {
-  matcher: [
-    "/((?!_next/static|_next/image|favicon.ico|sitemap.xml|robots.txt).*)",
-  ],
+  matcher: ["/((?!_next/static|_next/image|favicon.ico|sitemap.xml|robots.txt).*)"],
 }

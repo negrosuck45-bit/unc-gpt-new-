@@ -1,16 +1,11 @@
 import type { Metadata, Viewport } from "next"
 import { Analytics } from "@vercel/analytics/next"
-import { ClerkProvider } from "@clerk/nextjs"
 import { getSession } from "@/lib/auth"
 import { Toaster } from "sonner"
 import { ThemeProvider } from "@/components/theme-provider"
 import { CustomCursor } from "@/components/custom-cursor"
 import { ThemeChrome } from "@/components/theme-chrome"
 import "./globals.css"
-
-// Google Fonts disabled for build compatibility
-// const geistSans = Geist({ subsets: ["latin"], variable: "--font-geist-sans" })
-// const geistMono = Geist_Mono({ subsets: ["latin"], variable: "--font-geist-mono" })
 
 export const metadata: Metadata = {
   title: "Lunar",
@@ -40,15 +35,8 @@ export default async function RootLayout({
   const accountScope = session?.user?.sub ?? "guest"
 
   return (
-    <ClerkProvider
-      signInUrl="/login"
-      signUpUrl="/signup"
-      signInFallbackRedirectUrl="/"
-      signUpFallbackRedirectUrl="/"
-      appearance={{ options: { unsafe_disableDevelopmentModeWarnings: true } }}
-    >
-      <html lang="en" suppressHydrationWarning>
-        <body className="font-sans antialiased">
+    <html lang="en" suppressHydrationWarning>
+      <body className="font-sans antialiased">
         <script dangerouslySetInnerHTML={{ __html: `window.__UNCGPT_ACCOUNT_SCOPE__ = ${JSON.stringify(accountScope)};` }} />
         <ThemeProvider
           attribute="class"
@@ -64,9 +52,8 @@ export default async function RootLayout({
           <Toaster position="bottom-center" theme="system" />
           {process.env.NODE_ENV === "production" && <Analytics />}
         </ThemeProvider>
-          <script src="https://js.puter.com/v2/"></script>
-        </body>
-      </html>
-    </ClerkProvider>
+        <script src="https://js.puter.com/v2/"></script>
+      </body>
+    </html>
   )
 }

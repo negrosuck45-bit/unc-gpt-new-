@@ -1,4 +1,4 @@
-import { auth, currentUser } from "@clerk/nextjs/server"
+import { getLunarSession } from "@/lib/lunar-auth"
 
 export type AppSessionUser = {
   sub: string
@@ -12,20 +12,21 @@ export type AppSession = {
 }
 
 /**
- * Returns the current Clerk identity in the session shape used by the app.
- * Clerk's userId is the account-isolation key for profiles, chats, and social data.
+ * Returns Lunar's signed first-party session in the stable account shape used by
+ * chats, profiles, attachments, analytics, and connector state. The scope is
+ * resolved and signed during the provider callback, so all existing user-owned
+ * routes keep their original account-isolation key without extra network calls.
  */
 export async function getSession(): Promise<AppSession | null> {
-  const { userId } = await auth()
-  if (!userId) return null
+  const session = await getLunarSession()
+  if (!session) return null
 
-  const user = await currentUser()
   return {
     user: {
-      sub: userId,
-      name: user?.fullName ?? user?.username ?? null,
-      email: user?.primaryEmailAddress?.emailAddress ?? null,
-      picture: user?.imageUrl ?? null,
+      sub: session.accountScope,
+      name: session.name,
+      email: session.email,
+      picture: session.picture,
     },
   }
 }
@@ -33,7 +34,6 @@ export async function getSession(): Promise<AppSession | null> {
 export const AUTH_CONNECTIONS = {
   google: "google",
   github: "github",
-  apple: "apple",
   discord: "discord",
 } as const
 

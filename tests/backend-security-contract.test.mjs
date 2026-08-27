@@ -5,15 +5,18 @@ import fs from 'node:fs'
 const root = new URL('../', import.meta.url)
 const source = (relativePath) => fs.readFileSync(new URL(relativePath, root), 'utf8')
 
-test('enforces a session and same-origin boundary for private API requests', () => {
+test('enforces a signed Lunar session and same-origin boundary for private API requests', () => {
   const proxy = source('proxy.ts')
-  assert.match(proxy, /const secureRequestBoundary = clerkMiddleware/)
+  assert.match(proxy, /import \{ getLunarSessionFromToken, LUNAR_SESSION_COOKIE \} from "@\/lib\/lunar-auth"/)
   assert.match(proxy, /STATE_CHANGING_METHODS/)
   assert.match(proxy, /hasTrustedOrigin\(request\)/)
   assert.match(proxy, /Cross-site requests are not allowed/)
-  assert.match(proxy, /const \{ userId \} = await auth\(\)/)
+  assert.match(proxy, /request\.cookies\.get\(LUNAR_SESSION_COOKIE\)/)
+  assert.match(proxy, /const session = await getLunarSessionFromToken\(token\)/)
   assert.match(proxy, /Sign in is required/)
-  assert.match(proxy, /OAUTH_CALLBACK_PATH/)
+  assert.match(proxy, /MCP_OAUTH_CALLBACK_PATH/)
+  assert.match(proxy, /LUNAR_OAUTH_PATH/)
+  assert.doesNotMatch(proxy, /clerkMiddleware|@clerk\/nextjs/)
   assert.doesNotMatch(proxy, /PUBLIC_API_PATHS = new Set\(\[\]\)/)
 })
 

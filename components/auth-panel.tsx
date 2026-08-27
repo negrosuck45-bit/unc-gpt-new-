@@ -2,17 +2,15 @@
 
 import Link from "next/link"
 import { useEffect, useState } from "react"
-import { useSignIn, useSignUp } from "@clerk/nextjs"
-import type { OAuthStrategy } from "@clerk/nextjs/types"
-import { ArrowRight, Check, Github, Loader2 } from "lucide-react"
+import { ArrowRight, Github, Loader2 } from "lucide-react"
 
 type AuthPanelProps = { mode?: "sign-in" | "sign-up" }
-type Provider = { strategy: OAuthStrategy; label: string; kind: "google" | "discord" | "github" }
+type Provider = { id: "google" | "discord" | "github"; label: string; kind: "google" | "discord" | "github" }
 
 const providers: Provider[] = [
-  { strategy: "oauth_google", label: "Continue with Google", kind: "google" },
-  { strategy: "oauth_discord", label: "Continue with Discord", kind: "discord" },
-  { strategy: "oauth_github", label: "Continue with GitHub", kind: "github" },
+  { id: "google", label: "Continue with Google", kind: "google" },
+  { id: "discord", label: "Continue with Discord", kind: "discord" },
+  { id: "github", label: "Continue with GitHub", kind: "github" },
 ]
 
 function GoogleMark() {
@@ -30,111 +28,38 @@ function ProviderMark({ kind }: Pick<Provider, "kind">) {
 }
 
 export function AuthPanel({ mode = "sign-in" }: AuthPanelProps) {
-  const { signIn, fetchStatus: signInFetchStatus } = useSignIn()
-  const { signUp, fetchStatus: signUpFetchStatus } = useSignUp()
-  const [loadingStrategy, setLoadingStrategy] = useState<OAuthStrategy | "email" | "code" | null>(null)
+  const [loadingProvider, setLoadingProvider] = useState<Provider["id"] | null>(null)
   const [emailAddress, setEmailAddress] = useState("")
-  const [emailCode, setEmailCode] = useState("")
-  const [showCodeEntry, setShowCodeEntry] = useState(false)
-  const [lastProvider, setLastProvider] = useState<OAuthStrategy | null>("oauth_google")
+  const [lastProvider, setLastProvider] = useState<Provider["id"]>("google")
   const [message, setMessage] = useState("")
 
   useEffect(() => {
     const stored = window.localStorage.getItem("lunar-last-auth-provider")
-    if (stored === "oauth_google" || stored === "oauth_discord" || stored === "oauth_github") setLastProvider(stored)
+    if (stored === "google" || stored === "discord" || stored === "github") setLastProvider(stored)
+
+    const authResult = new URLSearchParams(window.location.search).get("auth")
+    if (authResult === "cancelled") setMessage("Sign-in was cancelled. Choose a provider to continue.")
+    if (authResult === "unavailable") setMessage("This Lunar sign-in option is still being configured. Please choose another option.")
+    if (authResult === "failed") setMessage("Lunar could not complete that sign-in. Please try again.")
+    if (authResult === "unverified") setMessage("Use a provider account with a verified email address to continue.")
   }, [])
 
   const isSignUp = mode === "sign-up"
   const heading = isSignUp ? "Create your Lunar account" : "Sign in to Lunar"
   const subheading = isSignUp ? "Create an account to continue." : "Welcome back! Please sign in to continue"
-  const isBusy = loadingStrategy !== null || signInFetchStatus === "fetching" || signUpFetchStatus === "fetching"
-  const navigateToLunar = async ({ decorateUrl }: { decorateUrl: (url: string) => string }) => window.location.assign(decorateUrl("/"))
 
-  const signInWithProvider = async (strategy: OAuthStrategy) => {
+  const signInWithProvider = (provider: Provider["id"]) => {
     setMessage("")
-    setLoadingStrategy(strategy)
-    window.localStorage.setItem("lunar-last-auth-provider", strategy)
-    setLastProvider(strategy)
-    const { error } = await signIn.sso({ strategy, redirectCallbackUrl: "/sso-callback", redirectUrl: "/" })
-    if (error) {
-      setMessage("This sign-in option is not available right now. Please choose another option or try again later.")
-      setLoadingStrategy(null)
-    }
+    setLoadingProvider(provider)
+    window.localStorage.setItem("lunar-last-auth-provider", provider)
+    setLastProvider(provider)
+    window.location.assign(`/api/auth/${provider}/start`)
   }
 
-  const startEmailCode = async (event: React.FormEvent<HTMLFormElement>) => {
+  const explainEmailAvailability = (event: React.FormEvent<HTMLFormElement>) => {
     event.preventDefault()
-    const email = emailAddress.trim().toLowerCase()
-    if (!email) return
-    setMessage("")
-    setLoadingStrategy("email")
-
-    if (isSignUp) {
-      const { error: createError } = await signUp.create({ emailAddress: email })
-      if (createError) {
-        setMessage("Email sign-up is not available right now. Please choose an enabled provider or try again later.")
-        setLoadingStrategy(null)
-        return
-      }
-      const { error: sendError } = await signUp.verifications.sendEmailCode()
-      if (sendError) {
-        setMessage("Email sign-up is not available right now. Please choose an enabled provider or try again later.")
-        setLoadingStrategy(null)
-        return
-      }
-    } else {
-      const { error } = await signIn.emailCode.sendCode({ emailAddress: email })
-      if (error) {
-        setMessage("Email sign-in is not available right now. Please choose an enabled provider or try again later.")
-        setLoadingStrategy(null)
-        return
-      }
-    }
-    setShowCodeEntry(true)
-    setLoadingStrategy(null)
-  }
-
-  const verifyEmailCode = async (event: React.FormEvent<HTMLFormElement>) => {
-    event.preventDefault()
-    const code = emailCode.trim()
-    if (!code) return
-    setMessage("")
-    setLoadingStrategy("code")
-
-    if (isSignUp) {
-      const { error } = await signUp.verifications.verifyEmailCode({ code })
-      if (error || signUp.status !== "complete") {
-        setMessage("That verification code could not be confirmed. Check the latest code and try again.")
-        setLoadingStrategy(null)
-        return
-      }
-      const { error: finalizeError } = await signUp.finalize({ navigate: navigateToLunar })
-      if (finalizeError) {
-        setMessage("Your account was verified, but Lunar could not finish signing you in. Please try again.")
-        setLoadingStrategy(null)
-      }
-      return
-    }
-
-    const { error } = await signIn.emailCode.verifyCode({ code })
-    if (error || signIn.status !== "complete") {
-      setMessage("That verification code could not be confirmed. Check the latest code and try again.")
-      setLoadingStrategy(null)
-      return
-    }
-    const { error: finalizeError } = await signIn.finalize({ navigate: navigateToLunar })
-    if (finalizeError) {
-      setMessage("Your account was verified, but Lunar could not finish signing you in. Please try again.")
-      setLoadingStrategy(null)
-    }
-  }
-
-  const useDifferentEmail = async () => {
-    if (isSignUp) await signUp.reset()
-    else await signIn.reset()
-    setShowCodeEntry(false)
-    setEmailCode("")
-    setMessage("")
+    if (!emailAddress.trim()) return
+    setMessage("Email sign-in is not configured yet. Use Google, Discord, or GitHub to continue securely.")
   }
 
   const primaryProvider = providers[0]
@@ -148,40 +73,27 @@ export function AuthPanel({ mode = "sign-in" }: AuthPanelProps) {
           <h1 id="lunar-login-title" className="text-center text-[29px] font-semibold tracking-[-0.045em] text-[#202124] sm:text-[32px]">{heading}</h1>
           <p className="mt-2 text-center text-[16px] leading-6 text-[#6f7074] sm:text-[18px]">{subheading}</p>
 
-          {showCodeEntry ? (
-            <form className="mt-8" onSubmit={verifyEmailCode}>
-              <label htmlFor="lunar-email-code" className="block text-[17px] font-semibold text-[#202124]">Verification code</label>
-              <p className="mt-1 text-[14px] leading-5 text-[#747579]">We sent a secure code to {emailAddress.trim()}.</p>
-              <input id="lunar-email-code" name="code" inputMode="numeric" autoComplete="one-time-code" value={emailCode} onChange={(event) => setEmailCode(event.target.value.replace(/\s/g, ""))} placeholder="Enter your verification code" className="mt-3 h-[54px] w-full rounded-xl border border-[#d9d9db] bg-white px-5 text-[17px] tracking-[0.14em] text-[#202124] outline-none transition placeholder:tracking-normal placeholder:text-[#999a9e] focus:border-[#55565a] focus:ring-4 focus:ring-[#55565a]/10" required />
-              <button type="submit" disabled={isBusy || !emailCode.trim()} className="mt-5 flex h-[56px] w-full items-center justify-center gap-3 rounded-xl border border-[#2e3035] bg-[#5e5f64] text-[17px] font-medium text-white shadow-[0_3px_0_rgba(0,0,0,0.8)] transition hover:bg-[#4c4d51] active:translate-y-px active:shadow-none disabled:cursor-not-allowed disabled:opacity-50">{loadingStrategy === "code" ? <Loader2 className="h-5 w-5 animate-spin" /> : <>Verify and continue <Check className="h-5 w-5" /></>}</button>
-              <button type="button" onClick={() => void useDifferentEmail()} disabled={isBusy} className="mt-4 w-full text-center text-[15px] font-medium text-[#55565a] underline decoration-[#b6b6b8] underline-offset-4 hover:text-[#202124]">Use a different email</button>
-            </form>
-          ) : (
-            <>
-              <div className="mt-9 space-y-3">
-                <button type="button" onClick={() => void signInWithProvider(primaryProvider.strategy)} disabled={isBusy} className="relative flex h-[54px] w-full items-center justify-center rounded-xl border border-[#dedee0] bg-white px-5 text-[17px] font-medium text-[#55565a] shadow-[0_2px_3px_rgba(0,0,0,0.13)] transition hover:bg-[#f7f7f8] active:scale-[0.99] disabled:cursor-wait disabled:opacity-55">
-                  <span className="absolute left-5"><ProviderMark kind={primaryProvider.kind} /></span>
-                  {lastProvider === primaryProvider.strategy && <span className="absolute -right-2 -top-3 rounded-full border border-[#dddddf] bg-[#fafafa] px-3 py-0.5 text-[13px] font-medium text-[#707175] shadow-sm">Last used</span>}
-                  {loadingStrategy === primaryProvider.strategy ? "Opening secure sign-in…" : primaryProvider.label}
-                </button>
-                <div className="grid grid-cols-2 gap-3">
-                  {compactProviders.map((provider) => {
-                    const isLoading = loadingStrategy === provider.strategy
-                    return <button key={provider.strategy} type="button" aria-label={provider.label} onClick={() => void signInWithProvider(provider.strategy)} disabled={isBusy} className="flex h-[50px] items-center justify-center rounded-xl border border-[#dedee0] bg-white text-[#27282b] shadow-[0_2px_3px_rgba(0,0,0,0.13)] transition hover:bg-[#f7f7f8] active:scale-[0.99] disabled:cursor-wait disabled:opacity-55">{isLoading ? <Loader2 className="h-5 w-5 animate-spin" /> : <ProviderMark kind={provider.kind} />}</button>
-                  })}
-                </div>
-              </div>
+          <div className="mt-9 space-y-3">
+            <button type="button" onClick={() => signInWithProvider(primaryProvider.id)} disabled={loadingProvider !== null} className="relative flex h-[54px] w-full items-center justify-center rounded-xl border border-[#dedee0] bg-white px-5 text-[17px] font-medium text-[#55565a] shadow-[0_2px_3px_rgba(0,0,0,0.13)] transition hover:bg-[#f7f7f8] active:scale-[0.99] disabled:cursor-wait disabled:opacity-55">
+              <span className="absolute left-5"><ProviderMark kind={primaryProvider.kind} /></span>
+              {lastProvider === primaryProvider.id && <span className="absolute -right-2 -top-3 rounded-full border border-[#dddddf] bg-[#fafafa] px-3 py-0.5 text-[13px] font-medium text-[#707175] shadow-sm">Last used</span>}
+              {loadingProvider === primaryProvider.id ? "Opening secure sign-in…" : primaryProvider.label}
+            </button>
+            <div className="grid grid-cols-2 gap-3">
+              {compactProviders.map((provider) => {
+                const isLoading = loadingProvider === provider.id
+                return <button key={provider.id} type="button" aria-label={provider.label} onClick={() => signInWithProvider(provider.id)} disabled={loadingProvider !== null} className="flex h-[50px] items-center justify-center rounded-xl border border-[#dedee0] bg-white text-[#27282b] shadow-[0_2px_3px_rgba(0,0,0,0.13)] transition hover:bg-[#f7f7f8] active:scale-[0.99] disabled:cursor-wait disabled:opacity-55">{isLoading ? <Loader2 className="h-5 w-5 animate-spin" /> : <ProviderMark kind={provider.kind} />}</button>
+              })}
+            </div>
+          </div>
 
-              <div className="my-7 flex items-center gap-5 text-[16px] text-[#77787c]"><span className="h-px flex-1 bg-[#e2e2e4]" />or<span className="h-px flex-1 bg-[#e2e2e4]" /></div>
-              <form onSubmit={startEmailCode}>
-                <label htmlFor="lunar-email" className="block text-[17px] font-semibold tracking-[-0.02em] text-[#202124]">Email address</label>
-                <input id="lunar-email" name="email" type="email" autoComplete="email" inputMode="email" value={emailAddress} onChange={(event) => setEmailAddress(event.target.value)} placeholder="Enter your email address" className="mt-3 h-[54px] w-full rounded-xl border border-[#d9d9db] bg-white px-5 text-[17px] text-[#202124] outline-none transition placeholder:text-[#999a9e] focus:border-[#55565a] focus:ring-4 focus:ring-[#55565a]/10" required />
-                <button type="submit" disabled={isBusy || !emailAddress.trim()} className="mt-6 flex h-[56px] w-full items-center justify-center gap-3 rounded-xl border border-[#2e3035] bg-[#5e5f64] text-[17px] font-medium text-white shadow-[0_3px_0_rgba(0,0,0,0.8)] transition hover:bg-[#4c4d51] active:translate-y-px active:shadow-none disabled:cursor-not-allowed disabled:opacity-50">{loadingStrategy === "email" ? <Loader2 className="h-5 w-5 animate-spin" /> : <>Continue <ArrowRight className="h-5 w-5 fill-current" /></>}</button>
-              </form>
-            </>
-          )}
+          <div className="my-7 flex items-center gap-5 text-[16px] text-[#77787c]"><span className="h-px flex-1 bg-[#e2e2e4]" />or<span className="h-px flex-1 bg-[#e2e2e4]" /></div>
+          <form onSubmit={explainEmailAvailability}>
+            <label htmlFor="lunar-email" className="block text-[17px] font-semibold tracking-[-0.02em] text-[#202124]">Email address</label>
+            <input id="lunar-email" name="email" type="email" autoComplete="email" inputMode="email" value={emailAddress} onChange={(event) => setEmailAddress(event.target.value)} placeholder="Enter your email address" className="mt-3 h-[54px] w-full rounded-xl border border-[#d9d9db] bg-white px-5 text-[17px] text-[#202124] outline-none transition placeholder:text-[#999a9e] focus:border-[#55565a] focus:ring-4 focus:ring-[#55565a]/10" required />
+            <button type="submit" disabled={!emailAddress.trim()} className="mt-6 flex h-[56px] w-full items-center justify-center gap-3 rounded-xl border border-[#2e3035] bg-[#5e5f64] text-[17px] font-medium text-white shadow-[0_3px_0_rgba(0,0,0,0.8)] transition hover:bg-[#4c4d51] active:translate-y-px active:shadow-none disabled:cursor-not-allowed disabled:opacity-50">Continue <ArrowRight className="h-5 w-5 fill-current" /></button>
+          </form>
           {message && <p role="alert" className="mt-4 text-center text-[13px] leading-5 text-[#a03232]">{message}</p>}
-          <div id="clerk-captcha" className="mt-3" />
         </div>
         <footer className="border-t border-[#e5e5e6] bg-[#f5f5f5] px-6 py-5 text-center text-[16px] text-[#77787c] sm:text-[18px]">{isSignUp ? <>Already have an account? <Link href="/login" className="font-medium text-[#202124] hover:underline">Sign in</Link></> : <>Don&apos;t have an account? <Link href="/signup" className="font-medium text-[#202124] hover:underline">Sign up</Link></>}</footer>
       </section>

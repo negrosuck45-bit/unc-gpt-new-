@@ -14,6 +14,9 @@ pnpm build
 git diff --check
 
 files=(
+  "app/api/auth/[provider]/start/route.ts"
+  "app/api/auth/[provider]/callback/route.ts"
+  "app/api/auth/logout/route.ts"
   "app/api/chat/route.ts"
   "app/api/analytics/route.ts"
   "app/api/computer-use/route.ts"
@@ -47,6 +50,7 @@ files=(
   "components/chat-interface.tsx"
   "components/auth-panel.tsx"
   "components/chat-sidebar.tsx"
+  "components/sign-out-button.tsx"
   "components/chat-messages-computer-use.tsx"
   "components/settings-page.tsx"
   "components/theme-chrome.tsx"
@@ -76,6 +80,8 @@ files=(
   "lib/calendar-event-presentation.ts"
   "lib/composio.ts"
   "lib/auth.ts"
+  "lib/lunar-auth.ts"
+  "lib/legacy-account-bridge.ts"
   "lib/supabase.ts"
   "lib/supabase/admin.ts"
   "lib/upload.ts"
@@ -90,7 +96,10 @@ files=(
   "lib/uncgpt-router.ts"
   "scripts/publish-agent-upgrade.sh"
   "scripts/apply-lunar-visible-rebrand.sh"
+  ".env.example"
+  "SUPABASE_LUNAR_AUTH_IDENTITIES.sql"
   "package.json"
+  "pnpm-lock.yaml"
   "tests/connector-results.test.mjs"
   "tests/connector-action-safety.test.mjs"
   "tests/chat-connector-execution.test.mjs"
