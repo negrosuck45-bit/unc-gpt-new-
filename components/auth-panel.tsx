@@ -36,7 +36,7 @@ export function AuthPanel({ mode = "sign-in" }: AuthPanelProps) {
   const [emailAddress, setEmailAddress] = useState("")
   const [emailCode, setEmailCode] = useState("")
   const [showCodeEntry, setShowCodeEntry] = useState(false)
-  const [lastProvider, setLastProvider] = useState<OAuthStrategy | null>(null)
+  const [lastProvider, setLastProvider] = useState<OAuthStrategy | null>("oauth_google")
   const [message, setMessage] = useState("")
 
   useEffect(() => {
