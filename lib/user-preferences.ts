@@ -55,7 +55,7 @@ export const DEFAULT_USER_PREFERENCES: UserPreferences = {
   profileCardOffsetX: 0,
   profileCardOffsetY: 0,
   onboardingComplete: false,
-  onboardingVersion: 1,
+  onboardingVersion: 2,
 }
 
 const STORAGE_KEY = 'user-preferences'
