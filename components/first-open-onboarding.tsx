@@ -1,9 +1,10 @@
 'use client'
 
 import { AnimatePresence, motion } from 'framer-motion'
-import { ArrowLeft, ArrowRight, Check, Globe2, Loader2 } from 'lucide-react'
+import { ArrowLeft, ArrowRight, Globe2, Loader2 } from 'lucide-react'
 import { useEffect, useMemo, useState } from 'react'
 import { Button } from '@/components/ui/button'
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { LANGUAGE_OPTIONS, getLanguageOption, normalizeLanguagePreference } from '@/lib/language-preferences'
 import { readUserPreferences, writeUserPreferences } from '@/lib/user-preferences'
 
@@ -28,10 +29,9 @@ export function FirstOpenOnboarding({ onComplete }: FirstOpenOnboardingProps) {
   const [username, setUsername] = useState(preferences.username || '')
   const [language, setLanguage] = useState(() => {
     try {
-      const stored = normalizeLanguagePreference(localStorage.getItem('uncgpt-language'))
-      return stored === 'auto' ? 'en' : stored
+      return normalizeLanguagePreference(localStorage.getItem('uncgpt-language'))
     } catch {
-      return 'en'
+      return 'auto'
     }
   })
   const [usernameError, setUsernameError] = useState('')
@@ -125,14 +125,16 @@ export function FirstOpenOnboarding({ onComplete }: FirstOpenOnboardingProps) {
         <div className="flex w-full max-w-[370px] flex-1 flex-col">
           <motion.div initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: [0, -4, 0] }} transition={{ opacity: { duration: 0.22 }, y: { duration: 2.4, repeat: Infinity, ease: 'easeInOut' } }} className="mx-auto mb-5 flex h-12 w-12 items-center justify-center text-foreground"><Globe2 className="h-10 w-10" strokeWidth={1.35} /></motion.div>
           <h1 className="text-center text-[29px] font-medium tracking-[-0.045em] text-foreground">Choose your language</h1>
-          <p className="mt-2 text-center text-[14px] text-foreground/50">Language</p>
-          <div role="radiogroup" aria-label="Language" className="onboarding-language-menu mt-5 min-h-0 flex-1 overflow-y-auto border-y border-foreground/[0.12] pr-1">
-            {LANGUAGE_OPTIONS.map((option) => {
-              const selected = language === option.code
-              return <button key={option.code} type="button" role="radio" aria-checked={selected} onClick={() => setLanguage(option.code)} className="flex min-h-[54px] w-full items-center justify-between border-b border-foreground/[0.10] pr-1 text-left text-[16px] text-foreground last:border-b-0"><span>{option.label}</span><span className={`ml-4 flex h-5 w-5 shrink-0 items-center justify-center rounded-full border ${selected ? 'border-foreground bg-foreground text-[#292929]' : 'border-foreground/35'}`}>{selected && <Check className="h-3 w-3" strokeWidth={3} />}</span></button>
-            })}
+          <div className="mt-9 flex items-center justify-between gap-5 border-b border-foreground/[0.22] pb-3">
+            <span className="text-[16px] text-foreground/58">Language</span>
+            <Select value={language} onValueChange={(value) => setLanguage(normalizeLanguagePreference(value))}>
+              <SelectTrigger className="h-auto w-[216px] border-0 bg-transparent px-0 py-0 text-right text-[16px] text-foreground shadow-none focus:ring-0"><SelectValue placeholder="Automatic (device language)" /></SelectTrigger>
+              <SelectContent className="max-h-[min(52dvh,420px)]">
+                {LANGUAGE_OPTIONS.map((option) => <SelectItem key={option.code} value={option.code}>{option.label}</SelectItem>)}
+              </SelectContent>
+            </Select>
           </div>
-          <p className="pt-3 text-center text-[12px] text-foreground/35">Selected: {selectedLanguage.label}</p>
+          <p className="mt-3 text-center text-[12px] text-foreground/35">{language === 'auto' ? 'Automatic uses your device language.' : `Selected: ${selectedLanguage.label}`}</p>
         </div>
       )}
     </>
