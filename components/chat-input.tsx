@@ -829,7 +829,7 @@ export function ChatInput({
               className="voice-live-composer relative mx-3 min-h-[146px] overflow-hidden rounded-[34px]"
             >
               <button type="button" onClick={cancelVoiceRecording} aria-label="Discard voice recording" className="voice-draft-action absolute bottom-5 left-5 flex h-11 w-11 items-center justify-center rounded-2xl">
-                <X className="h-7 w-7" strokeWidth={1.75} />
+                <X className="h-6 w-6" strokeWidth={1.75} />
               </button>
               <div className="absolute inset-x-0 top-7 flex items-center gap-3 px-7 sm:px-9">
                 <span className="voice-live-wave" aria-label="Recording waveform">
@@ -842,7 +842,7 @@ export function ChatInput({
                 <span className="shrink-0 text-[17px] font-medium tabular-nums text-white/62">{Math.floor(voiceDuration / 60)}:{String(voiceDuration % 60).padStart(2, '0')}</span>
               </div>
               <button type="button" onClick={confirmVoiceRecording} disabled={disabled || isStreaming} aria-label="Send recognized voice text" className="voice-draft-confirm absolute bottom-5 right-5 flex h-11 w-11 items-center justify-center rounded-2xl">
-                <Check className="h-7 w-7" strokeWidth={1.9} />
+                <Check className="h-6 w-6" strokeWidth={1.9} />
               </button>
             </motion.div>
           )}

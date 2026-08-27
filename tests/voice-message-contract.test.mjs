@@ -26,7 +26,9 @@ test('voice input shows the full waveform tray while recording and sends only re
   assert.match(input, /\.map\(\(base, index\) =>/);
   assert.match(input, /voiceDraft && "hidden"|isRecording && "hidden"/);
   assert.match(input, /Discard voice recording/);
+  assert.match(input, /<X className="h-6 w-6" strokeWidth=\{1\.75\} \/>/);
   assert.match(input, /Send recognized voice text/);
+  assert.match(input, /<Check className="h-6 w-6" strokeWidth=\{1\.9\} \/>/);
   assert.match(input, /cancelVoiceRecording/);
   assert.match(input, /confirmVoiceRecording/);
   assert.doesNotMatch(voiceLifecycle, /Voice message transcript:/);
