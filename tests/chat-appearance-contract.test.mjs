@@ -23,6 +23,7 @@ test('Settings keeps a comprehensive AI language list while the app is locked to
   const chrome = read('./components/theme-chrome.tsx');
   const input = read('./components/chat-input.tsx');
   const notifications = read('./components/notifications-page.tsx');
+  const notificationsPanel = read('./components/notifications-panel.tsx');
   const inbox = read('./components/messages-page.tsx');
   const thread = read('./components/message-thread-page.tsx');
   const languages = read('./lib/language-preferences.ts');
@@ -41,7 +42,7 @@ test('Settings keeps a comprehensive AI language list while the app is locked to
   assert.match(styles, /--task-chrome/);
   assert.match(styles, /\.dark-gray/);
   assert.match(styles, /\.white/);
-  assert.match(styles, /#242424/);
+  assert.match(styles, /#292929/);
   assert.match(styles, /#101011/);
   assert.match(styles, /background-color: var\(--background\)/);
   assert.match(styles, /\.task-welcome-back[\s\S]*color: var\(--task-chat-foreground\)/);
@@ -50,15 +51,19 @@ test('Settings keeps a comprehensive AI language list while the app is locked to
   assert.match(chrome, /activeTheme === "light" \|\| activeTheme === "white" \? "light" : "dark"/);
   assert.match(chrome, /meta\[name="theme-color"\]/);
   assert.match(styles, /--task-send-disabled-bg/);
-  assert.match(styles, /--sidebar: oklch\(0\.20 0 0\)/);
-  assert.match(styles, /--task-chrome: #242424/);
-  assert.match(styles, /--task-composer-surface: #242424/);
-  assert.match(styles, /background: rgba\(36, 36, 36, 0\.72\)/);
-  assert.match(workspace, /bg-\[rgba\(36,36,36,0\.62\)\]/);
+  assert.match(styles, /--sidebar: oklch\(0\.225 0 0\)/);
+  assert.match(styles, /--task-chat-canvas: #292929/);
+  assert.match(styles, /--task-chrome: #292929/);
+  assert.match(styles, /--task-composer-surface: #292929/);
+  assert.match(styles, /background: rgba\(41, 41, 41, 0\.72\)/);
+  assert.match(chrome, /gray: "#292929"/);
+  assert.match(workspace, /bg-\[rgba\(41,41,41,0\.62\)\]/);
   assert.match(styles, /\.task-composer-send[\s\S]*var\(--task-send-disabled-color\)/);
   assert.match(input, /task-composer-send h-10 w-10 rounded-full/);
   assert.match(notifications, /social-scroll-page min-h-screen bg-background/);
   assert.match(notifications, /rounded-\[22px\] border border-border bg-card/);
+  assert.match(notificationsPanel, /bg-popover text-popover-foreground/);
+  assert.match(notificationsPanel, /bg-\[rgba\(41,41,41,0\.72\)\]/);
   assert.match(inbox, /social-scroll-page min-h-screen bg-background/);
   assert.match(thread, /social-scroll-page min-h-screen bg-background/);
   assert.doesNotMatch(notifications, /bg-\[#050505\]/);
@@ -73,7 +78,7 @@ test('Settings keeps a comprehensive AI language list while the app is locked to
   assert.match(chat, /clientLanguage: getStoredLanguagePreference\(\)/);
   assert.match(api, /clientLanguage,/);
   assert.match(api, /languagePreferenceInstruction\(clientLanguage, clientLocale\)/);
-  for (const requiredFile of ['app/layout.tsx', 'app/chat-workspace.tsx', 'components/chat-sidebar.tsx', 'components/settings-page.tsx', 'components/theme-chrome.tsx', 'components/notifications-page.tsx', 'components/messages-page.tsx', 'components/message-thread-page.tsx', 'lib/language-preferences.ts']) {
+  for (const requiredFile of ['app/layout.tsx', 'app/chat-workspace.tsx', 'components/chat-sidebar.tsx', 'components/settings-page.tsx', 'components/theme-chrome.tsx', 'components/notifications-page.tsx', 'components/notifications-panel.tsx', 'components/messages-page.tsx', 'components/message-thread-page.tsx', 'lib/language-preferences.ts']) {
     assert.match(publisher, new RegExp(`"${requiredFile.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}"`));
   }
 });

@@ -26,6 +26,7 @@ files=(
   "components/settings-page.tsx"
   "components/theme-chrome.tsx"
   "components/notifications-page.tsx"
+  "components/notifications-panel.tsx"
   "components/messages-page.tsx"
   "components/message-thread-page.tsx"
   "components/chat-header.tsx"

@@ -30,22 +30,29 @@ export function composioToolkitSlug(key: unknown) {
 
 const CONNECTOR_WRITE_INTENT = /\b(send|create|update|edit|delete|schedule|deploy|upload|move|write|add|publish|commit)\b/i;
 const CALENDAR_SCHEDULING_INTENT = /\b(schedule|appointment|meeting|calendar\s+event|set\s+up\s+(?:a\s+)?reminder)\b/i;
+const CALENDAR_DETAILS_FOLLOW_UP = /\b(?:at\s+)?(?:1[0-2]|0?[1-9])(?::[0-5]\d)?\s*(?:am|pm)\b|\b(?:event|title)\s+(?:is|will be)\b|\b(?:called|named|titled)\b/i;
 
 export function isConnectorWriteIntent(userText: string, recentUserText = '', connectorConfirmation = false) {
   return CONNECTOR_WRITE_INTENT.test(userText) || (connectorConfirmation && CONNECTOR_WRITE_INTENT.test(recentUserText));
 }
 
 export function isCalendarSchedulingIntent(userText: string, recentUserText = '', connectorConfirmation = false) {
-  return CALENDAR_SCHEDULING_INTENT.test(userText) || (connectorConfirmation && CALENDAR_SCHEDULING_INTENT.test(recentUserText));
+  const hasPriorSchedule = CALENDAR_SCHEDULING_INTENT.test(recentUserText);
+  return CALENDAR_SCHEDULING_INTENT.test(userText)
+    || (connectorConfirmation && hasPriorSchedule)
+    || (hasPriorSchedule && CALENDAR_DETAILS_FOLLOW_UP.test(userText));
 }
 
-export function parseDeterministicCalendarCreate(text: string, requestedTimeZone?: string, now = new Date()) {
+export function parseDeterministicCalendarCreate(text: string, requestedTimeZone?: string, now = new Date(), recentUserText = '') {
   const timezone = requestedTimeZone && (() => { try { Intl.DateTimeFormat('en-US', { timeZone: requestedTimeZone }); return true; } catch { return false; } })() ? requestedTimeZone : 'UTC';
   const parts = new Intl.DateTimeFormat('en-CA', { timeZone: timezone, year: 'numeric', month: '2-digit', day: '2-digit' }).formatToParts(now);
   const part = (type: string) => Number(parts.find((item) => item.type === type)?.value || 0);
   const currentYear = part('year');
   const currentDate = `${currentYear}-${String(part('month')).padStart(2, '0')}-${String(part('day')).padStart(2, '0')}`;
-  const explicitDate = text.match(/\b(20\d{2}-\d{2}-\d{2})\b/)?.[1];
+  // Follow-up turns often contain only the missing time/title. Use prior user text
+  // only to recover the date; the current turn remains the authority for the title and time.
+  const dateContext = `${String(recentUserText || '')}\n${text}`;
+  const explicitDate = dateContext.match(/\b(20\d{2}-\d{2}-\d{2})\b/)?.[1];
   let date = explicitDate;
   if (!date && /\btomorrow\b/i.test(text)) {
     const tomorrow = new Date(Date.UTC(currentYear, part('month') - 1, part('day') + 1));
@@ -53,8 +60,8 @@ export function parseDeterministicCalendarCreate(text: string, requestedTimeZone
   }
   if (!date) {
     const monthNames = ['january', 'february', 'march', 'april', 'may', 'june', 'july', 'august', 'september', 'october', 'november', 'december'];
-    const dayFirst = text.match(/\b(?:on\s+)?(\d{1,2})(?:st|nd|rd|th)?\s+(january|february|march|april|may|june|july|august|september|october|november|december)\b/i);
-    const monthFirst = text.match(/\b(?:on\s+)?(january|february|march|april|may|june|july|august|september|october|november|december)\s+(\d{1,2})(?:st|nd|rd|th)?\b/i);
+    const dayFirst = dateContext.match(/\b(?:on\s+)?(\d{1,2})(?:st|nd|rd|th)?\s+(january|february|march|april|may|june|july|august|september|october|november|december)\b/i);
+    const monthFirst = dateContext.match(/\b(?:on\s+)?(january|february|march|april|may|june|july|august|september|october|november|december)\s+(\d{1,2})(?:st|nd|rd|th)?\b/i);
     const day = Number(dayFirst?.[1] || monthFirst?.[2] || 0);
     const monthName = String(dayFirst?.[2] || monthFirst?.[1] || '').toLowerCase();
     const monthIndex = monthNames.indexOf(monthName);
@@ -74,10 +81,11 @@ export function parseDeterministicCalendarCreate(text: string, requestedTimeZone
   }
   const timeMatch = text.match(/\b(?:at\s+)?(1[0-2]|0?[1-9])(?::([0-5]\d))?\s*(am|pm)\b/i);
   const namedTitle = text.match(/\b(?:called|named|titled)\s+["“”']?(.+?)["“”']?\s*$/i)?.[1]?.trim();
+  const conversationalTitle = text.match(/\b(?:event|title)\s+(?:is|will be)\s+(?:like\s+)?["“”']?(.+?)["“”']?\s*$/i)?.[1]?.trim();
   const trailingTitle = timeMatch && typeof timeMatch.index === 'number'
-    ? text.slice(timeMatch.index + timeMatch[0].length).replace(/^[\s,:;\-–—]*(?:for\s+)?/i, '').trim()
+    ? text.slice(timeMatch.index + timeMatch[0].length).replace(/^[\s,:;\-–—]*(?:for\s+)?(?:and\s+the\s+)?(?:event|title)\s+(?:is|will be)\s+(?:like\s+)?/i, '').trim()
     : '';
-  const title = namedTitle || trailingTitle;
+  const title = namedTitle || conversationalTitle || trailingTitle;
   if (!date || !timeMatch || !title) return null;
   let hour = Number(timeMatch[1]);
   const minute = Number(timeMatch[2] || 0);

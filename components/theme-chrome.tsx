@@ -7,9 +7,9 @@ const THEME_CHROME = {
   light: "#f4f4f5",
   white: "#f4f4f5",
   dark: "#101011",
-  gray: "#242424",
-  "dark-gray": "#242424",
-  system: "#242424",
+  gray: "#292929",
+  "dark-gray": "#292929",
+  system: "#292929",
 } as const;
 
 export function ThemeChrome() {

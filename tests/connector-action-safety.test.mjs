@@ -64,6 +64,26 @@ test('parses a spoken month date and trailing event title without falling back t
   });
 });
 
+test('continues a Calendar request when the user supplies its missing time and title in the next message', () => {
+  const priorRequest = 'Schedule a Google Calendar event on 28 August.';
+  const followUp = 'At 3pm and the event is like happy birthday';
+  assert.equal(isCalendarSchedulingIntent(followUp, priorRequest, false), true);
+  const event = parseDeterministicCalendarCreate(
+    followUp,
+    'Europe/Amsterdam',
+    new Date('2026-08-26T10:00:00.000Z'),
+    priorRequest,
+  );
+  assert.deepEqual(JSON.parse(JSON.stringify(event)), {
+    summary: 'happy birthday',
+    start_datetime: '2026-08-28T15:00:00',
+    timezone: 'Europe/Amsterdam',
+    event_duration_hour: 1,
+    event_duration_minutes: 0,
+    calendar_id: 'primary',
+  });
+});
+
 test('does not manufacture incomplete Calendar create arguments', () => {
   assert.equal(parseDeterministicCalendarCreate('Schedule something tomorrow called Unspecified', 'UTC', new Date('2026-08-26T10:00:00.000Z')), null);
   assert.equal(parseDeterministicCalendarCreate('Schedule a meeting at 3 PM', 'UTC', new Date('2026-08-26T10:00:00.000Z')), null);

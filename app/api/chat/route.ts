@@ -3689,7 +3689,7 @@ export async function POST(req: NextRequest) {
             }
           }
           const deterministicCalendarCreate = calendarSchedulingIntent && requestedConnectorKey === 'google_calendar'
-            ? parseDeterministicCalendarCreate(userText, clientTimeZone)
+            ? parseDeterministicCalendarCreate(userText, clientTimeZone, new Date(), recentUserText)
             : null;
           if (composioSession && deterministicCalendarCreate) {
             try {
