@@ -47,6 +47,6 @@ export async function GET(request: Request, context: { params: Promise<{ provide
   if (!config) return lunarAuthFailure(request, "unavailable")
 
   const url = authorizationUrl(request, requestedProvider, config.clientId)
-  const response = NextResponse.redirect(url)
+  const response = NextResponse.redirect(url, 302)
   return beginLunarOAuth(response, requestedProvider, url)
 }
