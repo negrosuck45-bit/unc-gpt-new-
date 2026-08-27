@@ -1,14 +1,13 @@
 'use client'
 
 import { AnimatePresence, motion } from 'framer-motion'
-import { ArrowLeft, ArrowRight, Check, Loader2 } from 'lucide-react'
+import { ArrowLeft, ArrowRight, Check, Globe2, Loader2 } from 'lucide-react'
 import { useEffect, useMemo, useState } from 'react'
 import { Button } from '@/components/ui/button'
 import { LANGUAGE_OPTIONS, getLanguageOption, normalizeLanguagePreference } from '@/lib/language-preferences'
 import { readUserPreferences, writeUserPreferences } from '@/lib/user-preferences'
 
 const ONBOARDING_VERSION = 2
-const FEATURED_LANGUAGE_CODES = ['ru', 'en', 'de', 'fr']
 
 type AuthUser = { name?: string | null; email?: string | null }
 
@@ -28,10 +27,16 @@ export function FirstOpenOnboarding({ onComplete }: FirstOpenOnboardingProps) {
   const [displayName, setDisplayName] = useState(preferences.profileName || '')
   const [username, setUsername] = useState(preferences.username || '')
   const [language, setLanguage] = useState(() => {
-    try { return normalizeLanguagePreference(localStorage.getItem('uncgpt-language')) } catch { return 'auto' }
+    try {
+      const stored = normalizeLanguagePreference(localStorage.getItem('uncgpt-language'))
+      return stored === 'auto' ? 'en' : stored
+    } catch {
+      return 'en'
+    }
   })
   const [usernameError, setUsernameError] = useState('')
   const [saving, setSaving] = useState(false)
+  const [languageTransition, setLanguageTransition] = useState(false)
 
   useEffect(() => {
     fetch('/api/auth/me', { cache: 'no-store' })
@@ -45,7 +50,6 @@ export function FirstOpenOnboarding({ onComplete }: FirstOpenOnboardingProps) {
   }, [])
 
   const selectedLanguage = getLanguageOption(language)
-  const featuredLanguages = LANGUAGE_OPTIONS.filter((option) => FEATURED_LANGUAGE_CODES.includes(option.code))
   const canContinue = step === 0 || step === 1 || (step === 2 && displayName.trim().length > 0) || (step === 3 && /^[A-Za-z0-9_]{1,24}$/.test(username)) || step === 4
 
   const complete = () => {
@@ -63,7 +67,7 @@ export function FirstOpenOnboarding({ onComplete }: FirstOpenOnboardingProps) {
   }
 
   const continueSetup = async () => {
-    if (!canContinue || saving) return
+    if (!canContinue || saving || languageTransition) return
     if (step === 3) {
       setSaving(true)
       setUsernameError('')
@@ -77,7 +81,11 @@ export function FirstOpenOnboarding({ onComplete }: FirstOpenOnboardingProps) {
         if (!response.ok || !payload?.username) throw new Error(payload?.error || 'That username could not be saved.')
         setUsername(payload.username)
         writeUserPreferences({ username: payload.username, profileName: displayName.trim() })
-        setStep(4)
+        setLanguageTransition(true)
+        window.setTimeout(() => {
+          setStep(4)
+          setLanguageTransition(false)
+        }, 640)
       } catch (error) {
         setUsernameError(error instanceof Error ? error.message : 'That username could not be saved.')
       } finally {
@@ -114,18 +122,18 @@ export function FirstOpenOnboarding({ onComplete }: FirstOpenOnboardingProps) {
         </>
       )}
       {step === 4 && (
-        <>
-          <h1 className="text-[29px] font-medium tracking-[-0.045em] text-foreground">Choose your language</h1>
-          <p className="mt-2 text-[15px] leading-6 text-foreground/52">This updates your AI language preference in Settings.</p>
-          <div className="mt-7 divide-y divide-foreground/[0.10] border-y border-foreground/[0.10]">
-            {featuredLanguages.map((option) => {
+        <div className="flex w-full max-w-[370px] flex-1 flex-col">
+          <motion.div initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: [0, -4, 0] }} transition={{ opacity: { duration: 0.22 }, y: { duration: 2.4, repeat: Infinity, ease: 'easeInOut' } }} className="mx-auto mb-5 flex h-12 w-12 items-center justify-center text-foreground"><Globe2 className="h-10 w-10" strokeWidth={1.35} /></motion.div>
+          <h1 className="text-center text-[29px] font-medium tracking-[-0.045em] text-foreground">Choose your language</h1>
+          <p className="mt-2 text-center text-[14px] text-foreground/50">Language</p>
+          <div role="radiogroup" aria-label="Language" className="onboarding-language-menu mt-5 min-h-0 flex-1 overflow-y-auto border-y border-foreground/[0.12] pr-1">
+            {LANGUAGE_OPTIONS.map((option) => {
               const selected = language === option.code
-              return <button key={option.code} type="button" onClick={() => setLanguage(option.code)} className="flex h-[54px] w-full items-center justify-between text-left text-[16px] text-foreground"><span>{option.label}</span><span className={`flex h-5 w-5 items-center justify-center rounded-full border ${selected ? 'border-foreground bg-foreground text-[#292929]' : 'border-foreground/35'}`}>{selected && <Check className="h-3 w-3" strokeWidth={3} />}</span></button>
+              return <button key={option.code} type="button" role="radio" aria-checked={selected} onClick={() => setLanguage(option.code)} className="flex min-h-[54px] w-full items-center justify-between border-b border-foreground/[0.10] pr-1 text-left text-[16px] text-foreground last:border-b-0"><span>{option.label}</span><span className={`ml-4 flex h-5 w-5 shrink-0 items-center justify-center rounded-full border ${selected ? 'border-foreground bg-foreground text-[#292929]' : 'border-foreground/35'}`}>{selected && <Check className="h-3 w-3" strokeWidth={3} />}</span></button>
             })}
           </div>
-          <label className="mt-5 flex items-center gap-3 text-[14px] text-foreground/55">More languages <select value={language} onChange={(event) => setLanguage(normalizeLanguagePreference(event.target.value))} className="min-w-0 flex-1 appearance-none bg-transparent py-1 text-right text-[14px] text-foreground outline-none"><option value="auto">Automatic</option>{LANGUAGE_OPTIONS.filter((option) => option.code !== 'auto' && !FEATURED_LANGUAGE_CODES.includes(option.code)).map((option) => <option key={option.code} value={option.code}>{option.label}</option>)}</select></label>
-          <p className="mt-2 text-[12px] text-foreground/35">Selected: {selectedLanguage.label}</p>
-        </>
+          <p className="pt-3 text-center text-[12px] text-foreground/35">Selected: {selectedLanguage.label}</p>
+        </div>
       )}
     </>
   )
@@ -139,13 +147,17 @@ export function FirstOpenOnboarding({ onComplete }: FirstOpenOnboardingProps) {
             <Button type="button" onClick={() => setStep(1)} className="h-[54px] w-full rounded-xl bg-foreground text-[16px] font-medium text-[#292929] hover:bg-foreground/90">Get started <ArrowRight className="ml-1 h-4 w-4" /></Button>
           </motion.div>
         ) : (
-          <div className="flex flex-1 flex-col">
-            <div className="flex h-12 items-center justify-between"><button type="button" onClick={() => setStep((value) => Math.max(0, value - 1))} className="-ml-2 flex h-10 w-10 items-center justify-center text-foreground/65 transition hover:text-foreground" aria-label="Back"><ArrowLeft className="h-5 w-5" /></button><img src="/uncgpt.png" alt="UncGPT" className="h-8 w-8 rounded-full object-cover" /><span className="w-10" /></div>
-            <AnimatePresence mode="wait"><motion.section key={step} initial={{ opacity: 0, x: 12 }} animate={{ opacity: 1, x: 0 }} exit={{ opacity: 0, x: -12 }} transition={{ duration: 0.18, ease: [0.23, 1, 0.32, 1] }} className="flex flex-1 flex-col pt-[15vh] sm:pt-[17vh]">{stepContent}</motion.section></AnimatePresence>
-            <Button type="button" disabled={!canContinue || saving} onClick={() => void continueSetup()} className="h-[54px] w-full rounded-xl bg-foreground text-[16px] font-medium text-[#292929] hover:bg-foreground/90 disabled:bg-foreground/25 disabled:text-foreground/45">{saving ? <Loader2 className="h-4 w-4 animate-spin" /> : step === 4 ? 'Continue' : step === 3 ? 'Create account' : 'Continue'} {!saving && <ArrowRight className="ml-1 h-4 w-4" />}</Button>
+          <div className="flex min-h-0 flex-1 flex-col">
+            <div className="flex h-12 items-center justify-between"><button type="button" onClick={() => setStep((value) => Math.max(0, value - 1))} className="-ml-2 flex h-10 w-10 items-center justify-center text-foreground/65 transition hover:text-foreground" aria-label="Back"><ArrowLeft className="h-5 w-5" /></button>{step === 4 ? <span className="w-10" /> : <img src="/uncgpt.png" alt="UncGPT" className="h-8 w-8 rounded-full object-cover" />}<span className="w-10" /></div>
+            <AnimatePresence mode="wait"><motion.section key={step} initial={{ opacity: 0, x: 12 }} animate={{ opacity: 1, x: 0 }} exit={{ opacity: 0, x: -12 }} transition={{ duration: 0.18, ease: [0.23, 1, 0.32, 1] }} className={step === 4 ? 'flex min-h-0 flex-1 flex-col pb-4 pt-[7vh]' : 'flex flex-1 flex-col pt-[15vh] sm:pt-[17vh]'}>{stepContent}</motion.section></AnimatePresence>
+            <Button type="button" disabled={!canContinue || saving || languageTransition} onClick={() => void continueSetup()} className="h-[54px] w-full shrink-0 rounded-xl bg-foreground text-[16px] font-medium text-[#292929] hover:bg-foreground/90 disabled:bg-foreground/25 disabled:text-foreground/45">{saving ? <Loader2 className="h-4 w-4 animate-spin" /> : step === 4 ? 'Continue' : step === 3 ? 'Create account' : 'Continue'} {!saving && <ArrowRight className="ml-1 h-4 w-4" />}</Button>
           </div>
         )}
       </div>
+
+      <AnimatePresence>
+        {languageTransition && <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} transition={{ duration: 0.16 }} className="absolute inset-0 z-10 flex items-center justify-center bg-[#292929]" aria-label="Opening language selection" aria-live="polite"><span className="relative flex h-5 w-5 items-center justify-center"><motion.span className="absolute h-3 w-3 rounded-full bg-foreground" /><motion.span className="absolute h-3 w-3 rounded-full border border-foreground/80" animate={{ scale: [1, 3.4], opacity: [0.82, 0] }} transition={{ duration: 0.95, repeat: Infinity, ease: 'easeOut' }} /><motion.span className="absolute h-3 w-3 rounded-full border border-foreground/55" animate={{ scale: [1, 5.4], opacity: [0.65, 0] }} transition={{ duration: 0.95, repeat: Infinity, delay: 0.2, ease: 'easeOut' }} /></span></motion.div>}
+      </AnimatePresence>
     </div>
   )
 }
