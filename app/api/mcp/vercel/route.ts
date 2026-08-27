@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
+import { getSession } from "@/lib/auth";
 
 const VERCEL_API = "https://api.vercel.com";
 
@@ -26,6 +27,8 @@ function encodePath(value: unknown) {
 }
 
 export async function POST(request: NextRequest) {
+  const session = await getSession().catch(() => null);
+  if (!session?.user?.sub) return NextResponse.json({ error: "Sign in is required." }, { status: 401 });
   const token = request.cookies.get("mcp_oauth_vercel")?.value;
   if (!token) {
     return NextResponse.json({ error: "Vercel is not connected. Connect Vercel in Settings → Connectors." }, { status: 401 });

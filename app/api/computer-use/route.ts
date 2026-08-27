@@ -2,6 +2,7 @@ import type { NextRequest } from "next/server";
 import AgentService, { AgentStep } from "@/lib/agents/agent-service";
 import CustomModelService from "@/lib/models/custom-model-service";
 import { getBuiltInTools } from "@/lib/agents/built-in-tools";
+import { getSession } from "@/lib/auth";
 
 export const runtime = "nodejs";
 
@@ -10,6 +11,8 @@ export const runtime = "nodejs";
  * Handles real computer use capabilities with streaming steps
  */
 export async function POST(req: NextRequest) {
+  const session = await getSession().catch(() => null);
+  if (!session?.user?.sub) return Response.json({ error: "Sign in is required." }, { status: 401 });
   try {
     const body = await req.json();
     const {
@@ -18,11 +21,12 @@ export async function POST(req: NextRequest) {
       preferredProvider = "groq",
     } = body;
 
-    if (!messages || !Array.isArray(messages)) {
-      return Response.json(
-        { error: "Invalid messages format" },
-        { status: 400 }
-      );
+    if (!messages || !Array.isArray(messages) || messages.length === 0 || messages.length > 50) {
+      return Response.json({ error: "Invalid messages format." }, { status: 400 });
+    }
+    const latestContent = messages[messages.length - 1]?.content;
+    if (typeof latestContent !== "string" || latestContent.length === 0 || latestContent.length > 20_000) {
+      return Response.json({ error: "Enter a valid task under 20,000 characters." }, { status: 400 });
     }
 
     // Initialize model service
@@ -68,7 +72,7 @@ GUIDELINES:
       async start(controller) {
         try {
           // Convert messages to agent format
-          const userMessage = messages[messages.length - 1]?.content || "";
+          const userMessage = latestContent;
 
           // Stream agent steps
           for await (const step of agent.runStream(userMessage)) {
@@ -84,7 +88,7 @@ GUIDELINES:
           controller.enqueue(
             encoder.encode(
               `data: ${JSON.stringify({
-                error: error.message || "Agent execution failed",
+                error: "Agent execution failed.",
               })}\n\n`
             )
           );
@@ -99,7 +103,7 @@ GUIDELINES:
     });
   } catch (error: any) {
     return Response.json(
-      { error: error.message || "Internal server error" },
+      { error: "Computer Use is temporarily unavailable." },
       { status: 500 }
     );
   }

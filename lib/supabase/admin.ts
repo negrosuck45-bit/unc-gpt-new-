@@ -10,4 +10,5 @@ export function getSupabaseAdmin(): SupabaseClient | null {
   return cached
 }
 
-export const CHAT_UPLOAD_BUCKET = 'chat-uploads'
+export const CHAT_UPLOAD_BUCKET = 'chat-private-uploads'
+export const PROFILE_MEDIA_BUCKET = 'profile-media'

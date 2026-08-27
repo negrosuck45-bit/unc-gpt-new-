@@ -8,7 +8,7 @@ import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 
 const execFileAsync = promisify(execFile)
-import { CHAT_UPLOAD_BUCKET, getSupabaseAdmin } from '@/lib/supabase/admin'
+import { PROFILE_MEDIA_BUCKET, getSupabaseAdmin } from '@/lib/supabase/admin'
 
 export const runtime = 'nodejs'
 
@@ -75,9 +75,9 @@ export async function POST(request: NextRequest) {
     return Response.json({ error: `Files must be ${maxSize} MB or smaller` }, { status: 413 })
   }
 
-  const { data: bucket } = await supabase.storage.getBucket(CHAT_UPLOAD_BUCKET)
+  const { data: bucket } = await supabase.storage.getBucket(PROFILE_MEDIA_BUCKET)
   if (!bucket) {
-    const { error } = await supabase.storage.createBucket(CHAT_UPLOAD_BUCKET, {
+    const { error } = await supabase.storage.createBucket(PROFILE_MEDIA_BUCKET, {
       public: true,
       fileSizeLimit: '50MB',
     })
@@ -113,7 +113,7 @@ export async function POST(request: NextRequest) {
     }
   }
   const path = `users/${safeSegment(userId)}/profile/${uploadKind}/${Date.now()}-${crypto.randomUUID()}.${extension}`
-  const storage = supabase.storage.from(CHAT_UPLOAD_BUCKET)
+  const storage = supabase.storage.from(PROFILE_MEDIA_BUCKET)
   const { error: uploadError } = await storage.upload(path, buffer, {
     contentType,
     cacheControl: '31536000',

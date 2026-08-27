@@ -24,5 +24,3 @@ export function getSupabase(): SupabaseClient | null {
   cached = createClient()
   return cached
 }
-
-export const SUPABASE_BUCKET = 'chat-uploads'

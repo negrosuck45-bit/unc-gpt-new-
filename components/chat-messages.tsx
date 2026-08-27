@@ -699,7 +699,7 @@ export function ChatMessages({ messages, isStreaming, isThinking, onRegenerate, 
 
                   {/* Assistant Avatar - Left side */}
                   {isAssistant && (
-                    <div className="mt-0 flex h-7 w-7 flex-shrink-0 items-center justify-center overflow-hidden rounded-full border border-white/[0.08] bg-white/[0.03]">
+                    <div className="mt-0 flex h-7 w-7 flex-shrink-0 items-center justify-center overflow-hidden rounded-full">
                       <MarsAvatar size={28} family={messageFamily} useSimpleIcon />
                     </div>
                   )}

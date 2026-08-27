@@ -1,15 +1,3 @@
-// lib/upload.ts
-// Uploads images (and other binary attachments) to Supabase Storage when
-// configured, otherwise returns a local data: URL so the app still works.
-//
-// The returned string is what you should put in `Attachment.url`. For uploaded
-// files this is a small public URL — perfect for localStorage. For the local
-// fallback it's a data URL (and yes, those bloat localStorage; that's why
-// configuring Supabase is recommended for image-heavy use).
-
-import { getSupabase } from './supabase'
-import { SUPABASE_BUCKET } from './supabase'
-
 export interface UploadResult {
   url: string
   storedRemotely: boolean
@@ -18,81 +6,45 @@ export interface UploadResult {
 
 export interface UploadOptions {
   folder?: string
+  chatId?: string
   allowLocalFallback?: boolean
 }
 
-const SUPABASE_URL = process.env.NEXT_PUBLIC_SUPABASE_URL;
-
-function randomId(): string {
-  return (
-    Date.now().toString(36) +
-    '-' +
-    Math.random().toString(36).slice(2, 10)
-  )
-}
-
-function extFromMime(mime: string | undefined, fallback = 'bin'): string {
-  if (!mime) return fallback
-  const map: Record<string, string> = {
-    'image/png': 'png',
-    'image/jpeg': 'jpg',
-    'image/jpg': 'jpg',
-    'image/webp': 'webp',
-    'image/gif': 'gif',
-    'image/heic': 'heic',
-    'image/avif': 'avif',
+function extensionFor(type: string) {
+  const extensions: Record<string, string> = {
+    'image/jpeg': 'jpg', 'image/png': 'png', 'image/webp': 'webp', 'image/gif': 'gif',
+    'image/avif': 'avif', 'image/heic': 'heic', 'audio/mpeg': 'mp3', 'audio/wav': 'wav',
+    'audio/webm': 'webm', 'audio/ogg': 'ogg', 'audio/mp4': 'm4a',
   }
-  return map[mime] ?? (mime.includes('/') ? mime.split('/')[1] : fallback) ?? fallback
+  return extensions[type] || 'bin'
 }
 
-function fileToDataUrl(file: Blob): Promise<string> {
-  return new Promise((resolve, reject) => {
-    const r = new FileReader()
-    r.onload = () => resolve(r.result as string)
-    r.onerror = () => reject(r.error)
-    r.readAsDataURL(file)
-  })
+async function asUploadFile(file: File | Blob) {
+  if (file instanceof File) return file
+  const type = file.type || 'application/octet-stream'
+  return new File([file], `attachment.${extensionFor(type)}`, { type })
 }
 
-/** Upload a File/Blob. Falls back to a data URL if Supabase isn't configured. */
+/** Uploads an attachment through the authenticated private-storage API. */
 export async function uploadFile(file: File | Blob, opts?: UploadOptions): Promise<UploadResult> {
-  const supabase = getSupabase()
-  
-  // Check if supabase is ready AND we have environment variables
-  if (!supabase || !SUPABASE_URL) {
-    if (opts?.allowLocalFallback) {
-      const url = await fileToDataUrl(file)
-      return { url, storedRemotely: false }
-    }
-    throw new Error('Supabase Storage is not configured in this browser')
-  }
+  const upload = await asUploadFile(file)
+  const form = new FormData()
+  form.set('file', upload)
+  if (opts?.chatId) form.set('chatId', opts.chatId)
 
-  const folder = opts?.folder ?? 'images'
-  const path = `${folder}/${randomId()}.${extFromMime((file as File).type || 'image/png')}`
-
-  const { error } = await supabase.storage
-    .from(SUPABASE_BUCKET)
-    .upload(path, file, {
-      contentType: (file as File).type || 'application/octet-stream',
-      cacheControl: '31536000',
-      upsert: false,
-    })
-
-  if (error) {
-    if (opts?.allowLocalFallback) {
-      const url = await fileToDataUrl(file)
-      return { url, storedRemotely: false }
-    }
-    throw new Error(`Supabase Storage upload failed: ${error.message}`)
-  }
-
-  const { data } = supabase.storage.from(SUPABASE_BUCKET).getPublicUrl(path)
-  return { url: data.publicUrl, storedRemotely: true, path }
+  const response = await fetch('/api/storage/upload', {
+    method: 'POST',
+    credentials: 'same-origin',
+    body: form,
+  })
+  const result = await response.json().catch(() => null)
+  if (!response.ok || !result?.url) throw new Error('Secure upload failed.')
+  return { url: String(result.url), storedRemotely: true, path: typeof result.path === 'string' ? result.path : undefined }
 }
 
-/** Convenience: upload by data URL (used by the paste handler). */
-export async function uploadDataUrl(dataUrl: string, opts?: { folder?: string }): Promise<UploadResult> {
-  const res = await fetch(dataUrl)
-  const blob = await res.blob()
-  return uploadFile(blob, opts)
+/** Convenience uploader for generated data URLs and pasted images. */
+export async function uploadDataUrl(dataUrl: string, opts?: UploadOptions): Promise<UploadResult> {
+  const response = await fetch(dataUrl)
+  if (!response.ok) throw new Error('Attachment could not be prepared.')
+  return uploadFile(await response.blob(), opts)
 }

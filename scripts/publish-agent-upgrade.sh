@@ -15,6 +15,16 @@ git diff --check
 
 files=(
   "app/api/chat/route.ts"
+  "app/api/analytics/route.ts"
+  "app/api/computer-use/route.ts"
+  "app/api/rag/upload/route.ts"
+  "app/api/rag/search/route.ts"
+  "app/api/upload-image/route.ts"
+  "app/api/storage/upload/route.ts"
+  "app/api/storage/file/route.ts"
+  "app/api/profile/media/route.ts"
+  "proxy.ts"
+  "next.config.mjs"
   "app/layout.tsx"
   "app/chat-workspace.tsx"
   "app/api/mcp/github/route.ts"
@@ -50,6 +60,10 @@ files=(
   "lib/calendar-event-presentation.ts"
   "lib/composio.ts"
   "lib/auth.ts"
+  "lib/supabase.ts"
+  "lib/supabase/admin.ts"
+  "lib/upload.ts"
+  "lib/storage-offload.ts"
   "lib/chat-store.ts"
   "lib/client-runtime-context.ts"
   "lib/language-preferences.ts"
@@ -65,6 +79,7 @@ files=(
   "tests/uncgpt-router.test.mjs"
   "tests/voice-message-contract.test.mjs"
   "tests/chat-appearance-contract.test.mjs"
+  "tests/backend-security-contract.test.mjs"
 )
 
 base_commit="$(gh api "repos/$repo/git/ref/heads/$branch" --jq '.object.sha')"

@@ -3,17 +3,16 @@
 //
 // Two responsibilities:
 //   1) Detect when an attachment / message field is a big base64 data URL
-//      and replace it with a tiny Supabase Storage public URL.
+//      and replace it with a small authenticated private-storage URL.
 //   2) Provide a localStorage adapter for zustand/persist that:
 //        - throttles writes (no fsync on every keystroke)
 //        - on QuotaExceededError, walks the state, offloads the biggest
 //          data URLs to Supabase, then retries.
 //
-// Safe to use even when Supabase isn't configured: offload becomes a no-op
-// and we just trim oldest chats if quota is hit.
+// Secure uploads remain server-side. If private storage is unavailable, offload
+// becomes a no-op and the quota recovery path trims the oldest chats instead.
 
 import { uploadDataUrl } from './upload'
-import { getSupabase } from './supabase'
 
 // Anything bigger than this stays out of localStorage.
 // 200 KB of base64 ≈ 150 KB raw. iOS Safari starts choking around ~3-5 MB total.
@@ -29,8 +28,6 @@ export function isBigDataUrl(value: unknown): value is string {
 
 /** Walk an arbitrary state tree, upload any oversized data: URL, replace inline. */
 export async function offloadBigDataUrls(state: any): Promise<number> {
-  if (!getSupabase()) return 0 // no remote target — leave as-is
-
   let offloaded = 0
   const tasks: Promise<void>[] = []
 

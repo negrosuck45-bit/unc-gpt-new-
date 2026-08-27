@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
+import { getSession } from "@/lib/auth";
 
 /**
  * Real GitHub MCP actions.
@@ -39,6 +40,8 @@ async function gh(token: string, path: string, method = "GET", body?: unknown) {
 }
 
 export async function POST(request: NextRequest) {
+  const session = await getSession().catch(() => null);
+  if (!session?.user?.sub) return NextResponse.json({ error: "Sign in is required." }, { status: 401 });
   const token = request.cookies.get("mcp_oauth_github")?.value;
   if (!token) {
     return NextResponse.json({ error: "GitHub not connected. Please connect GitHub in Settings → Connectors." }, { status: 401 });
