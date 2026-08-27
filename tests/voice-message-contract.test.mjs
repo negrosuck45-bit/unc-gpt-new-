@@ -18,9 +18,9 @@ test('voice input shows the full waveform tray while recording and sends only re
   assert.match(input, /onSend\(transcript\)/);
   assert.match(input, /voice-live-composer relative mx-3 min-h-\[146px\]/);
   assert.match(input, /voice-live-wave/);
-  assert.match(input, /voice-live-wave-left/);
-  assert.match(input, /voice-live-wave-right/);
-  assert.match(input, /--voice-wave-distance/);
+  assert.match(input, /inset-x-0 top-7 flex items-center gap-3 px-7/);
+  assert.match(input, /--voice-wave-index/);
+  assert.match(input, /\.map\(\(base, index\) => <i key=\{index\}/);
   assert.match(input, /voiceDraft && "hidden"|isRecording && "hidden"/);
   assert.match(input, /Discard voice recording/);
   assert.match(input, /Send recognized voice text/);
@@ -31,8 +31,9 @@ test('voice input shows the full waveform tray while recording and sends only re
   assert.doesNotMatch(voiceLifecycle, /type: 'audio'/);
   assert.match(styles, /voice-live-composer/);
   assert.match(styles, /voice-live-wave/);
-  assert.match(styles, /voice-wave-center-ripple/);
-  assert.match(styles, /--voice-wave-distance/);
+  assert.match(styles, /voice-wave-flow/);
+  assert.match(styles, /--voice-wave-index/);
+  assert.match(styles, /flex: 1;/);
   assert.match(styles, /prefers-reduced-motion/);
   assert.match(messages, /attachment\.type === 'audio'/);
 });

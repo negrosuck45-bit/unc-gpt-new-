@@ -713,48 +713,51 @@ textarea {
 }
 
 .voice-live-wave {
-  display: inline-flex;
+  display: flex;
   height: 46px;
   min-width: 0;
+  flex: 1;
   align-items: center;
-  gap: clamp(3px, 0.7vw, 7px);
+  justify-content: space-between;
+  gap: clamp(2px, 0.5vw, 6px);
 }
 
-/* Mirrored bars begin beside the timer, then the visual peak ripples outwards. */
+/* One continuous microphone waveform stretches to the timer on the right. */
 .voice-live-wave i {
   display: block;
-  width: clamp(4px, 0.55vw, 7px);
-  min-height: 12px;
+  width: clamp(3px, 0.55vw, 6px);
+  min-height: 7px;
   max-height: 42px;
+  flex: 1 1 0;
   transform-origin: center;
   border-radius: 999px;
-  background: rgba(255, 255, 255, 0.82);
-  transition: height 88ms linear;
-  animation: voice-wave-center-ripple 1.36s cubic-bezier(0.35, 0, 0.28, 1) infinite;
-  animation-delay: calc(var(--voice-wave-distance) * 0.085s);
+  background: rgba(255, 255, 255, 0.84);
+  transition: height 86ms linear;
+  animation: voice-wave-flow 1.24s cubic-bezier(0.36, 0, 0.25, 1) infinite;
+  animation-delay: calc(var(--voice-wave-index) * -0.038s);
   will-change: opacity, filter, transform;
 }
 
-@keyframes voice-wave-center-ripple {
+@keyframes voice-wave-flow {
   0%, 100% {
-    opacity: 0.28;
-    filter: brightness(0.7);
-    transform: scaleY(0.68);
+    opacity: 0.38;
+    filter: brightness(0.78);
+    transform: scaleY(0.74);
   }
-  26% {
-    opacity: 0.44;
-    filter: brightness(0.9);
-    transform: scaleY(0.82);
+  28% {
+    opacity: 0.54;
+    filter: brightness(0.96);
+    transform: scaleY(0.9);
   }
-  48% {
+  50% {
     opacity: 1;
     filter: brightness(1.38);
-    transform: scaleY(1.18);
+    transform: scaleY(1.16);
   }
-  68% {
-    opacity: 0.5;
-    filter: brightness(0.94);
-    transform: scaleY(0.88);
+  72% {
+    opacity: 0.56;
+    filter: brightness(0.98);
+    transform: scaleY(0.92);
   }
 }
 

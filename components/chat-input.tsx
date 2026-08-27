@@ -831,17 +831,11 @@ export function ChatInput({
               <button type="button" onClick={cancelVoiceRecording} aria-label="Discard voice recording" className="voice-draft-action absolute bottom-5 left-5 flex h-11 w-11 items-center justify-center rounded-2xl">
                 <X className="h-7 w-7" strokeWidth={1.75} />
               </button>
-              <div className="absolute inset-x-0 top-7 flex items-center justify-center gap-3">
-                <span className="voice-live-wave voice-live-wave-left" aria-label="Recording waveform">
-                  {[0.36, 0.63, 0.48, 0.8, 0.55, 0.92, 0.66, 1].map((base, index) => {
-                    const distance = 7 - index
-                    return <i key={`left-${index}`} style={{ height: `${Math.round(13 + (base + voiceLevel * 0.9) * 19)}px`, '--voice-wave-distance': distance } as React.CSSProperties} />
-                  })}
+              <div className="absolute inset-x-0 top-7 flex items-center gap-3 px-7 sm:px-9">
+                <span className="voice-live-wave" aria-label="Recording waveform">
+                  {[0.26, 0.48, 0.35, 0.6, 0.28, 0.52, 0.38, 0.68, 0.42, 0.3, 0.55, 0.36, 0.62, 0.45, 0.31, 0.58, 0.4, 0.72, 0.5, 0.64, 0.82, 0.58, 0.44, 0.7, 0.36, 0.6, 0.29, 0.54, 0.41, 0.65, 0.34, 0.5, 0.26, 0.57, 0.39, 0.63, 0.32, 0.48, 0.28, 0.53].map((base, index) => <i key={index} style={{ height: `${Math.round(8 + (base + voiceLevel * (0.8 + (index % 5) * 0.06)) * 28)}px`, '--voice-wave-index': index } as React.CSSProperties} />)}
                 </span>
-                <span className="text-[18px] font-medium tabular-nums text-white/62">{Math.floor(voiceDuration / 60)}:{String(voiceDuration % 60).padStart(2, '0')}</span>
-                <span className="voice-live-wave voice-live-wave-right" aria-hidden="true">
-                  {[1, 0.66, 0.92, 0.55, 0.8, 0.48, 0.63, 0.36].map((base, index) => <i key={`right-${index}`} style={{ height: `${Math.round(13 + (base + voiceLevel * 0.9) * 19)}px`, '--voice-wave-distance': index } as React.CSSProperties} />)}
-                </span>
+                <span className="shrink-0 text-[17px] font-medium tabular-nums text-white/62">{Math.floor(voiceDuration / 60)}:{String(voiceDuration % 60).padStart(2, '0')}</span>
               </div>
               <button type="button" onClick={confirmVoiceRecording} disabled={disabled || isStreaming} aria-label="Send recognized voice text" className="voice-draft-confirm absolute bottom-5 right-5 flex h-11 w-11 items-center justify-center rounded-2xl">
                 <Check className="h-7 w-7" strokeWidth={1.9} />
