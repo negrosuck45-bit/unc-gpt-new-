@@ -40,7 +40,13 @@ export default async function RootLayout({
   const accountScope = session?.user?.sub ?? "guest"
 
   return (
-    <ClerkProvider appearance={{ layout: { unsafe_disableDevelopmentModeWarnings: true } }}>
+    <ClerkProvider
+      signInUrl="/login"
+      signUpUrl="/signup"
+      signInFallbackRedirectUrl="/"
+      signUpFallbackRedirectUrl="/"
+      appearance={{ layout: { unsafe_disableDevelopmentModeWarnings: true } }}
+    >
       <html lang="en" suppressHydrationWarning>
         <body className="font-sans antialiased">
         <script dangerouslySetInnerHTML={{ __html: `window.__UNCGPT_ACCOUNT_SCOPE__ = ${JSON.stringify(accountScope)};` }} />
