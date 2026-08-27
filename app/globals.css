@@ -125,6 +125,10 @@
   --task-user-message-bg: rgba(0, 0, 0, 0.09);
   --task-user-message-border: rgba(0, 0, 0, 0.12);
   --task-link: #1d4ed8;
+  --task-send-disabled-bg: #dedee2;
+  --task-send-disabled-color: #4d4d55;
+  --task-send-active-bg: #18181b;
+  --task-send-active-color: #ffffff;
 }
 
 .dark {
@@ -141,6 +145,10 @@
   --task-user-message-bg: rgba(255, 255, 255, 0.095);
   --task-user-message-border: rgba(255, 255, 255, 0.10);
   --task-link: rgba(216, 244, 255, 0.9);
+  --task-send-disabled-bg: rgba(255, 255, 255, 0.14);
+  --task-send-disabled-color: rgba(255, 255, 255, 0.68);
+  --task-send-active-bg: #f1f1f1;
+  --task-send-active-color: #171717;
 }
 
 .dark-gray {
@@ -157,6 +165,10 @@
   --task-user-message-bg: rgba(255, 255, 255, 0.095);
   --task-user-message-border: rgba(255, 255, 255, 0.10);
   --task-link: rgba(216, 244, 255, 0.9);
+  --task-send-disabled-bg: rgba(255, 255, 255, 0.14);
+  --task-send-disabled-color: rgba(255, 255, 255, 0.68);
+  --task-send-active-bg: #f1f1f1;
+  --task-send-active-color: #171717;
 }
 
 @theme inline {
@@ -549,19 +561,19 @@ textarea {
 }
 
 .task-composer-send {
-  background: rgba(255, 255, 255, 0.13) !important;
-  color: rgba(255, 255, 255, 0.4) !important;
+  background: var(--task-send-disabled-bg) !important;
+  color: var(--task-send-disabled-color) !important;
   box-shadow: none !important;
   transition: background-color 150ms var(--ease-out, ease-out), color 150ms var(--ease-out, ease-out), transform 150ms var(--ease-out, ease-out);
 }
 
 .task-composer-send:not(:disabled) {
-  background: #f1f1f1 !important;
-  color: #171717 !important;
+  background: var(--task-send-active-bg) !important;
+  color: var(--task-send-active-color) !important;
 }
 
 .task-composer-send:not(:disabled):hover {
-  background: #ffffff !important;
+  filter: brightness(1.08);
 }
 
 .task-composer-send:disabled {
