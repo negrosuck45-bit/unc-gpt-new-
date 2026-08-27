@@ -45,7 +45,7 @@ export default async function RootLayout({
       signUpUrl="/signup"
       signInFallbackRedirectUrl="/"
       signUpFallbackRedirectUrl="/"
-      appearance={{ layout: { unsafe_disableDevelopmentModeWarnings: true } }}
+      appearance={{ options: { unsafe_disableDevelopmentModeWarnings: true } }}
     >
       <html lang="en" suppressHydrationWarning>
         <body className="font-sans antialiased">
