@@ -10,7 +10,7 @@ interface WelcomeScreenProps {
 export function WelcomeScreen({ onSelectPrompt: _onSelectPrompt, project: _project }: WelcomeScreenProps) {
   const t = useUiText()
   return (
-    <div className="flex h-full w-full items-center justify-center" aria-label={t('newTask')}>
+    <div className="task-welcome-stage flex w-full items-start justify-center pt-[clamp(2.5rem,13vh,8rem)] sm:h-full sm:items-center sm:pt-0" aria-label={t('newTask')}>
       <h1 className="task-welcome-back">{t('welcomeBackShort')}</h1>
     </div>
   );

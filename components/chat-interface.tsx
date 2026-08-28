@@ -452,7 +452,7 @@ export function ChatInterface({ onSwitchToImagine, onOpenSidebar, isSidebarOpen 
         </div>
       ) : (
         <div className="flex-1 flex flex-col min-h-0 overflow-hidden">
-          <div className="flex-1 min-h-0 flex flex-col items-center justify-center px-5 pb-4 pt-4 sm:px-8">
+          <div className="flex-1 min-h-0 flex flex-col items-center justify-start px-5 pb-4 pt-4 sm:justify-center sm:px-8">
             <WelcomeScreen onSelectPrompt={(p) => handleSend(p)} project={currentProject} />
           </div>
 
