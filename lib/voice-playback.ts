@@ -39,6 +39,33 @@ const LANGUAGE_REGIONS: Record<string, string> = {
 let activePlayback: ActivePlayback | null = null
 let playbackToken = 0
 
+type PreparedAudio = {
+  objectUrl: string
+  createdAt: number
+}
+
+const preparedAudioCache = new Map<string, Promise<PreparedAudio>>()
+const PREPARED_AUDIO_TTL = 15 * 60 * 1000
+
+function preparedAudioKey(key: string, text: string) {
+  return `${key}:${text}`
+}
+
+async function fetchGroqAudio(text: string, language: string, signal?: AbortSignal): Promise<PreparedAudio> {
+  const response = await fetch("/api/voice-chat", {
+    method: "POST",
+    headers: { "Content-Type": "application/json", Accept: "audio/wav, audio/*" },
+    body: JSON.stringify({ text, language }),
+    ...(signal ? { signal } : {}),
+  })
+  if (!response.ok) throw await responseError(response)
+  const contentType = response.headers.get("content-type") || ""
+  if (!contentType.toLowerCase().startsWith("audio/")) throw new Error("Groq voice returned an invalid audio response")
+  const audioBlob = await response.blob()
+  if (!audioBlob.size) throw new Error("Groq voice returned an empty audio response")
+  return { objectUrl: URL.createObjectURL(audioBlob), createdAt: Date.now() }
+}
+
 function emitVoiceState(status: VoicePlaybackStatus, key?: string) {
   if (typeof window === "undefined") return
   window.dispatchEvent(new CustomEvent("uncgpt-voice-state", { detail: { status, key } }))
@@ -175,6 +202,30 @@ async function responseError(response: Response) {
   return new Error(`Groq voice request failed (${response.status}): ${detail}`)
 }
 
+export function prepareGroqTtsResponse({ text, language, key }: VoicePlaybackOptions) {
+  const cleanText = text.trim()
+  if (!cleanText) return Promise.reject(new Error("There is no response text to read"))
+  const voiceLanguage = resolveVoiceLanguage(language)
+  const cacheKey = preparedAudioKey(key, cleanText)
+  const existing = preparedAudioCache.get(cacheKey)
+  if (existing) return existing.then(() => undefined)
+
+  const prepared = fetchGroqAudio(cleanText, voiceLanguage.code)
+  preparedAudioCache.set(cacheKey, prepared)
+  void prepared.then((audio) => {
+    window.setTimeout(() => {
+      const current = preparedAudioCache.get(cacheKey)
+      if (current === prepared) {
+        preparedAudioCache.delete(cacheKey)
+        URL.revokeObjectURL(audio.objectUrl)
+      }
+    }, PREPARED_AUDIO_TTL)
+  }).catch(() => {
+    if (preparedAudioCache.get(cacheKey) === prepared) preparedAudioCache.delete(cacheKey)
+  })
+  return prepared.then(() => undefined)
+}
+
 export async function playGroqTtsResponse({ text, language, key }: VoicePlaybackOptions) {
   const cleanText = text.trim()
   if (!cleanText) throw new Error("There is no response text to read")
@@ -184,32 +235,23 @@ export async function playGroqTtsResponse({ text, language, key }: VoicePlayback
   const abortController = new AbortController()
   activePlayback = { token, key, abortController }
   const voiceLanguage = resolveVoiceLanguage(language)
+  const cacheKey = preparedAudioKey(key, cleanText)
   emitVoiceState("loading", key)
 
   try {
-    const response = await fetch("/api/voice-chat", {
-      method: "POST",
-      headers: { "Content-Type": "application/json", Accept: "audio/wav, audio/*" },
-      body: JSON.stringify({ text: cleanText, language: voiceLanguage.code }),
-      signal: abortController.signal,
-    })
+    const preparedPromise = preparedAudioCache.get(cacheKey) || fetchGroqAudio(cleanText, voiceLanguage.code, abortController.signal)
+    if (!preparedAudioCache.has(cacheKey)) preparedAudioCache.set(cacheKey, preparedPromise)
+    const prepared = await preparedPromise
+    preparedAudioCache.delete(cacheKey)
     ensureCurrent(token)
-    if (!response.ok) throw await responseError(response)
 
-    const contentType = response.headers.get("content-type") || ""
-    if (!contentType.toLowerCase().startsWith("audio/")) throw new Error("Groq voice returned an invalid audio response")
-    const audioBlob = await response.blob()
-    ensureCurrent(token)
-    if (!audioBlob.size) throw new Error("Groq voice returned an empty audio response")
-
-    const objectUrl = URL.createObjectURL(audioBlob)
-    const audio = new Audio(objectUrl)
+    const audio = new Audio(prepared.objectUrl)
     audio.preload = "auto"
     if (!isCurrent(token)) {
-      URL.revokeObjectURL(objectUrl)
+      URL.revokeObjectURL(prepared.objectUrl)
       throw new VoicePlaybackCancelledError()
     }
-    activePlayback = { token, key, abortController, audio, objectUrl }
+    activePlayback = { token, key, abortController, audio, objectUrl: prepared.objectUrl }
     await waitForAudioPlayback(audio, token, abortController.signal)
     cleanupActivePlayback(token)
   } catch (error) {

@@ -4,7 +4,7 @@ import { useEffect, useRef, useState, useMemo, useCallback } from 'react';
 import NextImage from 'next/image';
 import { Message, Attachment } from '@/lib/chat-store';
 import { getStoredLanguagePreference } from '@/lib/language-preferences';
-import { playGroqTtsResponse, speakWithBrowserFallback, stopVoicePlayback, VoicePlaybackCancelledError } from '@/lib/voice-playback';
+import { playGroqTtsResponse, prepareGroqTtsResponse, speakWithBrowserFallback, stopVoicePlayback, VoicePlaybackCancelledError } from '@/lib/voice-playback';
 import { useUiText } from '@/lib/ui-translations';
 import { cn } from '@/lib/utils';
 import { motion, AnimatePresence } from 'framer-motion';
@@ -674,6 +674,24 @@ export function ChatMessages({ messages, isStreaming, isThinking, onRegenerate, 
   const streamingFamily = useMemo(() => getModelFamilyFromModel(currentChat?.model || settings.model), [currentChat?.model, settings.model]);
 
   useEffect(() => subscribeToUserPreferences(setPreferences), []);
+
+  // Prepare the latest assistant reply in the background so the speaker button
+  // can play cached Hannah audio without starting a new network request.
+  useEffect(() => {
+    if (isStreaming || typeof window === 'undefined') return;
+    const latestAssistant = [...messages].reverse().find((message) => message.role === 'assistant' && message.content?.trim());
+    if (!latestAssistant) return;
+    const timer = window.setTimeout(() => {
+      void prepareGroqTtsResponse({
+        text: latestAssistant.content,
+        language: getStoredLanguagePreference(),
+        key: latestAssistant.id,
+      }).catch(() => {
+        // The speaker action still has its normal fallback if the provider is unavailable.
+      });
+    }, 250);
+    return () => window.clearTimeout(timer);
+  }, [isStreaming, messages]);
 
   const shownToastsRef = useRef<Set<string>>(new Set());
 

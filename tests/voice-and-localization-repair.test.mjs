@@ -23,7 +23,9 @@ test('uses direct Groq audio synthesis as the primary voice provider', () => {
   assert.match(playback, /stopVoicePlayback\(\)/)
   assert.match(playback, /removeAttribute\("src"\)/)
   assert.match(playback, /audio\.load\(\)/)
-  assert.match(playback, /signal: abortController\.signal/)
+  assert.match(playback, /signal \? \{ signal \} : \{\}/)
+  assert.match(playback, /prepareGroqTtsResponse/)
+  assert.match(playback, /preparedAudioCache/)
   assert.match(messages, /playGroqTtsResponse/)
 })
 
