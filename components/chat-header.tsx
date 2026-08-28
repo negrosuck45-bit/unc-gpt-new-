@@ -1,6 +1,6 @@
 import { type Chat, type Project } from "@/lib/chat-store"
 import { Button } from "@/components/ui/button"
-import { Bell, Menu, PanelLeftClose } from "lucide-react"
+import { Bell, Menu, Moon, PanelLeftClose } from "lucide-react"
 import { useUiText } from "@/lib/ui-translations"
 
 interface ChatHeaderProps {
@@ -28,6 +28,14 @@ export function ChatHeader({ onOpenSidebar, isSidebarOpen }: ChatHeaderProps) {
           {isSidebarOpen ? <PanelLeftClose className="h-[19px] w-[19px]" /> : <Menu className="h-[19px] w-[19px]" />}
         </Button>
       )}
+      <span
+        role="img"
+        aria-label="Dark mode"
+        title="Dark mode"
+        className="ml-auto inline-flex h-10 w-10 shrink-0 items-center justify-center text-sidebar-foreground/75"
+      >
+        <Moon className="h-[19px] w-[19px]" strokeWidth={1.7} />
+      </span>
       <Button
         variant="ghost"
         size="icon"
