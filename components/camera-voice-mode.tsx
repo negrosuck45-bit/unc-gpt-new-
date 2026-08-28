@@ -179,12 +179,12 @@ export function CameraVoiceMode({ open, onClose, onAsk }: CameraVoiceModeProps) 
       <button type="button" onClick={onClose} aria-label="Close camera voice mode" className="absolute right-5 top-[max(1.25rem,env(safe-area-inset-top))] z-20 flex h-11 w-11 items-center justify-center rounded-full bg-black/45 text-white backdrop-blur-xl"><X className="h-5 w-5" /></button>
       <div className="relative z-10 flex w-full max-w-md flex-col items-center px-8 text-center">
         <p className="min-h-7 max-w-sm text-lg font-medium drop-shadow-lg">{interim || transcriptRef.current}</p>
-        <p className="absolute bottom-28 max-w-xs text-sm text-white/80">{cameraError || (busy ? "Lunar is replying…" : muted ? "Tap the microphone to speak" : listening ? "Listening…" : "Microphone muted")}</p>
+        <p className="fixed bottom-[calc(10rem+env(safe-area-inset-bottom))] left-1/2 z-20 w-full -translate-x-1/2 px-8 text-sm text-white/80">{cameraError || (busy ? "Lunar is replying…" : muted ? "Tap the microphone to speak" : listening ? "Listening…" : "Microphone muted")}</p>
         <button
           type="button"
           onClick={toggleMicrophone}
           aria-label={muted ? "Turn microphone on" : "Mute microphone"}
-          className={cn("absolute bottom-7 flex h-24 w-24 items-center justify-center rounded-full border border-white/50 bg-black/50 shadow-[0_0_42px_rgba(255,255,255,.22)] backdrop-blur-xl transition", !muted && "border-white bg-white text-black shadow-[0_0_54px_rgba(255,255,255,.8)]")}
+          className={cn("fixed bottom-[calc(3.5rem+env(safe-area-inset-bottom))] left-1/2 z-20 flex h-24 w-24 -translate-x-1/2 items-center justify-center rounded-full border border-white/50 bg-black/50 shadow-[0_0_42px_rgba(255,255,255,.22)] backdrop-blur-xl transition", !muted && "border-white bg-white text-black shadow-[0_0_54px_rgba(255,255,255,.8)]")}
         >
           {muted ? <MicOff className="h-9 w-9" /> : <Mic className="h-9 w-9" />}
         </button>
