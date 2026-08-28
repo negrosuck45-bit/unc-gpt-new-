@@ -3,6 +3,7 @@
 import { useEffect, useRef, useState, useMemo, useCallback } from 'react';
 import NextImage from 'next/image';
 import { Message, Attachment } from '@/lib/chat-store';
+import { getStoredLanguagePreference } from '@/lib/language-preferences';
 import { cn } from '@/lib/utils';
 import { motion, AnimatePresence } from 'framer-motion';
 import {
@@ -446,7 +447,7 @@ function MessageActions({ message, isAssistant, onCopy, onRegenerate, onEdit, on
     }
     setIsSpeaking(true);
     try {
-      const response = await fetch('/api/voice-chat', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ text: message.content }) });
+      const response = await fetch('/api/voice-chat', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ text: message.content, language: getStoredLanguagePreference() === 'auto' ? (navigator.language || 'en').split('-')[0] : getStoredLanguagePreference() }) });
       const data = await response.json();
       if (data.audioUrl) {
         const audio = new Audio(data.audioUrl);
@@ -454,10 +455,8 @@ function MessageActions({ message, isAssistant, onCopy, onRegenerate, onEdit, on
         await audio.play();
       } else throw new Error('Audio unavailable');
     } catch {
-      const utterance = new SpeechSynthesisUtterance(message.content);
-      utterance.onend = () => setIsSpeaking(false);
-      window.speechSynthesis.cancel();
-      window.speechSynthesis.speak(utterance);
+      setIsSpeaking(false);
+      window.alert('Aura-2-es audio is unavailable right now. Please try again.');
     }
   }, [isSpeaking, message.content]);
 
