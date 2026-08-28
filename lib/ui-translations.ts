@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react'
-import { normalizeLanguagePreference, getStoredLanguagePreference } from '@/lib/language-preferences'
+import { LANGUAGE_OPTIONS, normalizeLanguagePreference, getStoredLanguagePreference } from '@/lib/language-preferences'
 
 type TranslationKey =
   | 'signInTitle' | 'signUpTitle' | 'welcomeBack' | 'createAccount'
@@ -37,18 +37,38 @@ const translations: Record<string, Partial<Record<TranslationKey, string>>> = {
   pt: { welcomeBack: 'Bem-vindo de volta!', assignTask: 'Atribua uma tarefa ou digite / para mais', language: 'Idioma', settings: 'Configurações', notifications: 'Notificações', newChat: 'Novo chat', search: 'Pesquisar', send: 'Enviar', cancel: 'Cancelar', connect: 'Conectar', disconnect: 'Desconectar', messages: 'Mensagens', inbox: 'Caixa de entrada', startConversation: 'Iniciar uma conversa', chooseLanguage: 'Escolha seu idioma' },
 }
 
+// Every language in the picker gets a complete catalog. Locale-specific phrases
+// win, while individual untranslated phrases safely fall back to English.
+const completeTranslations: Record<string, Partial<Record<TranslationKey, string>>> = Object.fromEntries(
+  LANGUAGE_OPTIONS
+    .filter(({ code }) => code !== 'auto')
+    .map(({ code }) => [code, { ...(translations.en || {}), ...(translations[code] || {}) }]),
+)
+
+function getDeviceLanguage(): string {
+  if (typeof navigator === 'undefined') return 'en'
+  const candidates = [navigator.language, ...(navigator.languages || [])]
+  for (const candidate of candidates) {
+    const code = String(candidate || '').toLowerCase().split('-')[0]
+    if (code && completeTranslations[code]) return code
+  }
+  return 'en'
+}
+
 export function getUiLanguage(value: unknown): string {
   const code = normalizeLanguagePreference(value)
-  return code === 'auto' ? 'en' : code
+  if (code === 'auto') return getDeviceLanguage()
+  return completeTranslations[code] ? code : 'en'
 }
 
 export function uiText(value: unknown, key: TranslationKey): string {
   const language = getUiLanguage(value)
-  return translations[language]?.[key] ?? translations.en[key] ?? key
+  return completeTranslations[language]?.[key] ?? translations.en[key] ?? key
 }
 
 export function useUiText() {
-  const [language, setLanguage] = useState<string>('auto')
+  // Render English on the server/first paint, then resolve the device locale after mount.
+  const [language, setLanguage] = useState<string>('en')
   useEffect(() => {
     const sync = () => setLanguage(getStoredLanguagePreference())
     sync()
