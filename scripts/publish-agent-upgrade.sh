@@ -89,6 +89,7 @@ files=(
   "lib/chat-store.ts"
   "lib/client-runtime-context.ts"
   "lib/language-preferences.ts"
+  "lib/ui-translations.ts"
   "lib/user-preferences.ts"
   "lib/chat-with-search.ts"
   "lib/passkey.ts"

@@ -1,0 +1,38 @@
+import { normalizeLanguagePreference } from '@/lib/language-preferences'
+
+type TranslationKey =
+  | 'signInTitle' | 'signUpTitle' | 'welcomeBack' | 'createAccount'
+  | 'continueGoogle' | 'continueDiscord' | 'continueGithub' | 'openingSignIn'
+  | 'lastUsed' | 'or' | 'emailAddress' | 'enterEmail' | 'continue'
+  | 'signUpPrompt' | 'signInPrompt' | 'dontHaveAccount' | 'alreadyHaveAccount'
+  | 'emailUnavailable' | 'cancelled' | 'unavailable' | 'failed' | 'unverified'
+  | 'getStarted' | 'language' | 'automaticDevice' | 'selected' | 'back' | 'openingLanguageSelection'
+  | 'enterEmailOnboarding' | 'accountRecovery' | 'signedInAccount'
+  | 'whatsYourName' | 'nameDescription' | 'yourName' | 'chooseUsername'
+  | 'usernameDescription' | 'changeLater' | 'createAccountButton' | 'chooseLanguage'
+
+const translations: Record<string, Partial<Record<TranslationKey, string>>> = {
+  en: {
+    signInTitle: 'Sign in to Lunar', signUpTitle: 'Create your Lunar account', welcomeBack: 'Welcome back! Please sign in to continue', createAccount: 'Create an account to continue.',
+    continueGoogle: 'Continue with Google', continueDiscord: 'Continue with Discord', continueGithub: 'Continue with GitHub', openingSignIn: 'Opening secure sign-in…', lastUsed: 'Last used', or: 'or', emailAddress: 'Email address', enterEmail: 'Enter your email address', continue: 'Continue', dontHaveAccount: "Don't have an account?", alreadyHaveAccount: 'Already have an account?', signUpPrompt: 'Sign up', signInPrompt: 'Sign in', emailUnavailable: 'Email sign-in is not configured yet. Use Google, Discord, or GitHub to continue securely.', cancelled: 'Sign-in was cancelled. Choose a provider to continue.', unavailable: 'This Lunar sign-in option is still being configured. Please choose another option.', failed: 'Lunar could not complete that sign-in. Please try again.', unverified: 'Use a provider account with a verified email address to continue.', getStarted: 'Get started', language: 'Language', automaticDevice: 'Automatic uses your device language.', selected: 'Selected', back: 'Back', openingLanguageSelection: 'Opening language selection', enterEmailOnboarding: 'Enter your email', accountRecovery: 'For your Lunar account and recovery.', signedInAccount: 'Signed-in Lunar account', whatsYourName: "What's your name?", nameDescription: 'This name will be shown in your Lunar settings.', yourName: 'Your name', chooseUsername: 'Choose a username', usernameDescription: '1–24 characters. Use letters, numbers, and underscores.', changeLater: 'You can change this later in Settings.', createAccountButton: 'Create account', chooseLanguage: 'Choose your language',
+  },
+  it: {
+    signInTitle: 'Accedi a Lunar', signUpTitle: 'Crea il tuo account Lunar', welcomeBack: 'Bentornato! Accedi per continuare', createAccount: 'Crea un account per continuare.', continueGoogle: 'Continua con Google', continueDiscord: 'Continua con Discord', continueGithub: 'Continua con GitHub', openingSignIn: 'Apertura dell’accesso sicuro…', lastUsed: 'Usato di recente', or: 'oppure', emailAddress: 'Indirizzo email', enterEmail: 'Inserisci il tuo indirizzo email', continue: 'Continua', dontHaveAccount: 'Non hai un account?', alreadyHaveAccount: 'Hai già un account?', signUpPrompt: 'Registrati', signInPrompt: 'Accedi', emailUnavailable: 'L’accesso con email non è ancora configurato. Usa Google, Discord o GitHub per continuare in sicurezza.', cancelled: 'Accesso annullato. Scegli un provider per continuare.', unavailable: 'Questa opzione di accesso a Lunar è ancora in configurazione. Scegline un’altra.', failed: 'Lunar non ha potuto completare l’accesso. Riprova.', unverified: 'Usa un account del provider con un indirizzo email verificato per continuare.', getStarted: 'Inizia', language: 'Lingua', automaticDevice: 'Automatico usa la lingua del dispositivo.', selected: 'Selezionato', back: 'Indietro', openingLanguageSelection: 'Apertura della selezione della lingua', enterEmailOnboarding: 'Inserisci la tua email', accountRecovery: 'Per il tuo account Lunar e il recupero.', signedInAccount: 'Account Lunar connesso', whatsYourName: 'Come ti chiami?', nameDescription: 'Questo nome sarà mostrato nelle impostazioni di Lunar.', yourName: 'Il tuo nome', chooseUsername: 'Scegli un nome utente', usernameDescription: '1–24 caratteri. Usa lettere, numeri e trattini bassi.', changeLater: 'Puoi cambiarlo in seguito nelle Impostazioni.', createAccountButton: 'Crea account', chooseLanguage: 'Scegli la tua lingua',
+  },
+  es: { signInTitle: 'Inicia sesión en Lunar', welcomeBack: '¡Bienvenido de nuevo! Inicia sesión para continuar', continueGoogle: 'Continuar con Google', continueDiscord: 'Continuar con Discord', continueGithub: 'Continuar con GitHub', openingSignIn: 'Abriendo el inicio de sesión seguro…', lastUsed: 'Usado recientemente', or: 'o', emailAddress: 'Correo electrónico', enterEmail: 'Introduce tu correo electrónico', continue: 'Continuar', dontHaveAccount: '¿No tienes una cuenta?', signUpPrompt: 'Regístrate', failed: 'Lunar no pudo completar el inicio de sesión. Inténtalo de nuevo.', language: 'Idioma', automaticDevice: 'Automático usa el idioma de tu dispositivo.', chooseLanguage: 'Elige tu idioma' },
+  fr: { signInTitle: 'Se connecter à Lunar', welcomeBack: 'Bon retour ! Connectez-vous pour continuer', continueGoogle: 'Continuer avec Google', continueDiscord: 'Continuer avec Discord', continueGithub: 'Continuer avec GitHub', openingSignIn: 'Ouverture de la connexion sécurisée…', lastUsed: 'Dernière utilisation', or: 'ou', emailAddress: 'Adresse e-mail', enterEmail: 'Saisissez votre adresse e-mail', continue: 'Continuer', dontHaveAccount: 'Vous n’avez pas de compte ?', signUpPrompt: 'S’inscrire', failed: 'Lunar n’a pas pu terminer la connexion. Réessayez.', language: 'Langue', automaticDevice: 'Automatique utilise la langue de votre appareil.', chooseLanguage: 'Choisissez votre langue' },
+  de: { signInTitle: 'Bei Lunar anmelden', welcomeBack: 'Willkommen zurück! Bitte anmelden, um fortzufahren', continueGoogle: 'Mit Google fortfahren', continueDiscord: 'Mit Discord fortfahren', continueGithub: 'Mit GitHub fortfahren', openingSignIn: 'Sichere Anmeldung wird geöffnet…', lastUsed: 'Zuletzt verwendet', or: 'oder', emailAddress: 'E-Mail-Adresse', enterEmail: 'E-Mail-Adresse eingeben', continue: 'Weiter', dontHaveAccount: 'Noch kein Konto?', signUpPrompt: 'Registrieren', failed: 'Lunar konnte die Anmeldung nicht abschließen. Bitte versuche es erneut.', language: 'Sprache', automaticDevice: 'Automatisch verwendet die Gerätesprache.', chooseLanguage: 'Sprache auswählen' },
+  pt: { signInTitle: 'Entrar no Lunar', welcomeBack: 'Bem-vindo de volta! Entre para continuar', continueGoogle: 'Continuar com Google', continueDiscord: 'Continuar com Discord', continueGithub: 'Continuar com GitHub', openingSignIn: 'Abrindo login seguro…', lastUsed: 'Usado recentemente', or: 'ou', emailAddress: 'Endereço de e-mail', enterEmail: 'Digite seu e-mail', continue: 'Continuar', dontHaveAccount: 'Não tem uma conta?', signUpPrompt: 'Criar conta', failed: 'O Lunar não conseguiu concluir o login. Tente novamente.', language: 'Idioma', automaticDevice: 'Automático usa o idioma do dispositivo.', chooseLanguage: 'Escolha seu idioma' },
+}
+
+export function getUiLanguage(value: unknown): string {
+  const code = normalizeLanguagePreference(value)
+  return code === 'auto' ? 'en' : code
+}
+
+export function uiText(value: unknown, key: TranslationKey): string {
+  const language = getUiLanguage(value)
+  return translations[language]?.[key] ?? translations.en[key] ?? key
+}
+
+export type { TranslationKey }
