@@ -1,6 +1,6 @@
 import { type Chat, type Project } from "@/lib/chat-store"
 import { Button } from "@/components/ui/button"
-import { Bell, Menu, Moon, PanelLeftClose } from "lucide-react"
+import { Bell, Menu, PanelLeftClose } from "lucide-react"
 import { useUiText } from "@/lib/ui-translations"
 
 interface ChatHeaderProps {
@@ -34,7 +34,9 @@ export function ChatHeader({ onOpenSidebar, isSidebarOpen }: ChatHeaderProps) {
         title="Dark mode"
         className="ml-auto inline-flex h-10 w-10 shrink-0 items-center justify-center text-sidebar-foreground/75"
       >
-        <Moon className="h-[19px] w-[19px]" strokeWidth={1.7} />
+        <svg aria-hidden="true" viewBox="0 0 24 24" className="h-[21px] w-[21px] fill-current">
+          <path d="M20.4 14.4a8.5 8.5 0 0 1-10.8-10.8A8.5 8.5 0 1 0 20.4 14.4Z" />
+        </svg>
       </span>
       <Button
         variant="ghost"
