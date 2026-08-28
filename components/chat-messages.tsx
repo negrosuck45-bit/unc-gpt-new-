@@ -27,6 +27,8 @@ import {
   RotateCcw,
   AlertCircle,
   AudioWaveform,
+  Volume2,
+  VolumeX,
 } from 'lucide-react';
 import { MessageContent } from './message-content';
 import { ComputerUseSteps } from './computer-use-steps';
@@ -400,6 +402,7 @@ function NetworkErrorBanner({ error, onRetry }: { error: string; onRetry?: () =>
 function MessageActions({ message, isAssistant, onCopy, onRegenerate, onEdit, onDislike }: { message: Message; isAssistant: boolean; onCopy: () => void; onRegenerate?: () => void; onEdit?: () => void; onDislike?: () => void }) {
   const [copied, setCopied] = useState(false);
   const [feedback, setFeedback] = useState<'like' | 'dislike' | null>(null);
+  const [isSpeaking, setIsSpeaking] = useState(false);
   const hasCopiedRef = useRef(false);
   const copyTimeoutRef = useRef<NodeJS.Timeout | null>(null);
 
@@ -435,13 +438,35 @@ function MessageActions({ message, isAssistant, onCopy, onRegenerate, onEdit, on
 
   const handleLike = useCallback(async () => { await saveFeedbackToSupabase(message.id, 'like', message.content); setFeedback('like'); }, [message.id, message.content]);
   const handleDislike = useCallback(() => { onDislike?.(); }, [onDislike]);
+  const handleSpeak = useCallback(async () => {
+    if (isSpeaking) {
+      window.speechSynthesis.cancel();
+      setIsSpeaking(false);
+      return;
+    }
+    setIsSpeaking(true);
+    try {
+      const response = await fetch('/api/voice-chat', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ text: message.content }) });
+      const data = await response.json();
+      if (data.audioUrl) {
+        const audio = new Audio(data.audioUrl);
+        audio.onended = () => setIsSpeaking(false);
+        await audio.play();
+      } else throw new Error('Audio unavailable');
+    } catch {
+      const utterance = new SpeechSynthesisUtterance(message.content);
+      utterance.onend = () => setIsSpeaking(false);
+      window.speechSynthesis.cancel();
+      window.speechSynthesis.speak(utterance);
+    }
+  }, [isSpeaking, message.content]);
 
   return (
     <div className={cn('flex items-center gap-1 mt-1 transition-opacity', 'opacity-100 md:opacity-0 md:group-hover:opacity-100', isAssistant ? 'ml-0' : 'mr-0 flex-row-reverse')}>
       <Button variant="ghost" size="icon" className="h-7 w-7 text-muted-foreground" onClick={handleCopy}>
         {copied ? <Check className="h-3.5 w-3.5" /> : <Copy className="h-3.5 w-3.5" />}
       </Button>
-      {isAssistant && (<><Button variant="ghost" size="icon" className={cn("h-7 w-7", feedback === 'like' ? "text-green-500" : "text-muted-foreground hover:text-green-500")} onClick={handleLike} title="Good response"><ThumbsUp className="h-3.5 w-3.5" /></Button><Button variant="ghost" size="icon" className={cn("h-7 w-7", feedback === 'dislike' ? "text-red-500" : "text-muted-foreground hover:text-red-500")} onClick={handleDislike} title="Bad response - provide feedback"><ThumbsDown className="h-3.5 w-3.5" /></Button></>)}
+      {isAssistant && (<><Button variant="ghost" size="icon" className={cn("h-7 w-7", feedback === 'like' ? "text-green-500" : "text-muted-foreground hover:text-green-500")} onClick={handleLike} aria-label="Like response" title="Like response"><ThumbsUp className="h-3.5 w-3.5" /></Button><Button variant="ghost" size="icon" className={cn("h-7 w-7", feedback === 'dislike' ? "text-red-500" : "text-muted-foreground hover:text-red-500")} onClick={handleDislike} aria-label="Dislike response" title="Dislike response"><ThumbsDown className="h-3.5 w-3.5" /></Button><Button variant="ghost" size="icon" className="h-7 w-7 text-muted-foreground hover:text-foreground" onClick={handleSpeak} aria-label={isSpeaking ? "Stop reading" : "Read response aloud"} title={isSpeaking ? "Stop reading" : "Read response aloud"}>{isSpeaking ? <VolumeX className="h-3.5 w-3.5" /> : <Volume2 className="h-3.5 w-3.5" />}</Button></>)}
       {onRegenerate && (<Button variant="ghost" size="icon" className="h-7 w-7 text-muted-foreground" onClick={onRegenerate}><RefreshCw className="h-3.5 w-3.5" /></Button>)}
       {onEdit && (<Button variant="ghost" size="icon" className="h-7 w-7 text-muted-foreground" onClick={onEdit}><Pencil className="h-3.5 w-3.5" /></Button>)}
     </div>

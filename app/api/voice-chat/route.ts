@@ -8,10 +8,24 @@ export async function POST(req: NextRequest) {
       return Response.json({ error: "Missing text" }, { status: 400 });
     }
 
-    // Use Web Speech API alternative (client-side) or free TTS service
-    const ttsUrl = `https://api.elevenlabs.io/v1/text-to-speech/21m00Tcm4TlvDq8ikWAM`;
-    
-    // Alternative: Use free Google TTS
+    // Reuse the existing Cloudflare Worker gateway. If Aura is unavailable,
+    // return a browser-safe fallback URL so playback still works.
+    const workerUrl = "https://fragrant-band-d94a.blackmonkey098gg.workers.dev";
+    try {
+      const workerResponse = await fetch(workerUrl, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ model: "aura-2-es", text, language }),
+      });
+      const contentType = workerResponse.headers.get("content-type") || "";
+      if (workerResponse.ok && contentType.startsWith("audio/")) {
+        const audio = Buffer.from(await workerResponse.arrayBuffer()).toString("base64");
+        return Response.json({ success: true, audioUrl: `data:${contentType};base64,${audio}`, text, language, model: "aura-2-es" });
+      }
+    } catch {
+      // Fall through to the lightweight URL fallback below.
+    }
+
     const googleTtsUrl = new URL("https://translate.google.com/translate_tts");
     googleTtsUrl.searchParams.set("client", "tw-ob");
     googleTtsUrl.searchParams.set("q", text);
