@@ -142,7 +142,8 @@ async function providerUser(provider: LunarOAuthProvider, accessToken: string) {
   return githubUser(accessToken)
 }
 
-function oauthFailure(request: Request, provider: LunarOAuthProvider, code: "cancelled" | "unavailable" | "failed" | "unverified") {
+function oauthFailure(request: Request, provider: LunarOAuthProvider, code: "cancelled" | "unavailable" | "failed" | "unverified", stage = "unknown") {
+  console.warn(`[Lunar OAuth] callback failed provider=${provider} code=${code} stage=${stage}`)
   const response = lunarAuthFailure(request, code)
   clearLunarOAuthState(response, provider)
   return response
@@ -154,20 +155,21 @@ export async function GET(request: Request, context: { params: Promise<{ provide
   const provider = requestedProvider
   const url = new URL(request.url)
 
-  if (url.searchParams.has("error")) return oauthFailure(request, provider, "cancelled")
+  if (url.searchParams.has("error")) return oauthFailure(request, provider, "cancelled", "provider_cancelled")
   const code = url.searchParams.get("code")
-  if (!code) return oauthFailure(request, provider, "failed")
+  if (!code) return oauthFailure(request, provider, "failed", "missing_code")
   const oauthState = await validateLunarOAuthState(request, provider)
-  if (!oauthState) return oauthFailure(request, provider, "failed")
+  if (!oauthState) return oauthFailure(request, provider, "failed", "state_invalid")
 
   const accessToken = await exchangeCode(request, provider, code, oauthState.codeVerifier)
-  if (!accessToken) return oauthFailure(request, provider, "failed")
+  if (!accessToken) return oauthFailure(request, provider, "failed", "token_exchange")
   const user = await providerUser(provider, accessToken)
-  if (!user) return oauthFailure(request, provider, "unverified")
+  if (!user) return oauthFailure(request, provider, "unverified", "identity_unverified")
 
   const accountScope = await resolveLunarAccountScope(user)
-  if (!accountScope) return oauthFailure(request, provider, "failed")
+  if (!accountScope) return oauthFailure(request, provider, "failed", "account_bridge")
 
+  console.info(`[Lunar OAuth] callback success provider=${provider} account_scope=${accountScope.startsWith("user_") ? "legacy" : "new"}`)
   const response = await lunarAuthSuccess(request, user, accountScope)
   clearLunarOAuthState(response, provider)
   return response
