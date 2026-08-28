@@ -299,19 +299,16 @@ export function SettingsPage({ onClose }: SettingsPageProps) {
                   <SectionTitle title="General Settings" description="Basic app preferences" />
                   <div className="flex items-center justify-between gap-4">
                     <div className="min-w-0">
-                      <Label>AI language</Label>
-                      <p className="mt-1 text-xs leading-5 text-muted-foreground">The AI receives this preference with every chat request.</p>
+                      <Label>Language:</Label>
+                      <p className="mt-1 text-xs leading-5 text-muted-foreground">Choose the language used across Lunar.</p>
                     </div>
-                    <Select value={language} onValueChange={(value) => {
-                      const nextLanguage = normalizeLanguagePreference(value);
+                    <select aria-label="Language" value={language} onChange={(event) => {
+                      const nextLanguage = normalizeLanguagePreference(event.target.value);
                       setLanguage(nextLanguage);
                       try { localStorage.setItem('uncgpt-language', nextLanguage) } catch {}
-                    }}>
-                      <SelectTrigger className="w-[190px] shrink-0 rounded-full border-border/10 bg-muted/[0.08] px-4"><SelectValue /></SelectTrigger>
-                      <SelectContent className="max-h-[min(50dvh,420px)]">
-                        {LANGUAGE_OPTIONS.map((option) => <SelectItem key={option.code} value={option.code}>{option.label}</SelectItem>)}
-                      </SelectContent>
-                    </Select>
+                    }} className="h-10 w-[190px] shrink-0 appearance-none rounded-full border border-border/10 bg-muted/[0.08] px-4 text-sm text-foreground outline-none focus:ring-2 focus:ring-foreground/15">
+                      {LANGUAGE_OPTIONS.map((option) => <option key={option.code} value={option.code}>{option.label}</option>)}
+                    </select>
                   </div>
                   <SettingRow label="Send on Enter" description="Press Enter to send, Shift+Enter for new line">
                     <Switch checked={sendOnEnter} onCheckedChange={(value) => { setSendOnEnter(value); writeUserPreferences({ sendOnEnter: value }) }} />

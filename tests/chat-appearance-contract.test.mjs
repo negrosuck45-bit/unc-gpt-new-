@@ -16,7 +16,7 @@ test('AI replies are bubbleless while user messages retain their bubble', () => 
   assert.match(computerMessages, /\? 'rounded-lg bg-blue-600 px-4 py-3 text-white rounded-br-none'/);
 });
 
-test('Settings keeps a comprehensive AI language list while the app is locked to its clean gray appearance', () => {
+test('Settings keeps a comprehensive language list with a native mobile picker while the app is locked to its clean gray appearance', () => {
   const settings = read('./components/settings-page.tsx');
   const layout = read('./app/layout.tsx');
   const styles = read('./app/globals.css');
@@ -69,7 +69,9 @@ test('Settings keeps a comprehensive AI language list while the app is locked to
   assert.doesNotMatch(notifications, /bg-\[#050505\]/);
   assert.doesNotMatch(inbox, /bg-\[#050505\]/);
   assert.doesNotMatch(thread, /bg-\[#050505\]/);
-  assert.match(settings, /AI language/);
+  assert.match(settings, /<Label>Language:<\/Label>/);
+  assert.match(settings, /<select aria-label="Language"/);
+  assert.match(settings, /appearance-none/);
   assert.match(settings, /LANGUAGE_OPTIONS\.map/);
   assert.match(languages, /code: "aa", label: "Afar"/);
   assert.match(languages, /code: "zh", label: "Chinese"/);
