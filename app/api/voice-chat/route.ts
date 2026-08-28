@@ -5,7 +5,8 @@ export const runtime = "nodejs"
 const ENGLISH_MODEL = "canopylabs/orpheus-v1-english"
 const ARABIC_MODEL = "canopylabs/orpheus-arabic-saudi"
 const DEFAULT_VOICE = "hannah"
-const MAX_TEXT_LENGTH = 4_000
+// Groq Orpheus currently documents a 200-character input limit.
+const MAX_TEXT_LENGTH = 200
 let keyCursor = 0
 
 function normalizeLanguage(value: unknown) {

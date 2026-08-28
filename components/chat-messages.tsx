@@ -466,6 +466,18 @@ function MessageActions({ message, isAssistant, onCopy, onRegenerate, onEdit, on
     }
 
     setVoiceError(null);
+    // iOS Safari can reject speech/audio started after an awaited network request.
+    // Start its built-in free speech engine directly from the tap instead.
+    const isAppleMobile = typeof navigator !== 'undefined' && /iPhone|iPad|iPod/i.test(navigator.userAgent);
+    if (isAppleMobile) {
+      try {
+        await speakWithBrowserFallback({ text: message.content, language, key: message.id });
+      } catch (error) {
+        if (!(error instanceof VoicePlaybackCancelledError)) setVoiceError(t('voiceUnavailable'));
+      }
+      return;
+    }
+
     try {
       await playGroqTtsResponse({ text: message.content, language, key: message.id });
     } catch (error) {
