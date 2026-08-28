@@ -7,6 +7,26 @@ export const runtime = "nodejs";
 const PROFILE_FIELDS = ["username", "bio", "profile_picture", "background_media", "background_media_type", "music_url", "music_name", "music_thumbnail", "cursor_image"] as const;
 type ProfileField = (typeof PROFILE_FIELDS)[number];
 const THUMBNAIL_MARKER = "__uncgpt_thumbnail__:";
+const PROFILE_FIELD_LIMITS: Partial<Record<ProfileField, number>> = {
+  bio: 160,
+  profile_picture: 2048,
+  background_media: 2048,
+  music_url: 2048,
+  music_name: 120,
+  music_thumbnail: 2048,
+  cursor_image: 2048,
+};
+const PROFILE_MEDIA_FIELDS: ProfileField[] = ["profile_picture", "background_media", "music_url", "music_thumbnail", "cursor_image"];
+
+function isSafeProfileMediaUrl(value: string) {
+  if (value.startsWith("/")) return true;
+  try {
+    const url = new URL(value);
+    return url.protocol === "https:" && !url.username && !url.password;
+  } catch {
+    return false;
+  }
+}
 
 function normalizeProfile<T extends Record<string, any> | null>(profile: T): T {
   if (!profile || typeof profile.music_name !== "string") return profile;
@@ -54,14 +74,18 @@ export async function PATCH(request: NextRequest) {
     if (Object.prototype.hasOwnProperty.call(body ?? {}, field)) {
       const value = body?.[field];
       if (field === "username" && (value == null || String(value).trim() === "")) continue;
-      update[field] = value == null ? null : String(value);
+      if (value != null && typeof value !== "string") return NextResponse.json({ error: "Invalid profile value." }, { status: 400 });
+      const normalizedValue = value == null ? null : value.trim();
+      const maxLength = PROFILE_FIELD_LIMITS[field];
+      if (normalizedValue && maxLength && normalizedValue.length > maxLength) return NextResponse.json({ error: "Profile value is too long." }, { status: 400 });
+      if (normalizedValue && PROFILE_MEDIA_FIELDS.includes(field) && !isSafeProfileMediaUrl(normalizedValue)) return NextResponse.json({ error: "Invalid media address." }, { status: 400 });
+      update[field] = normalizedValue;
     }
   }
   if (typeof update.username === "string") {
     update.username = update.username.trim().replace(/^@+/, "");
     if (!/^[A-Za-z0-9_]{1,24}$/.test(update.username)) return NextResponse.json({ error: "Use 1–24 letters, numbers, or underscores." }, { status: 400 });
   }
-  if (typeof update.bio === "string") update.bio = update.bio.slice(0, 160);
   if (update.background_media_type && !["image", "video"].includes(update.background_media_type)) {
     return NextResponse.json({ error: "Invalid background media type." }, { status: 400 });
   }

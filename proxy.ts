@@ -8,9 +8,11 @@ const STATE_CHANGING_METHODS = new Set(["POST", "PUT", "PATCH", "DELETE"])
 
 function hasTrustedOrigin(request: NextRequest) {
   const origin = request.headers.get("origin")
-  if (!origin) return request.headers.get("sec-fetch-site") !== "cross-site"
+  // State-changing API calls from browsers include Origin. If it is absent,
+  // accept only requests explicitly identified as same-origin by Fetch Metadata.
+  if (!origin) return request.headers.get("sec-fetch-site") === "same-origin"
   try {
-    return new URL(origin).host === request.nextUrl.host
+    return new URL(origin).origin === request.nextUrl.origin
   } catch {
     return false
   }

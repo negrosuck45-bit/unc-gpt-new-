@@ -11,7 +11,7 @@ test('uses Lunar branding in the document metadata and visible app chrome', () =
   const onboarding = source('components/first-open-onboarding.tsx')
 
   assert.match(layout, /title: "Lunar"/)
-  assert.match(layout, /"\/lunar\.png"/)
+  assert.match(layout, /"\/lunar-mark\.svg"/)
   assert.match(sidebar, />Lunar</)
   assert.match(onboarding, />Lunar</)
   assert.match(onboarding, /alt="Lunar"/)
@@ -34,10 +34,10 @@ test('ships the Lunar icon and identifies the official profile as Lunar', () => 
   const profile = source('app/[username]/page.tsx')
   const avatar = source('app/api/profile/avatar/route.ts')
 
-  assert.equal(fs.existsSync(new URL('public/lunar.png', root)), true)
+  assert.equal(fs.existsSync(new URL('public/lunar-mark.svg', root)), true)
   assert.match(profile, /username: "lunar"/)
-  assert.match(profile, /profile_picture: "\/lunar\.png"/)
-  assert.match(avatar, /"\/lunar\.png"/)
+  assert.match(profile, /profile_picture: "\/lunar-mark\.svg"/)
+  assert.match(avatar, /"\/lunar-mark\.svg"/)
   assert.doesNotMatch(profile, /official uncgpt/i)
 })
 

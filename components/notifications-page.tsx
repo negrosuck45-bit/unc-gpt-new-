@@ -80,7 +80,7 @@ export function NotificationsPage() {
                     src={`/api/profile/avatar?username=${encodeURIComponent(item.username)}`}
                     alt={`@${item.username}`}
                     className="h-full w-full object-cover"
-                    onError={(event) => { event.currentTarget.src = '/lunar.png' }}
+                    onError={(event) => { event.currentTarget.src = '/lunar-mark.svg' }}
                   />
                 </div>
                 <div className="min-w-0 flex-1">

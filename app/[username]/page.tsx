@@ -39,7 +39,7 @@ function getAdminClient() {
 async function getProfile(username: string): Promise<Profile | null> {
   const normalized = username.trim().replace(/^@+/, "");
   if (!/^[A-Za-z0-9_]{1,24}$/.test(normalized)) return null;
-  if (normalized.toLowerCase() === "lunar") return { username: "lunar", bio: "The official Lunar profile.", profile_picture: "/lunar.png", background_media: null, background_media_type: null, music_url: null, music_name: null, music_thumbnail: null, profile_views: 0, cursor_image: null, is_verified: true };
+  if (normalized.toLowerCase() === "lunar") return { username: "lunar", bio: "The official Lunar profile.", profile_picture: "/lunar-mark.svg", background_media: null, background_media_type: null, music_url: null, music_name: null, music_thumbnail: null, profile_views: 0, cursor_image: null, is_verified: true };
   const supabase = getAdminClient();
   if (!supabase) return null;
   const selectFields = "username,bio,profile_picture,background_media,background_media_type,music_url,music_name,music_thumbnail,profile_views,cursor_image";

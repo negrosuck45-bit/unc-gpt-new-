@@ -13,9 +13,9 @@ export const metadata: Metadata = {
   title: "Lunar",
   description: "A clean AI workspace with chat, projects, and memory.",
   icons: {
-    icon: "/lunar.png",
-    shortcut: "/lunar.png",
-    apple: "/lunar.png",
+    icon: "/lunar-mark.svg",
+    shortcut: "/lunar-mark.svg",
+    apple: "/lunar-mark.svg",
   },
 }
 
@@ -54,7 +54,6 @@ export default async function RootLayout({
           <Toaster position="bottom-center" theme="system" />
           {process.env.NODE_ENV === "production" && <Analytics />}
         </ThemeProvider>
-        <script src="https://js.puter.com/v2/"></script>
       </body>
     </html>
   )

@@ -42,17 +42,21 @@ export async function GET(request: NextRequest) {
   if (!supabase) return Response.json({ error: 'Private storage is not configured.' }, { status: 503 })
 
   try {
-    const { data, error } = await supabase.storage.from(CHAT_UPLOAD_BUCKET).download(path)
-    if (error || !data) return Response.json({ error: 'File not found.' }, { status: 404 })
-
-    const decrypted = decryptUpload(Buffer.from(await data.arrayBuffer()))
-    const { data: metadata } = await supabase
+    // Require a matching application record before accessing the storage object.
+    // The path prefix is an additional guard; the database record is authoritative.
+    const { data: metadata, error: metadataError } = await supabase
       .from('chat_attachments')
       .select('file_name, mime_type')
       .eq('user_id', session.user.sub)
       .eq('file_path', path)
       .maybeSingle()
-    const mimeType = typeof metadata?.mime_type === 'string' ? metadata.mime_type : 'application/octet-stream'
+    if (metadataError || !metadata) return Response.json({ error: 'File not found.' }, { status: 404 })
+
+    const { data, error } = await supabase.storage.from(CHAT_UPLOAD_BUCKET).download(path)
+    if (error || !data) return Response.json({ error: 'File not found.' }, { status: 404 })
+
+    const decrypted = decryptUpload(Buffer.from(await data.arrayBuffer()))
+    const mimeType = typeof metadata.mime_type === 'string' ? metadata.mime_type : 'application/octet-stream'
     const filename = String(metadata?.file_name || 'upload').replace(/["\\\r\n]/g, '_').slice(0, 120)
 
     return new Response(decrypted, {

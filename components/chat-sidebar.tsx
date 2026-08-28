@@ -247,11 +247,11 @@ export function ChatSidebar({
           className="group relative h-10 w-10 rounded-xl flex items-center justify-center text-sidebar-foreground/65 hover:bg-sidebar-accent hover:text-sidebar-foreground transition-all mb-1"
         >
           <Image
-            src="/lunar.png"
+            src="/lunar-mark.svg"
             alt="Lunar"
             width={28}
             height={28}
-            className="rounded-md transition-opacity duration-150 group-hover:opacity-0"
+            className="object-contain transition-opacity duration-150 group-hover:opacity-0"
           />
           <PanelLeft className="h-5 w-5 absolute opacity-0 group-hover:opacity-100 transition-opacity duration-150" />
         </button>
@@ -302,7 +302,7 @@ export function ChatSidebar({
             {/* Borderless sidebar identity row with the Mars logo restored. */}
             <div className="bg-transparent px-3.5 sm:px-4 pt-[max(0.875rem,env(safe-area-inset-top))] pb-3 flex items-center justify-between">
               <div className="flex items-center gap-2.5 min-w-0">
-                <Image src="/lunar.png" alt="Lunar logo" width={34} height={34} className="h-[34px] w-[34px] rounded-full object-cover" />
+                <Image src="/lunar-mark.svg" alt="Lunar logo" width={34} height={34} className="h-[34px] w-[34px] object-contain" />
                 <span className="font-semibold text-base truncate">Lunar</span>
               </div>
               <div className="flex items-center gap-1">
@@ -485,7 +485,7 @@ export function ChatSidebar({
               </AnimatePresence>
               <button onClick={() => setAccountOpen((open) => !open)} className="flex w-full items-center gap-3 rounded-[18px] border border-sidebar-border/[0.08] bg-sidebar-accent/[0.075] px-3 py-2.5 text-left shadow-[inset_0_1px_0_rgba(255,255,255,0.05)] transition hover:bg-sidebar-accent/[0.12]">
                 {profilePreferences.profilePicture || authUser?.picture ? <img src={profilePreferences.profilePicture || authUser?.picture || ''} alt="Profile" className="h-9 w-9 rounded-full object-cover ring-1 ring-white/15" /> : <span className="flex h-9 w-9 items-center justify-center rounded-full bg-emerald-500/80 text-base font-medium text-sidebar-foreground ring-1 ring-white/10">{(profilePreferences.profileName || authUser?.name || authUser?.email || 'U').slice(0, 1).toUpperCase()}</span>}
-                <span className="min-w-0 flex-1"><span className="block truncate text-[14px] font-medium leading-5 text-sidebar-foreground/92">{profilePreferences.profileName || authUser?.name || t('account')}</span><span className="block truncate text-[11px] leading-4 text-sidebar-foreground/45">{authUser?.email || t('signedInSecurely')}</span></span>
+                <span className="min-w-0 flex-1"><span className="block truncate text-[14px] font-medium leading-5 text-sidebar-foreground/92">{profilePreferences.profileName || authUser?.name || t('account')}</span>{authUser?.email && <span className="block truncate text-[11px] leading-4 text-sidebar-foreground/45">{authUser.email}</span>}</span>
                 <MoreHorizontal className="h-[18px] w-[18px] shrink-0 text-sidebar-foreground/50" />
               </button>
             </div>

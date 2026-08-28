@@ -16,12 +16,15 @@ function safeSegment(value: string) {
   return value.replace(/[^a-zA-Z0-9._-]/g, '_').slice(0, 120)
 }
 
-function mediaKind(type: string, name = '') {
-  const normalizedType = type.toLowerCase()
-  const extension = name.split('.').pop()?.toLowerCase() || ''
-  if (normalizedType.startsWith('image/') || ['gif', 'png', 'jpg', 'jpeg', 'webp', 'svg'].includes(extension)) return 'image'
-  if (normalizedType.startsWith('video/') || ['mp4', 'mov', 'webm', 'm4v'].includes(extension)) return 'video'
-  if (normalizedType.startsWith('audio/') || ['mp3', 'm4a', 'wav', 'ogg', 'aac', 'flac'].includes(extension)) return 'audio'
+const IMAGE_TYPES = new Set(['image/jpeg', 'image/png', 'image/webp', 'image/gif', 'image/avif', 'image/heic'])
+const VIDEO_TYPES = new Set(['video/mp4', 'video/webm', 'video/quicktime', 'video/x-m4v'])
+const AUDIO_TYPES = new Set(['audio/mpeg', 'audio/mp4', 'audio/wav', 'audio/ogg', 'audio/webm', 'audio/aac', 'audio/flac'])
+
+function mediaKind(type: string) {
+  const normalizedType = type.toLowerCase().trim()
+  if (IMAGE_TYPES.has(normalizedType)) return 'image'
+  if (VIDEO_TYPES.has(normalizedType)) return 'video'
+  if (AUDIO_TYPES.has(normalizedType)) return 'audio'
   return 'unknown'
 }
 
@@ -63,9 +66,9 @@ export async function POST(request: NextRequest) {
   const formData = await request.formData()
   const file = formData.get('file')
   const purpose = formData.get('purpose') === 'music'
-  const kind = file instanceof File ? mediaKind(file.type, file.name) : null
-  if (!(file instanceof File) || !kind) {
-    return Response.json({ error: 'Choose a file to upload.' }, { status: 400 })
+  const kind = file instanceof File ? mediaKind(file.type) : null
+  if (!(file instanceof File) || !kind || kind === 'unknown' || file.size <= 0) {
+    return Response.json({ error: 'Choose a supported image, video, or audio file to upload.' }, { status: 400 })
   }
   if (purpose && kind === 'image') {
     return Response.json({ error: 'Images cannot be used as Music. Choose an audio or video file.' }, { status: 415 })
@@ -88,7 +91,7 @@ export async function POST(request: NextRequest) {
 
   let uploadKind = purpose ? 'audio' : kind
   let extension = file.name.split('.').pop()?.toLowerCase() || 'bin'
-  let contentType = file.type || (extension === 'gif' ? 'image/gif' : extension === 'webp' ? 'image/webp' : 'application/octet-stream')
+  let contentType = file.type.toLowerCase().trim()
   let buffer = Buffer.from(await file.arrayBuffer())
   let extracted = false
   if (purpose || kind === 'audio') {
@@ -100,7 +103,7 @@ export async function POST(request: NextRequest) {
       uploadKind = 'audio'
       extracted = result.extracted
     } catch (error: any) {
-      if (purpose && (kind === 'video' || kind === 'unknown')) {
+      if (purpose && kind === 'video') {
         const noAudio = error?.code === 'NO_AUDIO_STREAM'
         return Response.json({
           error: noAudio

@@ -56,7 +56,7 @@ export function MessagesPage() {
               className="flex min-w-0 items-center gap-3 border-b border-border px-4 py-4 transition hover:bg-accent last:border-b-0 sm:gap-4 sm:px-6"
             >
               <div className="h-11 w-11 shrink-0 overflow-hidden rounded-full bg-muted">
-                <img src={`/api/profile/avatar?username=${encodeURIComponent(conversation.username)}`} alt={`@${conversation.username}`} className="h-full w-full object-cover" onError={(event) => { event.currentTarget.src = '/lunar.png' }} />
+                <img src={`/api/profile/avatar?username=${encodeURIComponent(conversation.username)}`} alt={`@${conversation.username}`} className="h-full w-full object-cover" onError={(event) => { event.currentTarget.src = '/lunar-mark.svg' }} />
               </div>
               <div className="min-w-0 flex-1">
                 <p className="truncate text-[15px] font-medium">@{conversation.username}</p>
