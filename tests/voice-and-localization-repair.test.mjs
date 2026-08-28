@@ -12,7 +12,9 @@ test('uses direct Groq audio synthesis as the primary voice provider', () => {
 
   assert.match(route, /const ENGLISH_MODEL = "canopylabs\/orpheus-v1-english"/)
   assert.match(route, /https:\/\/api\.groq\.com\/openai\/v1\/audio\/speech/)
-  assert.match(route, /GROQ_API_KEYS \|\| process\.env\.GROQ_API_KEY/)
+  assert.match(route, /process\.env\.GROQ_API_KEYS/)
+  assert.match(route, /process\.env\.GROQ_API_KEY/)
+  assert.match(route, /process\.env\.GROQ_KEY/)
   assert.match(route, /response_format: "wav"/)
   assert.match(route, /new Response\(result\.audio/)
   assert.match(playback, /response\.blob\(\)/)

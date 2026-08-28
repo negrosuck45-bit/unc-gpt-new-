@@ -495,9 +495,8 @@ textarea {
 
 /* ── Task-chat interface ── */
 .task-chat-surface {
-  background:
-    radial-gradient(840px 500px at 50% -130px, color-mix(in srgb, var(--task-chat-foreground) 5%, transparent), transparent 62%),
-    var(--task-chat-canvas);
+  /* Match the sidebar exactly instead of layering a separate chat gradient over it. */
+  background: var(--sidebar);
   color: var(--task-chat-foreground);
 }
 

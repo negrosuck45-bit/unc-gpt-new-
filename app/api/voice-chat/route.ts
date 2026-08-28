@@ -15,8 +15,13 @@ function normalizeLanguage(value: unknown) {
 }
 
 function configuredGroqKeys() {
-  return (process.env.GROQ_API_KEYS || process.env.GROQ_API_KEY || "")
-    .split(",")
+  const configured = process.env.GROQ_API_KEYS
+    || process.env.GROQ_API_KEY
+    || process.env.GROQ_KEY
+    || process.env.GROQ_TOKEN
+    || process.env.GROQ_API
+    || ""
+  return configured.split(",")
     .map((key) => key.trim())
     .filter(Boolean)
 }
