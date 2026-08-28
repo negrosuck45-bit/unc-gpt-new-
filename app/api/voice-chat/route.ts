@@ -33,7 +33,8 @@ function modelForLanguage(language: string) {
 
 function voiceForLanguage(language: string) {
   if (language === "ar") return process.env.GROQ_TTS_ARABIC_VOICE || "faisal"
-  return process.env.GROQ_TTS_VOICE || DEFAULT_VOICE
+  // Hannah is the selected English voice for this app.
+  return DEFAULT_VOICE
 }
 
 function safeProviderDetail(body: ArrayBuffer) {
