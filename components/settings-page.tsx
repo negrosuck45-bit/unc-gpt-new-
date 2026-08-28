@@ -24,6 +24,7 @@ import { DEFAULT_USER_PREFERENCES, readUserPreferences, writeUserPreferences, ty
 import { playReplySound, unlockReplySound } from '@/lib/notifications';
 import { SignOutButton } from './sign-out-button';
 import { LANGUAGE_OPTIONS, normalizeLanguagePreference, setStoredLanguagePreference } from '@/lib/language-preferences';
+import { useUiText } from '@/lib/ui-translations';
 
 interface SettingsPageProps { onClose?: () => void; }
 
@@ -63,6 +64,7 @@ export function SettingsPage({ onClose }: SettingsPageProps) {
   const [profileCardOffsetX, setProfileCardOffsetX] = useState(0);
   const [profileCardOffsetY, setProfileCardOffsetY] = useState(0);
   const [language, setLanguage] = useState('auto');
+  const t = useUiText();
 
   const currentChat = getCurrentChat();
   const isLocked = false;
@@ -247,10 +249,10 @@ export function SettingsPage({ onClose }: SettingsPageProps) {
   };
 
   const tabs: { id: SettingsTab; label: string; icon: React.ReactNode }[] = [
-    { id: 'general',    label: 'General',    icon: <Settings className="h-4 w-4" /> },
-    { id: 'profile',    label: 'Profile',    icon: <UserCircle className="h-4 w-4" /> },
-    { id: 'data',       label: 'Data',       icon: <Database className="h-4 w-4" /> },
-    { id: 'connectors', label: 'Connectors', icon: <PlugZap className="h-4 w-4" /> },
+    { id: 'general',    label: t('general'),    icon: <Settings className="h-4 w-4" /> },
+    { id: 'profile',    label: t('profile'),    icon: <UserCircle className="h-4 w-4" /> },
+    { id: 'data',       label: t('data'),       icon: <Database className="h-4 w-4" /> },
+    { id: 'connectors', label: t('connectors'), icon: <PlugZap className="h-4 w-4" /> },
   ];
 
   return (
@@ -296,39 +298,39 @@ export function SettingsPage({ onClose }: SettingsPageProps) {
               {/* ── General ─────────────────────────────────────────────── */}
               {activeTab === 'general' && (
                 <div className="space-y-6">
-                  <SectionTitle title="General Settings" description="Basic app preferences" />
+                  <SectionTitle title={t('generalSettings')} description={t('basicAppPreferences')} />
                   <div className="flex items-center justify-between gap-4">
                     <div className="min-w-0">
-                      <Label>Language:</Label>
-                      <p className="mt-1 text-xs leading-5 text-muted-foreground">Choose the language used across Lunar.</p>
+                      <Label>{t('language')}:</Label>
+                      <p className="mt-1 text-xs leading-5 text-muted-foreground">{t('chooseLanguageDescription')}</p>
                     </div>
-                    <select aria-label="Language" value={language} onChange={(event) => {
+                    <select aria-label={t('language')} value={language} onChange={(event) => {
                       const nextLanguage = setStoredLanguagePreference(event.target.value);
                       setLanguage(nextLanguage)
                     }} className="h-10 w-[190px] shrink-0 appearance-none rounded-full border border-border/10 bg-muted/[0.08] px-4 text-sm text-foreground outline-none focus:ring-2 focus:ring-foreground/15">
                       {LANGUAGE_OPTIONS.map((option) => <option key={option.code} value={option.code}>{option.label}</option>)}
                     </select>
                   </div>
-                  <SettingRow label="Send on Enter" description="Press Enter to send, Shift+Enter for new line">
+                  <SettingRow label={t('sendOnEnter')} description={t('sendOnEnterDescription')}>
                     <Switch checked={sendOnEnter} onCheckedChange={(value) => { setSendOnEnter(value); writeUserPreferences({ sendOnEnter: value }) }} />
                   </SettingRow>
-                  <SettingRow label="Auto-scroll" description="Automatically scroll to new messages">
+                  <SettingRow label={t('autoScroll')} description={t('autoScrollDescription')}>
                     <Switch checked={autoScroll} onCheckedChange={(value) => { setAutoScroll(value); writeUserPreferences({ autoScroll: value }) }} />
                   </SettingRow>
-                  <SettingRow label="Sound Effects" description="Play the clean reply tone when an assistant reply finishes">
+                  <SettingRow label={t('soundEffects')} description={t('soundEffectsDescription')}>
                     <Switch checked={soundEnabled} onCheckedChange={(value) => { setSoundEnabled(value); writeUserPreferences({ sound: value }) }} />
                   </SettingRow>
-                  <SettingRow label="Haptic Feedback" description="Use device vibration when supported">
+                  <SettingRow label={t('hapticFeedback')} description={t('hapticFeedbackDescription')}>
                     <Switch checked={hapticsEnabled} onCheckedChange={(value) => { setHapticsEnabled(value); writeUserPreferences({ haptics: value }) }} />
                   </SettingRow>
                   <div className="flex items-center justify-between gap-4 rounded-2xl border border-border/10 bg-muted/[0.045] px-4 py-3">
                     <div className="flex items-center gap-3 min-w-0">
                       <Volume2 className="h-4 w-4 text-muted-foreground shrink-0" />
-                      <span className="text-sm text-muted-foreground">Preview the clean reply tone</span>
+                      <span className="text-sm text-muted-foreground">{t('previewReplyTone')}</span>
                     </div>
-                    <Button variant="outline" size="sm" className="shrink-0 border-border/15 bg-muted/[0.04] hover:bg-muted/[0.1]" onClick={() => { writeUserPreferences({ sound: true }); setSoundEnabled(true); unlockReplySound(); setTimeout(playReplySound, 40) }}>Test sound</Button>
+                    <Button variant="outline" size="sm" className="shrink-0 border-border/15 bg-muted/[0.04] hover:bg-muted/[0.1]" onClick={() => { writeUserPreferences({ sound: true }); setSoundEnabled(true); unlockReplySound(); setTimeout(playReplySound, 40) }}>{t('testSound')}</Button>
                   </div>
-                  <SettingRow label="Streaming Responses" description="Show response text live or wait until the reply is complete">
+                  <SettingRow label={t('streamingResponses')} description={t('streamingResponsesDescription')}>
                     <Switch checked={streamingEnabled} onCheckedChange={(value) => { setStreamingEnabled(value); writeUserPreferences({ streaming: value }) }} />
                   </SettingRow>
                 </div>
