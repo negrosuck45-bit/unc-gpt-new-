@@ -15,6 +15,7 @@ function extensionFor(type: string) {
     'image/jpeg': 'jpg', 'image/png': 'png', 'image/webp': 'webp', 'image/gif': 'gif',
     'image/avif': 'avif', 'image/heic': 'heic', 'audio/mpeg': 'mp3', 'audio/wav': 'wav',
     'audio/webm': 'webm', 'audio/ogg': 'ogg', 'audio/mp4': 'm4a',
+    'video/mp4': 'mp4', 'video/webm': 'webm', 'video/quicktime': 'mov', 'video/ogg': 'ogv',
   }
   return extensions[type] || 'bin'
 }

@@ -200,6 +200,13 @@ export function ChatInterface({ onSwitchToImagine, onOpenSidebar, isSidebarOpen 
           if (a.type === "image") {
             const imageUrl = a.permanentUrl || a.url || a.visionUrl;
             if (imageUrl) contentParts.push({ type: "image_url", image_url: { url: imageUrl } });
+          } else if (a.type === "video") {
+            const videoUrl = a.permanentUrl || a.url;
+            if (videoUrl && !videoUrl.startsWith("blob:")) {
+              contentParts.push({ type: "video_url", video_url: { url: videoUrl } });
+            } else {
+              contentParts[0].text += `\n\n[Attached video: ${a.name}]`;
+            }
           } else if (a.type === "file" || a.type === "link" || a.type === "audio") {
             contentParts[0].text += `\n\n[Attached ${a.type}: ${a.name}](${a.url})`;
           }
@@ -210,8 +217,17 @@ export function ChatInterface({ onSwitchToImagine, onOpenSidebar, isSidebarOpen 
     });
 
     const runtimeContext = await getClientRuntimeContext();
+    let enabledSkills: string[] = []
+    try {
+      const saved = JSON.parse(window.localStorage.getItem('skill-toggles') || '{}')
+      const defaults = ['web_search', 'image_gen', 'neural_memory', 'file_reading', 'vision']
+      enabledSkills = [...new Set([...defaults, ...Object.entries(saved).filter(([, value]) => value === true).map(([id]) => id)])]
+        .filter((id) => saved[id] !== false)
+    } catch {}
+
     const payload: any = {
       messages: formattedMessages,
+      enabledSkills,
       preferredModel: selectedModel,
       preferredProvider: selectedProvider,
       // Keep Agent Computer available to the backend without exposing a chat-level toggle.

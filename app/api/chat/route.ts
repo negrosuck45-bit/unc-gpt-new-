@@ -673,9 +673,17 @@ async function processAttachmentsForModel(
     }
     const textParts: string[] = [];
     const imageParts: any[] = [];
+    const videoParts: any[] = [];
     for (const part of msg.content) {
       if (part.type === "text") {
         textParts.push(part.text);
+      } else if (part.type === "video_url") {
+        const videoUrl = part.video_url?.url;
+        if (videoUrl && !videoUrl.startsWith("blob:") && hasVision) {
+          videoParts.push({ type: "video_url", video_url: { url: videoUrl } });
+        } else if (videoUrl) {
+          textParts.push(`[User attached a video. You can view it at: ${videoUrl}]`);
+        }
       } else if (part.type === "image_url") {
         const imageUrl = part.image_url.url;
         if (imageUrl.startsWith("blob:")) {
@@ -706,12 +714,13 @@ async function processAttachmentsForModel(
         }
       }
     }
-    if (hasVision && imageParts.length > 0) {
+    if (hasVision && (imageParts.length > 0 || videoParts.length > 0)) {
       processed.push({
         role: msg.role,
         content: [
-          { type: "text", text: processedText || "Please describe what you see in this image:" },
+          { type: "text", text: processedText || "Please analyze the attached media and answer the user's question:" },
           ...imageParts,
+          ...videoParts,
         ],
       });
     } else {
@@ -734,6 +743,9 @@ function convertMessageWithAttachments(msg: any): any {
     if (att.type === "image") {
       const imageUrl = att.permanentUrl || att.url || att.visionUrl;
       if (imageUrl) content.push({ type: "image_url", image_url: { url: imageUrl } });
+    } else if (att.type === "video") {
+      const videoUrl = att.permanentUrl || att.url;
+      if (videoUrl) content.push({ type: "video_url", video_url: { url: videoUrl } });
     }
   }
   return { ...msg, content: content.length > 0 ? content : msg.content };
@@ -3231,6 +3243,7 @@ export async function POST(req: NextRequest) {
       clientCountry,
       clientCountryCode,
       clientLanguage,
+      enabledSkills = [],
     } = body;
 
     // The replacement release exposes one model only; old client model values are ignored.
@@ -3323,6 +3336,7 @@ export async function POST(req: NextRequest) {
     }
 
     let hasImage = false;
+    let hasVideo = false;
     let imageUrl = "";
 
     for (const msg of messages) {
@@ -3335,6 +3349,8 @@ export async function POST(req: NextRequest) {
         }
       }
       if (msg?.attachments) {
+        const videoAtt = msg.attachments.find((a: any) => a.type === "video");
+        if (videoAtt && !(videoAtt.permanentUrl || videoAtt.url || "").startsWith("blob:")) hasVideo = true;
         const imgAtt = msg.attachments.find((a: any) => a.type === "image");
         if (imgAtt && !imgAtt.url.startsWith("blob:")) {
           hasImage = true;
@@ -3398,12 +3414,12 @@ export async function POST(req: NextRequest) {
 
     // ==================== CHAT WITH TOOLS ====================
     const autoRoute = finalModel === "lunar" || finalModel === "auto"
-      ? chooseUncGptRoute(messages, hasImage)
+      ? chooseUncGptRoute(messages, hasImage || hasVideo)
       : { provider: finalProvider, model: finalModel, reason: "explicit-model" };
     const resolvedProvider = autoRoute.provider;
     const resolvedModel = autoRoute.model;
     const targetModel = resolvedModel;
-    const hasVisionCapability = isVisionModel(targetModel) || hasImage;
+    const hasVisionCapability = isVisionModel(targetModel) || hasImage || hasVideo;
 
     const messagesWithVisionFormat = messages.map(convertMessageWithAttachments);
     const apiMessages = await processAttachmentsForModel(
@@ -3419,6 +3435,8 @@ export async function POST(req: NextRequest) {
       `\n\n${UNCGPT_IDENTITY_PROMPT}`,
       `\n\n${buildRuntimeContextMessage({ clientTimeZone, clientLocale, clientCountry, clientCountryCode })}`,
       `\n\n${languagePreferenceInstruction(clientLanguage, clientLocale)}`,
+      `\n\nActive Manus-style skills: ${Array.isArray(enabledSkills) && enabledSkills.length ? enabledSkills.join(', ') : 'general reasoning'}. Use an enabled skill when relevant, and be transparent when a capability or connector is unavailable.`,
+      `\n\nWhen a user attaches a video, inspect the supplied media when the selected model supports video input. Answer the specific question about the footage, and do not claim to have seen it if the provider rejects the media format.`,
       `\n\nConnected calendar rule: when the user asks to schedule, add, create, move, or cancel a Google Calendar event and a Google Calendar tool is available, use that tool. Create an event only when the title plus a concrete date and start time are clear; otherwise ask one concise follow-up for the missing detail. Convert natural-language dates using the user’s runtime time zone and pass the calendar tool an exact ISO date-time. Never say an event was scheduled unless the provider tool confirms success. For confirmed events, keep the final reply concise because the interface renders the verified event card.`,
     ];
     if (projectInstructions) {

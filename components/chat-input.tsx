@@ -666,17 +666,17 @@ export function ChatInput({
       try { window.localStorage.setItem('uncgpt-photo-access-requested', '1') } catch {}
     }
 
-    if (type === 'image') {
-      setIsUploading(true)
-    }
+    const videoFiles = files.filter((file) => type === 'file' && file.type.startsWith('video/'))
+    if (type === 'image' || videoFiles.length > 0) setIsUploading(true)
 
     for (const file of files) {
       const id = crypto.randomUUID()
-      const localUrl = type === 'image' ? URL.createObjectURL(file) : ''
+      const isVideo = type === 'file' && file.type.startsWith('video/')
+      const localUrl = (type === 'image' || isVideo) ? URL.createObjectURL(file) : ''
 
       setAttachments((prev) => [...prev, {
         id,
-        type,
+        type: isVideo ? 'video' : type,
         name: file.name,
         url: localUrl,
         size: file.size,
@@ -686,12 +686,23 @@ export function ChatInput({
       if (type === 'image') {
         await uploadImage(file, id)
         URL.revokeObjectURL(localUrl)
+      } else if (isVideo) {
+        try {
+          setUploadStatus((prev) => new Map(prev).set(id, { status: 'uploading', progress: 15 }))
+          const uploaded = await uploadFile(file)
+          setAttachments((prev) => prev.map((a) => a.id === id ? { ...a, url: uploaded.url, permanentUrl: uploaded.url, uploaded: true } : a))
+          setUploadStatus((prev) => new Map(prev).set(id, { status: 'completed', progress: 100, url: uploaded.url }))
+        } catch (error) {
+          const message = error instanceof Error ? error.message : 'Video upload failed'
+          setAttachments((prev) => prev.map((a) => a.id === id ? { ...a, uploadError: true, errorMessage: message } : a))
+          setUploadStatus((prev) => new Map(prev).set(id, { status: 'error', error: message }))
+        } finally {
+          URL.revokeObjectURL(localUrl)
+        }
       }
     }
 
-    if (type === 'image') {
-      setIsUploading(false)
-    }
+    if (type === 'image' || videoFiles.length > 0) setIsUploading(false)
 
     if (type !== 'image') setAttachMenuOpen(false)
   }
@@ -1013,7 +1024,7 @@ export function ChatInput({
           )}
         </AnimatePresence>
 
-        <input ref={fileInputRef} type="file" multiple className="hidden" onChange={(e) => handleFileSelect(e, 'file')} />
+        <input ref={fileInputRef} type="file" accept="video/*,.pdf,.txt,.md,.csv,.json,.doc,.docx,.xls,.xlsx" multiple className="hidden" onChange={(e) => handleFileSelect(e, 'file')} />
         <input ref={imageInputRef} type="file" accept="image/*" multiple className="hidden" onChange={(e) => handleFileSelect(e, 'image')} />
         <input ref={cameraInputRef} type="file" accept="image/*" capture="environment" className="hidden" onChange={(e) => handleFileSelect(e, 'image')} />
 

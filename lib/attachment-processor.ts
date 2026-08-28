@@ -104,7 +104,7 @@ export async function processAttachment(
       if (includeMetadata && attachment.size) {
         summary += ` - ${(attachment.size / 1024).toFixed(2)}KB`;
       }
-      content = `[Video attached: ${attachment.name}]\nNote: Claude cannot currently process video files. Please provide a description of the video content or share key frames as images.`;
+      content = `[Video attached: ${attachment.name}]\nUse the multimodal video input when the selected model supports it, and answer the user’s question about the footage without inventing details.`;
       break;
     }
 
