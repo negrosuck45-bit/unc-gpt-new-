@@ -133,7 +133,10 @@ async function findLegacyAccountScope(user: LunarSessionUser): Promise<LookupRes
 
 async function readStoredLink(providerSubject: string): Promise<LookupResult> {
   const supabase = getSupabaseAdmin()
-  if (!supabase) return { kind: "unavailable" }
+  if (!supabase) {
+    console.warn("[Lunar OAuth] account bridge stored_lookup=unavailable reason=supabase_client")
+    return { kind: "unavailable" }
+  }
 
   const { data, error } = await supabase
     .from(LEGACY_LINKS_TABLE)
@@ -141,7 +144,10 @@ async function readStoredLink(providerSubject: string): Promise<LookupResult> {
     .eq("provider_subject", providerSubject)
     .maybeSingle()
 
-  if (error) return { kind: "unavailable" }
+  if (error) {
+    console.warn("[Lunar OAuth] account bridge stored_lookup=unavailable reason=database")
+    return { kind: "unavailable" }
+  }
   if (!data) return { kind: "missing" }
   const link = data as StoredLink
   if (!isLegacyClerkUserId(link.account_scope)) return { kind: "conflict" }
@@ -150,7 +156,10 @@ async function readStoredLink(providerSubject: string): Promise<LookupResult> {
 
 async function persistStoredLink(user: LunarSessionUser, accountScope: string): Promise<LookupResult> {
   const supabase = getSupabaseAdmin()
-  if (!supabase) return { kind: "unavailable" }
+  if (!supabase) {
+    console.warn("[Lunar OAuth] account bridge persist=unavailable reason=supabase_client")
+    return { kind: "unavailable" }
+  }
 
   const { error } = await supabase
     .from(LEGACY_LINKS_TABLE)
@@ -161,7 +170,10 @@ async function persistStoredLink(user: LunarSessionUser, accountScope: string): 
       linked_via: "legacy-clerk",
     }, { onConflict: "provider_subject", ignoreDuplicates: true })
 
-  if (error) return { kind: "unavailable" }
+  if (error) {
+    console.warn("[Lunar OAuth] account bridge persist=unavailable reason=database")
+    return { kind: "unavailable" }
+  }
   const stored = await readStoredLink(user.sub)
   if (stored.kind === "linked" && stored.accountScope !== accountScope) return { kind: "conflict" }
   return stored
@@ -177,12 +189,19 @@ async function persistStoredLink(user: LunarSessionUser, accountScope: string): 
 export async function resolveLunarAccountScope(user: LunarSessionUser): Promise<string | null> {
   const stored = await readStoredLink(user.sub)
   if (stored.kind === "linked") return stored.accountScope
-  if (stored.kind !== "missing") return null
+  if (stored.kind !== "missing") {
+    console.warn(`[Lunar OAuth] account bridge failed stage=stored_${stored.kind}`)
+    return null
+  }
 
   const legacy = await findLegacyAccountScope(user)
-  if (legacy.kind === "unavailable" || legacy.kind === "conflict") return null
+  if (legacy.kind === "unavailable" || legacy.kind === "conflict") {
+    console.warn(`[Lunar OAuth] account bridge failed stage=legacy_${legacy.kind}`)
+    return null
+  }
   if (legacy.kind === "missing") return user.sub
 
   const persisted = await persistStoredLink(user, legacy.accountScope)
+  if (persisted.kind !== "linked") console.warn(`[Lunar OAuth] account bridge failed stage=persist_${persisted.kind}`)
   return persisted.kind === "linked" ? persisted.accountScope : null
 }
