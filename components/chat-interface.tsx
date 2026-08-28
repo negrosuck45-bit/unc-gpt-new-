@@ -6,6 +6,7 @@ import { ChatMessages } from "@/components/chat-messages";
 import { ChatInput } from "@/components/chat-input";
 import { WelcomeScreen } from "@/components/welcome-screen";
 import { ChatHeader } from "@/components/chat-header";
+import { CameraVoiceMode } from "@/components/camera-voice-mode";
 import { playReplySound, unlockReplySound } from "@/lib/notifications";
 import { readUserPreferences } from "@/lib/user-preferences";
 import { triggerHaptic } from "@/lib/haptics";
@@ -14,7 +15,7 @@ import { accountStorageKey } from "@/lib/account-scope";
 import { ConnectionStatusBanner, type ConnectionIssue } from "@/components/connection-status-banner";
 import { getClientRuntimeContext } from "@/lib/client-runtime-context";
 import { getStoredLanguagePreference } from "@/lib/language-preferences";
-import { prepareGroqTtsResponse } from "@/lib/voice-playback";
+import { playGroqTtsResponse, prepareGroqTtsResponse, speakWithBrowserFallback } from "@/lib/voice-playback";
 
 interface ChatInterfaceProps {
   onSwitchToImagine?: () => void;
@@ -70,6 +71,7 @@ export function ChatInterface({ onSwitchToImagine, onOpenSidebar, isSidebarOpen 
   const [mounted, setMounted] = useState(false);
   const [isThinking, setIsThinking] = useState(false);
   const [connectionIssue, setConnectionIssue] = useState<ConnectionIssue>(null);
+  const [cameraVoiceOpen, setCameraVoiceOpen] = useState(false);
 
   const abortControllerRef = useRef<AbortController | null>(null);
 
@@ -133,7 +135,7 @@ export function ChatInterface({ onSwitchToImagine, onOpenSidebar, isSidebarOpen 
     }
   }, [currentChat, isCurrentChatStreaming, addMessage, deleteMessage, setIsStreaming]);
 
-  const handleSend = useCallback(async (content: string, attachments?: Attachment[]) => {
+  const handleSend = useCallback(async (content: string, attachments?: Attachment[]): Promise<string | undefined> => {
     if (!content?.trim() && (!attachments || attachments.length === 0)) return;
 
     const chatId = currentChatId || createNewChat("text", null, settings.model, settings.provider);
@@ -157,12 +159,14 @@ export function ChatInterface({ onSwitchToImagine, onOpenSidebar, isSidebarOpen 
     abortControllerRef.current = new AbortController();
 
     let completed = false;
+    let completedResponse = "";
     try {
       const messagesToSend = useChatStore.getState().chats.find((c) => c.id === chatId)?.messages || [];
       // Always use the hosted vision path for images. Browser-local WebGPU vision can
       // report support while still failing to load a remote Supabase URL on mobile;
       // the hosted path receives the same public image URL and has provider fallbacks.
       const responseContent = await processAIResponse(chatId, messagesToSend);
+      completedResponse = responseContent || "";
       void persistNeuralMemory(chatId, messagesToSend, responseContent);
       completed = true;
     } catch (error: any) {
@@ -180,7 +184,20 @@ export function ChatInterface({ onSwitchToImagine, onOpenSidebar, isSidebarOpen 
         playReplySound();
       }
     }
+    return completedResponse || undefined;
   }, [currentChatId, createNewChat, addMessage, updateChatTitle, setIsStreaming, settings]);
+
+  const handleCameraAsk = useCallback(async (text: string) => {
+    const response = await handleSend(text);
+    if (!response?.trim()) return;
+    const language = getStoredLanguagePreference();
+    const key = `camera-voice-${Date.now()}`;
+    try {
+      await playGroqTtsResponse({ text: response, language, key });
+    } catch {
+      await speakWithBrowserFallback({ text: response, language, key }).catch(() => undefined);
+    }
+  }, [handleSend]);
 
   const processAIResponse = async (chatId: string, messages: any[]) => {
     const currentChat = useChatStore.getState().chats.find(c => c.id === chatId);
@@ -450,6 +467,7 @@ export function ChatInterface({ onSwitchToImagine, onOpenSidebar, isSidebarOpen 
     <div className="task-chat-surface relative flex h-full flex-col overflow-hidden bg-background text-foreground">
       <ChatHeader
         project={currentProject}
+        onOpenCameraVoice={() => setCameraVoiceOpen(true)}
         chat={currentChat}
         onOpenSidebar={onOpenSidebar}
         isSidebarOpen={isSidebarOpen}
@@ -498,6 +516,7 @@ export function ChatInterface({ onSwitchToImagine, onOpenSidebar, isSidebarOpen 
           </div>
         </div>
       )}
+      <CameraVoiceMode open={cameraVoiceOpen} onClose={() => setCameraVoiceOpen(false)} onAsk={handleCameraAsk} />
     </div>
   );
 }

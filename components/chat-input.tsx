@@ -289,6 +289,7 @@ export function ChatInput({
   const cameraInputRef = useRef<HTMLInputElement>(null)
   const recognitionRef = useRef<any>(null)
   const recognitionRunningRef = useRef(false)
+  const keepRecognitionAliveRef = useRef(false)
   const mediaStreamRef = useRef<MediaStream | null>(null)
   const voiceTranscriptRef = useRef('')
   const audioContextRef = useRef<AudioContext | null>(null)
@@ -560,8 +561,26 @@ export function ChatInput({
       voiceTranscriptRef.current = finalText
       setVoiceTranscript([finalText, interimText].filter(Boolean).join(' '))
     }
-    recognition.onerror = () => { recognitionRunningRef.current = false }
-    recognition.onend = () => { recognitionRunningRef.current = false }
+    recognition.onerror = (event: any) => {
+      recognitionRunningRef.current = false
+      const error = String(event?.error || "").toLowerCase()
+      if (error === "not-allowed" || error === "service-not-allowed") {
+        setToast("Microphone or speech access was blocked. Allow microphone access for this site and try again.")
+      } else if (error === "audio-capture") {
+        setToast("No microphone was found. Check the selected microphone and try again.")
+      } else if (error && error !== "no-speech" && error !== "aborted") {
+        setToast("Speech recognition stopped. Tap the microphone and try again.")
+      }
+    }
+    recognition.onend = () => {
+      recognitionRunningRef.current = false
+      if (keepRecognitionAliveRef.current) {
+        window.setTimeout(() => {
+          if (!keepRecognitionAliveRef.current || recognitionRunningRef.current) return
+          try { recognition.start() } catch {}
+        }, 140)
+      }
+    }
     recognitionRef.current = recognition
     try {
       recognition.start()
@@ -573,6 +592,7 @@ export function ChatInput({
 
   const cancelVoiceRecording = useCallback(() => {
     if (!isRecording) return
+    keepRecognitionAliveRef.current = false
     setIsRecording(false)
     try { recognitionRef.current?.abort() } catch {}
     stopVoiceMeter()
@@ -583,6 +603,7 @@ export function ChatInput({
   const confirmVoiceRecording = useCallback(() => {
     if (!isRecording || disabled || isStreaming) return
     setIsRecording(false)
+    keepRecognitionAliveRef.current = false
     if (recognitionRunningRef.current) {
       try { recognitionRef.current?.stop() } catch {}
     }
@@ -625,6 +646,7 @@ export function ChatInput({
       setVoiceTranscript('')
       setVoiceDuration(0)
       setIsRecording(true)
+      keepRecognitionAliveRef.current = true
       startVoiceMeter(stream)
       if (!startVoiceRecognition()) {
         releaseVoiceStream()
@@ -646,6 +668,7 @@ export function ChatInput({
   }, [isRecording])
 
   useEffect(() => () => {
+    keepRecognitionAliveRef.current = false
     try { recognitionRef.current?.abort() } catch {}
     releaseVoiceStream()
     stopVoiceMeter()

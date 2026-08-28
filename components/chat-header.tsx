@@ -9,9 +9,10 @@ interface ChatHeaderProps {
   activeModelInfo?: { provider: string; model: string } | null
   onOpenSidebar?: () => void
   isSidebarOpen?: boolean
+  onOpenCameraVoice?: () => void
 }
 
-export function ChatHeader({ onOpenSidebar, isSidebarOpen }: ChatHeaderProps) {
+export function ChatHeader({ onOpenSidebar, isSidebarOpen, onOpenCameraVoice }: ChatHeaderProps) {
   const t = useUiText()
   return (
     <header className="task-header flex shrink-0 items-center gap-2 px-4 pb-3 pt-[max(0.75rem,env(safe-area-inset-top))] sm:px-7 sm:pb-4 sm:pt-5">
@@ -28,16 +29,18 @@ export function ChatHeader({ onOpenSidebar, isSidebarOpen }: ChatHeaderProps) {
           {isSidebarOpen ? <PanelLeftClose className="h-[19px] w-[19px]" /> : <Menu className="h-[19px] w-[19px]" />}
         </Button>
       )}
-      <span
-        role="img"
-        aria-label="Dark mode"
-        title="Dark mode"
-        className="ml-auto inline-flex h-10 w-10 shrink-0 items-center justify-center text-sidebar-foreground/75"
+      <Button
+        variant="ghost"
+        size="icon"
+        onClick={onOpenCameraVoice}
+        aria-label="Open camera voice mode"
+        title="Open camera voice mode"
+        className="task-header-icon ml-auto h-10 w-10 shrink-0 rounded-full"
       >
         <svg aria-hidden="true" viewBox="0 0 24 24" className="h-[21px] w-[21px] fill-current">
           <path d="M20.4 14.4a8.5 8.5 0 0 1-10.8-10.8A8.5 8.5 0 1 0 20.4 14.4Z" />
         </svg>
-      </span>
+      </Button>
       <Button
         variant="ghost"
         size="icon"

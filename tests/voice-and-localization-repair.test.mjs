@@ -85,8 +85,9 @@ test('prepares final assistant audio before the reply leaves the streaming lifec
   const chatInterface = read('./components/chat-interface.tsx')
   const messages = read('./components/chat-messages.tsx')
 
-  assert.match(chatInterface, /import \{ prepareGroqTtsResponse \} from "@\/lib\/voice-playback"/)
+  assert.match(chatInterface, /import \{ playGroqTtsResponse, prepareGroqTtsResponse, speakWithBrowserFallback \} from "@\/lib\/voice-playback"/)
   assert.match(chatInterface, /void prepareGroqTtsResponse\(\{[\s\S]*?text: fullContent,[\s\S]*?key: assistantMsgId/)
   assert.match(chatInterface, /assistantMsgId = addMessage\(chatId, \{ role: "assistant", content: fullContent \}\)/)
+  assert.match(chatInterface, /handleCameraAsk[\s\S]*?playGroqTtsResponse[\s\S]*?speakWithBrowserFallback/)
   assert.match(messages, /prepareGroqTtsResponse\([\s\S]*?key: latestAssistant\.id/)
 })
