@@ -147,7 +147,7 @@ export function ChatMessages({
             )}
           >
             {message.role === 'assistant' && (
-              <MarsAvatar className="h-8 w-8 flex-shrink-0 mt-1" />
+              <MarsAvatar size={32} />
             )}
             
             <div
@@ -187,7 +187,7 @@ export function ChatMessages({
             animate={{ opacity: 1 }}
             className="flex gap-3 justify-start"
           >
-            <MarsAvatar className="h-8 w-8 flex-shrink-0 mt-1" />
+            <MarsAvatar size={32} />
             <div className="bg-transparent px-0 py-1">
               <div className="flex gap-2 items-center">
                 <div className="w-2 h-2 bg-gray-400 rounded-full animate-bounce" />

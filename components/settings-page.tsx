@@ -259,7 +259,7 @@ export function SettingsPage({ onClose }: SettingsPageProps) {
     <div className="w-full max-w-none sm:max-w-5xl mx-auto h-[100dvh] sm:h-[min(720px,calc(100dvh-96px))] min-h-0 bg-background text-foreground supports-[backdrop-filter]:backdrop-blur-[30px] rounded-t-[30px] rounded-b-none sm:rounded-[28px] border border-border shadow-[0_24px_90px_rgba(0,0,0,0.28)] overflow-hidden pb-[env(safe-area-inset-bottom)] transition-colors duration-200">
       {/* Header */}
       <div className="flex items-center justify-between px-5 sm:px-6 py-4 bg-transparent">
-        <h1 className="text-[19px] font-medium tracking-tight">Settings</h1>
+        <h1 className="text-[19px] font-medium tracking-tight">{t('settings')}</h1>
         <Button variant="ghost" size="icon" onClick={onClose}><X className="h-5 w-5" /></Button>
       </div>
 
@@ -558,7 +558,7 @@ export function SettingsPage({ onClose }: SettingsPageProps) {
               {/* ── Advanced ────────────────────────────────────────────── */}
               {false && activeTab === 'advanced' && (
                 <div className="space-y-6">
-                  <SectionTitle title="Advanced Settings" description="For power users" />
+                  <SectionTitle title={t('advancedSettings')} description={t('advancedSettingsDescription')} />
                   <SettingRow label="Debug Mode" description="Show diagnostic details while testing"><Switch checked={debugMode} onCheckedChange={(value) => { setDebugMode(value); writeUserPreferences({ debugMode: value }) }} /></SettingRow>
                   <SettingRow label="Experimental Features" description="Enable optional features as they become available"><Switch checked={experimentalFeatures} onCheckedChange={(value) => { setExperimentalFeatures(value); writeUserPreferences({ experimentalFeatures: value }) }} /></SettingRow>
                   <div className="p-4 rounded-lg bg-muted/50 border border-border">

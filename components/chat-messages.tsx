@@ -4,6 +4,8 @@ import { useEffect, useRef, useState, useMemo, useCallback } from 'react';
 import NextImage from 'next/image';
 import { Message, Attachment } from '@/lib/chat-store';
 import { getStoredLanguagePreference } from '@/lib/language-preferences';
+import { playCloudflareAuraResponse, speakWithBrowserFallback, stopVoicePlayback, VoicePlaybackCancelledError } from '@/lib/voice-playback';
+import { useUiText } from '@/lib/ui-translations';
 import { cn } from '@/lib/utils';
 import { motion, AnimatePresence } from 'framer-motion';
 import {
@@ -101,6 +103,7 @@ function textToFileAttachment(text: string, filename?: string): Attachment {
   const base64 = toBase64(text);
   const dataUrl = `data:text/plain;base64,${base64}`;
   return {
+    id: `pasted-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
     name: filename || `pasted-message-${Date.now()}.txt`,
     url: dataUrl,
     type: 'file',
@@ -404,10 +407,26 @@ function MessageActions({ message, isAssistant, onCopy, onRegenerate, onEdit, on
   const [copied, setCopied] = useState(false);
   const [feedback, setFeedback] = useState<'like' | 'dislike' | null>(null);
   const [isSpeaking, setIsSpeaking] = useState(false);
+  const [voiceError, setVoiceError] = useState<string | null>(null);
   const hasCopiedRef = useRef(false);
   const copyTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+  const t = useUiText();
 
   useEffect(() => { if (isAssistant) { getFeedbackFromSupabase(message.id).then(setFeedback); } }, [message.id, isAssistant]);
+
+  useEffect(() => {
+    const handleVoiceState = (event: Event) => {
+      const detail = (event as CustomEvent<{ key?: string; status?: string }>).detail;
+      if (detail?.key !== message.id) {
+        setIsSpeaking(false);
+        return;
+      }
+      setIsSpeaking(detail.status === 'loading' || detail.status === 'playing');
+      if (detail.status !== 'error') setVoiceError(null);
+    };
+    window.addEventListener('uncgpt-voice-state', handleVoiceState);
+    return () => window.removeEventListener('uncgpt-voice-state', handleVoiceState);
+  }, [message.id]);
 
   // FIXED: Guaranteed single copy with ref guard + async clipboard
   const handleCopy = useCallback(async () => {
@@ -440,34 +459,36 @@ function MessageActions({ message, isAssistant, onCopy, onRegenerate, onEdit, on
   const handleLike = useCallback(async () => { await saveFeedbackToSupabase(message.id, 'like', message.content); setFeedback('like'); }, [message.id, message.content]);
   const handleDislike = useCallback(() => { onDislike?.(); }, [onDislike]);
   const handleSpeak = useCallback(async () => {
+    const language = getStoredLanguagePreference();
     if (isSpeaking) {
-      window.speechSynthesis.cancel();
-      setIsSpeaking(false);
+      stopVoicePlayback();
       return;
     }
-    setIsSpeaking(true);
+
+    setVoiceError(null);
     try {
-      const response = await fetch('/api/voice-chat', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ text: message.content, language: getStoredLanguagePreference() === 'auto' ? (navigator.language || 'en').split('-')[0] : getStoredLanguagePreference() }) });
-      const data = await response.json();
-      if (data.audioUrl) {
-        const audio = new Audio(data.audioUrl);
-        audio.onended = () => setIsSpeaking(false);
-        await audio.play();
-      } else throw new Error('Audio unavailable');
-    } catch {
-      setIsSpeaking(false);
-      window.alert('Aura-2-es audio is unavailable right now. Please try again.');
+      await playCloudflareAuraResponse({ text: message.content, language, key: message.id });
+    } catch (error) {
+      if (error instanceof VoicePlaybackCancelledError) return;
+      try {
+        // Browser speech is intentionally used only after the primary Cloudflare voice fails.
+        await speakWithBrowserFallback({ text: message.content, language, key: message.id });
+      } catch (fallbackError) {
+        if (fallbackError instanceof VoicePlaybackCancelledError) return;
+        setVoiceError(t('voiceUnavailable'));
+      }
     }
-  }, [isSpeaking, message.content]);
+  }, [isSpeaking, message.content, message.id, t]);
 
   return (
-    <div className={cn('flex items-center gap-1 mt-1 transition-opacity', 'opacity-100 md:opacity-0 md:group-hover:opacity-100', isAssistant ? 'ml-0' : 'mr-0 flex-row-reverse')}>
-      <Button variant="ghost" size="icon" className="h-7 w-7 text-muted-foreground" onClick={handleCopy}>
+    <div className={cn('mt-1 flex flex-wrap items-center gap-1 transition-opacity', 'opacity-100 md:opacity-0 md:group-hover:opacity-100', isAssistant ? 'ml-0' : 'mr-0 flex-row-reverse')}>
+      <Button variant="ghost" size="icon" className="h-7 w-7 text-muted-foreground" onClick={handleCopy} aria-label={t('copyResponse')} title={t('copyResponse')}>
         {copied ? <Check className="h-3.5 w-3.5" /> : <Copy className="h-3.5 w-3.5" />}
       </Button>
-      {isAssistant && (<><Button variant="ghost" size="icon" className={cn("h-7 w-7", feedback === 'like' ? "text-green-500" : "text-muted-foreground hover:text-green-500")} onClick={handleLike} aria-label="Like response" title="Like response"><ThumbsUp className="h-3.5 w-3.5" /></Button><Button variant="ghost" size="icon" className={cn("h-7 w-7", feedback === 'dislike' ? "text-red-500" : "text-muted-foreground hover:text-red-500")} onClick={handleDislike} aria-label="Dislike response" title="Dislike response"><ThumbsDown className="h-3.5 w-3.5" /></Button><Button variant="ghost" size="icon" className="h-7 w-7 text-muted-foreground hover:text-foreground" onClick={handleSpeak} aria-label={isSpeaking ? "Stop reading" : "Read response aloud"} title={isSpeaking ? "Stop reading" : "Read response aloud"}>{isSpeaking ? <VolumeX className="h-3.5 w-3.5" /> : <Volume2 className="h-3.5 w-3.5" />}</Button></>)}
-      {onRegenerate && (<Button variant="ghost" size="icon" className="h-7 w-7 text-muted-foreground" onClick={onRegenerate}><RefreshCw className="h-3.5 w-3.5" /></Button>)}
-      {onEdit && (<Button variant="ghost" size="icon" className="h-7 w-7 text-muted-foreground" onClick={onEdit}><Pencil className="h-3.5 w-3.5" /></Button>)}
+      {isAssistant && (<><Button variant="ghost" size="icon" className={cn("h-7 w-7", feedback === 'like' ? "text-green-500" : "text-muted-foreground hover:text-green-500")} onClick={handleLike} aria-label={t('likeResponse')} title={t('likeResponse')}><ThumbsUp className="h-3.5 w-3.5" /></Button><Button variant="ghost" size="icon" className={cn("h-7 w-7", feedback === 'dislike' ? "text-red-500" : "text-muted-foreground hover:text-red-500")} onClick={handleDislike} aria-label={t('dislikeResponse')} title={t('dislikeResponse')}><ThumbsDown className="h-3.5 w-3.5" /></Button><Button variant="ghost" size="icon" className={cn("h-7 w-7", isSpeaking ? "text-foreground" : "text-muted-foreground hover:text-foreground")} onClick={handleSpeak} aria-label={isSpeaking ? t('stopReading') : t('readResponseAloud')} title={isSpeaking ? t('stopReading') : t('readResponseAloud')}>{isSpeaking ? <VolumeX className="h-3.5 w-3.5" /> : <Volume2 className="h-3.5 w-3.5" />}</Button></>)}
+      {onRegenerate && (<Button variant="ghost" size="icon" className="h-7 w-7 text-muted-foreground" onClick={onRegenerate} aria-label={t('regenerate')} title={t('regenerate')}><RefreshCw className="h-3.5 w-3.5" /></Button>)}
+      {onEdit && (<Button variant="ghost" size="icon" className="h-7 w-7 text-muted-foreground" onClick={onEdit} aria-label={t('editMessage')} title={t('editMessage')}><Pencil className="h-3.5 w-3.5" /></Button>)}
+      {voiceError && <span role="status" className="basis-full text-[11px] text-muted-foreground">{voiceError}</span>}
     </div>
   );
 }

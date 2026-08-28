@@ -19,6 +19,7 @@ import {
 import { motion, AnimatePresence } from 'framer-motion'
 import { cn } from '@/lib/utils'
 import { Attachment } from '@/lib/chat-store'
+import { listMCPTools } from '@/lib/mcp-tools'
 
 interface ChatInputProps {
   onSend: (message: string, attachments?: Attachment[]) => void

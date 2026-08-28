@@ -44,7 +44,7 @@ async function searchSearxng(query: string): Promise<SearchResult[]> {
         "User-Agent":
           "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36",
       },
-      timeout: 8000,
+      signal: AbortSignal.timeout(8000),
     });
 
     if (!response.ok) throw new Error(`HTTP ${response.status}`);
@@ -78,7 +78,7 @@ async function searchDuckDuckGo(query: string): Promise<SearchResult[]> {
         "User-Agent":
           "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36",
       },
-      timeout: 8000,
+      signal: AbortSignal.timeout(8000),
     });
 
     if (!response.ok) throw new Error(`HTTP ${response.status}`);
@@ -134,7 +134,7 @@ async function searchBrave(query: string): Promise<SearchResult[]> {
         q: query,
         count: 8,
       }),
-      timeout: 8000,
+      signal: AbortSignal.timeout(8000),
     });
 
     if (!response.ok) throw new Error(`HTTP ${response.status}`);
@@ -164,7 +164,7 @@ async function extractReaderContent(url: string): Promise<string> {
       headers: {
         Accept: "application/json",
       },
-      timeout: 5000,
+      signal: AbortSignal.timeout(5000),
     });
 
     if (!response.ok) throw new Error(`HTTP ${response.status}`);

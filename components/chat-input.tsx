@@ -115,6 +115,7 @@ function textToFileAttachment(text: string, filename?: string): Attachment {
   const base64 = toBase64(text);
   const dataUrl = `data:text/plain;base64,${base64}`;
   return {
+    id: `pasted-${Date.now()}`,
     name: filename || `pasted-message-${Date.now()}.txt`,
     url: dataUrl,
     type: 'file',

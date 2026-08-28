@@ -1,7 +1,7 @@
 /* app/fiz/page.module.css */
 
 /* ==================== CSS Variables ==================== */
-:root {
+.container {
   --primary-color: #ffffff;
   --secondary-color: #ff6b9e;
   --background-dark: #000000;
@@ -9,7 +9,7 @@
 }
 
 /* ==================== Global Body & Theme Classes ==================== */
-body {
+.container {
   margin: 0;
   padding: 0;
   box-sizing: border-box;
@@ -20,27 +20,27 @@ body {
   cursor: none;
 }
 
-body.home-theme {
+:global(body.home-theme) .container {
   --primary-color: #00ced1;
   --secondary-color: #ff6b9e;
 }
 
-body.hacker-theme {
+:global(body.hacker-theme) .container {
   --primary-color: #22c55e;
   --secondary-color: #2dd4bf;
 }
 
-body.rain-theme {
+:global(body.rain-theme) .container {
   --primary-color: #1e3a8a;
   --secondary-color: #2563eb;
 }
 
-body.anime-theme {
+:global(body.anime-theme) .container {
   --primary-color: #dc2626;
   --secondary-color: #f87171;
 }
 
-body.car-theme {
+:global(body.car-theme) .container {
   --primary-color: #eab308;
   --secondary-color: #facc15;
 }
@@ -52,7 +52,7 @@ body.car-theme {
   position: relative;
 }
 
-:global(.hidden) {
+.container :global(.hidden) {
   display: none !important;
 }
 
@@ -90,12 +90,12 @@ body.car-theme {
   z-index: 3;
 }
 
-#hacker-overlay {
+.container :global(#hacker-overlay) {
   mix-blend-mode: screen;
   opacity: 0.7;
 }
 
-#snow-overlay {
+.container :global(#snow-overlay) {
   mix-blend-mode: color-dodge;
   opacity: 0.5;
 }
@@ -452,15 +452,15 @@ body.car-theme {
   transition: width 2s;
 }
 
-#python-bar {
+.container :global(#python-bar) {
   background: linear-gradient(67deg, #ff6b6b, #ff9f9f);
 }
 
-#html-bar {
+.container :global(#html-bar) {
   background: linear-gradient(45deg, #4facfe, #00f2fe);
 }
 
-#golang-bar {
+.container :global(#golang-bar) {
   background: linear-gradient(30deg, #43e97b, #38f9d7);
 }
 

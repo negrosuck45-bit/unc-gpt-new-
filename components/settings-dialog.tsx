@@ -20,6 +20,7 @@ import {
   SelectValue,
 } from '@/components/ui/select';
 import { Trash2, Plug } from 'lucide-react';
+import { useUiText } from '@/lib/ui-translations';
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip"
 
 
@@ -30,6 +31,7 @@ interface SettingsDialogProps {
 
 export function SettingsDialog({ open, onOpenChange }: SettingsDialogProps) {
   const { settings, updateSettings, clearAllChats, getCurrentChat } = useChatStore();
+  const t = useUiText();
 
   const currentChat = getCurrentChat();
   const isLocked = false;
@@ -78,8 +80,8 @@ export function SettingsDialog({ open, onOpenChange }: SettingsDialogProps) {
       <Dialog open={open} onOpenChange={onOpenChange}>
         <DialogContent className="max-w-lg">
           <DialogHeader>
-            <DialogTitle>Settings</DialogTitle>
-            <DialogDescription>Configure your preferences.</DialogDescription>
+            <DialogTitle>{t('settings')}</DialogTitle>
+            <DialogDescription>{t('basicAppPreferences')}</DialogDescription>
           </DialogHeader>
 
           <div className="space-y-5">
@@ -101,9 +103,9 @@ export function SettingsDialog({ open, onOpenChange }: SettingsDialogProps) {
                             <SelectItem key={m.value} value={m.value}>
                               <div className="flex items-center gap-2">
                                 <span>{m.label}</span>
-                                {m.contextWindow && (
+                                {(m as typeof m & { contextWindow?: string }).contextWindow && (
                                   <span className="text-[10px] opacity-50 bg-muted px-1 rounded">
-                                    {m.contextWindow}
+                                    {(m as typeof m & { contextWindow?: string }).contextWindow}
                                   </span>
                                 )}
                               </div>
@@ -137,10 +139,11 @@ export function SettingsDialog({ open, onOpenChange }: SettingsDialogProps) {
 
           <DialogFooter>
             <Button variant="outline" onClick={() => onOpenChange(false)}>
-              Cancel
+                              {t('cancel')}
+
             </Button>
             <Button onClick={handleSave}>
-              Save Settings
+              {t('saveSettings')}
             </Button>
           </DialogFooter>
         </DialogContent>

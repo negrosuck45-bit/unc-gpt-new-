@@ -7,6 +7,8 @@ import { CustomCursor } from "@/components/custom-cursor"
 import { ThemeChrome } from "@/components/theme-chrome"
 import "./globals.css"
 
+export const dynamic = "force-dynamic"
+
 export const metadata: Metadata = {
   title: "Lunar",
   description: "A clean AI workspace with chat, projects, and memory.",

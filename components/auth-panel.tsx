@@ -4,7 +4,7 @@ import Link from "next/link"
 import { useEffect, useState } from "react"
 import { ArrowRight, Github, Loader2 } from "lucide-react"
 import { getStoredLanguagePreference } from "@/lib/language-preferences"
-import { uiText } from "@/lib/ui-translations"
+import { useUiText } from "@/lib/ui-translations"
 
 type AuthPanelProps = { mode?: "sign-in" | "sign-up" }
 type Provider = { id: "google" | "discord" | "github"; label: string; kind: "google" | "discord" | "github" }
@@ -35,13 +35,18 @@ export function AuthPanel({ mode = "sign-in" }: AuthPanelProps) {
   const [emailAddress, setEmailAddress] = useState("")
   const [lastProvider, setLastProvider] = useState<Provider["id"]>("google")
   const [message, setMessage] = useState("")
-  const [language, setLanguage] = useState("en")
+  const [language, setLanguage] = useState("auto")
+  const t = useUiText()
 
   useEffect(() => {
     const updateLanguage = () => setLanguage(getStoredLanguagePreference())
     updateLanguage()
     window.addEventListener("storage", updateLanguage)
-    return () => window.removeEventListener("storage", updateLanguage)
+    window.addEventListener("uncgpt-language-changed", updateLanguage)
+    return () => {
+      window.removeEventListener("storage", updateLanguage)
+      window.removeEventListener("uncgpt-language-changed", updateLanguage)
+    }
   }, [])
 
   useEffect(() => {
@@ -49,15 +54,15 @@ export function AuthPanel({ mode = "sign-in" }: AuthPanelProps) {
     if (stored === "google" || stored === "discord" || stored === "github") setLastProvider(stored)
 
     const authResult = new URLSearchParams(window.location.search).get("auth")
-    if (authResult === "cancelled") setMessage(uiText(language, "cancelled"))
-    if (authResult === "unavailable") setMessage(uiText(language, "unavailable"))
-    if (authResult === "failed") setMessage(uiText(language, "failed"))
-    if (authResult === "unverified") setMessage(uiText(language, "unverified"))
+    if (authResult === "cancelled") setMessage(t("cancelled"))
+    if (authResult === "unavailable") setMessage(t("unavailable"))
+    if (authResult === "failed") setMessage(t("failed"))
+    if (authResult === "unverified") setMessage(t("unverified"))
   }, [language])
 
   const isSignUp = mode === "sign-up"
-  const heading = isSignUp ? uiText(language, "signUpTitle") : uiText(language, "signInTitle")
-  const subheading = isSignUp ? uiText(language, "createAccount") : uiText(language, "welcomeBack")
+  const heading = isSignUp ? t("signUpTitle") : t("signInTitle")
+  const subheading = isSignUp ? t("createAccount") : t("welcomeBack")
 
   const signInWithProvider = (provider: Provider["id"]) => {
     setMessage("")
@@ -70,43 +75,43 @@ export function AuthPanel({ mode = "sign-in" }: AuthPanelProps) {
   const explainEmailAvailability = (event: React.FormEvent<HTMLFormElement>) => {
     event.preventDefault()
     if (!emailAddress.trim()) return
-    setMessage(uiText(language, "emailUnavailable"))
+    setMessage(t("emailUnavailable"))
   }
 
   const primaryProvider = providers[0]
   const compactProviders = providers.slice(1)
 
   return (
-    <main className="relative flex min-h-[100dvh] items-center justify-center overflow-hidden bg-[#151515] px-3 py-[max(24px,env(safe-area-inset-top))] text-[#202124] sm:px-8 sm:py-10">
+    <main className="relative flex min-h-[100dvh] items-center justify-center overflow-x-hidden overflow-y-auto bg-[#151515] px-3 py-[max(24px,env(safe-area-inset-top))] text-[#202124] sm:px-6 sm:py-8">
       <div className="pointer-events-none absolute inset-0 bg-[radial-gradient(ellipse_85%_55%_at_50%_13%,rgba(62,27,129,0.48),transparent_73%),linear-gradient(135deg,#0b0b13_0%,#171022_50%,#0e1018_100%)]" />
-      <section className="relative w-full max-w-[646px] overflow-visible rounded-[21px] bg-[#fdfdfd] shadow-[0_22px_64px_rgba(0,0,0,0.42)]" aria-labelledby="lunar-login-title">
-        <div className="px-6 pb-8 pt-12 sm:px-[70px] sm:pb-9 sm:pt-14">
-          <h1 id="lunar-login-title" className="text-center text-[29px] font-semibold tracking-[-0.045em] text-[#202124] sm:text-[32px]">{heading}</h1>
-          <p className="mt-2 text-center text-[16px] leading-6 text-[#6f7074] sm:text-[18px]">{subheading}</p>
+      <section className="relative w-full min-w-0 max-w-[480px] overflow-hidden rounded-[32px] bg-[#fdfdfd] shadow-[0_22px_64px_rgba(0,0,0,0.42)]" aria-labelledby="lunar-login-title">
+        <div className="min-w-0 px-5 pb-7 pt-8 sm:px-10 sm:pb-8 sm:pt-10">
+          <h1 id="lunar-login-title" className="break-words text-center text-[26px] font-semibold tracking-[-0.045em] text-[#202124] sm:text-[30px]">{heading}</h1>
+          <p className="mt-2 break-words text-center text-[15px] leading-6 text-[#6f7074] sm:text-[17px]">{subheading}</p>
 
           <div className="mt-9 space-y-3">
             <button type="button" onClick={() => signInWithProvider(primaryProvider.id)} disabled={loadingProvider !== null} className="relative flex h-[54px] w-full items-center justify-center rounded-xl border border-[#dedee0] bg-white px-5 text-[17px] font-medium text-[#55565a] shadow-[0_2px_3px_rgba(0,0,0,0.13)] transition hover:bg-[#f7f7f8] active:scale-[0.99] disabled:cursor-wait disabled:opacity-55">
               <span className="absolute left-5"><ProviderMark kind={primaryProvider.kind} /></span>
-              {lastProvider === primaryProvider.id && <span className="absolute -right-2 -top-3 rounded-full border border-[#dddddf] bg-[#fafafa] px-3 py-0.5 text-[13px] font-medium text-[#707175] shadow-sm">{uiText(language, "lastUsed")}</span>}
-              {loadingProvider === primaryProvider.id ? uiText(language, "openingSignIn") : uiText(language, primaryProvider.id === "google" ? "continueGoogle" : primaryProvider.id === "discord" ? "continueDiscord" : "continueGithub")}
+              {lastProvider === primaryProvider.id && <span className="absolute right-2 top-2 rounded-full border border-[#dddddf] bg-[#fafafa] px-2.5 py-0.5 text-[11px] font-medium text-[#707175] shadow-sm sm:-right-2 sm:-top-3 sm:px-3 sm:text-[13px]">{t("lastUsed")}</span>}
+              {loadingProvider === primaryProvider.id ? t("openingSignIn") : t(primaryProvider.id === "google" ? "continueGoogle" : primaryProvider.id === "discord" ? "continueDiscord" : "continueGithub")}
             </button>
             <div className="grid grid-cols-2 gap-3">
               {compactProviders.map((provider) => {
                 const isLoading = loadingProvider === provider.id
-                return <button key={provider.id} type="button" aria-label={uiText(language, provider.id === "google" ? "continueGoogle" : provider.id === "discord" ? "continueDiscord" : "continueGithub")} onClick={() => signInWithProvider(provider.id)} disabled={loadingProvider !== null} className="flex h-[50px] items-center justify-center rounded-xl border border-[#dedee0] bg-white text-[#27282b] shadow-[0_2px_3px_rgba(0,0,0,0.13)] transition hover:bg-[#f7f7f8] active:scale-[0.99] disabled:cursor-wait disabled:opacity-55">{isLoading ? <Loader2 className="h-5 w-5 animate-spin" /> : <ProviderMark kind={provider.kind} />}</button>
+                return <button key={provider.id} type="button" aria-label={t(provider.id === "google" ? "continueGoogle" : provider.id === "discord" ? "continueDiscord" : "continueGithub")} onClick={() => signInWithProvider(provider.id)} disabled={loadingProvider !== null} className="flex h-[50px] items-center justify-center rounded-xl border border-[#dedee0] bg-white text-[#27282b] shadow-[0_2px_3px_rgba(0,0,0,0.13)] transition hover:bg-[#f7f7f8] active:scale-[0.99] disabled:cursor-wait disabled:opacity-55">{isLoading ? <Loader2 className="h-5 w-5 animate-spin" /> : <ProviderMark kind={provider.kind} />}</button>
               })}
             </div>
           </div>
 
-          <div className="my-7 flex items-center gap-5 text-[16px] text-[#77787c]"><span className="h-px flex-1 bg-[#e2e2e4]" />{uiText(language, "or")}<span className="h-px flex-1 bg-[#e2e2e4]" /></div>
+          <div className="my-7 flex items-center gap-5 text-[16px] text-[#77787c]"><span className="h-px flex-1 bg-[#e2e2e4]" />{t("or")}<span className="h-px flex-1 bg-[#e2e2e4]" /></div>
           <form onSubmit={explainEmailAvailability}>
-            <label htmlFor="lunar-email" className="block text-[17px] font-semibold tracking-[-0.02em] text-[#202124]">{uiText(language, "emailAddress")}</label>
-            <input id="lunar-email" name="email" type="email" autoComplete="email" inputMode="email" value={emailAddress} onChange={(event) => setEmailAddress(event.target.value)} placeholder={uiText(language, "enterEmail")} className="mt-3 h-[54px] w-full rounded-xl border border-[#d9d9db] bg-white px-5 text-[17px] text-[#202124] outline-none transition placeholder:text-[#999a9e] focus:border-[#55565a] focus:ring-4 focus:ring-[#55565a]/10" required />
-            <button type="submit" disabled={!emailAddress.trim()} className="mt-6 flex h-[56px] w-full items-center justify-center gap-3 rounded-xl border border-[#2e3035] bg-[#5e5f64] text-[17px] font-medium text-white shadow-[0_3px_0_rgba(0,0,0,0.8)] transition hover:bg-[#4c4d51] active:translate-y-px active:shadow-none disabled:cursor-not-allowed disabled:opacity-50">{uiText(language, "continue")} <ArrowRight className="h-5 w-5 fill-current" /></button>
+            <label htmlFor="lunar-email" className="block text-[17px] font-semibold tracking-[-0.02em] text-[#202124]">{t("emailAddress")}</label>
+            <input id="lunar-email" name="email" type="email" autoComplete="email" inputMode="email" value={emailAddress} onChange={(event) => setEmailAddress(event.target.value)} placeholder={t("enterEmail")} className="mt-3 h-[54px] w-full rounded-xl border border-[#d9d9db] bg-white px-5 text-[17px] text-[#202124] outline-none transition placeholder:text-[#999a9e] focus:border-[#55565a] focus:ring-4 focus:ring-[#55565a]/10" required />
+            <button type="submit" disabled={!emailAddress.trim()} className="mt-6 flex h-[56px] w-full items-center justify-center gap-3 rounded-xl border border-[#2e3035] bg-[#5e5f64] text-[17px] font-medium text-white shadow-[0_3px_0_rgba(0,0,0,0.8)] transition hover:bg-[#4c4d51] active:translate-y-px active:shadow-none disabled:cursor-not-allowed disabled:opacity-50">{t("continue")} <ArrowRight className="h-5 w-5 fill-current" /></button>
           </form>
           {message && <p role="alert" className="mt-4 text-center text-[13px] leading-5 text-[#a03232]">{message}</p>}
         </div>
-        <footer className="border-t border-[#e5e5e6] bg-[#f5f5f5] px-6 py-5 text-center text-[16px] text-[#77787c] sm:text-[18px]">{isSignUp ? <>{uiText(language, "alreadyHaveAccount")} <Link href="/login" className="font-medium text-[#202124] hover:underline">{uiText(language, "signInPrompt")}</Link></> : <>{uiText(language, "dontHaveAccount")} <Link href="/signup" className="font-medium text-[#202124] hover:underline">{uiText(language, "signUpPrompt")}</Link></>}</footer>
+        <footer className="break-words border-t border-[#e5e5e6] bg-[#f5f5f5] px-5 py-4 text-center text-[15px] leading-6 text-[#77787c] sm:px-8 sm:py-5 sm:text-[16px]">{isSignUp ? <>{t("alreadyHaveAccount")} <Link href="/login" className="font-medium text-[#202124] hover:underline">{t("signInPrompt")}</Link></> : <>{t("dontHaveAccount")} <Link href="/signup" className="font-medium text-[#202124] hover:underline">{t("signUpPrompt")}</Link></>}</footer>
       </section>
     </main>
   )

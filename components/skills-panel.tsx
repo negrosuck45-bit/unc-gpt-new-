@@ -248,7 +248,7 @@ export function SkillsPanel() {
                           Always On
                         </span>
                       )}
-                      {skill.requiresConnector && (
+                      {('requiresConnector' in skill) && skill.requiresConnector && (
                         <span className="text-[10px] px-1.5 py-0.5 rounded-full bg-amber-500/10 text-amber-500 font-medium leading-none">
                           Needs connector
                         </span>

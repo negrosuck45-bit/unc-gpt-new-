@@ -1,5 +1,7 @@
 import Link from "next/link"
 
+export const dynamic = "force-dynamic"
+
 const reasonCopy: Record<string, string> = {
   "the connection is not enabled": "This social connection is not enabled for the Lunar Clerk application yet.",
   "unauthorized": "This sign-in provider is not authorized for the current application.",

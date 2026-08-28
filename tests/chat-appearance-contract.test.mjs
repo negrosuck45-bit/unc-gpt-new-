@@ -69,8 +69,8 @@ test('Settings keeps a comprehensive language list with a native mobile picker w
   assert.doesNotMatch(notifications, /bg-\[#050505\]/);
   assert.doesNotMatch(inbox, /bg-\[#050505\]/);
   assert.doesNotMatch(thread, /bg-\[#050505\]/);
-  assert.match(settings, /<Label>Language:<\/Label>/);
-  assert.match(settings, /<select aria-label="Language"/);
+  assert.match(settings, /<Label>\{t\('language'\)\}:<\/Label>/);
+  assert.match(settings, /<select aria-label=\{t\('language'\)\}/);
   assert.match(settings, /appearance-none/);
   assert.match(settings, /LANGUAGE_OPTIONS\.map/);
   assert.match(languages, /code: "aa", label: "Afar"/);

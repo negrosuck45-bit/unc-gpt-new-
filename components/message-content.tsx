@@ -44,6 +44,7 @@ type CalendarEvent = {
 type ActionStatus = { label: string; state: 'complete' | 'error' };
 
 type NormalizedEmail = {
+  messageId?: string;
   sender?: string;
   senderPhoto?: string;
   recipient?: string;
@@ -669,6 +670,7 @@ function parseContent(content: string | undefined | null): ContentPart[] {
       if (term) {
         parts.push({
           type: 'terminal',
+          content: '',
           command: term.command,
           output: term.output,
           error: term.error,

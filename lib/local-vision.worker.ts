@@ -66,7 +66,8 @@ self.addEventListener("message", async (event) => {
   const { type, image, prompt } = event.data || {};
   try {
     if (type === "check") {
-      const adapter = await navigator.gpu?.requestAdapter();
+      const gpuNavigator = navigator as Navigator & { gpu?: { requestAdapter: () => Promise<unknown> } };
+      const adapter = await gpuNavigator.gpu?.requestAdapter();
       self.postMessage({ type: adapter ? "supported" : "unsupported" });
       return;
     }

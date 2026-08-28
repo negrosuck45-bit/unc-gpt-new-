@@ -106,7 +106,7 @@ async function composioProviderStatus(owner: string, repo: string) {
     const payload = parseProviderObject(build?.data ?? build) || {};
     // A Pages build with `status: errored` legitimately contains an error object.
     // Preserve that provider-confirmed state; only discard an execution error with no build status.
-    if (build?.successful === false || build?.error || (payload?.error && !payload?.status)) return null;
+    if (build?.error || (payload?.error && !payload?.status)) return null;
     let workflowRuns: any = null;
     try {
       const search = await github.search({ query: "list GitHub Actions workflow runs for a workflow", toolkits: ["github"] });

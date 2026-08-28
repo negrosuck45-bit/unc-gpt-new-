@@ -277,6 +277,7 @@ export function getAttachmentTypeDisplay(type: Attachment["type"]): string {
     image: "🖼️ Image",
     link: "🔗 Link",
     video: "🎥 Video",
+    audio: "🔊 Audio",
   };
   return displayMap[type] || "📎 Attachment";
 }

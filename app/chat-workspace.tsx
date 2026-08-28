@@ -6,6 +6,7 @@ import { ChatSidebar } from "@/components/chat-sidebar"
 import { SettingsPage } from "@/components/settings-page"
 import { ChatInterface } from "@/components/chat-interface"
 import Imagine from "@/components/imagine"
+import VoiceChat from "@/components/voice-chat"
 import { FirstOpenOnboarding, shouldShowFirstOpenOnboarding } from "@/components/first-open-onboarding"
 
 function useIsMobile() {
@@ -108,7 +109,7 @@ export default function Home({ accountScope }: { accountScope: string }) {
     return () => { mounted = false }
   }, [accountScope])
   const [isSidebarOpen, setIsSidebarOpen] = useState(false)
-  const [currentMode, setCurrentMode] = useState<"text" | "imagine">("text")
+  const [currentMode, setCurrentMode] = useState<"text" | "voice" | "imagine">("text")
   const [settingsOpen, setSettingsOpen] = useState(false)
 
   // Set correct initial sidebar state once we know the screen size
@@ -158,6 +159,8 @@ export default function Home({ accountScope }: { accountScope: string }) {
             isSidebarOpen={isSidebarOpen}
           />
         )
+      case "voice":
+        return <VoiceChat onOpenSidebar={toggleSidebar} isSidebarOpen={isSidebarOpen} />
       default:
         return (
           <ChatInterface

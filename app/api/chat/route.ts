@@ -2805,18 +2805,18 @@ function buildOAuthTools(req: NextRequest, baseUrl: string) {
     },
   ];
 
-  if (connected.includes("github")) {
-    const callGh = async (action: string, params: any) => {
-      const res = await fetch(`${baseUrl}/api/mcp/github`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json", cookie: cookieHeader },
-        body: JSON.stringify({ action, ...params }),
-      });
-      const data = await res.json();
-      if (!res.ok) return `GitHub error: ${data.error || res.status}`;
-      return JSON.stringify(data.data ?? data);
-    };
+  const callGh = async (action: string, params: any) => {
+    const res = await fetch(`${baseUrl}/api/mcp/github`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json", cookie: cookieHeader },
+      body: JSON.stringify({ action, ...params }),
+    });
+    const data = await res.json();
+    if (!res.ok) return `GitHub error: ${data.error || res.status}`;
+    return JSON.stringify(data.data ?? data);
+  };
 
+  if (connected.includes("github")) {
     tools.push(
       {
         type: "function",
@@ -3825,18 +3825,19 @@ export async function POST(req: NextRequest) {
         ? composioTools.find((tool: any) => isSafeReadConnectorTool(tool))
         : null;
       if (directReadTool) {
+        const connectorName = requestedConnector?.label ?? requestedConnectorKey ?? "the connected service";
         const args = defaultReadToolArguments(directReadTool.function?.parameters);
         if (args) {
           try {
             const result = await directReadTool._exec(args);
             if (!String(result).startsWith("Tool error:")) {
-              return directTextResponse(String(result), requestedConnector?.label || requestedConnectorKey);
+              return directTextResponse(String(result), connectorName);
             }
             const message = String(result).replace(/^Tool error:\s*/i, '').replace(/https?:\/\/\S+/g, '').slice(0, 240);
-            return directTextResponse(`${requestedConnector?.label || requestedConnectorKey} is connected, but it did not return verified data. ${message || 'Please try again after checking the connector status.'}`, requestedConnector?.label || requestedConnectorKey, 'connector-error');
+            return directTextResponse(`${connectorName} is connected, but it did not return verified data. ${message || 'Please try again after checking the connector status.'}`, connectorName, 'connector-error');
           } catch (error: any) {
             const message = String(error?.message || 'The connected service did not confirm the read.').replace(/https?:\/\/\S+/g, '').slice(0, 240);
-            return directTextResponse(`${requestedConnector?.label || requestedConnectorKey} is connected, but it could not complete the read. ${message}`, requestedConnector?.label || requestedConnectorKey, 'connector-error');
+            return directTextResponse(`${connectorName} is connected, but it could not complete the read. ${message}`, connectorName, 'connector-error');
           }
         }
       }

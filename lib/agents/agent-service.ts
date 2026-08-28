@@ -7,6 +7,18 @@ export interface Tool {
   execute: (input: Record<string, any>) => Promise<string>;
 }
 
+export interface MCPToolDefinition {
+  server: string
+  name: string
+  description: string
+  inputSchema: Record<string, any>
+}
+
+export interface MCPManager {
+  getAvailableTools(): MCPToolDefinition[]
+  callTool(server: string, tool: string, input: Record<string, any>): Promise<string>
+}
+
 export interface AgentConfig {
   modelService: CustomModelService;
   tools: Tool[];
@@ -91,7 +103,7 @@ Rules:
     // Add MCP tools if available
     if (this.mcpManager) {
       const mcpTools = this.mcpManager.getAvailableTools();
-      mcpTools.forEach((tool) => {
+      mcpTools.forEach((tool: MCPToolDefinition) => {
         schemas.push({
           name: `mcp_${tool.server}_${tool.name}`,
           description: `[MCP] ${tool.description}`,
