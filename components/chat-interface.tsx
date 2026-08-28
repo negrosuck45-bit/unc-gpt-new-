@@ -14,6 +14,7 @@ import { accountStorageKey } from "@/lib/account-scope";
 import { ConnectionStatusBanner, type ConnectionIssue } from "@/components/connection-status-banner";
 import { getClientRuntimeContext } from "@/lib/client-runtime-context";
 import { getStoredLanguagePreference } from "@/lib/language-preferences";
+import { prepareGroqTtsResponse } from "@/lib/voice-playback";
 
 interface ChatInterfaceProps {
   onSwitchToImagine?: () => void;
@@ -413,9 +414,22 @@ export function ChatInterface({ onSwitchToImagine, onOpenSidebar, isSidebarOpen 
       else assistantMsgId = addMessage(chatId, { role: 'assistant', content: cleanContent, connectorPermission: permission });
     } else if (!streamingPreference && fullContent && !assistantMsgId) {
       setIsThinking(false);
-      addMessage(chatId, { role: "assistant", content: fullContent });
+      assistantMsgId = addMessage(chatId, { role: "assistant", content: fullContent });
     } else if (assistantMsgId && fullContent) {
       updateMessage(chatId, assistantMsgId, fullContent);
+    }
+
+    // Begin fetching the final reply audio now, while the reply is still settling.
+    // The speaker button then receives the exact same cached promise/object URL instead
+    // of starting a new network request after the user clicks it.
+    if (assistantMsgId && fullContent.trim()) {
+      void prepareGroqTtsResponse({
+        text: fullContent,
+        language: getStoredLanguagePreference(),
+        key: assistantMsgId,
+      }).catch(() => {
+        // Playback immediately uses the device speech fallback if pre-generation fails.
+      });
     }
 
     if (!fullContent.trim() && !permissionRequest) {

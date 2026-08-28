@@ -80,3 +80,13 @@ test('supports English, Hindi, Italian, and a broad ISO-639-1 language picker', 
   assert.match(translations, /completeTranslations/)
   assert.match(translations, /uncgpt-language-changed/)
 })
+
+test('prepares final assistant audio before the reply leaves the streaming lifecycle', () => {
+  const chatInterface = read('./components/chat-interface.tsx')
+  const messages = read('./components/chat-messages.tsx')
+
+  assert.match(chatInterface, /import \{ prepareGroqTtsResponse \} from "@\/lib\/voice-playback"/)
+  assert.match(chatInterface, /void prepareGroqTtsResponse\(\{[\s\S]*?text: fullContent,[\s\S]*?key: assistantMsgId/)
+  assert.match(chatInterface, /assistantMsgId = addMessage\(chatId, \{ role: "assistant", content: fullContent \}\)/)
+  assert.match(messages, /prepareGroqTtsResponse\([\s\S]*?key: latestAssistant\.id/)
+})
