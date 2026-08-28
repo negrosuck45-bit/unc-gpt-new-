@@ -5,25 +5,24 @@ import test from 'node:test'
 const projectRoot = new URL('..', import.meta.url)
 const read = (path) => fs.readFileSync(new URL(path, projectRoot), 'utf8')
 
-test('uses Cloudflare Aura-2-ES as the primary language-aware voice provider', () => {
+test('uses direct Groq audio synthesis as the primary voice provider', () => {
   const route = read('./app/api/voice-chat/route.ts')
   const playback = read('./lib/voice-playback.ts')
   const messages = read('./components/chat-messages.tsx')
 
-  assert.match(route, /const AURA_MODEL = "aura-2-es"/)
-  assert.match(route, /task: "speech"/)
-  assert.match(route, /prompt: text/)
-  assert.match(route, /language,/)
-  assert.match(route, /response_format: "mp3"/)
-  assert.match(route, /x-uncgpt-agent-secret/)
-  assert.match(route, /audioUrlFromPayload/)
-  assert.match(route, /Buffer\.from\(body\)\.toString\("base64"\)/)
-  assert.match(playback, /normalizeAudioResponse/)
+  assert.match(route, /const ENGLISH_MODEL = "canopylabs\/orpheus-v1-english"/)
+  assert.match(route, /https:\/\/api\.groq\.com\/openai\/v1\/audio\/speech/)
+  assert.match(route, /GROQ_API_KEYS \|\| process\.env\.GROQ_API_KEY/)
+  assert.match(route, /response_format: "wav"/)
+  assert.match(route, /new Response\(result\.audio/)
+  assert.match(playback, /response\.blob\(\)/)
+  assert.match(playback, /URL\.createObjectURL\(audioBlob\)/)
+  assert.match(playback, /URL\.revokeObjectURL/)
   assert.match(playback, /stopVoicePlayback\(\)/)
   assert.match(playback, /removeAttribute\("src"\)/)
   assert.match(playback, /audio\.load\(\)/)
   assert.match(playback, /signal: abortController\.signal/)
-  assert.match(messages, /playCloudflareAuraResponse/)
+  assert.match(messages, /playGroqTtsResponse/)
 })
 
 test('uses browser SpeechSynthesis only as an explicit language-aware fallback', () => {
@@ -33,9 +32,9 @@ test('uses browser SpeechSynthesis only as an explicit language-aware fallback',
   assert.match(playback, /utterance\.lang = voiceLanguage\.locale/)
   assert.match(playback, /pickBrowserVoice/)
   assert.match(playback, /window\.speechSynthesis\.speak\(utterance\)/)
-  assert.match(messages, /playCloudflareAuraResponse\([\s\S]*?catch \(error\)/)
+  assert.match(messages, /playGroqTtsResponse\([\s\S]*?catch \(error\)/)
   assert.match(messages, /speakWithBrowserFallback/)
-  assert.match(messages, /primary Cloudflare voice fails/)
+  assert.match(messages, /primary Groq voice fails/)
   assert.doesNotMatch(messages, /window\.speechSynthesis\.speak\(new SpeechSynthesisUtterance/)
 })
 

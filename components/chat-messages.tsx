@@ -4,7 +4,7 @@ import { useEffect, useRef, useState, useMemo, useCallback } from 'react';
 import NextImage from 'next/image';
 import { Message, Attachment } from '@/lib/chat-store';
 import { getStoredLanguagePreference } from '@/lib/language-preferences';
-import { playCloudflareAuraResponse, speakWithBrowserFallback, stopVoicePlayback, VoicePlaybackCancelledError } from '@/lib/voice-playback';
+import { playGroqTtsResponse, speakWithBrowserFallback, stopVoicePlayback, VoicePlaybackCancelledError } from '@/lib/voice-playback';
 import { useUiText } from '@/lib/ui-translations';
 import { cn } from '@/lib/utils';
 import { motion, AnimatePresence } from 'framer-motion';
@@ -467,11 +467,11 @@ function MessageActions({ message, isAssistant, onCopy, onRegenerate, onEdit, on
 
     setVoiceError(null);
     try {
-      await playCloudflareAuraResponse({ text: message.content, language, key: message.id });
+      await playGroqTtsResponse({ text: message.content, language, key: message.id });
     } catch (error) {
       if (error instanceof VoicePlaybackCancelledError) return;
       try {
-        // Browser speech is intentionally used only after the primary Cloudflare voice fails.
+        // Browser speech is intentionally used only after the primary Groq voice fails.
         await speakWithBrowserFallback({ text: message.content, language, key: message.id });
       } catch (fallbackError) {
         if (fallbackError instanceof VoicePlaybackCancelledError) return;

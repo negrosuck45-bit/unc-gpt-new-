@@ -174,8 +174,7 @@ export default function Home({ accountScope }: { accountScope: string }) {
 
   return (
     <div
-      className="flex overflow-hidden bg-background text-foreground"
-      style={{ height: "100dvh", minHeight: "-webkit-fill-available" }}
+      className="workspace-shell flex overflow-hidden bg-background text-foreground"
     >
       {/* Mobile overlay backdrop — tap to close sidebar */}
       {isMobile && isSidebarOpen && (
@@ -209,7 +208,7 @@ export default function Home({ accountScope }: { accountScope: string }) {
       </div>
 
       {/* Main content area */}
-      <main className="flex-1 flex flex-col overflow-hidden min-w-0">
+      <main className="workspace-main flex-1 flex flex-col overflow-hidden min-w-0">
         {renderMainContent()}
       </main>
 
