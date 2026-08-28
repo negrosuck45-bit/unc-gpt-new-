@@ -79,6 +79,17 @@ export function languagePreferenceInstruction(value: unknown, clientLocale?: unk
   return `Language preference: ${selected.label} (${selected.code}). Reply in ${selected.label} unless the user explicitly asks for another language, requests translation, or uses a different language for a clear reason.`;
 }
 
+export function setStoredLanguagePreference(value: unknown): string {
+  const normalized = normalizeLanguagePreference(value)
+  if (typeof window !== "undefined") {
+    try {
+      window.localStorage.setItem("uncgpt-language", normalized)
+      window.dispatchEvent(new Event("uncgpt-language-changed"))
+    } catch {}
+  }
+  return normalized
+}
+
 export function getStoredLanguagePreference(): string {
   if (typeof window === "undefined") return "auto";
   try {

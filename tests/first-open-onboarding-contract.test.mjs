@@ -25,7 +25,7 @@ test('renders a logo-first onboarding sequence that saves profile and language c
   assert.match(onboarding, /Choose a username/)
   assert.match(onboarding, /Choose your language/)
   assert.match(onboarding, /\/api\/profile\/username/)
-  assert.match(onboarding, /localStorage\.setItem\('uncgpt-language'/)
+  assert.match(onboarding, /setStoredLanguagePreference\(normalizedLanguage\)/)
   assert.match(onboarding, /onboardingComplete: true/)
   assert.match(onboarding, /onboardingVersion: ONBOARDING_VERSION/)
   assert.match(onboarding, /LANGUAGE_OPTIONS/)

@@ -23,7 +23,7 @@ import { SkillsPanel } from './skills-panel';
 import { DEFAULT_USER_PREFERENCES, readUserPreferences, writeUserPreferences, type MessageDensity } from '@/lib/user-preferences';
 import { playReplySound, unlockReplySound } from '@/lib/notifications';
 import { SignOutButton } from './sign-out-button';
-import { LANGUAGE_OPTIONS, normalizeLanguagePreference } from '@/lib/language-preferences';
+import { LANGUAGE_OPTIONS, normalizeLanguagePreference, setStoredLanguagePreference } from '@/lib/language-preferences';
 
 interface SettingsPageProps { onClose?: () => void; }
 
@@ -303,9 +303,8 @@ export function SettingsPage({ onClose }: SettingsPageProps) {
                       <p className="mt-1 text-xs leading-5 text-muted-foreground">Choose the language used across Lunar.</p>
                     </div>
                     <select aria-label="Language" value={language} onChange={(event) => {
-                      const nextLanguage = normalizeLanguagePreference(event.target.value);
-                      setLanguage(nextLanguage);
-                      try { localStorage.setItem('uncgpt-language', nextLanguage) } catch {}
+                      const nextLanguage = setStoredLanguagePreference(event.target.value);
+                      setLanguage(nextLanguage)
                     }} className="h-10 w-[190px] shrink-0 appearance-none rounded-full border border-border/10 bg-muted/[0.08] px-4 text-sm text-foreground outline-none focus:ring-2 focus:ring-foreground/15">
                       {LANGUAGE_OPTIONS.map((option) => <option key={option.code} value={option.code}>{option.label}</option>)}
                     </select>

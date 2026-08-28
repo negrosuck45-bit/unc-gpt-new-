@@ -3,10 +3,12 @@
 import { useEffect, useState } from 'react'
 import Link from 'next/link'
 import { ArrowLeft, Inbox } from 'lucide-react'
+import { useUiText } from '@/lib/ui-translations'
 
 type Conversation = { username: string; text: string; time: string }
 
 export function MessagesPage() {
+  const t = useUiText()
   const [conversations, setConversations] = useState<Conversation[]>([])
 
   useEffect(() => {
@@ -16,7 +18,7 @@ export function MessagesPage() {
         if (!data) return
         const grouped = new Map<string, Conversation>()
         for (const friend of data.friends || []) {
-          if (friend.username?.toLowerCase() !== 'lunar') grouped.set(friend.username, { username: friend.username, text: 'Start a conversation', time: '' })
+          if (friend.username?.toLowerCase() !== 'lunar') grouped.set(friend.username, { username: friend.username, text: t('startConversation'), time: '' })
         }
         for (const message of data.messages || []) {
           const username = String(message.sender_id) === String(data.userId) ? message.thread_username : message.sender_username
@@ -32,18 +34,18 @@ export function MessagesPage() {
     <main className="social-scroll-page min-h-screen bg-background px-4 py-6 text-foreground sm:px-8 sm:py-10">
       <div className="mx-auto w-full max-w-3xl">
         <header className="mb-8 flex items-center gap-3">
-          <Link href="/" aria-label="Back to workspace" className="rounded-full p-2 text-muted-foreground transition hover:bg-accent hover:text-foreground">
+          <Link href="/" aria-label={t('back')} className="rounded-full p-2 text-muted-foreground transition hover:bg-accent hover:text-foreground">
             <ArrowLeft className="h-5 w-5" />
           </Link>
           <div>
-            <p className="text-[11px] font-medium uppercase tracking-[0.24em] text-muted-foreground">Inbox</p>
-            <h1 className="mt-1 text-3xl font-semibold tracking-tight">Messages</h1>
+            <p className="text-[11px] font-medium uppercase tracking-[0.24em] text-muted-foreground">{t('inbox')}</p>
+            <h1 className="mt-1 text-3xl font-semibold tracking-tight">{t('messages')}</h1>
           </div>
         </header>
 
         <nav className="mb-6 flex w-fit items-center gap-1 rounded-full border border-border bg-card p-1">
-          <Link href="/notifications" className="rounded-full px-4 py-2 text-sm text-muted-foreground transition hover:bg-accent hover:text-foreground">Notifications</Link>
-          <Link href="/messages" className="rounded-full bg-primary px-4 py-2 text-sm text-primary-foreground">Messages</Link>
+          <Link href="/notifications" className="rounded-full px-4 py-2 text-sm text-muted-foreground transition hover:bg-accent hover:text-foreground">{t('notifications')}</Link>
+          <Link href="/messages" className="rounded-full bg-primary px-4 py-2 text-sm text-primary-foreground">{t('messages')}</Link>
         </nav>
 
         <section className="overflow-hidden rounded-[22px] border border-border bg-card">
@@ -65,8 +67,8 @@ export function MessagesPage() {
           )) : (
             <div className="flex flex-col items-center px-6 py-20 text-center">
               <div className="flex h-14 w-14 items-center justify-center rounded-full bg-muted text-muted-foreground"><Inbox className="h-6 w-6" /></div>
-              <h2 className="mt-5 text-lg font-medium">No messages yet</h2>
-              <p className="mt-2 max-w-sm text-sm leading-6 text-muted-foreground">When someone messages you, the conversation will appear here.</p>
+              <h2 className="mt-5 text-lg font-medium">{t('noMessagesYet')}</h2>
+              <p className="mt-2 max-w-sm text-sm leading-6 text-muted-foreground">{t('conversation')}</p>
             </div>
           )}
         </section>

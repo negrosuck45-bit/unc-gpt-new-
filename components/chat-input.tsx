@@ -55,6 +55,7 @@ import {
 } from '@/components/ui/dropdown-menu'
 import NextImage from 'next/image'
 import { uploadFile } from '@/lib/upload'
+import { useUiText } from '@/lib/ui-translations'
 
 // ============= CONSTANTS =============
 // Keep ordinary pasted text in the composer up to roughly 100 KB; only very large
@@ -263,6 +264,7 @@ export function ChatInput({
   initialValue,
   onClearInitialValue,
 }: ChatInputProps) {
+  const t = useUiText()
   const [input, setInput] = useState('')
   const [attachments, setAttachments] = useState<Attachment[]>([])
   const [showLinkInput, setShowLinkInput] = useState(false)
@@ -856,7 +858,7 @@ export function ChatInput({
               onChange={(e) => setInput(e.target.value)}
               onPaste={handlePasteEvent}
               onKeyDown={handleKeyDown}
-              placeholder="Assign a task or type / for more"
+              placeholder={t('assignTask')}
               className="w-full min-h-[54px] resize-none bg-transparent px-5 pb-1.5 pt-4 text-[16px] leading-6 text-foreground placeholder:text-muted-foreground focus:outline-none sm:px-6"
               disabled={disabled}
               rows={1}
@@ -917,8 +919,8 @@ export function ChatInput({
                           className="mx-auto mb-4 block h-1.5 w-12 cursor-pointer rounded-full border-0 bg-white/25 p-0 shadow-[0_1px_4px_rgba(0,0,0,0.25)] transition hover:bg-white/45 sm:hidden"
                         />
                         <div className="mb-4 flex items-center justify-between">
-                          <h3 className="text-lg font-semibold text-foreground">Photos</h3>
-                          <button type="button" onClick={() => imageInputRef.current?.click()} className="text-sm font-medium text-primary hover:text-primary/80">See all</button>
+                          <h3 className="text-lg font-semibold text-foreground">{t('photos')}</h3>
+                          <button type="button" onClick={() => imageInputRef.current?.click()} className="text-sm font-medium text-primary hover:text-primary/80">{t('seeAll')}</button>
                         </div>
                         <div className="mb-5 flex gap-2 overflow-x-auto pb-1">
                           <motion.button type="button" onClick={() => openPhotoPicker('camera')} whileTap={{ scale: 0.96 }} transition={{ type: 'spring', stiffness: 520, damping: 28 }} aria-label="Camera" className="flex h-28 w-28 shrink-0 flex-col items-center justify-center gap-2 rounded-[20px] border border-border bg-secondary text-foreground shadow-[inset_0_1px_0_rgba(255,255,255,0.07)] backdrop-blur-xl transition hover:bg-white/[0.13]">
@@ -932,17 +934,17 @@ export function ChatInput({
                           ))}
                           <motion.button type="button" onClick={() => openPhotoPicker('library')} whileTap={{ scale: 0.96 }} transition={{ type: 'spring', stiffness: 520, damping: 28 }} aria-label="Choose photos" className="flex h-28 w-28 shrink-0 flex-col items-center justify-center gap-2 rounded-[20px] border border-border bg-muted text-muted-foreground shadow-[inset_0_1px_0_rgba(255,255,255,0.05)] backdrop-blur-xl transition hover:bg-white/[0.10]">
                             <ImageIcon className="h-7 w-7" strokeWidth={1.8} />
-                            <span className="text-[13px]">Photo Library</span>
+                            <span className="text-[13px]">{t('photoLibrary')}</span>
                           </motion.button>
                         </div>
                         </div>
                         <div className="min-h-0 flex-1 overflow-y-auto overscroll-contain border-t border-border pt-3" style={{ WebkitOverflowScrolling: 'touch' }}>
-                          <button type="button" onClick={() => fileInputRef.current?.click()} className="flex min-h-12 w-full items-center gap-4 rounded-2xl px-3 text-[15px] text-foreground transition hover:bg-accent"><Paperclip className="h-6 w-6 text-muted-foreground" /> Add files</button>
-                          <button type="button" onClick={() => handleQuickAction('Connect my computer and show me what is available.')} className="flex min-h-12 w-full items-center gap-4 rounded-2xl px-3 text-[15px] text-foreground transition hover:bg-accent"><Monitor className="h-6 w-6 text-muted-foreground" /> Connect My Computer</button>
-                          <button type="button" onClick={() => handleQuickAction('Help me choose and use a skill for this task.')} className="flex min-h-12 w-full items-center gap-4 rounded-2xl px-3 text-[15px] text-foreground transition hover:bg-accent"><Puzzle className="h-6 w-6 text-muted-foreground" /> Add Skills</button>
-                          <button type="button" onClick={() => handleQuickAction('Build a website for me.')} className="flex min-h-12 w-full items-center gap-4 rounded-2xl px-3 text-[15px] text-foreground transition hover:bg-accent"><LayoutGrid className="h-6 w-6 text-muted-foreground" /> Build website</button>
-                          <button type="button" onClick={() => handleQuickAction('Create a slide presentation for me.')} className="flex min-h-12 w-full items-center gap-4 rounded-2xl px-3 text-[15px] text-foreground transition hover:bg-accent"><Presentation className="h-6 w-6 text-muted-foreground" /> Create slides</button>
-                          <button type="button" onClick={() => handleQuickAction('Create an image for me.')} className="flex min-h-12 w-full items-center gap-4 rounded-2xl px-3 text-[15px] text-foreground transition hover:bg-accent"><ImageIcon className="h-6 w-6 text-muted-foreground" /> Create image</button>
+                          <button type="button" onClick={() => fileInputRef.current?.click()} className="flex min-h-12 w-full items-center gap-4 rounded-2xl px-3 text-[15px] text-foreground transition hover:bg-accent"><Paperclip className="h-6 w-6 text-muted-foreground" /> {t('addFiles')}</button>
+                          <button type="button" onClick={() => handleQuickAction('Connect my computer and show me what is available.')} className="flex min-h-12 w-full items-center gap-4 rounded-2xl px-3 text-[15px] text-foreground transition hover:bg-accent"><Monitor className="h-6 w-6 text-muted-foreground" /> {t('connectComputer')}</button>
+                          <button type="button" onClick={() => handleQuickAction('Help me choose and use a skill for this task.')} className="flex min-h-12 w-full items-center gap-4 rounded-2xl px-3 text-[15px] text-foreground transition hover:bg-accent"><Puzzle className="h-6 w-6 text-muted-foreground" /> {t('addSkills')}</button>
+                          <button type="button" onClick={() => handleQuickAction('Build a website for me.')} className="flex min-h-12 w-full items-center gap-4 rounded-2xl px-3 text-[15px] text-foreground transition hover:bg-accent"><LayoutGrid className="h-6 w-6 text-muted-foreground" /> {t('buildWebsite')}</button>
+                          <button type="button" onClick={() => handleQuickAction('Create a slide presentation for me.')} className="flex min-h-12 w-full items-center gap-4 rounded-2xl px-3 text-[15px] text-foreground transition hover:bg-accent"><Presentation className="h-6 w-6 text-muted-foreground" /> {t('createSlides')}</button>
+                          <button type="button" onClick={() => handleQuickAction('Create an image for me.')} className="flex min-h-12 w-full items-center gap-4 rounded-2xl px-3 text-[15px] text-foreground transition hover:bg-accent"><ImageIcon className="h-6 w-6 text-muted-foreground" /> {t('createImage')}</button>
                         </div>
                       </motion.div>
                     </motion.div>
@@ -983,7 +985,7 @@ export function ChatInput({
                       disabled={isStreaming || disabled || hasUploadingImages || (!input.trim() && attachments.length === 0)}
                       size="icon"
                       className="task-composer-send h-10 w-10 rounded-full"
-                      aria-label="Send message"
+                      aria-label={t('send')}
                     >
                       {hasUploadingImages ? <Loader2 className="h-4 w-4 animate-spin" /> : <ArrowUp className="h-[19px] w-[19px]" strokeWidth={2.2} />}
                     </Button>
@@ -1003,9 +1005,9 @@ export function ChatInput({
         <AnimatePresence>
           {showLinkInput && (
             <motion.div initial={{ opacity: 0, height: 0 }} animate={{ opacity: 1, height: 'auto' }} exit={{ opacity: 0, height: 0 }} className="mt-2 px-3 flex gap-2">
-              <input autoFocus className="flex-1 px-4 py-2 rounded-lg border border-border bg-background" placeholder="Paste URL..." value={linkUrl} onChange={(e) => setLinkUrl(e.target.value)} onKeyDown={(e) => e.key === 'Enter' && handleAddLink()} />
-              <Button onClick={handleAddLink}>Add</Button>
-              <Button variant="ghost" onClick={() => setShowLinkInput(false)}>Cancel</Button>
+              <input autoFocus className="flex-1 px-4 py-2 rounded-lg border border-border bg-background" placeholder={t('pasteUrl')} value={linkUrl} onChange={(e) => setLinkUrl(e.target.value)} onKeyDown={(e) => e.key === 'Enter' && handleAddLink()} />
+              <Button onClick={handleAddLink}>{t('add')}</Button>
+              <Button variant="ghost" onClick={() => setShowLinkInput(false)}>{t('cancel')}</Button>
             </motion.div>
           )}
         </AnimatePresence>

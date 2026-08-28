@@ -4,7 +4,7 @@ import { AnimatePresence, motion } from 'framer-motion'
 import { ArrowLeft, ArrowRight, ChevronDown, Globe2, Loader2 } from 'lucide-react'
 import { useEffect, useMemo, useState } from 'react'
 import { Button } from '@/components/ui/button'
-import { LANGUAGE_OPTIONS, getLanguageOption, normalizeLanguagePreference } from '@/lib/language-preferences'
+import { LANGUAGE_OPTIONS, getLanguageOption, normalizeLanguagePreference, setStoredLanguagePreference } from '@/lib/language-preferences'
 import { uiText, type TranslationKey } from '@/lib/ui-translations'
 import { readUserPreferences, writeUserPreferences } from '@/lib/user-preferences'
 
@@ -64,7 +64,7 @@ export function FirstOpenOnboarding({ onComplete }: FirstOpenOnboardingProps) {
       onboardingComplete: true,
       onboardingVersion: ONBOARDING_VERSION,
     })
-    try { localStorage.setItem('uncgpt-language', normalizedLanguage) } catch {}
+    setStoredLanguagePreference(normalizedLanguage)
     onComplete()
   }
 

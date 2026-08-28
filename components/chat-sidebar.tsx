@@ -33,6 +33,7 @@ import { MemoryImportDialog } from "./memory-import-dialog"
 import { MemoryExportDialog } from "./memory-export-dialog"
 import { ImageEditDialog } from "./image-edit-dialog"
 import { ChatHistoryPanel } from "./chat-history-panel"
+import { useUiText } from "@/lib/ui-translations"
 import { SignOutButton } from "./sign-out-button"
 import {
   DropdownMenu,
@@ -87,6 +88,7 @@ export function ChatSidebar({
     appendToProjectMemory,
     updateChatTitle,
   } = useChatStore()
+  const t = useUiText()
 
   const [hoveredChatId, setHoveredChatId] = useState<string | null>(null)
   const [renamingChatId, setRenamingChatId] = useState<string | null>(null)
@@ -240,8 +242,8 @@ export function ChatSidebar({
       >
         <button
           onClick={onToggle}
-          title="Open sidebar"
-          aria-label="Open sidebar"
+          title={t('openSidebar')}
+          aria-label={t('openSidebar')}
           className="group relative h-10 w-10 rounded-xl flex items-center justify-center text-sidebar-foreground/65 hover:bg-sidebar-accent hover:text-sidebar-foreground transition-all mb-1"
         >
           <Image
@@ -254,13 +256,13 @@ export function ChatSidebar({
           <PanelLeft className="h-5 w-5 absolute opacity-0 group-hover:opacity-100 transition-opacity duration-150" />
         </button>
 
-        <RailButton title="New chat" onClick={() => handleNew("text")}>
+        <RailButton title={t('newChat')} onClick={() => handleNew("text")}>
           <Plus className="h-5 w-5" />
         </RailButton>
-        <RailButton title="Search" onClick={() => { onToggle(); setShowSearch(true) }}>
+        <RailButton title={t('search')} onClick={() => { onToggle(); setShowSearch(true) }}>
           <Search className="h-5 w-5" />
         </RailButton>
-        <RailButton title="Imagine" onClick={() => onModeChange("imagine")}>
+        <RailButton title={t('imagine')} onClick={() => onModeChange("imagine")}>
           <Sparkles className="h-5 w-5" />
         </RailButton>
 
@@ -272,7 +274,7 @@ export function ChatSidebar({
         >
           <DiscordIcon className="h-5 w-5 text-muted-foreground" />
         </RailButton>
-        <RailButton title="Settings" onClick={openSettings}>
+        <RailButton title={t('settings')} onClick={openSettings}>
           <SettingsIcon className="h-5 w-5" />
         </RailButton>
 
@@ -306,16 +308,16 @@ export function ChatSidebar({
               <div className="flex items-center gap-1">
                 <button
                   onClick={() => setShowSearch((open) => !open)}
-                  title="Search chats"
-                  aria-label="Search chats"
+                  title={t('searchChats')}
+                  aria-label={t('searchChats')}
                   className="flex h-9 w-9 items-center justify-center rounded-full text-sidebar-foreground/65 transition-all hover:bg-sidebar-accent hover:text-sidebar-foreground"
                 >
                   <Search className="h-[19px] w-[19px]" />
                 </button>
                 <button
                   onClick={onToggle}
-                  title="Close sidebar"
-                  aria-label="Close sidebar"
+                  title={t('closeSidebar')}
+                  aria-label={t('closeSidebar')}
                   className="flex h-9 w-9 items-center justify-center rounded-full text-sidebar-foreground/65 transition-all hover:bg-sidebar-accent hover:text-sidebar-foreground"
                 >
                   <PanelLeftClose className="h-[19px] w-[19px]" />
@@ -330,7 +332,7 @@ export function ChatSidebar({
                 className="flex w-full items-center justify-center gap-2.5 rounded-full border border-sidebar-border bg-sidebar-accent px-4 py-3 text-[15px] font-medium text-sidebar-foreground shadow-[inset_0_1px_0_rgba(255,255,255,0.08),0_8px_24px_rgba(0,0,0,0.10)] transition hover:bg-sidebar-accent/80 active:scale-[0.99]"
               >
                 <CirclePlus className="h-[19px] w-[19px]" />
-                <span>New chat</span>
+                <span>{t('newChat')}</span>
               </button>
             </div>
 
@@ -345,7 +347,7 @@ export function ChatSidebar({
                 >
                   <input
                     type="text"
-                    placeholder="Search chats..."
+                    placeholder={t('searchChatsPlaceholder')}
                     value={searchQuery}
                     onChange={(e) => setSearchQuery(e.target.value)}
                     autoFocus
@@ -360,13 +362,13 @@ export function ChatSidebar({
 
 
               <div className="px-2 pb-2 text-[11px] font-semibold uppercase tracking-[0.14em] text-muted-foreground">
-                Recents
+                {t('recents')}
               </div>
 
               {/* Today */}
               {groupedChats.today.length > 0 && (
                 <ChatGroup
-                  label="Today"
+                  label={t('today')}
                   chats={groupedChats.today}
                   currentChatId={currentChatId}
                   hoveredChatId={hoveredChatId}
@@ -385,7 +387,7 @@ export function ChatSidebar({
               {/* Yesterday */}
               {groupedChats.yesterday.length > 0 && (
                 <ChatGroup
-                  label="Yesterday"
+                  label={t('yesterday')}
                   chats={groupedChats.yesterday}
                   currentChatId={currentChatId}
                   hoveredChatId={hoveredChatId}
@@ -404,7 +406,7 @@ export function ChatSidebar({
               {/* Previous 7 Days */}
               {groupedChats.previous7Days.length > 0 && (
                 <ChatGroup
-                  label="Previous 7 Days"
+                  label={t('previous7Days')}
                   chats={groupedChats.previous7Days}
                   currentChatId={currentChatId}
                   hoveredChatId={hoveredChatId}
@@ -423,7 +425,7 @@ export function ChatSidebar({
               {/* Previous 30 Days */}
               {groupedChats.previous30Days.length > 0 && (
                 <ChatGroup
-                  label="Previous 30 Days"
+                  label={t('previous30Days')}
                   chats={groupedChats.previous30Days}
                   currentChatId={currentChatId}
                   hoveredChatId={hoveredChatId}
@@ -442,7 +444,7 @@ export function ChatSidebar({
               {/* Older */}
               {groupedChats.older.length > 0 && (
                 <ChatGroup
-                  label="Older"
+                  label={t('older')}
                   chats={groupedChats.older}
                   currentChatId={currentChatId}
                   hoveredChatId={hoveredChatId}
@@ -461,7 +463,7 @@ export function ChatSidebar({
               {/* Empty state */}
               {filteredChats.length === 0 && (
                 <div className="text-center py-8 text-muted-foreground text-sm">
-                  {searchQuery ? "No chats found" : "No chats yet"}
+                  {searchQuery ? t('noChatsFound') : t('noChatsYet')}
                 </div>
               )}
             </div>
@@ -476,14 +478,14 @@ export function ChatSidebar({
                     exit={{ opacity: 0, y: 8, scale: 0.98 }}
                     className="absolute bottom-[calc(100%-0.2rem)] left-2 right-2 z-20 overflow-hidden rounded-[18px] border border-border bg-popover p-1 text-popover-foreground shadow-[0_16px_42px_rgba(0,0,0,0.22)] backdrop-blur-2xl"
                   >
-                    <button onClick={openSettings} className="flex w-full items-center gap-3 rounded-[14px] px-3 py-2.5 text-left text-[14px] text-sidebar-foreground/90 transition hover:bg-sidebar-accent/[0.10]"><SettingsIcon className="h-[18px] w-[18px] text-sidebar-foreground/75" /> Settings</button>
+                    <button onClick={openSettings} className="flex w-full items-center gap-3 rounded-[14px] px-3 py-2.5 text-left text-[14px] text-sidebar-foreground/90 transition hover:bg-sidebar-accent/[0.10]"><SettingsIcon className="h-[18px] w-[18px] text-sidebar-foreground/75" /> {t('settings')}</button>
                     <SignOutButton className="flex w-full items-center gap-3 rounded-[14px] px-3 py-2.5 text-left text-[14px] text-destructive transition hover:bg-destructive/[0.10]" />
                   </motion.div>
                 )}
               </AnimatePresence>
               <button onClick={() => setAccountOpen((open) => !open)} className="flex w-full items-center gap-3 rounded-[18px] border border-sidebar-border/[0.08] bg-sidebar-accent/[0.075] px-3 py-2.5 text-left shadow-[inset_0_1px_0_rgba(255,255,255,0.05)] transition hover:bg-sidebar-accent/[0.12]">
                 {profilePreferences.profilePicture || authUser?.picture ? <img src={profilePreferences.profilePicture || authUser?.picture || ''} alt="Profile" className="h-9 w-9 rounded-full object-cover ring-1 ring-white/15" /> : <span className="flex h-9 w-9 items-center justify-center rounded-full bg-emerald-500/80 text-base font-medium text-sidebar-foreground ring-1 ring-white/10">{(profilePreferences.profileName || authUser?.name || authUser?.email || 'U').slice(0, 1).toUpperCase()}</span>}
-                <span className="min-w-0 flex-1"><span className="block truncate text-[14px] font-medium leading-5 text-sidebar-foreground/92">{profilePreferences.profileName || authUser?.name || 'Account'}</span><span className="block truncate text-[11px] leading-4 text-sidebar-foreground/45">{authUser?.email || 'Signed in securely'}</span></span>
+                <span className="min-w-0 flex-1"><span className="block truncate text-[14px] font-medium leading-5 text-sidebar-foreground/92">{profilePreferences.profileName || authUser?.name || t('account')}</span><span className="block truncate text-[11px] leading-4 text-sidebar-foreground/45">{authUser?.email || t('signedInSecurely')}</span></span>
                 <MoreHorizontal className="h-[18px] w-[18px] shrink-0 text-sidebar-foreground/50" />
               </button>
             </div>
