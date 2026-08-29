@@ -187,16 +187,15 @@ export function ChatInterface({ onSwitchToImagine, onOpenSidebar, isSidebarOpen 
     return completedResponse || undefined;
   }, [currentChatId, createNewChat, addMessage, updateChatTitle, setIsStreaming, settings]);
 
-  const handleCameraAsk = useCallback(async (text: string) => {
+  const handleCameraAsk = useCallback(async (text: string): Promise<string | undefined> => {
     const response = await handleSend(text);
-    if (!response?.trim()) return;
+    if (!response?.trim()) return undefined;
     const language = getStoredLanguagePreference();
     const key = `camera-voice-${Date.now()}`;
-    try {
-      await playGroqTtsResponse({ text: response, language, key });
-    } catch {
-      await speakWithBrowserFallback({ text: response, language, key }).catch(() => undefined);
-    }
+    void playGroqTtsResponse({ text: response, language, key })
+      .catch(() => speakWithBrowserFallback({ text: response, language, key }))
+      .catch(() => undefined);
+    return response;
   }, [handleSend]);
 
   const processAIResponse = async (chatId: string, messages: any[]) => {

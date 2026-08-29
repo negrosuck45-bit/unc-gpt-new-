@@ -7,7 +7,7 @@ import { cn } from "@/lib/utils"
 interface CameraVoiceModeProps {
   open: boolean
   onClose: () => void
-  onAsk: (text: string) => Promise<void>
+  onAsk: (text: string) => Promise<string | undefined>
 }
 
 type SpeechRecognitionInstance = {
@@ -44,6 +44,7 @@ export function CameraVoiceMode({ open, onClose, onAsk }: CameraVoiceModeProps) 
   const [interim, setInterim] = useState("")
   const [busy, setBusy] = useState(false)
   const [cameraError, setCameraError] = useState<string | null>(null)
+  const [answer, setAnswer] = useState("")
 
   const stopRecognition = useCallback(() => {
     shouldListenRef.current = false
@@ -119,8 +120,18 @@ export function CameraVoiceMode({ open, onClose, onAsk }: CameraVoiceModeProps) 
     busyRef.current = true
     setBusy(true)
     setInterim("")
-    try { await onAsk(text); transcriptRef.current = "" }
-    finally { busyRef.current = false; setBusy(false) }
+    setAnswer("")
+    try {
+      const response = await onAsk(text)
+      if (response?.trim()) {
+        setAnswer(response.trim())
+        transcriptRef.current = ""
+      } else {
+        setCameraError("Lunar did not return a response. Please try again.")
+      }
+    } catch {
+      setCameraError("Lunar could not answer right now. Please try again.")
+    } finally { busyRef.current = false; setBusy(false) }
   }, [onAsk, stopRecognition])
 
   const toggleMicrophone = useCallback(() => {
@@ -172,8 +183,8 @@ export function CameraVoiceMode({ open, onClose, onAsk }: CameraVoiceModeProps) 
       </div>
       <button type="button" onClick={onClose} aria-label="Close camera voice mode" className="absolute right-5 top-[max(1.25rem,env(safe-area-inset-top))] z-20 flex h-11 w-11 items-center justify-center rounded-full bg-black/45 text-white backdrop-blur-xl"><X className="h-5 w-5" /></button>
       <div className="relative z-10 flex w-full max-w-md flex-col items-center px-8 text-center">
-        <p className="min-h-7 max-w-sm text-lg font-medium drop-shadow-lg">{interim || transcriptRef.current}</p>
-        <p className="fixed bottom-[calc(10rem+env(safe-area-inset-bottom))] left-1/2 z-20 w-full -translate-x-1/2 px-8 text-sm text-white/80">{cameraError || (busy ? "Lunar is replying…" : muted ? "Tap the microphone to speak" : listening ? "Listening…" : "Microphone muted")}</p>
+        <p className="max-h-48 max-w-sm overflow-y-auto text-lg font-medium leading-relaxed drop-shadow-lg">{answer || interim || transcriptRef.current}</p>
+        <p className="fixed bottom-[calc(10rem+env(safe-area-inset-bottom))] left-1/2 z-20 w-full -translate-x-1/2 px-8 text-sm text-white/80">{cameraError || (busy ? "Lunar is replying…" : answer ? "Lunar answered" : muted ? "Tap the microphone to speak" : listening ? "Listening…" : "Microphone muted")}</p>
         <button
           type="button"
           onClick={toggleMicrophone}
