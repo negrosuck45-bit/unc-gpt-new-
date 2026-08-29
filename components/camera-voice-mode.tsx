@@ -213,6 +213,18 @@ export function CameraVoiceMode({ open, onClose, onAsk }: CameraVoiceModeProps) 
     return () => { stopRecognition(); stopCamera() }
   }, [facingMode, open, startCamera, stopCamera, stopRecognition])
 
+  useEffect(() => {
+    if (!open) return
+    const handleVoiceError = (event: Event) => {
+      const detail = (event as CustomEvent<{ message?: string }>).detail
+      setCameraError(detail?.message || "Hannah voice is unavailable right now.")
+      setBusy(false)
+      busyRef.current = false
+    }
+    window.addEventListener("uncgpt-camera-voice-error", handleVoiceError)
+    return () => window.removeEventListener("uncgpt-camera-voice-error", handleVoiceError)
+  }, [open])
+
   if (!open) return null
   return (
     <div

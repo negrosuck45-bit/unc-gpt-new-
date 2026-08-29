@@ -15,7 +15,7 @@ import { accountStorageKey } from "@/lib/account-scope";
 import { ConnectionStatusBanner, type ConnectionIssue } from "@/components/connection-status-banner";
 import { getClientRuntimeContext } from "@/lib/client-runtime-context";
 import { getStoredLanguagePreference } from "@/lib/language-preferences";
-import { playGroqTtsResponse, prepareGroqTtsResponse, speakWithBrowserFallback } from "@/lib/voice-playback";
+import { playGroqTtsResponse, prepareGroqTtsResponse } from "@/lib/voice-playback";
 
 interface ChatInterfaceProps {
   onSwitchToImagine?: () => void;
@@ -193,8 +193,7 @@ export function ChatInterface({ onSwitchToImagine, onOpenSidebar, isSidebarOpen 
     const language = getStoredLanguagePreference();
     const key = `camera-voice-${Date.now()}`;
     void playGroqTtsResponse({ text: response, language, key })
-      .catch(() => speakWithBrowserFallback({ text: response, language, key }))
-      .catch(() => undefined);
+      .catch(() => window.dispatchEvent(new CustomEvent("uncgpt-camera-voice-error", { detail: { message: "Hannah voice is unavailable right now." } })));
     return response;
   }, [handleSend]);
 

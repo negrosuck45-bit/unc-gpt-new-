@@ -29,17 +29,17 @@ test('uses direct Groq audio synthesis as the primary voice provider', () => {
   assert.match(messages, /playGroqTtsResponse/)
 })
 
-test('uses browser SpeechSynthesis only as an explicit language-aware fallback', () => {
-  const playback = read('./lib/voice-playback.ts')
+test('uses Hannah server audio without substituting the browser voice', () => {
+  const route = read('./app/api/voice-chat/route.ts')
   const messages = read('./components/chat-messages.tsx')
+  const camera = read('./components/chat-interface.tsx')
 
-  assert.match(playback, /utterance\.lang = voiceLanguage\.locale/)
-  assert.match(playback, /pickBrowserVoice/)
-  assert.match(playback, /window\.speechSynthesis\.speak\(utterance\)/)
+  assert.match(route, /const DEFAULT_VOICE = "hannah"/)
+  assert.match(route, /canopylabs\/orpheus-v1-english/)
   assert.match(messages, /playGroqTtsResponse\([\s\S]*?catch \(error\)/)
-  assert.match(messages, /speakWithBrowserFallback/)
-  assert.match(messages, /primary Groq voice fails/)
-  assert.doesNotMatch(messages, /window\.speechSynthesis\.speak\(new SpeechSynthesisUtterance/)
+  assert.doesNotMatch(messages, /speakWithBrowserFallback/)
+  assert.doesNotMatch(messages, /speechSynthesis\.speak/)
+  assert.match(camera, /playGroqTtsResponse\([\s\S]*?uncgpt-camera-voice-error/)
 })
 
 test('keeps a speaker control beside feedback controls under assistant replies', () => {
@@ -85,9 +85,9 @@ test('prepares final assistant audio before the reply leaves the streaming lifec
   const chatInterface = read('./components/chat-interface.tsx')
   const messages = read('./components/chat-messages.tsx')
 
-  assert.match(chatInterface, /import \{ playGroqTtsResponse, prepareGroqTtsResponse, speakWithBrowserFallback \} from "@\/lib\/voice-playback"/)
+  assert.match(chatInterface, /import \{ playGroqTtsResponse, prepareGroqTtsResponse \} from "@\/lib\/voice-playback"/)
   assert.match(chatInterface, /void prepareGroqTtsResponse\(\{[\s\S]*?text: fullContent,[\s\S]*?key: assistantMsgId/)
   assert.match(chatInterface, /assistantMsgId = addMessage\(chatId, \{ role: "assistant", content: fullContent \}\)/)
-  assert.match(chatInterface, /handleCameraAsk[\s\S]*?playGroqTtsResponse[\s\S]*?speakWithBrowserFallback/)
+  assert.match(chatInterface, /handleCameraAsk[\s\S]*?playGroqTtsResponse[\s\S]*?uncgpt-camera-voice-error/)
   assert.match(messages, /prepareGroqTtsResponse\([\s\S]*?key: latestAssistant\.id/)
 })

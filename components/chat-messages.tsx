@@ -4,7 +4,7 @@ import { useEffect, useRef, useState, useMemo, useCallback } from 'react';
 import NextImage from 'next/image';
 import { Message, Attachment } from '@/lib/chat-store';
 import { getStoredLanguagePreference } from '@/lib/language-preferences';
-import { playGroqTtsResponse, prepareGroqTtsResponse, speakWithBrowserFallback, stopVoicePlayback, unlockVoicePlayback, VoicePlaybackCancelledError } from '@/lib/voice-playback';
+import { playGroqTtsResponse, prepareGroqTtsResponse, stopVoicePlayback, unlockVoicePlayback, VoicePlaybackCancelledError } from '@/lib/voice-playback';
 import { useUiText } from '@/lib/ui-translations';
 import { cn } from '@/lib/utils';
 import { motion, AnimatePresence } from 'framer-motion';
@@ -466,30 +466,13 @@ function MessageActions({ message, isAssistant, onCopy, onRegenerate, onEdit, on
     }
 
     unlockVoicePlayback();
-    if (typeof window !== "undefined" && "speechSynthesis" in window) window.speechSynthesis.resume();
+    if (typeof window !== "undefined" && "speechSynthesis" in window) window.speechSynthesis.cancel();
     setVoiceError(null);
-    const isAppleMobile = typeof navigator !== "undefined" && /iPhone|iPad|iPod/i.test(navigator.userAgent);
-    // Invoke browser speech directly from the iPhone tap so Safari keeps the user gesture.
-    // Other devices continue to use Hannah/Groq as the primary voice.
-    if (isAppleMobile) {
-      try {
-        await speakWithBrowserFallback({ text: message.content, language, key: message.id });
-        return;
-      } catch (mobileFallbackError) {
-        if (mobileFallbackError instanceof VoicePlaybackCancelledError) return;
-      }
-    }
     try {
       await playGroqTtsResponse({ text: message.content, language, key: message.id });
     } catch (error) {
       if (error instanceof VoicePlaybackCancelledError) return;
-      try {
-        // Browser speech is intentionally used only after the primary Groq voice fails.
-        await speakWithBrowserFallback({ text: message.content, language, key: message.id });
-      } catch (fallbackError) {
-        if (fallbackError instanceof VoicePlaybackCancelledError) return;
-        setVoiceError(t('voiceUnavailable'));
-      }
+      setVoiceError(t('voiceUnavailable'));
     }
   }, [isSpeaking, message.content, message.id, t]);
 
