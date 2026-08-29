@@ -1,177 +1,155 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
 import { Button } from '@/components/ui/button';
 import { cn } from '@/lib/utils';
-import { Check, Loader2, Network, RefreshCw, Unplug } from 'lucide-react';
+import { Check, Loader2, Network, RefreshCw, Search, ShieldCheck, Unplug } from 'lucide-react';
 import { accountStorageKey } from '@/lib/account-scope';
 
-// ─── Brand SVG Icons ──────────────────────────────────────────────────────────
+type ProviderStatus = { connected: boolean; configured: boolean };
+type ComposioStatus = { authenticated: boolean; configured: boolean; label: string; description: string; setupUrl: string };
+type ComposioCatalogItem = { slug: string; name: string; description: string; logo?: string | null; categories?: string[] };
+type ComposioAccount = { id: string; toolkit: string; status: string; statusReason?: string | null; enabled: boolean; connected?: boolean; alias?: string | null; updatedAt?: string | null };
 
-function GithubIcon({ className }: { className?: string }) {
-  return (
-    <svg className={className} viewBox="0 0 24 24" fill="currentColor">
-      <path d="M12 0C5.37 0 0 5.37 0 12c0 5.31 3.435 9.795 8.205 11.385.6.105.825-.255.825-.57 0-.285-.015-1.23-.015-2.235-3.015.555-3.795-.735-4.035-1.41-.135-.345-.72-1.41-1.23-1.695-.42-.225-1.02-.78-.015-.795.945-.015 1.62.87 1.845 1.23 1.08 1.815 2.805 1.305 3.495.99.105-.78.42-1.305.765-1.605-2.67-.3-5.46-1.335-5.46-5.925 0-1.305.465-2.385 1.23-3.225-.12-.3-.54-1.53.12-3.18 0 0 1.005-.315 3.3 1.23.96-.27 1.98-.405 3-.405s2.04.135 3 .405c2.295-1.56 3.3-1.23 3.3-1.23.66 1.65.24 2.88.12 3.18.765.84 1.23 1.905 1.23 3.225 0 4.605-2.805 5.625-5.475 5.925.435.375.81 1.095.81 2.22 0 1.605-.015 2.895-.015 3.3 0 .315.225.69.825.57A12.02 12.02 0 0 0 24 12c0-6.63-5.37-12-12-12z"/>
-    </svg>
-  );
+type ConnectorMeta = {
+  slug: string;
+  name: string;
+  description: string;
+  accent: string;
+  logo?: string | null;
+};
+
+const PROVIDERS: ConnectorMeta[] = [
+  { slug: 'google_drive', name: 'Google Drive', description: 'Search, read, and upload files instantly', accent: 'bg-blue-500/15' },
+  { slug: 'gmail', name: 'Gmail', description: 'Draft replies, summarize threads, and search your inbox', accent: 'bg-red-500/10' },
+  { slug: 'googlecalendar', name: 'Google Calendar', description: 'Manage your schedule and coordinate meetings', accent: 'bg-blue-500/15' },
+  { slug: 'github', name: 'GitHub', description: 'Work with repositories, issues, and pull requests', accent: 'bg-white/10' },
+  { slug: 'slack', name: 'Slack', description: 'Read channels and send messages to your team', accent: 'bg-fuchsia-500/10' },
+  { slug: 'notion', name: 'Notion', description: 'Search and update pages, docs, and databases', accent: 'bg-white/10' },
+  { slug: 'linear', name: 'Linear', description: 'Manage issues, projects, and product work', accent: 'bg-violet-500/15' },
+  { slug: 'vercel', name: 'Vercel', description: 'Inspect deployments and manage web projects', accent: 'bg-white/10' },
+];
+
+const OAUTH_PROVIDER_SLUGS = new Set(['github', 'slack', 'notion', 'linear', 'google_drive', 'vercel']);
+const COMPOSIO_STATE_KEY = 'composio-connector-state';
+
+function normalizeSlug(value: string) {
+  return value.toLowerCase().replace(/[^a-z0-9-]/g, '');
 }
-
-function SlackIcon({ className }: { className?: string }) {
-  return (
-    <svg className={className} viewBox="0 0 24 24" fill="none">
-      <path d="M5.042 15.165a2.528 2.528 0 0 1-2.52 2.523A2.528 2.528 0 0 1 0 15.165a2.527 2.527 0 0 1 2.522-2.52h2.52v2.52z" fill="#E01E5A"/>
-      <path d="M6.313 15.165a2.527 2.527 0 0 1 2.521-2.52 2.527 2.527 0 0 1 2.521 2.52v6.313A2.528 2.528 0 0 1 8.834 24a2.528 2.528 0 0 1-2.521-2.522v-6.313z" fill="#E01E5A"/>
-      <path d="M8.834 5.042a2.528 2.528 0 0 1-2.521-2.52A2.528 2.528 0 0 1 8.834 0a2.528 2.528 0 0 1 2.521 2.522v2.52H8.834z" fill="#36C5F0"/>
-      <path d="M8.834 6.313a2.528 2.528 0 0 1 2.521 2.521 2.528 2.528 0 0 1-2.521 2.521H2.522A2.528 2.528 0 0 1 0 8.834a2.528 2.528 0 0 1 2.522-2.521h6.312z" fill="#36C5F0"/>
-      <path d="M18.956 8.834a2.528 2.528 0 0 1 2.522-2.521A2.528 2.528 0 0 1 24 8.834a2.528 2.528 0 0 1-2.522 2.521h-2.522V8.834z" fill="#2EB67D"/>
-      <path d="M17.688 8.834a2.528 2.528 0 0 1-2.523 2.521 2.527 2.527 0 0 1-2.52-2.521V2.522A2.527 2.527 0 0 1 15.165 0a2.528 2.528 0 0 1 2.523 2.522v6.312z" fill="#2EB67D"/>
-      <path d="M15.165 18.956a2.528 2.528 0 0 1 2.523 2.522A2.528 2.528 0 0 1 15.165 24a2.527 2.527 0 0 1-2.52-2.522v-2.522h2.52z" fill="#ECB22E"/>
-      <path d="M15.165 17.688a2.527 2.527 0 0 1-2.52-2.523 2.526 2.526 0 0 1 2.52-2.52h6.313A2.527 2.527 0 0 1 24 15.165a2.528 2.528 0 0 1-2.522 2.523h-6.313z" fill="#ECB22E"/>
-    </svg>
-  );
-}
-
-function NotionIcon({ className }: { className?: string }) {
-  return (
-    <svg className={className} viewBox="0 0 24 24" fill="currentColor">
-      <path d="M4.459 4.208c.746.606 1.026.56 2.428.466l13.215-.793c.28 0 .047-.28-.046-.326L17.86 1.968c-.42-.326-.981-.7-2.055-.607L3.01 2.295c-.466.046-.56.28-.374.466zm.793 3.08v13.904c0 .747.373 1.027 1.214.98l14.523-.84c.841-.046.935-.56.935-1.167V6.354c0-.606-.233-.933-.748-.887l-15.177.887c-.56.047-.747.327-.747.933zm14.337.745c.093.42 0 .84-.42.888l-.7.14v10.264c-.608.327-1.168.514-1.635.514-.748 0-.935-.234-1.495-.933l-4.577-7.186v6.952L12.21 19s0 .84-1.168.84l-3.222.186c-.093-.186 0-.653.327-.746l.84-.233V9.854L7.822 9.76c-.094-.42.14-1.026.793-1.073l3.456-.233 4.764 7.279v-6.44l-1.215-.139c-.093-.514.28-.887.747-.933zM1.936 1.035l13.31-.98c1.634-.14 2.055-.047 3.082.7l4.249 2.986c.7.513.934.653.934 1.213v16.378c0 1.026-.373 1.634-1.68 1.726l-15.458.934c-.98.047-1.448-.093-1.962-.747l-3.129-4.06c-.56-.747-.793-1.306-.793-1.96V2.667c0-.839.374-1.54 1.447-1.632z"/>
-    </svg>
-  );
-}
-
-function LinearIcon({ className }: { className?: string }) {
-  return (
-    <svg className={className} viewBox="0 0 24 24" fill="currentColor">
-      <path d="M0 14.008l9.992 9.992C4.371 22.913 0.9 19.01 0 14.008zm0-2.75l12.75 12.75c-.549.07-1.11.107-1.678.107-1.018 0-2.007-.126-2.951-.363L0 14.76v-3.5zM.587 8.7l14.713 14.713a11.65 11.65 0 01-2.156 1.055L.992 10.856A11.748 11.748 0 01.587 8.7zm2.09-3.61l16.233 16.233a11.722 11.722 0 01-1.713 1.388L2.265 6.478a11.744 11.744 0 01.412-.387zm3.17-2.498l16.06 16.06a11.792 11.792 0 01-1.17 1.607L4.56 3.775c.417-.41.863-.79 1.337-1.143zm4.046-2.059L24 15.13c-.13.65-.33 1.28-.592 1.876L9.03 2.134c.596-.263 1.224-.465 1.875-.6zM14.008 0l9.992 9.992C22.913 4.372 19.01.9 14.008 0zm-2.75 0l12.75 12.75c.07-.549.107-1.11.107-1.678 0-1.018-.126-2.008-.363-2.952L11.26 0h2.998z"/>
-    </svg>
-  );
-}
-
-function GoogleDriveIcon({ className }: { className?: string }) {
-  return (
-    <svg className={className} viewBox="0 0 87.3 78" fill="none">
-      <path d="M6.6 66.85l3.85 6.65c.8 1.4 1.95 2.5 3.3 3.3l13.75-23.8H1.05c0 1.55.4 3.1 1.2 4.5z" fill="#0066DA"/>
-      <path d="M43.65 25L29.9 1.2C28.55 2 27.4 3.1 26.6 4.5L1.05 49.5c-.8 1.4-1.2 2.95-1.2 4.5h27.45z" fill="#00AC47"/>
-      <path d="M73.55 76.8c1.35-.8 2.5-1.9 3.3-3.3l1.6-2.75 7.65-13.25c.8-1.4 1.2-2.95 1.2-4.5H60.3l5.8 11.6z" fill="#EA4335"/>
-      <path d="M43.65 25L57.4 1.2C56.05.4 54.5 0 52.9 0H34.4c-1.6 0-3.15.45-4.5 1.2z" fill="#00832D"/>
-      <path d="M60.3 54H27.45L13.7 77.8c1.35.8 2.9 1.2 4.5 1.2h50.85c1.6 0 3.15-.45 4.5-1.2z" fill="#2684FC"/>
-      <path d="M73.4 26.5l-12.75-22.1C59.85 3.1 58.7 2 57.35 1.2L43.6 25l16.65 29h27.45c0-1.55-.4-3.1-1.2-4.5z" fill="#FFBA00"/>
-    </svg>
-  );
-}
-
-function VercelIcon({ className }: { className?: string }) {
-  return (
-    <svg className={className} viewBox="0 0 24 24" fill="currentColor">
-      <path d="M12 1L24 22H0L12 1z"/>
-    </svg>
-  );
-}
-
-// ─── Config ────────────────────────────────────────────────────────────────────
 
 function ConnectorLogo({ slug, name, src, className = 'h-7 w-7' }: { slug: string; name: string; src?: string | null; className?: string }) {
   const [failed, setFailed] = useState<string[]>([]);
-  const normalized = slug.toLowerCase().replace(/[^a-z0-9-]/g, '');
-  const sources = [src || '', `https://cdn.simpleicons.org/${normalized}`, `https://www.google.com/s2/favicons?domain=${encodeURIComponent(`${normalized}.com`)}&sz=128`].filter(Boolean);
+  const normalized = normalizeSlug(slug);
+  const sources = [
+    src || '',
+    `https://cdn.simpleicons.org/${normalized}`,
+    `https://www.google.com/s2/favicons?domain=${encodeURIComponent(`${normalized}.com`)}&sz=128`,
+  ].filter(Boolean);
   const current = sources.find((candidate) => !failed.includes(candidate));
-  if (!current) return <span className={cn('flex items-center justify-center rounded-md bg-violet-500/10 text-xs font-semibold text-violet-300', className)}>{String(name || slug).slice(0, 1).toUpperCase()}</span>;
+
+  if (!current) {
+    return <span className={cn('flex items-center justify-center rounded-xl bg-white/10 text-xs font-semibold text-white', className)}>{name.slice(0, 1).toUpperCase()}</span>;
+  }
+
   return <img src={current} alt="" className={cn('object-contain', className)} onError={() => setFailed((items) => items.includes(current) ? items : [...items, current])} />;
 }
 
-const PROVIDERS = [
-  { name: 'github',      label: 'GitHub',       description: 'Read & write repos, issues, PRs', Icon: GithubIcon,      iconBg: 'bg-[#24292e]',       iconColor: 'text-white' },
-  { name: 'slack',       label: 'Slack',        description: 'Send messages, read channels',     Icon: SlackIcon,       iconBg: 'bg-[#611f69]/10',    iconColor: '' },
-  { name: 'notion',      label: 'Notion',       description: 'Read & write pages, databases',    Icon: NotionIcon,      iconBg: 'bg-muted',           iconColor: 'text-foreground' },
-  { name: 'linear',      label: 'Linear',       description: 'Manage issues & projects',         Icon: LinearIcon,      iconBg: 'bg-[#5E6AD2]/15',    iconColor: 'text-[#5E6AD2]' },
-  { name: 'google_drive',label: 'Google Drive', description: 'Access & edit your files',         Icon: GoogleDriveIcon, iconBg: 'bg-blue-500/10',     iconColor: '' },
-  { name: 'vercel',      label: 'Vercel',       description: 'Deploy & manage projects',         Icon: VercelIcon,      iconBg: 'bg-muted',           iconColor: 'text-foreground' },
-];
+function isActive(account: ComposioAccount) {
+  return account.status === 'active' || account.status === 'connected' || account.status === 'success';
+}
 
-interface ProviderStatus { connected: boolean; configured: boolean; }
-interface ComposioStatus { authenticated: boolean; configured: boolean; label: string; description: string; setupUrl: string; }
-interface ComposioCatalogItem { slug: string; name: string; description: string; logo?: string | null; categories?: string[]; }
-interface ComposioAccount { id: string; toolkit: string; status: string; statusReason?: string | null; enabled: boolean; connected?: boolean; alias?: string | null; updatedAt?: string | null; }
-
-const COMPOSIO_STATE_KEY = 'composio-connector-state';
-
-// ─── Compact pill strip (for sidebar / header) ─────────────────────────────────
 export function OAuthConnectorPills() {
   const [status, setStatus] = useState<Record<string, ProviderStatus>>({});
-  const [loading, setLoading] = useState(true);
-  const [busy, setBusy] = useState<string | null>(null);
 
-  useEffect(() => { fetch('/api/mcp/oauth/status').then(r => r.json()).then(setStatus).finally(() => setLoading(false)); }, []);
+  useEffect(() => {
+    fetch('/api/mcp/oauth/status').then((response) => response.json()).then(setStatus).catch(() => setStatus({}));
+  }, []);
 
-  if (loading) return null;
-
-  const connected = PROVIDERS.filter(p => status[p.name]?.connected);
+  const connected = PROVIDERS.filter((provider) => status[provider.slug]?.connected);
   if (!connected.length) return null;
 
   return (
-    <div className="flex gap-1.5 flex-wrap">
-      {connected.map(p => (
-        <span key={p.name} className="flex items-center gap-1 px-2 py-0.5 rounded-full text-[11px] font-medium bg-emerald-500/15 text-emerald-400 border border-emerald-500/25">
-          <svg viewBox="0 0 10 10" className="w-2.5 h-2.5 fill-none stroke-current stroke-[2.5]"><polyline points="1.5,5 4,7.5 8.5,2.5"/></svg>
-          <p.Icon className="w-3 h-3" />
-          {p.label}
+    <div className="flex flex-wrap gap-1.5">
+      {connected.map((provider) => (
+        <span key={provider.slug} className="inline-flex items-center gap-1.5 rounded-full border border-emerald-400/20 bg-emerald-400/10 px-2 py-1 text-[11px] font-medium text-emerald-200">
+          <Check className="h-3 w-3" />
+          {provider.name}
         </span>
       ))}
     </div>
   );
 }
 
-// ─── Full settings panel ────────────────────────────────────────────────────────
 export function OAuthConnectors() {
   const [status, setStatus] = useState<Record<string, ProviderStatus>>({});
   const [loading, setLoading] = useState(true);
   const [busy, setBusy] = useState<string | null>(null);
   const [composio, setComposio] = useState<ComposioStatus | null>(null);
-  const [oauthError, setOauthError] = useState<string | null>(null);
-  const [composioToolkit, setComposioToolkit] = useState('github');
-  const [composioBusy, setComposioBusy] = useState(false);
   const [catalog, setCatalog] = useState<ComposioCatalogItem[]>([]);
-  const [catalogQuery, setCatalogQuery] = useState('');
   const [accounts, setAccounts] = useState<ComposioAccount[]>([]);
-  const [accountBusy, setAccountBusy] = useState<string | null>(null);
+  const [query, setQuery] = useState('');
+  const [notice, setNotice] = useState<string | null>(null);
 
-  const syncChatConnectorState = (nextAccounts: ComposioAccount[]) => {
+  const syncChatConnectorState = useCallback((nextAccounts: ComposioAccount[]) => {
     try {
-      const state = nextAccounts.map((account) => ({ id: `composio:${account.toolkit}`, accountId: account.id, provider: account.toolkit, toolkit: account.toolkit, enabled: account.enabled && account.connected !== false, source: 'composio' }));
+      const state = nextAccounts.map((account) => ({
+        id: `composio:${account.toolkit}`,
+        accountId: account.id,
+        provider: account.toolkit,
+        toolkit: account.toolkit,
+        enabled: account.enabled && account.connected !== false,
+        source: 'composio',
+      }));
       localStorage.setItem(accountStorageKey(COMPOSIO_STATE_KEY), JSON.stringify(Object.fromEntries(nextAccounts.map((account) => [account.toolkit, account.enabled && account.connected !== false]))));
       localStorage.setItem(accountStorageKey('mcp-connectors'), JSON.stringify(state));
       window.dispatchEvent(new Event('mcp-connectors-changed'));
     } catch {}
-  };
-
-  const refresh = () =>
-    Promise.all([
-      fetch('/api/mcp/oauth/status').then(r => r.json()),
-      fetch('/api/connectors/composio').then(r => r.json()),
-      fetch('/api/connectors/composio/status').then(r => r.json()),
-    ]).then(([oauth, composioStatus, accountStatus]) => {
-      setStatus(oauth);
-      setComposio(composioStatus);
-      const nextAccounts: ComposioAccount[] = accountStatus.accounts || [];
-      setAccounts(nextAccounts);
-      syncChatConnectorState(nextAccounts);
-    }).finally(() => setLoading(false));
-
-  useEffect(() => {
-    refresh();
-    fetch('/api/connectors/composio/catalog').then((response) => response.json()).then((data) => setCatalog(data.items || [])).catch(() => setCatalog([]));
-    const params = new URLSearchParams(window.location.search);
-    const error = params.get('mcp_error');
-    if (error) {
-      setOauthError(error);
-      window.history.replaceState({}, '', window.location.pathname);
-    }
   }, []);
 
-  const connect = (name: string) => { setBusy(name); window.location.href = `/api/mcp/oauth/${name}/start`; };
-  const connectComposio = async (toolkit = composioToolkit) => {
-    setComposioBusy(true);
-    setOauthError(null);
+  const refresh = useCallback(async () => {
+    try {
+      const [oauth, composioStatus, accountStatus] = await Promise.all([
+        fetch('/api/mcp/oauth/status').then((response) => response.json()),
+        fetch('/api/connectors/composio').then((response) => response.json()),
+        fetch('/api/connectors/composio/status').then((response) => response.json()),
+      ]);
+      setStatus(oauth || {});
+      setComposio(composioStatus || null);
+      const nextAccounts: ComposioAccount[] = accountStatus?.accounts || [];
+      setAccounts(nextAccounts);
+      syncChatConnectorState(nextAccounts);
+    } catch {
+      setNotice('Unable to refresh connector status. Please try again.');
+    } finally {
+      setLoading(false);
+    }
+  }, [syncChatConnectorState]);
+
+  useEffect(() => {
+    const refreshTimer = window.setTimeout(() => { void refresh(); }, 0);
+    fetch('/api/connectors/composio/catalog')
+      .then((response) => response.json())
+      .then((data) => setCatalog(data.items || []))
+      .catch(() => setCatalog([]));
+
+    const params = new URLSearchParams(window.location.search);
+    const error = params.get('mcp_error');
+    const errorTimer = error ? window.setTimeout(() => setNotice(error), 0) : null;
+    if (error) window.history.replaceState({}, '', window.location.pathname);
+    return () => {
+      window.clearTimeout(refreshTimer);
+      if (errorTimer) window.clearTimeout(errorTimer);
+    };
+  }, [refresh]);
+
+  const connectOAuth = (slug: string) => {
+    setBusy(slug);
+    window.location.assign(`/api/mcp/oauth/${slug}/start`);
+  };
+
+  const connectComposio = async (toolkit: string) => {
+    setBusy(toolkit);
+    setNotice(null);
     try {
       const response = await fetch('/api/connectors/composio/connect', {
         method: 'POST',
@@ -179,197 +157,146 @@ export function OAuthConnectors() {
         body: JSON.stringify({ toolkit }),
       });
       const data = await response.json();
-      if (!response.ok || !data.redirectUrl) throw new Error(data.error || 'Unable to start the connection');
-      window.location.href = data.redirectUrl;
+      if (!response.ok || !data.redirectUrl) throw new Error(data.error || 'Unable to start the connection.');
+      window.location.assign(data.redirectUrl);
     } catch (error: any) {
-      setOauthError(error?.message || 'Unable to start the connection');
-      setComposioBusy(false);
+      setNotice(error?.message || 'Unable to start the connection.');
+      setBusy(null);
     }
   };
 
-  const disconnect = async (name: string) => {
-    setBusy(name);
-    await fetch('/api/mcp/oauth/disconnect', { method: 'POST', headers: {'Content-Type':'application/json'}, body: JSON.stringify({ provider: name }) });
-    await refresh();
-    setBusy(null);
+  const disconnectOAuth = async (slug: string) => {
+    setBusy(slug);
+    try {
+      await fetch('/api/mcp/oauth/disconnect', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ provider: slug }),
+      });
+      await refresh();
+    } catch {
+      setNotice('Unable to disconnect this connector. Please try again.');
+    } finally {
+      setBusy(null);
+    }
   };
 
   const manageAccount = async (account: ComposioAccount, action: 'enable' | 'disable' | 'disconnect') => {
-    setAccountBusy(account.toolkit);
+    setBusy(account.toolkit);
     try {
       const response = await fetch('/api/connectors/composio/manage', {
-        method: 'POST', headers: { 'Content-Type': 'application/json' },
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ action, accountId: account.id, toolkit: account.toolkit }),
       });
-      if (!response.ok) throw new Error((await response.json()).error || 'Unable to update connector');
+      if (!response.ok) throw new Error((await response.json()).error || 'Unable to update connector.');
       await refresh();
     } catch (error: any) {
-      setOauthError(error?.message || 'Unable to update connector');
-    } finally { setAccountBusy(null); }
+      setNotice(error?.message || 'Unable to update connector.');
+    } finally {
+      setBusy(null);
+    }
   };
 
-  if (loading) return (
-    <div className="flex items-center gap-2 text-sm text-muted-foreground py-4">
-      <Loader2 className="h-4 w-4 animate-spin" /> Loading connectors…
-    </div>
-  );
+  const accountByToolkit = useMemo(() => new Map(accounts.map((account) => [account.toolkit, account])), [accounts]);
+  const visibleProviders = useMemo(() => {
+    const normalizedQuery = query.trim().toLowerCase();
+    const catalogBySlug = new Map(catalog.map((item) => [item.slug, item]));
+    const primary = PROVIDERS.map((provider) => {
+      const fromCatalog = catalogBySlug.get(provider.slug);
+      return { ...provider, name: fromCatalog?.name || provider.name, description: fromCatalog?.description || provider.description, logo: fromCatalog?.logo };
+    });
+    const extras = catalog.filter((item) => !primary.some((provider) => provider.slug === item.slug)).slice(0, 80).map((item) => ({ slug: item.slug, name: item.name, description: item.description, accent: 'bg-white/[0.07]', logo: item.logo }));
+    return [...primary, ...extras].filter((item) => !normalizedQuery || `${item.name} ${item.slug} ${item.description}`.toLowerCase().includes(normalizedQuery));
+  }, [catalog, query]);
+
+  const connectedCount = accounts.filter((account) => isActive(account) && account.enabled).length + PROVIDERS.filter((provider) => status[provider.slug]?.connected).length;
+
+  if (loading) {
+    return <div className="flex min-h-48 items-center justify-center gap-2 rounded-[24px] border border-white/10 bg-[#171717] text-sm text-zinc-400"><Loader2 className="h-4 w-4 animate-spin" /> Loading connectors</div>;
+  }
 
   return (
-    <div className="space-y-4">
-      {oauthError && (
-        <div role="alert" className="flex items-start justify-between gap-3 rounded-xl border border-amber-400/25 bg-amber-400/[0.08] px-3 py-2.5 text-sm text-amber-100">
-          <div><p className="font-medium">Connector connection needs attention</p><p className="mt-0.5 text-xs text-amber-100/70">{oauthError}</p></div>
-          <button onClick={() => setOauthError(null)} className="text-amber-100/60 hover:text-amber-100" aria-label="Dismiss connector error">×</button>
-        </div>
-      )}
-      {composio && (
-        <div className={cn(
-          'flex items-center gap-3 rounded-xl border p-4 transition-colors',
-          composio.configured ? 'border-emerald-500/30 bg-emerald-500/[0.06]' : 'border-white/10 bg-white/[0.03]'
-        )}>
-          <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-violet-500/10 text-violet-300">
-            <Network className="h-5 w-5" />
-          </div>
-          <div className="min-w-0 flex-1">
+    <section className="overflow-hidden rounded-[28px] border border-white/10 bg-[#151515] text-zinc-100 shadow-[0_20px_70px_rgba(0,0,0,0.25)]">
+      <div className="border-b border-white/[0.08] px-4 pb-4 pt-5 sm:px-6 sm:pb-5 sm:pt-6">
+        <div className="flex items-start justify-between gap-4">
+          <div>
             <div className="flex items-center gap-2">
-              <span className="text-sm font-medium">Connections</span>
-              <span className={cn('rounded-full px-2 py-0.5 text-[10px] font-semibold', composio.configured ? 'bg-emerald-400/10 text-emerald-300' : 'bg-white/10 text-zinc-400')}>
-                {composio.configured ? 'Ready' : 'Needs setup'}
-              </span>
+              <h2 className="text-xl font-semibold tracking-[-0.03em] text-white">Connectors</h2>
+              {connectedCount > 0 && <span className="rounded-full bg-emerald-400/12 px-2 py-0.5 text-[11px] font-medium text-emerald-200">{connectedCount} active</span>}
             </div>
-            <p className="mt-1 text-xs leading-relaxed text-zinc-400">Connect the apps you use and control what Lunar can access.</p>
-            <p className="mt-1 text-[11px] leading-relaxed text-zinc-500">Choose an app below and finish its secure sign-in once.</p>
-            <div className="mt-3 flex flex-wrap items-center gap-2">
-              <select value={composioToolkit} onChange={(event) => setComposioToolkit(event.target.value)} className="h-8 rounded-lg border border-white/10 bg-black/20 px-2 text-xs text-zinc-200 outline-none">
-                <option value="github">GitHub</option>
-                <option value="gmail">Gmail</option>
-                <option value="slack">Slack</option>
-                <option value="notion">Notion</option>
-                <option value="linear">Linear</option>
-                <option value="google_drive">Google Drive</option>
-                <option value="googlecalendar">Google Calendar</option>
-                <option value="vercel">Vercel</option>
-              </select>
-              <Button size="sm" variant="secondary" onClick={() => connectComposio()} disabled={composioBusy || !composio.configured}>
-                {composioBusy ? <Loader2 className="mr-1.5 h-3.5 w-3.5 animate-spin" /> : null}
-                Connect app
-              </Button>
-            </div>
+            <p className="mt-1.5 max-w-xl text-sm leading-6 text-zinc-400">Give Lunar secure access to the tools you use. You can disconnect or pause access anytime.</p>
           </div>
-          {!composio.configured && <a href={composio.setupUrl} target="_blank" rel="noreferrer" className="shrink-0 text-xs font-medium text-violet-300 hover:text-violet-200">Docs</a>}
+          <button type="button" onClick={() => void refresh()} className="inline-flex h-10 w-10 shrink-0 items-center justify-center rounded-full border border-white/10 bg-white/[0.04] text-zinc-400 transition hover:bg-white/[0.09] hover:text-white" aria-label="Refresh connector status" title="Refresh connector status">
+            <RefreshCw className="h-4 w-4" />
+          </button>
         </div>
-      )}
-      {composio?.configured && accounts.length === 0 && (
-        <div className="rounded-2xl border border-dashed border-white/10 bg-white/[0.025] px-4 py-5 text-center">
-          <div className="mx-auto flex h-10 w-10 items-center justify-center rounded-xl border border-violet-300/15 bg-violet-300/10 text-violet-200"><Network className="h-5 w-5" /></div>
-          <p className="mt-3 text-sm font-medium text-zinc-200">No apps connected yet</p>
-          <p className="mx-auto mt-1 max-w-sm text-xs leading-relaxed text-zinc-500">Connect an app, then use its switch to control whether Lunar can act through it.</p>
-        </div>
-      )}
-      {composio?.configured && accounts.length > 0 && (
-        <section className="space-y-3">
-          <div className="flex items-center justify-between gap-3 px-1">
-            <div><h3 className="text-sm font-medium text-zinc-100">Connected apps</h3><p className="mt-1 text-xs text-zinc-500">Only enabled apps are available to Lunar.</p></div>
-            <button type="button" onClick={() => refresh()} className="inline-flex h-8 w-8 items-center justify-center rounded-full border border-white/10 bg-white/[0.04] text-zinc-400 transition hover:bg-white/[0.08] hover:text-white" aria-label="Refresh connector status"><RefreshCw className="h-3.5 w-3.5" /></button>
+
+        <label className="mt-5 flex h-12 items-center gap-3 rounded-full border border-white/[0.13] bg-white/[0.055] px-4 text-zinc-300 transition focus-within:border-white/25 focus-within:bg-white/[0.075]">
+          <Search className="h-4 w-4 shrink-0 text-zinc-500" />
+          <input value={query} onChange={(event) => setQuery(event.target.value)} placeholder="Search connectors" className="h-full min-w-0 flex-1 bg-transparent text-sm text-white outline-none placeholder:text-zinc-500" aria-label="Search connectors" />
+        </label>
+      </div>
+
+      <div className="space-y-3 px-3 py-4 sm:px-5 sm:py-5">
+        {notice && (
+          <div role="alert" className="flex items-start justify-between gap-3 rounded-2xl border border-amber-300/20 bg-amber-300/[0.08] px-3.5 py-3 text-sm text-amber-100">
+            <span>{notice}</span>
+            <button type="button" onClick={() => setNotice(null)} className="text-amber-100/60 transition hover:text-amber-100" aria-label="Dismiss connector message">×</button>
           </div>
-          <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
-            {accounts.map((account) => {
-              const meta = catalog.find((item) => item.slug === account.toolkit);
-              const connected = account.status === 'active' || account.status === 'connected' || account.status === 'success';
-              const busy = accountBusy === account.toolkit;
-              return (
-                <div key={account.id} className="group relative overflow-hidden rounded-2xl border border-white/10 bg-white/[0.035] p-3.5 shadow-[0_12px_40px_rgba(0,0,0,0.18)] backdrop-blur-xl transition hover:border-white/20 hover:bg-white/[0.055]">
-                  <div className="flex items-start gap-3">
-                    <div className="flex h-11 w-11 shrink-0 items-center justify-center overflow-hidden rounded-xl border border-white/10 bg-black/20">
-                      <ConnectorLogo slug={account.toolkit} name={meta?.name || account.toolkit} src={meta?.logo} className="h-7 w-7" />
+        )}
+
+        {composio?.configured && accounts.length > 0 && (
+          <div className="pb-2 pt-1">
+            <div className="mb-2 flex items-center gap-2 px-1"><ShieldCheck className="h-4 w-4 text-emerald-300" /><h3 className="text-xs font-semibold uppercase tracking-[0.14em] text-zinc-400">Connected</h3></div>
+            <div className="space-y-2">
+              {accounts.map((account) => {
+                const meta = catalog.find((item) => item.slug === account.toolkit) || PROVIDERS.find((item) => item.slug === account.toolkit);
+                const active = isActive(account);
+                const enabled = active && account.enabled;
+                const pending = busy === account.toolkit;
+                return (
+                  <article key={account.id} className="flex items-center gap-3 rounded-[20px] border border-emerald-300/[0.12] bg-emerald-300/[0.055] p-3.5 sm:px-4">
+                    <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-2xl border border-white/10 bg-[#101010]"><ConnectorLogo slug={account.toolkit} name={meta?.name || account.toolkit} src={meta?.logo} className="h-7 w-7" /></div>
+                    <div className="min-w-0 flex-1"><div className="flex items-center gap-2"><h4 className="truncate text-sm font-semibold text-white">{meta?.name || account.toolkit}</h4><span className={cn('h-1.5 w-1.5 rounded-full', enabled ? 'bg-emerald-300' : 'bg-amber-300')} /></div><p className="mt-1 text-xs text-zinc-400">{active ? (enabled ? 'Connected and ready to use' : 'Connected, but paused') : (account.statusReason || 'Reconnect required')}</p></div>
+                    <div className="flex shrink-0 items-center gap-1.5">
+                      <button type="button" onClick={() => void manageAccount(account, enabled ? 'disable' : 'enable')} disabled={pending || !active} className={cn('relative h-7 w-12 rounded-full p-1 transition disabled:opacity-45', enabled ? 'bg-emerald-400' : 'bg-white/15')} aria-label={`${enabled ? 'Pause' : 'Enable'} ${meta?.name || account.toolkit}`}><span className={cn('block h-5 w-5 rounded-full bg-white shadow transition-transform', enabled ? 'translate-x-5' : 'translate-x-0')} /></button>
+                      <button type="button" onClick={() => void manageAccount(account, 'disconnect')} disabled={pending} className="inline-flex h-8 w-8 items-center justify-center rounded-full text-zinc-500 transition hover:bg-red-400/10 hover:text-red-200 disabled:opacity-45" aria-label={`Disconnect ${meta?.name || account.toolkit}`} title="Disconnect"><Unplug className="h-3.5 w-3.5" /></button>
                     </div>
-                    <div className="min-w-0 flex-1">
-                      <div className="flex items-center gap-2"><span className="truncate text-sm font-medium text-zinc-100">{meta?.name || account.toolkit}</span><span className={cn('h-1.5 w-1.5 rounded-full', connected ? 'bg-emerald-400 shadow-[0_0_10px_rgba(52,211,153,.8)]' : 'bg-amber-400')} /></div>
-                      <p className="mt-1 truncate text-[11px] text-zinc-500">{connected ? (account.enabled ? 'Connected · enabled for Lunar' : 'Connected · paused') : (account.statusReason || 'Needs attention')}</p>
-                    </div>
-                    <button type="button" onClick={() => manageAccount(account, account.enabled ? 'disable' : 'enable')} disabled={busy || !connected} aria-label={`${account.enabled ? 'Disable' : 'Enable'} ${meta?.name || account.toolkit}`} className={cn('relative h-7 w-12 shrink-0 rounded-full p-1 transition', account.enabled && connected ? 'bg-emerald-400/90' : 'bg-white/10', (busy || !connected) && 'opacity-50')}>
-                      <span className={cn('block h-5 w-5 rounded-full bg-white shadow-sm transition-transform', account.enabled && connected ? 'translate-x-5' : 'translate-x-0')} />
-                    </button>
-                  </div>
-                  <div className="mt-3 flex items-center justify-between border-t border-white/[0.07] pt-3"><span className={cn('text-[10px] font-medium', connected ? 'text-emerald-300' : 'text-amber-300')}>{connected ? (account.enabled ? 'Ready to use' : 'Off') : 'Reconnect required'}</span><button type="button" onClick={() => manageAccount(account, 'disconnect')} disabled={busy} className="inline-flex items-center gap-1 rounded-lg px-2 py-1 text-[10px] text-zinc-500 transition hover:bg-red-400/10 hover:text-red-300 disabled:opacity-50"><Unplug className="h-3 w-3" /> Disconnect</button></div>
-                </div>
-              );
-            })}
+                  </article>
+                );
+              })}
+            </div>
           </div>
-        </section>
-      )}
-      {composio?.configured && (
-        <div className="rounded-2xl border border-violet-400/15 bg-violet-400/[0.04] p-4">
-          <div className="flex items-center justify-between gap-3">
-            <div><h3 className="text-sm font-medium">Browse apps</h3><p className="mt-1 text-xs text-zinc-500">Search for an app and connect it securely.</p></div>
-            <span className="text-[10px] font-semibold uppercase tracking-wider text-violet-300">1000+ toolkits</span>
-          </div>
-          <input value={catalogQuery} onChange={(event) => setCatalogQuery(event.target.value)} placeholder="Search apps…" className="mt-3 h-9 w-full rounded-lg border border-white/10 bg-black/20 px-3 text-sm text-zinc-200 outline-none placeholder:text-zinc-600" />
-          <div className="mt-3 grid max-h-80 grid-cols-1 gap-2 overflow-y-auto sm:grid-cols-2">
-            {catalog.filter((item) => `${item.name} ${item.slug} ${item.description}`.toLowerCase().includes(catalogQuery.toLowerCase())).map((item) => (
-              <button key={item.slug} onClick={() => connectComposio(item.slug)} disabled={composioBusy} className="flex items-center gap-3 rounded-lg border border-white/8 bg-white/[0.025] p-2.5 text-left transition-colors hover:bg-white/[0.07] disabled:opacity-50">
-                <ConnectorLogo slug={item.slug} name={item.name || item.slug} src={item.logo} className="h-7 w-7 rounded-md" />
-                <span className="min-w-0 flex-1"><span className="block truncate text-xs font-medium text-zinc-200">{item.name}</span><span className="block truncate text-[10px] text-zinc-500">{item.slug}</span></span><span className="shrink-0 rounded-full border border-violet-300/15 bg-violet-300/10 px-2 py-1 text-[10px] font-medium text-violet-200">Connect</span>
-              </button>
-            ))}
-          </div>
+        )}
+
+        <div className="px-1 pb-1 pt-1"><h3 className="text-xs font-semibold uppercase tracking-[0.14em] text-zinc-400">{composio?.configured ? 'Explore connectors' : 'Available connectors'}</h3></div>
+        <div className="space-y-2">
+          {visibleProviders.map((provider) => {
+            const oauthConnected = !!status[provider.slug]?.connected;
+            const linkedAccount = accountByToolkit.get(provider.slug);
+            const linked = linkedAccount && isActive(linkedAccount);
+            const connected = oauthConnected || linked;
+            const pending = busy === provider.slug;
+            const canUseOAuth = OAUTH_PROVIDER_SLUGS.has(provider.slug);
+            const connect = () => composio?.configured ? void connectComposio(provider.slug) : canUseOAuth ? connectOAuth(provider.slug) : setNotice('This connector needs the shared connector service to be configured first.');
+            const disconnect = () => oauthConnected ? void disconnectOAuth(provider.slug) : linkedAccount ? void manageAccount(linkedAccount, 'disconnect') : undefined;
+            return (
+              <article key={provider.slug} className="group flex items-center gap-3 rounded-[20px] border border-white/[0.07] bg-white/[0.055] p-3.5 transition hover:border-white/[0.15] hover:bg-white/[0.075] sm:px-4">
+                <div className={cn('flex h-12 w-12 shrink-0 items-center justify-center rounded-2xl border border-white/10', provider.accent)}><ConnectorLogo slug={provider.slug} name={provider.name} src={provider.logo} className="h-7 w-7" /></div>
+                <div className="min-w-0 flex-1"><div className="flex items-center gap-2"><h4 className="truncate text-[15px] font-semibold tracking-[-0.01em] text-white">{provider.name}</h4>{connected && <span className="inline-flex items-center gap-1 text-[11px] font-medium text-emerald-200"><Check className="h-3 w-3" />Connected</span>}</div><p className="mt-1 line-clamp-2 text-[13px] leading-5 text-zinc-400">{provider.description}</p></div>
+                <Button type="button" size="sm" onClick={connected ? disconnect : connect} disabled={pending} className={cn('h-10 shrink-0 rounded-full px-4 text-sm font-semibold shadow-none transition', connected ? 'border border-white/15 bg-transparent text-zinc-300 hover:bg-red-400/10 hover:text-red-100' : 'bg-white text-zinc-950 hover:bg-zinc-200')} variant={connected ? 'outline' : 'default'}>
+                  {pending ? <Loader2 className="h-4 w-4 animate-spin" /> : connected ? 'Disconnect' : 'Connect'}
+                </Button>
+              </article>
+            );
+          })}
         </div>
-      )}
-      {!composio?.configured && <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
-      {PROVIDERS.map(p => {
-        const s = status[p.name];
-        const isConnected = !!s?.connected;
-        const isLoading   = busy === p.name;
 
-        return (
-          <div key={p.name} className={cn(
-            'relative flex items-center gap-3 p-3 rounded-xl border transition-all',
-            isConnected ? 'border-emerald-500/35 bg-emerald-500/5' : 'border-border bg-muted/20 hover:bg-muted/40'
-          )}>
-            {/* ✓ badge top-left when connected */}
-            {isConnected && (
-              <span className="absolute -top-1.5 -left-1.5 w-4 h-4 rounded-full bg-emerald-500 flex items-center justify-center shadow-sm">
-                <svg viewBox="0 0 10 10" className="w-2.5 h-2.5 fill-none stroke-white stroke-[2.5]">
-                  <polyline points="1.5,5 4,7.5 8.5,2.5"/>
-                </svg>
-              </span>
-            )}
+        {!visibleProviders.length && <div className="rounded-[20px] border border-dashed border-white/10 px-4 py-10 text-center text-sm text-zinc-500">No connectors match “{query}”. Try a different search.</div>}
+      </div>
 
-            {/* Icon */}
-            <div className={cn('flex items-center justify-center w-9 h-9 rounded-lg shrink-0', p.iconBg)}>
-              <p.Icon className={cn('w-4 h-4', p.iconColor)} />
-            </div>
-
-            {/* Label + desc */}
-            <div className="flex-1 min-w-0">
-              <div className="flex items-center gap-1.5">
-                <span className="text-sm font-medium">{p.label}</span>
-                {isConnected && (
-                  <span className="text-[10px] font-semibold px-1.5 py-0.5 rounded-full bg-emerald-400/10 text-emerald-400 leading-none">
-                    Connected
-                  </span>
-                )}
-              </div>
-              <p className="text-xs text-muted-foreground truncate">{p.description}</p>
-            </div>
-
-            {/* Button */}
-            <Button
-              size="sm"
-              variant={isConnected ? 'outline' : 'default'}
-              onClick={() => isConnected ? disconnect(p.name) : connect(p.name)}
-              disabled={isLoading}
-              className={cn(
-                'shrink-0 h-7 text-xs px-3',
-                isConnected && 'border-destructive/40 text-destructive hover:bg-destructive/10'
-              )}
-            >
-              {isLoading ? <Loader2 className="h-3 w-3 animate-spin" /> : isConnected ? 'Disconnect' : 'Connect'}
-            </Button>
-          </div>
-        );
-      })}
-      </div>}
-    </div>
+      <div className="flex items-center gap-2 border-t border-white/[0.08] bg-black/15 px-4 py-3 text-xs leading-5 text-zinc-500 sm:px-6"><Network className="h-3.5 w-3.5 shrink-0" /> Connections use secure authorization. Lunar only uses an app when you ask it to.</div>
+    </section>
   );
 }

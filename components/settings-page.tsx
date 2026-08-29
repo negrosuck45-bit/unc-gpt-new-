@@ -451,15 +451,8 @@ export function SettingsPage({ onClose }: SettingsPageProps) {
 
               {/* ── Connectors ──────────────────────────────────────────── */}
               {activeTab === 'connectors' && (
-                <div className="space-y-6">
-                  <SectionTitle
-                    title="MCP Connectors"
-                    description="Connect third-party services so all AI models can take real actions"
-                  />
+                <div className="mx-auto w-full max-w-2xl">
                   <OAuthConnectors />
-                  <div className="p-3 rounded-lg bg-muted/40 border border-border text-xs text-muted-foreground">
-                    Connected services are available to every model. The AI can create commits, send messages, update pages, and more — all using your real accounts via OAuth.
-                  </div>
                 </div>
               )}
 

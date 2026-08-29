@@ -61,6 +61,17 @@ function compileModule(relativePath, mocks = {}, extraGlobals = {}) {
 
 const connectorSafety = compileModule('../lib/connector-action-safety.ts');
 
+function nextAmsterdamOccurrence(monthIndex, day) {
+  const parts = new Intl.DateTimeFormat('en-CA', {
+    timeZone: 'Europe/Amsterdam', year: 'numeric', month: '2-digit', day: '2-digit',
+  }).formatToParts(new Date());
+  const value = (type) => Number(parts.find((part) => part.type === type)?.value || 0);
+  const current = Date.UTC(value('year'), value('month') - 1, value('day'));
+  let year = value('year');
+  if (Date.UTC(year, monthIndex, day) < current) year += 1;
+  return new Date(Date.UTC(year, monthIndex, day)).toISOString().slice(0, 10);
+}
+
 function createRequest(body) {
   return {
     headers: {
@@ -285,7 +296,7 @@ test('creates the screenshot-style date-and-title Calendar request without a con
   assert.match(text, /happy birthday/);
   assert.doesNotMatch(text, /confirm|text-based AI assistant|don't have direct access/i);
   assert.deepEqual(JSON.parse(JSON.stringify(calls)), [
-    { slug: 'GOOGLECALENDAR_CREATE_EVENT', args: { summary: 'happy birthday', start_datetime: '2026-08-28T09:00:00', timezone: 'Europe/Amsterdam', event_duration_hour: 1, event_duration_minutes: 0, calendar_id: 'primary' } },
+    { slug: 'GOOGLECALENDAR_CREATE_EVENT', args: { summary: 'happy birthday', start_datetime: `${nextAmsterdamOccurrence(7, 28)}T09:00:00`, timezone: 'Europe/Amsterdam', event_duration_hour: 1, event_duration_minutes: 0, calendar_id: 'primary' } },
     { slug: 'GOOGLECALENDAR_EVENTS_GET', args: { event_id: 'birthday-default-time-789', calendar_id: 'primary', time_zone: 'Europe/Amsterdam' } },
   ]);
 });
@@ -325,7 +336,7 @@ test('uses the connected Calendar for a time-and-title follow-up instead of gene
   assert.match(text, /happy birthday/);
   assert.doesNotMatch(text, /text-based AI assistant|don't have direct access/i);
   assert.deepEqual(JSON.parse(JSON.stringify(calls)), [
-    { slug: 'GOOGLECALENDAR_CREATE_EVENT', args: { summary: 'happy birthday', start_datetime: '2026-08-28T15:00:00', timezone: 'Europe/Amsterdam', event_duration_hour: 1, event_duration_minutes: 0, calendar_id: 'primary' } },
+    { slug: 'GOOGLECALENDAR_CREATE_EVENT', args: { summary: 'happy birthday', start_datetime: `${nextAmsterdamOccurrence(7, 28)}T15:00:00`, timezone: 'Europe/Amsterdam', event_duration_hour: 1, event_duration_minutes: 0, calendar_id: 'primary' } },
     { slug: 'GOOGLECALENDAR_EVENTS_GET', args: { event_id: 'birthday-456', calendar_id: 'primary', time_zone: 'Europe/Amsterdam' } },
   ]);
 });

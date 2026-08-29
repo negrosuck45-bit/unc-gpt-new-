@@ -97,9 +97,13 @@ export async function PATCH(request: NextRequest) {
   let result = current
     ? await supabase.from("user_profiles").update({ ...coreUpdate, updated_at: new Date().toISOString() }).eq("user_id", userId).select(profileSelect).single()
     : await supabase.from("user_profiles").insert({ user_id: userId, username: `user_${userId.slice(-8)}`, ...coreUpdate }).select(profileSelect).single();
-  if (result.error && Object.prototype.hasOwnProperty.call(coreUpdate, "music_thumbnail")) {
-    const { music_thumbnail: _thumbnail, ...legacyUpdate } = coreUpdate;
-    if (typeof _thumbnail === "string" && _thumbnail) legacyUpdate.music_name = `${String(legacyUpdate.music_name ?? current?.music_name ?? "").split(THUMBNAIL_MARKER)[0].trim()}\n${THUMBNAIL_MARKER}${_thumbnail}`;
+  const thumbnailColumnUnavailable = Boolean(result.error && /music_thumbnail/i.test(`${result.error.code || ""} ${result.error.message || ""}`));
+  if (thumbnailColumnUnavailable) {
+    // Some existing deployments use the earlier profile schema. Retry every update with
+    // the legacy projection, not only thumbnail edits, because the modern SELECT itself
+    // also references the optional column.
+    const { music_thumbnail: thumbnail, ...legacyUpdate } = coreUpdate;
+    if (typeof thumbnail === "string" && thumbnail) legacyUpdate.music_name = `${String(legacyUpdate.music_name ?? current?.music_name ?? "").split(THUMBNAIL_MARKER)[0].trim()}\n${THUMBNAIL_MARKER}${thumbnail}`;
     result = current
       ? await supabase.from("user_profiles").update({ ...legacyUpdate, updated_at: new Date().toISOString() }).eq("user_id", userId).select("username,bio,profile_picture,background_media,background_media_type,music_url,music_name").single()
       : await supabase.from("user_profiles").insert({ user_id: userId, username: `user_${userId.slice(-8)}`, ...legacyUpdate }).select("username,bio,profile_picture,background_media,background_media_type,music_url,music_name").single();
