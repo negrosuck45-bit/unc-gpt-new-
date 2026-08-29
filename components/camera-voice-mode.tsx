@@ -90,8 +90,9 @@ export function CameraVoiceMode({ open, onClose, onAsk }: CameraVoiceModeProps) 
 
   const startListening = useCallback(() => {
     const Recognition = getRecognitionConstructor()
+    const useRecordedTranscription = true
     if (busyRef.current || mutedRef.current) return
-    if (!Recognition) {
+    if (useRecordedTranscription || !Recognition) {
       if (!streamRef.current || typeof MediaRecorder === "undefined") {
         setCameraError("This browser cannot transcribe microphone audio. Try Safari or Chrome with microphone access enabled.")
         return
@@ -112,7 +113,7 @@ export function CameraVoiceMode({ open, onClose, onAsk }: CameraVoiceModeProps) 
           transcriptRef.current = json.text.trim()
           setInterim("")
         } catch {
-          setCameraError("I couldn’t understand that recording. Please try again.")
+          setCameraError("I couldn’t understand that recording. Tap the microphone, speak, and tap again to send.")
         } finally {
           recorderResolveRef.current?.()
           recorderResolveRef.current = null

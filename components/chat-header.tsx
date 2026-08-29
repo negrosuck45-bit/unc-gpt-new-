@@ -1,6 +1,6 @@
 import { type Chat, type Project } from "@/lib/chat-store"
 import { Button } from "@/components/ui/button"
-import { Bell, Menu, PanelLeftClose } from "lucide-react"
+import { Bell, PanelLeft, PanelLeftClose } from "lucide-react"
 import { useUiText } from "@/lib/ui-translations"
 
 interface ChatHeaderProps {
@@ -26,8 +26,7 @@ export function ChatHeader({ onOpenSidebar, isSidebarOpen, onOpenCameraVoice }: 
           title={isSidebarOpen ? t('closeSidebar') : t('openSidebar')}
           aria-label={isSidebarOpen ? t('closeSidebar') : t('openSidebar')}
         >
-          {isSidebarOpen ? <PanelLeftClose className="h-[18px] w-[18px]" /> : <Menu className="h-[18px] w-[18px]" />}
-          <span className="text-xs font-semibold tracking-wide">{isSidebarOpen ? t('closeSidebar') : t('openSidebar')}</span>
+          {isSidebarOpen ? <PanelLeftClose className="h-[18px] w-[18px]" /> : <PanelLeft className="h-[18px] w-[18px]" />}
         </Button>
       )}
       <Button
