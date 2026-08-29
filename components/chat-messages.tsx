@@ -466,6 +466,7 @@ function MessageActions({ message, isAssistant, onCopy, onRegenerate, onEdit, on
     }
 
     unlockVoicePlayback();
+    if (typeof window !== "undefined" && "speechSynthesis" in window) window.speechSynthesis.resume();
     setVoiceError(null);
     // Always attempt the server-side Groq Hannah voice first, including on iPhone.
     // Safari speech synthesis is only used if Groq rejects or the audio cannot play.

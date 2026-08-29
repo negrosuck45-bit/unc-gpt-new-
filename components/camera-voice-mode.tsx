@@ -222,7 +222,8 @@ export function CameraVoiceMode({ open, onClose, onAsk }: CameraVoiceModeProps) 
     >
       <video ref={videoRef} muted playsInline className={cn("absolute inset-0 h-full w-full object-cover", facingMode === "user" && "-scale-x-100")} />
       <div className="absolute inset-0 bg-black/40" />
-      <div className="pointer-events-none absolute inset-0 opacity-95 blur-[16px]">
+      <div className={cn("pointer-events-none absolute inset-0 opacity-95 blur-[16px]", busy && "lunar-rainbow-wave")}>
+
         <div className="absolute left-0 top-0 h-full w-8 bg-gradient-to-b from-fuchsia-500 via-violet-500 to-cyan-400" />
         <div className="absolute right-0 top-0 h-full w-8 bg-gradient-to-b from-cyan-400 via-emerald-400 to-fuchsia-500" />
         <div className="absolute left-0 top-0 h-8 w-full bg-gradient-to-r from-fuchsia-500 via-violet-500 to-cyan-400" />
