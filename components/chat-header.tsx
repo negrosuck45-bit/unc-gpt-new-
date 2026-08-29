@@ -19,14 +19,15 @@ export function ChatHeader({ onOpenSidebar, isSidebarOpen, onOpenCameraVoice }: 
       {onOpenSidebar && (
         <Button
           variant="outline"
-          size="icon"
+          size="default"
           onClick={onOpenSidebar}
           data-testid="sidebar-toggle"
-          className="task-header-icon h-10 w-10 shrink-0 rounded-xl border-sidebar-border/70 bg-sidebar-accent/50 shadow-sm"
+          className="task-header-icon h-10 shrink-0 gap-2 rounded-xl border-sidebar-border/70 bg-sidebar-accent/50 px-3 shadow-sm"
           title={isSidebarOpen ? t('closeSidebar') : t('openSidebar')}
           aria-label={isSidebarOpen ? t('closeSidebar') : t('openSidebar')}
         >
-          {isSidebarOpen ? <PanelLeftClose className="h-[19px] w-[19px]" /> : <Menu className="h-[19px] w-[19px]" />}
+          {isSidebarOpen ? <PanelLeftClose className="h-[18px] w-[18px]" /> : <Menu className="h-[18px] w-[18px]" />}
+          <span className="text-xs font-semibold tracking-wide">{isSidebarOpen ? t('closeSidebar') : t('openSidebar')}</span>
         </Button>
       )}
       <Button

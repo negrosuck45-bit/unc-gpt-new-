@@ -34,6 +34,9 @@ export function CameraVoiceMode({ open, onClose, onAsk }: CameraVoiceModeProps) 
   const videoRef = useRef<HTMLVideoElement>(null)
   const streamRef = useRef<MediaStream | null>(null)
   const recognitionRef = useRef<SpeechRecognitionInstance | null>(null)
+  const recorderRef = useRef<MediaRecorder | null>(null)
+  const recorderChunksRef = useRef<Blob[]>([])
+  const recorderResolveRef = useRef<(() => void) | null>(null)
   const transcriptRef = useRef("")
   const shouldListenRef = useRef(false)
   const mutedRef = useRef(true)
@@ -50,7 +53,13 @@ export function CameraVoiceMode({ open, onClose, onAsk }: CameraVoiceModeProps) 
     shouldListenRef.current = false
     try { recognitionRef.current?.abort() } catch {}
     recognitionRef.current = null
+    const recorder = recorderRef.current
+    if (recorder && recorder.state === "recording") {
+      recorder.stop()
+      return new Promise<void>((resolve) => { recorderResolveRef.current = resolve })
+    }
     setListening(false)
+    return Promise.resolve()
   }, [])
 
   const stopCamera = useCallback(() => {
@@ -80,7 +89,39 @@ export function CameraVoiceMode({ open, onClose, onAsk }: CameraVoiceModeProps) 
 
   const startListening = useCallback(() => {
     const Recognition = getRecognitionConstructor()
-    if (!Recognition || busyRef.current || mutedRef.current) return
+    if (busyRef.current || mutedRef.current) return
+    if (!Recognition) {
+      if (!streamRef.current || typeof MediaRecorder === "undefined") {
+        setCameraError("This browser cannot transcribe microphone audio. Try Safari or Chrome with microphone access enabled.")
+        return
+      }
+      recorderChunksRef.current = []
+      const recorder = new MediaRecorder(streamRef.current)
+      recorder.ondataavailable = (event) => { if (event.data.size > 0) recorderChunksRef.current.push(event.data) }
+      recorder.onstop = async () => {
+        const blob = new Blob(recorderChunksRef.current, { type: recorder.mimeType || "audio/webm" })
+        recorderRef.current = null
+        setListening(false)
+        try {
+          const form = new FormData()
+          form.append("file", blob, "lunar-recording.webm")
+          const response = await fetch("/api/transcribe", { method: "POST", body: form })
+          const json = await response.json().catch(() => ({}))
+          if (!response.ok || typeof json?.text !== "string") throw new Error(json?.error || "No speech detected")
+          transcriptRef.current = json.text.trim()
+          setInterim("")
+        } catch {
+          setCameraError("I couldn’t understand that recording. Please try again.")
+        } finally {
+          recorderResolveRef.current?.()
+          recorderResolveRef.current = null
+        }
+      }
+      recorderRef.current = recorder
+      recorder.start(250)
+      setListening(true)
+      return
+    }
     const recognition = new Recognition()
     transcriptRef.current = ""
     setInterim("")
@@ -111,12 +152,16 @@ export function CameraVoiceMode({ open, onClose, onAsk }: CameraVoiceModeProps) 
   }, [])
 
   const askCurrent = useCallback(async () => {
-    const text = transcriptRef.current.replace(/\s+/g, " ").trim()
-    if (!text || busyRef.current) return
+    if (busyRef.current) return
     mutedRef.current = true
     setMuted(true)
     streamRef.current?.getAudioTracks().forEach((track) => { track.enabled = false })
-    stopRecognition()
+    await stopRecognition()
+    const text = transcriptRef.current.replace(/\s+/g, " ").trim()
+    if (!text) {
+      setCameraError("No speech was detected. Tap the microphone and try again.")
+      return
+    }
     busyRef.current = true
     setBusy(true)
     setInterim("")
