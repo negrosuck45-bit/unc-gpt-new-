@@ -256,23 +256,23 @@ export function SettingsPage({ onClose }: SettingsPageProps) {
   ];
 
   return (
-    <div className="w-full max-w-none sm:max-w-5xl mx-auto h-[100dvh] sm:h-[min(720px,calc(100dvh-96px))] min-h-0 bg-background text-foreground supports-[backdrop-filter]:backdrop-blur-[30px] rounded-t-[30px] rounded-b-none sm:rounded-[28px] border border-border shadow-[0_24px_90px_rgba(0,0,0,0.28)] overflow-hidden pb-[env(safe-area-inset-bottom)] transition-colors duration-200">
+    <div className="isolate mx-auto flex h-[100dvh] w-full max-w-none flex-col overflow-hidden rounded-t-[28px] rounded-b-none border border-border bg-background text-foreground shadow-[0_24px_90px_rgba(0,0,0,0.28)] supports-[backdrop-filter]:backdrop-blur-[30px] pb-[env(safe-area-inset-bottom)] transition-colors duration-200 sm:h-[min(780px,calc(100dvh-64px))] sm:max-w-6xl sm:rounded-[28px]">
       {/* Header */}
-      <div className="flex items-center justify-between px-5 sm:px-6 py-4 bg-transparent">
-        <h1 className="text-[19px] font-medium tracking-tight">{t('settings')}</h1>
+      <div className="flex shrink-0 items-center justify-between border-b border-border/60 bg-background/90 px-4 py-3.5 backdrop-blur-xl sm:px-7 sm:py-4">
+        <h1 className="text-[19px] font-semibold tracking-[-0.02em] sm:text-xl">{t('settings')}</h1>
         <Button variant="ghost" size="icon" onClick={onClose}><X className="h-5 w-5" /></Button>
       </div>
 
-      <div className="flex h-[calc(100dvh-72px)] sm:h-[calc(100%-65px)] min-h-0 flex-col sm:flex-row">
+      <div className="flex min-h-0 flex-1 flex-col sm:flex-row">
         {/* Sidebar */}
-        <div className="w-full sm:w-[208px] shrink-0 border-b sm:border-b-0 sm:border-r border-border bg-muted/30 p-2.5 sm:p-3 overflow-visible">
-            <nav className="grid grid-cols-2 gap-1 sm:flex sm:flex-col">
+        <div className="w-full shrink-0 border-b border-border/60 bg-muted/20 px-3 py-2.5 sm:w-60 sm:border-b-0 sm:border-r sm:px-3 sm:py-5">
+            <nav className="flex gap-2 overflow-x-auto pb-0.5 sm:flex-col sm:gap-1.5">
             {tabs.map(tab => (
               <button
                 key={tab.id}
                 onClick={() => setActiveTab(tab.id)}
                 className={cn(
-                  'flex min-w-0 items-center justify-center gap-2 rounded-[16px] px-2.5 py-2.5 text-[13px] transition-all sm:justify-start sm:px-3 sm:py-3 sm:text-[14px] lg:text-[15px]',
+                  'flex min-h-11 min-w-[112px] shrink-0 items-center justify-center gap-2 rounded-xl px-3 py-2.5 text-[13px] font-medium transition-all sm:min-w-0 sm:justify-start sm:px-3.5 sm:py-3 sm:text-sm',
                   activeTab === tab.id
                     ? 'bg-muted/[0.18] text-foreground shadow-[inset_0_1px_0_rgba(255,255,255,0.10)]'
                     : 'text-muted-foreground hover:text-foreground hover:bg-accent/50'
@@ -286,10 +286,11 @@ export function SettingsPage({ onClose }: SettingsPageProps) {
         </div>
 
         {/* Content */}
-        <div className="flex-1 min-w-0 overflow-y-auto px-5 pb-8 pt-4 sm:px-8 sm:py-7 lg:px-10 lg:py-8 bg-transparent">
+        <div className="min-h-0 min-w-0 flex-1 overflow-y-auto overscroll-contain bg-transparent px-4 pb-8 pt-5 sm:px-8 sm:py-8 lg:px-12 lg:py-10">
           <AnimatePresence mode="wait">
             <motion.div
               key={activeTab}
+              className="mx-auto w-full max-w-3xl"
               initial={{ opacity: 0, y: 10 }}
               animate={{ opacity: 1, y: 0 }}
               exit={{ opacity: 0, y: -10 }}
@@ -297,9 +298,9 @@ export function SettingsPage({ onClose }: SettingsPageProps) {
             >
               {/* ── General ─────────────────────────────────────────────── */}
               {activeTab === 'general' && (
-                <div className="space-y-6">
+                <div className="space-y-5 sm:space-y-6">
                   <SectionTitle title={t('generalSettings')} description={t('basicAppPreferences')} />
-                  <div className="flex items-center justify-between gap-4">
+                  <div className="flex flex-col items-stretch gap-3 sm:flex-row sm:items-center sm:justify-between sm:gap-4">
                     <div className="min-w-0">
                       <Label>{t('language')}:</Label>
                       <p className="mt-1 text-xs leading-5 text-muted-foreground">{t('chooseLanguageDescription')}</p>
@@ -307,7 +308,7 @@ export function SettingsPage({ onClose }: SettingsPageProps) {
                     <select aria-label={t('language')} value={language} onChange={(event) => {
                       const nextLanguage = setStoredLanguagePreference(event.target.value);
                       setLanguage(nextLanguage)
-                    }} className="h-10 w-[190px] shrink-0 appearance-none rounded-full border border-border/10 bg-muted/[0.08] px-4 text-sm text-foreground outline-none focus:ring-2 focus:ring-foreground/15">
+                    }} className="h-10 w-full shrink-0 appearance-none sm:w-[190px] rounded-full border border-border/10 bg-muted/[0.08] px-4 text-sm text-foreground outline-none focus:ring-2 focus:ring-foreground/15">
                       {LANGUAGE_OPTIONS.map((option) => <option key={option.code} value={option.code}>{option.label}</option>)}
                     </select>
                   </div>
@@ -640,12 +641,12 @@ function ProfileRow({ label, value }: { label: string; value: string }) {
 
 function SettingRow({ label, description, children }: { label: string, description: string, children: React.ReactNode }) {
   return (
-    <div className="flex items-center justify-between py-3 border-b border-border last:border-0">
-      <div className="flex-1">
+    <div className="flex flex-col items-stretch gap-3 border-b border-border py-4 last:border-0 sm:flex-row sm:items-center sm:justify-between sm:gap-4">
+      <div className="min-w-0 flex-1">
         <p className="text-sm font-medium">{label}</p>
         {description && <p className="text-xs text-muted-foreground">{description}</p>}
       </div>
-      <div className="ml-4">{children}</div>
+      <div className="shrink-0 sm:ml-4">{children}</div>
     </div>
   );
 }
