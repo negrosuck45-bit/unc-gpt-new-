@@ -170,12 +170,6 @@ export function CameraVoiceMode({ open, onClose, onAsk }: CameraVoiceModeProps) 
         <div className="absolute left-0 top-0 h-8 w-full bg-gradient-to-r from-fuchsia-500 via-violet-500 to-cyan-400" />
         <div className="absolute bottom-0 left-0 h-8 w-full bg-gradient-to-r from-cyan-400 via-emerald-400 to-fuchsia-500" />
       </div>
-      <div className="pointer-events-none absolute inset-0 opacity-80">
-        <div className="absolute left-0 top-0 h-24 w-24 border-l-2 border-t-2 border-white/90 shadow-[-5px_-5px_30px_rgba(255,255,255,.7)]" />
-        <div className="absolute right-0 top-0 h-24 w-24 border-r-2 border-t-2 border-white/90 shadow-[5px_-5px_30px_rgba(255,255,255,.7)]" />
-        <div className="absolute bottom-0 left-0 h-24 w-24 border-b-2 border-l-2 border-white/90 shadow-[-5px_5px_30px_rgba(255,255,255,.7)]" />
-        <div className="absolute bottom-0 right-0 h-24 w-24 border-b-2 border-r-2 border-white/90 shadow-[5px_5px_30px_rgba(255,255,255,.7)]" />
-      </div>
       <button type="button" onClick={onClose} aria-label="Close camera voice mode" className="absolute right-5 top-[max(1.25rem,env(safe-area-inset-top))] z-20 flex h-11 w-11 items-center justify-center rounded-full bg-black/45 text-white backdrop-blur-xl"><X className="h-5 w-5" /></button>
       <div className="relative z-10 flex w-full max-w-md flex-col items-center px-8 text-center">
         <p className="min-h-7 max-w-sm text-lg font-medium drop-shadow-lg">{interim || transcriptRef.current}</p>

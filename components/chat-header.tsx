@@ -18,11 +18,11 @@ export function ChatHeader({ onOpenSidebar, isSidebarOpen, onOpenCameraVoice }: 
     <header className="task-header flex shrink-0 items-center gap-2 px-4 pb-3 pt-[max(0.75rem,env(safe-area-inset-top))] sm:px-7 sm:pb-4 sm:pt-5">
       {onOpenSidebar && (
         <Button
-          variant="ghost"
+          variant="outline"
           size="icon"
           onClick={onOpenSidebar}
           data-testid="sidebar-toggle"
-          className="task-header-icon h-10 w-10 shrink-0 rounded-full"
+          className="task-header-icon h-10 w-10 shrink-0 rounded-xl border-sidebar-border/70 bg-sidebar-accent/50 shadow-sm"
           title={isSidebarOpen ? t('closeSidebar') : t('openSidebar')}
           aria-label={isSidebarOpen ? t('closeSidebar') : t('openSidebar')}
         >
