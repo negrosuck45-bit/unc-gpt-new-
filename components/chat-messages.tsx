@@ -468,8 +468,17 @@ function MessageActions({ message, isAssistant, onCopy, onRegenerate, onEdit, on
     unlockVoicePlayback();
     if (typeof window !== "undefined" && "speechSynthesis" in window) window.speechSynthesis.resume();
     setVoiceError(null);
-    // Always attempt the server-side Groq Hannah voice first, including on iPhone.
-    // Safari speech synthesis is only used if Groq rejects or the audio cannot play.
+    const isAppleMobile = typeof navigator !== "undefined" && /iPhone|iPad|iPod/i.test(navigator.userAgent);
+    // Invoke browser speech directly from the iPhone tap so Safari keeps the user gesture.
+    // Other devices continue to use Hannah/Groq as the primary voice.
+    if (isAppleMobile) {
+      try {
+        await speakWithBrowserFallback({ text: message.content, language, key: message.id });
+        return;
+      } catch (mobileFallbackError) {
+        if (mobileFallbackError instanceof VoicePlaybackCancelledError) return;
+      }
+    }
     try {
       await playGroqTtsResponse({ text: message.content, language, key: message.id });
     } catch (error) {
