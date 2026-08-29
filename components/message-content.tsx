@@ -4,7 +4,7 @@ import { cn } from '@/lib/utils';
 import { formatCalendarEventPresentation } from '@/lib/calendar-event-presentation';
 import { CodeBlock } from './code-block';
 import { TerminalBlock } from './terminal-block';
-import { Download, ExternalLink, Loader2, Tag, Mail, ChevronDown, CalendarDays, Clock3, Github, GitBranch } from 'lucide-react';
+import { Download, ExternalLink, Loader2, Tag, Mail, ChevronDown, CalendarDays, Clock3, Github, GitBranch, ShieldCheck } from 'lucide-react';
 import { toast } from 'sonner';
 
 interface MessageContentProps {
@@ -42,6 +42,7 @@ type CalendarEvent = {
 };
 
 type ActionStatus = { label: string; state: 'complete' | 'error' };
+type ConnectorActionReview = { token: string; service: string; summary: string };
 
 type NormalizedEmail = {
   messageId?: string;
@@ -84,6 +85,20 @@ function parseActionStatus(content: string | undefined | null): ActionStatus | n
     const state = parsed?.state === 'error' ? 'error' : 'complete';
     const label = String(parsed?.label || (state === 'error' ? 'Connected action failed' : 'Connected action completed')).slice(0, 180);
     return { label, state };
+  } catch { return null; }
+}
+
+function parseConnectorActionReview(content: string | undefined | null): ConnectorActionReview | null {
+  if (!content) return null;
+  const match = content.match(/\[\[UNCGPT_CONNECTOR_ACTION_REVIEW:([\s\S]*?)\]\]/);
+  if (!match?.[1]) return null;
+  try {
+    const parsed = JSON.parse(match[1]);
+    const token = String(parsed?.token || "");
+    const service = String(parsed?.service || "Connected service").slice(0, 80);
+    const summary = String(parsed?.summary || "").trim().slice(0, 1200);
+    if (!/^[a-z0-9-]{20,}$/i.test(token) || !summary) return null;
+    return { token, service, summary };
   } catch { return null; }
 }
 
@@ -814,9 +829,19 @@ function ImagePreview({ src, alt, compact = false }: { src: string; alt?: string
   );
 }
 
+function ConnectorActionReviewCard({ review }: { review: ConnectorActionReview }) {
+  const [approved, setApproved] = useState(false);
+  const approve = () => {
+    setApproved(true);
+    window.dispatchEvent(new CustomEvent("uncgpt-connector-action-approved", { detail: review }));
+  };
+  return <section className="my-3 max-w-xl rounded-2xl border border-violet-300/20 bg-violet-300/[0.08] p-4 shadow-sm"><div className="flex items-start gap-3"><div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-violet-300/15 text-violet-100"><ShieldCheck className="h-4.5 w-4.5" /></div><div className="min-w-0"><p className="text-sm font-semibold text-white">Review external action</p><p className="mt-1 text-xs leading-5 text-zinc-300">{review.service} will only receive this request after you approve it.</p></div></div><p className="mt-4 rounded-xl border border-white/[0.08] bg-black/15 p-3 text-sm leading-6 text-zinc-200">{review.summary}</p><p className="mt-3 text-xs leading-5 text-zinc-400">Approval is limited to this exact request, your signed-in account, and ten minutes. No email, edit, deployment, or other connected change has run yet.</p><button type="button" disabled={approved} onClick={approve} className="mt-4 inline-flex h-10 items-center justify-center rounded-xl bg-violet-200 px-4 text-sm font-semibold text-[#20183b] transition hover:bg-white active:scale-[0.98] disabled:cursor-default disabled:opacity-70">{approved ? "Approval sent" : "Approve and continue"}</button></section>;
+}
+
 export function MessageContent({ content }: MessageContentProps) {
   const websiteDeployment = useMemo(() => parseWebsiteDeployment(content), [content]);
   const actionStatus = useMemo(() => parseActionStatus(content), [content]);
+  const connectorActionReview = useMemo(() => parseConnectorActionReview(content), [content]);
   const calendarEvent = useMemo(() => parseCalendarEvent(content), [content]);
   const emails = useMemo(() => parseEmailPayload(content), [content]);
   const connectorText = useMemo(() => genericConnectorText(content || ''), [content]);
@@ -827,6 +852,7 @@ export function MessageContent({ content }: MessageContentProps) {
 
   if (websiteDeployment) return <WebsiteDeploymentCard deployment={websiteDeployment} />;
   if (actionStatus) return <ActionStatusCard status={actionStatus} />;
+  if (connectorActionReview) return <ConnectorActionReviewCard review={connectorActionReview} />;
   if (calendarEvent) return <CalendarEventCard event={calendarEvent} />;
   if (emails) return <EmailCards emails={emails} />;
   if (connectorText && connectorBrandInfo) return <ConnectorResultCard text={connectorText} brand={connectorBrandInfo} />;

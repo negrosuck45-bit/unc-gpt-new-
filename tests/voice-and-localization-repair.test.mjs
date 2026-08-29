@@ -51,7 +51,7 @@ test('keeps a speaker control beside feedback controls under assistant replies',
   assert.match(messages, /VolumeX/)
 })
 
-test('localizes the Lunar welcome screen and keeps it compact and mobile-safe', () => {
+test('localizes the clean authentication card and keeps it compact and mobile-safe', () => {
   const auth = read('./components/auth-panel.tsx')
   const settings = read('./components/settings-page.tsx')
   const sidebar = read('./components/chat-sidebar.tsx')
@@ -59,8 +59,8 @@ test('localizes the Lunar welcome screen and keeps it compact and mobile-safe', 
   assert.match(auth, /useUiText/)
   assert.match(auth, /Welcome to Lunar/)
   assert.match(auth, /t\("lastUsed"\)/)
-  assert.match(auth, /bg-\[#080909\]/)
-  assert.match(auth, /font-serif/)
+  assert.match(auth, /bg-\[#151515\]/)
+  assert.match(auth, /max-w-\[480px\]/)
   assert.match(auth, /min-h-\[100dvh\]/)
   assert.match(auth, /min-w-0/)
   assert.match(settings, /\{t\('settings'\)\}/)

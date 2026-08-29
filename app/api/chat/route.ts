@@ -12,6 +12,7 @@ import { languagePreferenceInstruction } from "@/lib/language-preferences";
 export const runtime = "nodejs";
 
 const conversations = new Map<string, any>();
+const pendingConnectorActionApprovals = new Map<string, { userId: string; request: string; expiresAt: number }>();
 
 function generateId() {
   return `conv_${Date.now()}_${Math.random().toString(36).substring(2, 8)}`;
@@ -1300,10 +1301,14 @@ async function fallbackChat(
       errors.push(`OpenAI: ${err.message}`);
     }
   }
-  try {
-    return await callGroq(messages, "llama-3.3-70b-versatile", false, tools);
-  } catch (err: any) {
-    errors.push(`Groq: ${err.message}`);
+  if (GROQ_KEYS.some((_, index) => !deadGroqKeys.has(index))) {
+    try {
+      return await callGroq(messages, "llama-3.3-70b-versatile", false, tools);
+    } catch (err: any) {
+      errors.push(`Groq: ${err.message}`);
+    }
+  } else {
+    errors.push("Groq: all configured keys are unavailable");
   }
   try {
     return await callOpenRouter(messages, false, tools);
@@ -2334,6 +2339,18 @@ function directTextResponse(content: string, provider: string, model = "connecte
   return createStreamResponse(stream, provider, model, []);
 }
 
+function connectorActionReviewResponse(userId: string | null, service: string, request: string) {
+  if (!userId) return directTextResponse("Sign in before approving an external action.", service, "connector-review");
+  const now = Date.now();
+  for (const [token, approval] of pendingConnectorActionApprovals) {
+    if (approval.expiresAt <= now) pendingConnectorActionApprovals.delete(token);
+  }
+  const summary = request.replace(/\s+/g, " ").trim().slice(0, 1200);
+  const token = crypto.randomUUID();
+  pendingConnectorActionApprovals.set(token, { userId, request: summary, expiresAt: now + 10 * 60 * 1000 });
+  return directTextResponse(`[[UNCGPT_CONNECTOR_ACTION_REVIEW:${JSON.stringify({ token, service: service.slice(0, 80), summary })}]]`, service, "connector-review");
+}
+
 // ============================================================
 // TOOL LOOP WITH BUILTIN TOOLS
 // ============================================================
@@ -3244,6 +3261,7 @@ export async function POST(req: NextRequest) {
       clientCountryCode,
       clientLanguage,
       enabledSkills = [],
+      connectorActionApproval,
     } = body;
 
     // The replacement release exposes one model only; old client model values are ignored.
@@ -3260,6 +3278,13 @@ export async function POST(req: NextRequest) {
     const userText = Array.isArray(lastMsg?.content)
       ? lastMsg.content.find((c: any) => c.type === "text")?.text || ""
       : lastMsg?.content || "";
+    const currentSession = await getSession();
+    const currentUserId = currentSession?.user?.sub || null;
+    const submittedApprovalToken = typeof connectorActionApproval === "string" ? connectorActionApproval : "";
+    const pendingApproval = submittedApprovalToken ? pendingConnectorActionApprovals.get(submittedApprovalToken) : null;
+    if (submittedApprovalToken) pendingConnectorActionApprovals.delete(submittedApprovalToken);
+    const normalizedRequest = String(userText).replace(/\s+/g, " ").trim();
+    const isApprovedConnectorAction = Boolean(pendingApproval && currentUserId && pendingApproval.userId === currentUserId && pendingApproval.expiresAt > Date.now() && pendingApproval.request === normalizedRequest);
 
     // ==================== FAST CONNECTOR READS ====================
     // Handle direct Discord reads before memory/search/tool discovery. Those steps can
@@ -3541,6 +3566,7 @@ export async function POST(req: NextRequest) {
         if (!oauthConnected.has("github") && !githubComposioConnected) return connectorPermissionResponse("github", "GitHub", "create and update website files and commits", "https://cdn.simpleicons.org/github");
         if (!oauthConnected.has("github") && !websiteComposioSession) return directTextResponse("Your GitHub account is connected, but I could not open its action session right now. Please try again in a moment; you do not need to reconnect it.", "GitHub", "connector-error");
         if (wantsVercel && !oauthConnected.has("vercel")) return connectorPermissionResponse("vercel", "Vercel", "deploy the committed GitHub website", "https://cdn.simpleicons.org/vercel");
+        if (!isApprovedConnectorAction) return connectorActionReviewResponse(currentUserId, wantsVercel ? "GitHub and Vercel" : "GitHub", userText);
         try {
           const result = websiteComposioSession && !oauthConnected.has("github")
             ? await executeComposioWebsiteScaffold(websiteComposioSession, websiteRepository.owner, websiteRepository.repo, userText, wantsGithubPages, githubPagesRepairRequest)
@@ -3570,6 +3596,7 @@ export async function POST(req: NextRequest) {
         if (!name) {
           return directTextResponse("What name should I use for the new GitHub repository?", "GitHub", "connected-action");
         }
+        if (!isApprovedConnectorAction) return connectorActionReviewResponse(currentUserId, "GitHub", userText);
         try {
           const repository = await executeOAuthGithubAction(baseUrl, req.headers.get("cookie") || "", "create_repo", { name, private: /\bprivate\b/i.test(userText) });
           const fullName = repository?.full_name || repository?.name || name;
@@ -3689,6 +3716,9 @@ export async function POST(req: NextRequest) {
         }});
         return new Response(stream, { headers: { 'Content-Type': 'text/event-stream', 'Cache-Control': 'no-cache' } });
       }
+      if (connectorWriteIntent && !isApprovedConnectorAction) {
+        return connectorActionReviewResponse(currentUserId, requestedConnector?.label || "Connected service", userText);
+      }
       try {
         const shouldLoadConnectedTools = Boolean(requestedConnectorKey && connectorActionIntent);
         if (shouldLoadConnectedTools) {
@@ -3709,6 +3739,9 @@ export async function POST(req: NextRequest) {
           const deterministicCalendarCreate = calendarSchedulingIntent && requestedConnectorKey === 'google_calendar'
             ? parseDeterministicCalendarCreate(userText, clientTimeZone, new Date(), recentUserText)
             : null;
+          if (composioSession && deterministicCalendarCreate && !isApprovedConnectorAction) {
+            return connectorActionReviewResponse(currentUserId, "Google Calendar", userText);
+          }
           if (composioSession && deterministicCalendarCreate) {
             try {
               return directTextResponse(await executeVerifiedGoogleCalendarCreate(composioSession, deterministicCalendarCreate), 'Google Calendar', 'connected-action');
@@ -3998,7 +4031,7 @@ export async function POST(req: NextRequest) {
         result = await fallbackChat(messagesWithSystem, hasImage, availableTools);
       }
     } catch (primaryErr: any) {
-      console.error("[Main] Primary provider failed:", primaryErr);
+      console.warn("[Main] Primary provider failed; attempting the configured fallback chain:", primaryErr?.message || primaryErr);
       result = await fallbackChat(messagesWithSystem, hasImage, availableTools);
     }
 
@@ -4013,6 +4046,13 @@ export async function POST(req: NextRequest) {
     );
   } catch (err: any) {
     console.error("[Main] Fatal error:", err);
+    const detail = String(err?.message || "");
+    if (/all providers failed|all groq keys (?:dead|failed)/i.test(detail)) {
+      return Response.json(
+        { error: "The AI response service is temporarily at capacity. No connected action was performed; please try again shortly." },
+        { status: 503, headers: { "Cache-Control": "private, no-store, max-age=0", "Retry-After": "60" } }
+      );
+    }
     return Response.json(
       { error: err.message || "Internal server error" },
       { status: 500 }

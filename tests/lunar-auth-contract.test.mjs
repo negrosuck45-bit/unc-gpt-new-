@@ -5,36 +5,33 @@ import fs from 'node:fs'
 const root = new URL('../', import.meta.url)
 const source = (relativePath) => fs.readFileSync(new URL(relativePath, root), 'utf8')
 
-test('renders the dark Lunar welcome screen with first-party provider choices', () => {
+test('renders the clean prior authentication card with first-party provider choices', () => {
   const authPanel = source('components/auth-panel.tsx')
 
   assert.match(authPanel, /useUiText/)
-  assert.match(authPanel, /Welcome to Lunar/)
   assert.match(authPanel, /primaryProvider\.id/)
   assert.match(authPanel, /provider\.id === "discord"/)
   assert.match(authPanel, /"continueGithub"/)
   assert.match(authPanel, /t\("lastUsed"\)/)
   assert.match(authPanel, /t\("emailAddress"\)/)
   assert.match(authPanel, /t\("dontHaveAccount"\)/)
-  assert.match(authPanel, /bg-\[#080909\]/)
-  assert.match(authPanel, /font-serif/)
-  assert.match(authPanel, /Continue with Email/)
+  assert.match(authPanel, /bg-\[#151515\]/)
+  assert.match(authPanel, /max-w-\[480px\]/)
   assert.match(authPanel, /\/api\/auth\/\$\{provider\}\/start/)
   assert.doesNotMatch(authPanel, /@clerk\/nextjs|useSignIn|useSignUp|signIn\.sso|Secured by Clerk|Development mode/)
   assert.doesNotMatch(authPanel, /type="password"|\.password\(/)
 })
 
-test('opens social sign-in in a new Safari context from an installed Home Screen app', () => {
+test('opens social sign-in in a dedicated Safari context from an installed Home Screen app', () => {
   const authPanel = source('components/auth-panel.tsx')
   const manifest = source('app/manifest.ts')
 
   assert.match(authPanel, /display-mode: standalone/)
   assert.match(authPanel, /navigator as Navigator & \{ standalone\?: boolean \}/)
-  assert.match(authPanel, /pendingProvider/)
-  assert.match(authPanel, /providerDomains/)
-  assert.match(authPanel, /“Lunar” Wants to Use/)
+  assert.match(authPanel, /pendingSafariProvider/)
+  assert.match(authPanel, /Continue in Safari/)
   assert.match(authPanel, /window\.open\(authUrl, "_blank"/)
-  assert.match(authPanel, /setPendingProvider\(selectedProvider\)/)
+  assert.match(authPanel, /setPendingSafariProvider\(selectedProvider\)/)
   assert.match(manifest, /display: "standalone"/)
   assert.match(manifest, /start_url: "\/"/)
 })

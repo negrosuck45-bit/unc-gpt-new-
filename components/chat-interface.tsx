@@ -1,5 +1,5 @@
 "use client";
-import { useState, useRef, useCallback, useEffect } from "react";
+import { useState, useRef, useCallback, useEffect, useSyncExternalStore } from "react";
 import { useChatStore, type Attachment } from "@/lib/chat-store";
 import { truncateMemory } from "@/lib/memory-parsers";
 import { ChatMessages } from "@/components/chat-messages";
@@ -68,7 +68,7 @@ async function persistNeuralMemory(chatId: string, messages: any[], responseCont
 }
 
 export function ChatInterface({ onSwitchToImagine, onOpenSidebar, isSidebarOpen }: ChatInterfaceProps) {
-  const [mounted, setMounted] = useState(false);
+  const mounted = useSyncExternalStore(() => () => {}, () => true, () => false);
   const [isThinking, setIsThinking] = useState(false);
   const [connectionIssue, setConnectionIssue] = useState<ConnectionIssue>(null);
   const [cameraVoiceOpen, setCameraVoiceOpen] = useState(false);
@@ -90,8 +90,6 @@ export function ChatInterface({ onSwitchToImagine, onOpenSidebar, isSidebarOpen 
   } = useChatStore();
 
   const isCurrentChatStreaming = currentChatId ? getIsStreamingForChat(currentChatId) : false;
-
-  useEffect(() => { setMounted(true); }, []);
 
   const currentChat = getCurrentChat();
   const currentProject = getProject(currentChat?.projectId);
@@ -115,6 +113,7 @@ export function ChatInterface({ onSwitchToImagine, onOpenSidebar, isSidebarOpen 
     let completed = false;
     try {
       const messagesToSend = messages.slice(0, assistantIndex);
+      // eslint-disable-next-line react-hooks/immutability -- processAIResponse is a hoisted component-local function.
       const responseContent = await processAIResponse(chatId, messagesToSend);
       void persistNeuralMemory(chatId, messagesToSend, responseContent);
       completed = true;
@@ -135,7 +134,7 @@ export function ChatInterface({ onSwitchToImagine, onOpenSidebar, isSidebarOpen 
     }
   }, [currentChat, isCurrentChatStreaming, addMessage, deleteMessage, setIsStreaming]);
 
-  const handleSend = useCallback(async (content: string, attachments?: Attachment[]): Promise<string | undefined> => {
+  const handleSend = useCallback(async (content: string, attachments?: Attachment[], connectorActionApproval?: string): Promise<string | undefined> => {
     if (!content?.trim() && (!attachments || attachments.length === 0)) return;
 
     const chatId = currentChatId || createNewChat("text", null, settings.model, settings.provider);
@@ -165,7 +164,7 @@ export function ChatInterface({ onSwitchToImagine, onOpenSidebar, isSidebarOpen 
       // Always use the hosted vision path for images. Browser-local WebGPU vision can
       // report support while still failing to load a remote Supabase URL on mobile;
       // the hosted path receives the same public image URL and has provider fallbacks.
-      const responseContent = await processAIResponse(chatId, messagesToSend);
+      const responseContent = await processAIResponse(chatId, messagesToSend, connectorActionApproval);
       completedResponse = responseContent || "";
       void persistNeuralMemory(chatId, messagesToSend, responseContent);
       completed = true;
@@ -197,7 +196,7 @@ export function ChatInterface({ onSwitchToImagine, onOpenSidebar, isSidebarOpen 
     return response;
   }, [handleSend]);
 
-  const processAIResponse = async (chatId: string, messages: any[]) => {
+  async function processAIResponse(chatId: string, messages: any[], connectorActionApproval?: string) {
     const currentChat = useChatStore.getState().chats.find(c => c.id === chatId);
     const selectedModel = currentChat?.model;
     const selectedProvider = currentChat?.provider;
@@ -253,6 +252,7 @@ export function ChatInterface({ onSwitchToImagine, onOpenSidebar, isSidebarOpen 
       clientCountry: runtimeContext.country,
       clientCountryCode: runtimeContext.countryCode,
       clientLanguage: getStoredLanguagePreference(),
+      ...(connectorActionApproval ? { connectorActionApproval } : {}),
     };
 
     try {
@@ -455,7 +455,17 @@ export function ChatInterface({ onSwitchToImagine, onOpenSidebar, isSidebarOpen 
     }
 
     return fullContent;
-  };
+  }
+
+  useEffect(() => {
+    const approveConnectorAction = (event: Event) => {
+      const detail = (event as CustomEvent<{ token?: string; summary?: string }>).detail;
+      if (!detail?.token || !detail.summary) return;
+      void handleSend(detail.summary, [], detail.token);
+    };
+    window.addEventListener("uncgpt-connector-action-approved", approveConnectorAction);
+    return () => window.removeEventListener("uncgpt-connector-action-approved", approveConnectorAction);
+  }, [handleSend]);
 
   if (!mounted) return null;
 

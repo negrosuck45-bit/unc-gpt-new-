@@ -1,4 +1,7 @@
 'use client'
+"use client"
+
+import Link from "next/link"
 
 export default function GlobalError({ reset }: { reset: () => void }) {
   return (
@@ -12,7 +15,7 @@ export default function GlobalError({ reset }: { reset: () => void }) {
             <p className="mt-3 text-sm leading-6 text-white/60">The workspace hit an unexpected error. Return to the sign-in page and try again.</p>
             <div className="mt-8 grid gap-3">
               <button type="button" onClick={() => reset()} className="flex h-12 items-center justify-center rounded-2xl bg-white px-5 text-sm font-semibold text-black transition hover:bg-white/90">Try again</button>
-              <a href="/" className="flex h-12 items-center justify-center rounded-2xl border border-white/12 bg-white/[0.045] px-5 text-sm font-medium text-white/85 transition hover:bg-white/[0.09]">Back to sign in</a>
+              <Link href="/" className="flex h-12 items-center justify-center rounded-2xl border border-white/12 bg-white/[0.045] px-5 text-sm font-medium text-white/85 transition hover:bg-white/[0.09]">Back to sign in</Link>
             </div>
           </section>
         </main>

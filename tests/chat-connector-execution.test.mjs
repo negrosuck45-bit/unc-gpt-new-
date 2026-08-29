@@ -95,6 +95,22 @@ async function responseSseText(response) {
   return response.text();
 }
 
+async function approvedResponse(POST, body) {
+  const reviewText = await responseSseText(await POST(createRequest(body)));
+  const reviewContent = reviewText.split("\n")
+    .filter((line) => line.startsWith("data: "))
+    .map((line) => line.slice(6).trim())
+    .filter((payload) => payload && payload !== "[DONE]")
+    .map((payload) => JSON.parse(payload))
+    .map((payload) => payload.content)
+    .find((content) => typeof content === "string" && content.includes("[[UNCGPT_CONNECTOR_ACTION_REVIEW:"));
+  const reviewMatch = typeof reviewContent === "string" ? reviewContent.match(/\[\[UNCGPT_CONNECTOR_ACTION_REVIEW:([\s\S]*?)\]\]/) : null;
+  assert.ok(reviewMatch, `Expected an external action review before execution. Received: ${reviewText}`);
+  const review = JSON.parse(reviewMatch[1]);
+  assert.ok(review.token, 'The review response must carry a single-use approval token.');
+  return responseSseText(await POST(createRequest({ ...body, connectorActionApproval: review.token })));
+}
+
 function githubWebsiteSchemas() {
   return {
     toolSchemas: [
@@ -159,12 +175,11 @@ test('runs the authenticated GitHub website workflow instead of falling into the
     },
   };
   const { POST } = createRoute({ connectorSession, enabledToolkits: ['github'] });
-  const response = await POST(createRequest({
+  const text = await approvedResponse(POST, {
     messages: [{ role: 'user', content: 'Create me a GitHub repo and a live website saying fix is the best with a clean black white UI' }],
     computerUse: false,
     mcpConnectors: [{ source: 'composio', provider: 'github', enabled: true }],
-  }));
-  const text = await responseSseText(response);
+  });
 
   assert.match(text, /Created and committed the website files in \*\*test-owner\/lunar-site-12345678\*\*/);
   assert.match(text, /UNCGPT_WEBSITE_DEPLOYMENT/);
@@ -201,12 +216,11 @@ test('refuses to emit a GitHub Pages deployment card when GitHub does not confir
     },
   };
   const { POST } = createRoute({ connectorSession, enabledToolkits: ['github'] });
-  const response = await POST(createRequest({
+  const text = await approvedResponse(POST, {
     messages: [{ role: 'user', content: 'Create me a GitHub repo and a live website' }],
     computerUse: false,
     mcpConnectors: [{ source: 'composio', provider: 'github', enabled: true }],
-  }));
-  const text = await responseSseText(response);
+  });
 
   assert.match(text, /couldn’t finish the website publish/i);
   assert.match(text, /did not confirm a new Pages Actions run/i);
@@ -233,13 +247,12 @@ test('creates and reads back a Calendar event instead of falling into the generi
     },
   };
   const { POST } = createRoute({ connectorSession, enabledToolkits: ['googlecalendar'] });
-  const response = await POST(createRequest({
+  const text = await approvedResponse(POST, {
     messages: [{ role: 'user', content: 'Schedule a 30 minute event tomorrow at 3 PM called Lunar Calendar Verify Final.' }],
     computerUse: false,
     clientTimeZone: 'Europe/Amsterdam',
     mcpConnectors: [{ source: 'composio', provider: 'google_calendar', enabled: true }],
-  }));
-  const text = await responseSseText(response);
+  });
 
   assert.match(text, /UNCGPT_CALENDAR_EVENT/);
   assert.match(text, /Lunar Calendar Verify Final/);
@@ -285,13 +298,12 @@ test('creates the screenshot-style date-and-title Calendar request without a con
     },
   };
   const { POST } = createRoute({ connectorSession, enabledToolkits: ['googlecalendar'] });
-  const response = await POST(createRequest({
+  const text = await approvedResponse(POST, {
     messages: [{ role: 'user', content: 'Create me an event on 28 August on my calendar that says happy birthday' }],
     computerUse: false,
     clientTimeZone: 'Europe/Amsterdam',
     mcpConnectors: [{ source: 'composio', provider: 'google_calendar', enabled: true }],
-  }));
-  const text = await responseSseText(response);
+  });
   assert.match(text, /UNCGPT_CALENDAR_EVENT/);
   assert.match(text, /happy birthday/);
   assert.doesNotMatch(text, /confirm|text-based AI assistant|don't have direct access/i);
@@ -320,7 +332,7 @@ test('uses the connected Calendar for a time-and-title follow-up instead of gene
     },
   };
   const { POST } = createRoute({ connectorSession, enabledToolkits: ['googlecalendar'] });
-  const response = await POST(createRequest({
+  const text = await approvedResponse(POST, {
     messages: [
       { role: 'user', content: 'Schedule a Google Calendar event on 28 August.' },
       { role: 'assistant', content: 'What time and title should I use?' },
@@ -329,8 +341,7 @@ test('uses the connected Calendar for a time-and-title follow-up instead of gene
     computerUse: false,
     clientTimeZone: 'Europe/Amsterdam',
     mcpConnectors: [{ source: 'composio', provider: 'google_calendar', enabled: true }],
-  }));
-  const text = await responseSseText(response);
+  });
 
   assert.match(text, /UNCGPT_CALENDAR_EVENT/);
   assert.match(text, /happy birthday/);
@@ -364,13 +375,12 @@ test('verifies a delayed nested Calendar event response without creating a dupli
     },
   };
   const { POST } = createRoute({ connectorSession, enabledToolkits: ['googlecalendar'] });
-  const response = await POST(createRequest({
+  const text = await approvedResponse(POST, {
     messages: [{ role: 'user', content: 'Can you schedule me on 28 August at 5pm rest' }],
     computerUse: false,
     clientTimeZone: 'Europe/Amsterdam',
     mcpConnectors: [{ source: 'composio', provider: 'google_calendar', enabled: true }],
-  }));
-  const text = await responseSseText(response);
+  });
 
   assert.match(text, /UNCGPT_CALENDAR_EVENT/);
   assert.match(text, /rest/);
@@ -430,7 +440,7 @@ test('repairs a failed GitHub Pages deployment from prior repository context ins
     },
   };
   const { POST } = createRoute({ connectorSession, enabledToolkits: ['github'] });
-  const response = await POST(createRequest({
+  const text = await approvedResponse(POST, {
     messages: [
       { role: 'user', content: 'Create a GitHub repo and a live website' },
       { role: 'assistant', content: 'Created website files in test-owner/lunar-site-previous. [[UNCGPT_WEBSITE_DEPLOYMENT:{"repository":"test-owner/lunar-site-previous"}]]' },
@@ -438,8 +448,7 @@ test('repairs a failed GitHub Pages deployment from prior repository context ins
     ],
     computerUse: false,
     mcpConnectors: [{ source: 'composio', provider: 'github', enabled: true }],
-  }));
-  const text = await responseSseText(response);
+  });
 
   assert.match(text, /Reconfigured GitHub Pages deployment for \*\*test-owner\/lunar-site-previous\*\*/);
   assert.match(text, /UNCGPT_WEBSITE_DEPLOYMENT/);
@@ -475,7 +484,7 @@ test('creates a new unique repository for a fresh website request even when a pr
     },
   };
   const { POST } = createRoute({ connectorSession, enabledToolkits: ['github'] });
-  const response = await POST(createRequest({
+  const text = await approvedResponse(POST, {
     messages: [
       { role: 'user', content: 'Create a GitHub repo and live website' },
       { role: 'assistant', content: 'Created website files in test-owner/old-site. [[UNCGPT_WEBSITE_DEPLOYMENT:{"repository":"test-owner/old-site"}]]' },
@@ -483,8 +492,7 @@ test('creates a new unique repository for a fresh website request even when a pr
     ],
     computerUse: false,
     mcpConnectors: [{ source: 'composio', provider: 'github', enabled: true }],
-  }));
-  const text = await responseSseText(response);
+  });
 
   assert.match(text, /test-owner\/lunar-site-12345678/);
   assert.doesNotMatch(text, /test-owner\/old-site/);
@@ -528,12 +536,11 @@ test('uses canonical Actions fallbacks when Composio search is sparse', async ()
       throw new Error(`Unexpected network call in sparse-schema test: ${url}`);
     },
   });
-  const response = await POST(createRequest({
+  const text = await approvedResponse(POST, {
     messages: [{ role: 'user', content: 'Create me a GitHub repo and a live website showing a GTA 6 presentation.' }],
     computerUse: false,
     mcpConnectors: [{ source: 'composio', provider: 'github', enabled: true }],
-  }));
-  const text = await responseSseText(response);
+  });
 
   assert.match(text, /UNCGPT_WEBSITE_DEPLOYMENT/);
   assert.ok(calls.some((call) => call.slug === 'GITHUB_CREATE_A_WORKFLOW_DISPATCH_EVENT'));
@@ -564,12 +571,11 @@ test('builds a GTA VI presentation instead of the generic personal portfolio fal
     },
   };
   const { POST } = createRoute({ connectorSession, enabledToolkits: ['github'] });
-  const response = await POST(createRequest({
+  const text = await approvedResponse(POST, {
     messages: [{ role: 'user', content: 'Create me a GitHub repo and a live website showing a GTA 6 presentation.' }],
     computerUse: false,
     mcpConnectors: [{ source: 'composio', provider: 'github', enabled: true }],
-  }));
-  await responseSseText(response);
+  });
   const indexWrite = calls.find((call) => call.slug === 'GITHUB_CREATE_OR_UPDATE_FILE_CONTENTS' && /index\.html/.test(JSON.stringify(call.args)) && String(call.args.content || '').includes('GRAND'));
 
   assert.ok(indexWrite, JSON.stringify(calls));

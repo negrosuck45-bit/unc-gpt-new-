@@ -14,8 +14,9 @@ export async function POST(request: NextRequest) {
     const supabase = createClient(url, key, { auth: { autoRefreshToken: false, persistSession: false } });
     const { data, error } = await supabase.rpc("increment_profile_views", { profile_username: username });
     if (error) {
-      console.error("[profile-view] increment failed", { code: error.code, message: error.message });
-      return NextResponse.json({ views: 0 }, { status: 200 });
+      const { data: profile } = await supabase.from("user_profiles").select("profile_views").eq("username", username).maybeSingle();
+      console.warn("[profile-view] counter update unavailable; returning the current stored value", { code: error.code });
+      return NextResponse.json({ views: Number(profile?.profile_views ?? 0), degraded: true }, { status: 200, headers: { "Cache-Control": "no-store" } });
     }
     return NextResponse.json({ views: Number(data ?? 0) });
   } catch {

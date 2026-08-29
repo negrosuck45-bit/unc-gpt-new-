@@ -1,5 +1,5 @@
 "use client"
-import { useState, useEffect, useCallback, useRef } from "react"
+import { useState, useEffect, useCallback, useRef, useSyncExternalStore } from "react"
 import { useChatStore } from "@/lib/chat-store"
 import { dispatchAccountScopeChanged, setActiveAccountScope } from "@/lib/account-scope"
 import { ChatSidebar } from "@/components/chat-sidebar"
@@ -8,17 +8,22 @@ import { ChatInterface } from "@/components/chat-interface"
 import Imagine from "@/components/imagine"
 import VoiceChat from "@/components/voice-chat"
 import { FirstOpenOnboarding, shouldShowFirstOpenOnboarding } from "@/components/first-open-onboarding"
+import { WebsiteRecoveryAudit } from "@/components/website-recovery-audit"
+
+const MOBILE_QUERY = "(max-width: 767px)"
+
+function subscribeToMobileQuery(onStoreChange: () => void) {
+  const mediaQuery = window.matchMedia(MOBILE_QUERY)
+  mediaQuery.addEventListener("change", onStoreChange)
+  return () => mediaQuery.removeEventListener("change", onStoreChange)
+}
+
+function getMobileSnapshot() {
+  return window.matchMedia(MOBILE_QUERY).matches
+}
 
 function useIsMobile() {
-  const [isMobile, setIsMobile] = useState(false)
-  useEffect(() => {
-    const mq = window.matchMedia("(max-width: 767px)")
-    const handler = (e: MediaQueryListEvent) => setIsMobile(e.matches)
-    setIsMobile(mq.matches)
-    mq.addEventListener("change", handler)
-    return () => mq.removeEventListener("change", handler)
-  }, [])
-  return isMobile
+  return useSyncExternalStore(subscribeToMobileQuery, getMobileSnapshot, () => false)
 }
 
 /**
@@ -108,25 +113,21 @@ export default function Home({ accountScope }: { accountScope: string }) {
     })()
     return () => { mounted = false }
   }, [accountScope])
-  const [isSidebarOpen, setIsSidebarOpen] = useState(false)
-  const [currentMode, setCurrentMode] = useState<"text" | "voice" | "imagine">("text")
+  const [sidebarPreference, setSidebarPreference] = useState<boolean | null>(null)
+  const isSidebarOpen = sidebarPreference ?? !isMobile
+  const [currentMode, setCurrentMode] = useState<"text" | "voice" | "imagine" | "audit">("text")
   const [settingsOpen, setSettingsOpen] = useState(false)
-
-  // Set correct initial sidebar state once we know the screen size
-  useEffect(() => {
-    setIsSidebarOpen(!isMobile)
-  }, [isMobile])
 
   // Single TOGGLE handler — used by every header trigger button.
   // Same handler works on mobile and desktop because the icon flips inside the header.
-  const toggleSidebar = useCallback(() => setIsSidebarOpen((v) => !v), [])
-  const closeSidebar = useCallback(() => setIsSidebarOpen(false), [])
+  const toggleSidebar = useCallback(() => setSidebarPreference((current) => !(current ?? !isMobile)), [isMobile])
+  const closeSidebar = useCallback(() => setSidebarPreference(false), [])
 
   // Swipe gestures (mobile only)
   useSidebarSwipe({
     isMobile,
     isOpen: isSidebarOpen,
-    onOpen: () => setIsSidebarOpen(true),
+    onOpen: () => setSidebarPreference(true),
     onClose: closeSidebar,
   })
 
@@ -144,7 +145,7 @@ export default function Home({ accountScope }: { accountScope: string }) {
   useEffect(() => {
     if (!isMobile || !isSidebarOpen) return
     const onKey = (e: KeyboardEvent) => {
-      if (e.key === "Escape") setIsSidebarOpen(false)
+      if (e.key === "Escape") setSidebarPreference(false)
     }
     window.addEventListener("keydown", onKey)
     return () => window.removeEventListener("keydown", onKey)
@@ -161,6 +162,8 @@ export default function Home({ accountScope }: { accountScope: string }) {
         )
       case "voice":
         return <VoiceChat onOpenSidebar={toggleSidebar} isSidebarOpen={isSidebarOpen} />
+      case "audit":
+        return <WebsiteRecoveryAudit onBack={() => setCurrentMode("text")} onOpenSettings={() => setSettingsOpen(true)} />
       default:
         return (
           <ChatInterface
@@ -196,11 +199,15 @@ export default function Home({ accountScope }: { accountScope: string }) {
           onToggle={toggleSidebar}
           onChatSelect={(_id, type) => {
             setCurrentMode(type)
-            if (isMobile) setIsSidebarOpen(false)
+            if (isMobile) setSidebarPreference(false)
           }}
           onModeChange={(mode) => {
             setCurrentMode(mode)
-            if (isMobile) setIsSidebarOpen(false)
+            if (isMobile) setSidebarPreference(false)
+          }}
+          onOpenAudit={() => {
+            setCurrentMode("audit")
+            if (isMobile) setSidebarPreference(false)
           }}
           isMobile={isMobile}
           onOpenSettings={() => setSettingsOpen(true)}

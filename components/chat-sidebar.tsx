@@ -24,6 +24,7 @@ import {
   MoreHorizontal,
   Code,
   Palette,
+  ShieldCheck,
 } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { motion, AnimatePresence } from "framer-motion"
@@ -62,9 +63,10 @@ interface ChatSidebarProps {
   isOpen: boolean
   onToggle: () => void
   onChatSelect: (chatId: string, type: "text" | "voice") => void
-  onModeChange: (mode: "text" | "voice" | "imagine") => void
+  onModeChange: (mode: "text" | "voice" | "imagine" | "audit") => void
   isMobile?: boolean
   onOpenSettings?: () => void
+  onOpenAudit?: () => void
 }
 
 export function ChatSidebar({
@@ -74,6 +76,7 @@ export function ChatSidebar({
   onModeChange,
   isMobile = false,
   onOpenSettings,
+  onOpenAudit,
 }: ChatSidebarProps) {
   const {
     chats,
@@ -265,6 +268,9 @@ export function ChatSidebar({
         <RailButton title={t('imagine')} onClick={() => onModeChange("imagine")}>
           <Sparkles className="h-5 w-5" />
         </RailButton>
+        <RailButton title="Website recovery audit" onClick={() => onOpenAudit?.()}>
+          <ShieldCheck className="h-5 w-5" />
+        </RailButton>
 
         <div className="flex-1" />
 
@@ -333,6 +339,13 @@ export function ChatSidebar({
               >
                 <CirclePlus className="h-[19px] w-[19px]" />
                 <span>{t('newChat')}</span>
+              </button>
+              <button
+                onClick={() => onOpenAudit?.()}
+                className="flex w-full items-center justify-center gap-2.5 rounded-full px-4 py-2.5 text-[14px] font-medium text-sidebar-foreground/76 transition hover:bg-sidebar-accent hover:text-sidebar-foreground"
+              >
+                <ShieldCheck className="h-[18px] w-[18px]" />
+                <span>Website audit</span>
               </button>
             </div>
 
