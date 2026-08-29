@@ -38,6 +38,7 @@ const LANGUAGE_REGIONS: Record<string, string> = {
 
 let activePlayback: ActivePlayback | null = null
 let playbackToken = 0
+let unlockedAudio: HTMLAudioElement | null = null
 
 type PreparedAudio = {
   objectUrl: string
@@ -103,6 +104,24 @@ function cleanupActivePlayback(token: number, status: VoicePlaybackStatus = "idl
   activePlayback = null
   releaseAudio(current)
   emitVoiceState(status, current.key)
+}
+
+export function unlockVoicePlayback() {
+  if (typeof window === "undefined") return
+  const audio = unlockedAudio || new Audio()
+  unlockedAudio = audio
+  audio.muted = true
+  audio.setAttribute("playsinline", "true")
+  audio.src = "data:audio/wav;base64,UklGRiQAAABXQVZFZm10IBAAAAABAAEAESsAACJWAAACABAAZGF0YQAAAAA="
+  void audio.play().then(() => {
+    audio.pause()
+    audio.currentTime = 0
+    audio.removeAttribute("src")
+    audio.load()
+    audio.muted = false
+  }).catch(() => {
+    audio.muted = false
+  })
 }
 
 export function stopVoicePlayback() {
@@ -245,8 +264,11 @@ export async function playGroqTtsResponse({ text, language, key }: VoicePlayback
     preparedAudioCache.delete(cacheKey)
     ensureCurrent(token)
 
-    const audio = new Audio(prepared.objectUrl)
+    const audio = unlockedAudio || new Audio()
+    audio.src = prepared.objectUrl
     audio.preload = "auto"
+    audio.muted = false
+    audio.setAttribute("playsinline", "true")
     if (!isCurrent(token)) {
       URL.revokeObjectURL(prepared.objectUrl)
       throw new VoicePlaybackCancelledError()

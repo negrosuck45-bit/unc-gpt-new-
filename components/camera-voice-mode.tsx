@@ -3,6 +3,7 @@
 import { useCallback, useEffect, useRef, useState } from "react"
 import { Mic, MicOff, X } from "lucide-react"
 import { cn } from "@/lib/utils"
+import { unlockVoicePlayback } from "@/lib/voice-playback"
 
 interface CameraVoiceModeProps {
   open: boolean
@@ -181,6 +182,7 @@ export function CameraVoiceMode({ open, onClose, onAsk }: CameraVoiceModeProps) 
 
   const toggleMicrophone = useCallback(() => {
     if (busyRef.current) return
+    unlockVoicePlayback()
     const nextMuted = !mutedRef.current
     mutedRef.current = nextMuted
     setMuted(nextMuted)
