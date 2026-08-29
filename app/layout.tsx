@@ -15,7 +15,12 @@ export const metadata: Metadata = {
   icons: {
     icon: "/lunar-mark.svg",
     shortcut: "/lunar-mark.svg",
-    apple: "/lunar-mark.svg",
+    apple: "/apple-touch-icon.png",
+  },
+  appleWebApp: {
+    capable: true,
+    title: "Lunar",
+    statusBarStyle: "black-translucent",
   },
 }
 

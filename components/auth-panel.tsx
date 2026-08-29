@@ -2,7 +2,7 @@
 
 import Link from "next/link"
 import { useEffect, useState } from "react"
-import { ArrowRight, Github, Loader2 } from "lucide-react"
+import { ArrowRight, ExternalLink, Github, Loader2, X } from "lucide-react"
 import { getStoredLanguagePreference } from "@/lib/language-preferences"
 import { useUiText } from "@/lib/ui-translations"
 
@@ -36,6 +36,8 @@ export function AuthPanel({ mode = "sign-in" }: AuthPanelProps) {
   const [lastProvider, setLastProvider] = useState<Provider["id"]>("google")
   const [message, setMessage] = useState("")
   const [language, setLanguage] = useState("auto")
+  const [isStandaloneApp, setIsStandaloneApp] = useState(false)
+  const [pendingSafariProvider, setPendingSafariProvider] = useState<Provider | null>(null)
   const t = useUiText()
 
   useEffect(() => {
@@ -47,6 +49,12 @@ export function AuthPanel({ mode = "sign-in" }: AuthPanelProps) {
       window.removeEventListener("storage", updateLanguage)
       window.removeEventListener("uncgpt-language-changed", updateLanguage)
     }
+  }, [])
+
+  useEffect(() => {
+    const standaloneNavigator = window.navigator as Navigator & { standalone?: boolean }
+    const isStandalone = standaloneNavigator.standalone === true || window.matchMedia("(display-mode: standalone)").matches
+    setIsStandaloneApp(isStandalone)
   }, [])
 
   useEffect(() => {
@@ -66,10 +74,28 @@ export function AuthPanel({ mode = "sign-in" }: AuthPanelProps) {
 
   const signInWithProvider = (provider: Provider["id"]) => {
     setMessage("")
-    setLoadingProvider(provider)
     window.localStorage.setItem("lunar-last-auth-provider", provider)
     setLastProvider(provider)
+    const selectedProvider = providers.find((item) => item.id === provider)
+    if (isStandaloneApp && selectedProvider) {
+      setPendingSafariProvider(selectedProvider)
+      return
+    }
+    setLoadingProvider(provider)
     window.location.assign(`/api/auth/${provider}/start`)
+  }
+
+  const continueInSafari = () => {
+    if (!pendingSafariProvider) return
+    setLoadingProvider(pendingSafariProvider.id)
+    const authUrl = new URL(`/api/auth/${pendingSafariProvider.id}/start`, window.location.origin).toString()
+    const safariWindow = window.open(authUrl, "_blank", "noopener,noreferrer")
+    setPendingSafariProvider(null)
+    setLoadingProvider(null)
+    if (!safariWindow) {
+      setMessage("Safari could not be opened. Tap the share button and choose Open in Safari, then try again.")
+      setLoadingProvider(null)
+    }
   }
 
   const explainEmailAvailability = (event: React.FormEvent<HTMLFormElement>) => {
@@ -113,6 +139,27 @@ export function AuthPanel({ mode = "sign-in" }: AuthPanelProps) {
         </div>
         <footer className="break-words border-t border-[#e5e5e6] bg-[#f5f5f5] px-5 py-4 text-center text-[15px] leading-6 text-[#77787c] sm:px-8 sm:py-5 sm:text-[16px]">{isSignUp ? <>{t("alreadyHaveAccount")} <Link href="/login" className="font-medium text-[#202124] hover:underline">{t("signInPrompt")}</Link></> : <>{t("dontHaveAccount")} <Link href="/signup" className="font-medium text-[#202124] hover:underline">{t("signUpPrompt")}</Link></>}</footer>
       </section>
+
+      {pendingSafariProvider && (
+        <div className="fixed inset-0 z-50 flex items-end bg-black/45 p-3 pb-[max(12px,env(safe-area-inset-bottom))] backdrop-blur-[2px] sm:items-center sm:justify-center" role="presentation">
+          <section role="dialog" aria-modal="true" aria-labelledby="safari-handoff-title" className="w-full max-w-[440px] overflow-hidden rounded-[28px] border border-white/10 bg-[#f6f6f7] text-[#202124] shadow-[0_24px_80px_rgba(0,0,0,0.4)]">
+            <div className="px-5 pb-4 pt-5 sm:px-6 sm:pt-6">
+              <div className="flex items-start justify-between gap-4">
+                <div className="flex min-w-0 items-center gap-3">
+                  <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-2xl bg-[#202124] text-white"><ExternalLink className="h-5 w-5" /></div>
+                  <div className="min-w-0"><h2 id="safari-handoff-title" className="text-[18px] font-semibold tracking-[-0.03em]">Continue in Safari</h2><p className="mt-0.5 text-[13px] text-[#6d6e73]">Secure sign-in with {pendingSafariProvider.label.replace("Continue with ", "")}</p></div>
+                </div>
+                <button type="button" onClick={() => setPendingSafariProvider(null)} className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full text-[#77787c] transition hover:bg-black/5 hover:text-[#202124]" aria-label="Close Safari sign-in prompt"><X className="h-5 w-5" /></button>
+              </div>
+              <p className="mt-5 text-[15px] leading-6 text-[#55565a]">You opened Lunar from your Home Screen. Safari is needed to finish this sign-in securely, then you can return to Lunar.</p>
+            </div>
+            <div className="grid gap-2 border-t border-[#e2e2e4] bg-[#ededee] p-3 sm:grid-cols-2">
+              <button type="button" onClick={() => setPendingSafariProvider(null)} className="h-12 rounded-2xl border border-[#d5d5d8] bg-white text-[16px] font-medium text-[#55565a] transition hover:bg-[#f8f8f9]">Not now</button>
+              <button type="button" onClick={continueInSafari} className="inline-flex h-12 items-center justify-center gap-2 rounded-2xl bg-[#202124] text-[16px] font-medium text-white transition hover:bg-[#3a3b3f]">Open Safari <ArrowRight className="h-4 w-4" /></button>
+            </div>
+          </section>
+        </div>
+      )}
     </main>
   )
 }

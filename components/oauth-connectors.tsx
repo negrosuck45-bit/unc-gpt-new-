@@ -207,8 +207,11 @@ export function OAuthConnectors() {
       return { ...provider, name: fromCatalog?.name || provider.name, description: fromCatalog?.description || provider.description, logo: fromCatalog?.logo };
     });
     const extras = catalog.filter((item) => !primary.some((provider) => provider.slug === item.slug)).slice(0, 80).map((item) => ({ slug: item.slug, name: item.name, description: item.description, accent: 'bg-white/[0.07]', logo: item.logo }));
-    return [...primary, ...extras].filter((item) => !normalizedQuery || `${item.name} ${item.slug} ${item.description}`.toLowerCase().includes(normalizedQuery));
-  }, [catalog, query]);
+    const connectedToolkits = composio?.configured ? new Set(accounts.map((account) => account.toolkit)) : new Set<string>();
+    return [...primary, ...extras]
+      .filter((item) => !connectedToolkits.has(item.slug))
+      .filter((item) => !normalizedQuery || `${item.name} ${item.slug} ${item.description}`.toLowerCase().includes(normalizedQuery));
+  }, [accounts, catalog, composio?.configured, query]);
 
   const connectedCount = accounts.filter((account) => isActive(account) && account.enabled).length + PROVIDERS.filter((provider) => status[provider.slug]?.connected).length;
 
@@ -217,28 +220,28 @@ export function OAuthConnectors() {
   }
 
   return (
-    <section className="overflow-hidden rounded-[28px] border border-white/10 bg-[#151515] text-zinc-100 shadow-[0_20px_70px_rgba(0,0,0,0.25)]">
-      <div className="border-b border-white/[0.08] px-4 pb-4 pt-5 sm:px-6 sm:pb-5 sm:pt-6">
+    <section className="overflow-hidden rounded-[26px] border border-white/[0.11] bg-[#151515] text-zinc-100 shadow-[0_18px_60px_rgba(0,0,0,0.22)]">
+      <div className="border-b border-white/[0.08] bg-[#171717] px-4 pb-4 pt-5 sm:px-6 sm:pb-5 sm:pt-6">
         <div className="flex items-start justify-between gap-4">
           <div>
             <div className="flex items-center gap-2">
-              <h2 className="text-xl font-semibold tracking-[-0.03em] text-white">Connectors</h2>
-              {connectedCount > 0 && <span className="rounded-full bg-emerald-400/12 px-2 py-0.5 text-[11px] font-medium text-emerald-200">{connectedCount} active</span>}
+              <h2 className="text-[21px] font-semibold tracking-[-0.035em] text-white">Connectors</h2>
+              {connectedCount > 0 && <span className="rounded-full bg-emerald-400/12 px-2.5 py-1 text-[11px] font-medium text-emerald-200">{connectedCount} active</span>}
             </div>
-            <p className="mt-1.5 max-w-xl text-sm leading-6 text-zinc-400">Give Lunar secure access to the tools you use. You can disconnect or pause access anytime.</p>
+            <p className="mt-1.5 max-w-xl text-[13px] leading-5 text-zinc-400">Give Lunar secure access to the tools you use. Disconnect or pause access anytime.</p>
           </div>
-          <button type="button" onClick={() => void refresh()} className="inline-flex h-10 w-10 shrink-0 items-center justify-center rounded-full border border-white/10 bg-white/[0.04] text-zinc-400 transition hover:bg-white/[0.09] hover:text-white" aria-label="Refresh connector status" title="Refresh connector status">
+          <button type="button" onClick={() => void refresh()} className="inline-flex h-11 w-11 shrink-0 items-center justify-center rounded-full border border-white/[0.13] bg-white/[0.045] text-zinc-400 transition hover:bg-white/[0.09] hover:text-white active:scale-95" aria-label="Refresh connector status" title="Refresh connector status">
             <RefreshCw className="h-4 w-4" />
           </button>
         </div>
 
-        <label className="mt-5 flex h-12 items-center gap-3 rounded-full border border-white/[0.13] bg-white/[0.055] px-4 text-zinc-300 transition focus-within:border-white/25 focus-within:bg-white/[0.075]">
+        <label className="mt-5 flex h-[50px] items-center gap-3 rounded-full border border-white/[0.13] bg-white/[0.055] px-4 text-zinc-300 transition focus-within:border-white/25 focus-within:bg-white/[0.075]">
           <Search className="h-4 w-4 shrink-0 text-zinc-500" />
           <input value={query} onChange={(event) => setQuery(event.target.value)} placeholder="Search connectors" className="h-full min-w-0 flex-1 bg-transparent text-sm text-white outline-none placeholder:text-zinc-500" aria-label="Search connectors" />
         </label>
       </div>
 
-      <div className="space-y-3 px-3 py-4 sm:px-5 sm:py-5">
+      <div className="space-y-3 bg-[#141414] px-3 py-4 sm:px-5 sm:py-5">
         {notice && (
           <div role="alert" className="flex items-start justify-between gap-3 rounded-2xl border border-amber-300/20 bg-amber-300/[0.08] px-3.5 py-3 text-sm text-amber-100">
             <span>{notice}</span>
@@ -248,7 +251,7 @@ export function OAuthConnectors() {
 
         {composio?.configured && accounts.length > 0 && (
           <div className="pb-2 pt-1">
-            <div className="mb-2 flex items-center gap-2 px-1"><ShieldCheck className="h-4 w-4 text-emerald-300" /><h3 className="text-xs font-semibold uppercase tracking-[0.14em] text-zinc-400">Connected</h3></div>
+            <div className="mb-2.5 flex items-center gap-2 px-1"><ShieldCheck className="h-4 w-4 text-emerald-300" /><h3 className="text-[11px] font-semibold uppercase tracking-[0.18em] text-zinc-400">Connected</h3></div>
             <div className="space-y-2">
               {accounts.map((account) => {
                 const meta = catalog.find((item) => item.slug === account.toolkit) || PROVIDERS.find((item) => item.slug === account.toolkit);
@@ -256,7 +259,7 @@ export function OAuthConnectors() {
                 const enabled = active && account.enabled;
                 const pending = busy === account.toolkit;
                 return (
-                  <article key={account.id} className="flex items-center gap-3 rounded-[20px] border border-emerald-300/[0.12] bg-emerald-300/[0.055] p-3.5 sm:px-4">
+                  <article key={account.id} className="flex items-center gap-3 rounded-[22px] border border-emerald-300/[0.16] bg-emerald-300/[0.065] p-3.5 sm:px-4">
                     <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-2xl border border-white/10 bg-[#101010]"><ConnectorLogo slug={account.toolkit} name={meta?.name || account.toolkit} src={meta?.logo} className="h-7 w-7" /></div>
                     <div className="min-w-0 flex-1"><div className="flex items-center gap-2"><h4 className="truncate text-sm font-semibold text-white">{meta?.name || account.toolkit}</h4><span className={cn('h-1.5 w-1.5 rounded-full', enabled ? 'bg-emerald-300' : 'bg-amber-300')} /></div><p className="mt-1 text-xs text-zinc-400">{active ? (enabled ? 'Connected and ready to use' : 'Connected, but paused') : (account.statusReason || 'Reconnect required')}</p></div>
                     <div className="flex shrink-0 items-center gap-1.5">
@@ -270,7 +273,7 @@ export function OAuthConnectors() {
           </div>
         )}
 
-        <div className="px-1 pb-1 pt-1"><h3 className="text-xs font-semibold uppercase tracking-[0.14em] text-zinc-400">{composio?.configured ? 'Explore connectors' : 'Available connectors'}</h3></div>
+        <div className="px-1 pb-1 pt-1"><h3 className="text-[11px] font-semibold uppercase tracking-[0.18em] text-zinc-400">{composio?.configured ? 'Explore connectors' : 'Available connectors'}</h3></div>
         <div className="space-y-2">
           {visibleProviders.map((provider) => {
             const oauthConnected = !!status[provider.slug]?.connected;
@@ -282,10 +285,10 @@ export function OAuthConnectors() {
             const connect = () => composio?.configured ? void connectComposio(provider.slug) : canUseOAuth ? connectOAuth(provider.slug) : setNotice('This connector needs the shared connector service to be configured first.');
             const disconnect = () => oauthConnected ? void disconnectOAuth(provider.slug) : linkedAccount ? void manageAccount(linkedAccount, 'disconnect') : undefined;
             return (
-              <article key={provider.slug} className="group flex items-center gap-3 rounded-[20px] border border-white/[0.07] bg-white/[0.055] p-3.5 transition hover:border-white/[0.15] hover:bg-white/[0.075] sm:px-4">
-                <div className={cn('flex h-12 w-12 shrink-0 items-center justify-center rounded-2xl border border-white/10', provider.accent)}><ConnectorLogo slug={provider.slug} name={provider.name} src={provider.logo} className="h-7 w-7" /></div>
-                <div className="min-w-0 flex-1"><div className="flex items-center gap-2"><h4 className="truncate text-[15px] font-semibold tracking-[-0.01em] text-white">{provider.name}</h4>{connected && <span className="inline-flex items-center gap-1 text-[11px] font-medium text-emerald-200"><Check className="h-3 w-3" />Connected</span>}</div><p className="mt-1 line-clamp-2 text-[13px] leading-5 text-zinc-400">{provider.description}</p></div>
-                <Button type="button" size="sm" onClick={connected ? disconnect : connect} disabled={pending} className={cn('h-10 shrink-0 rounded-full px-4 text-sm font-semibold shadow-none transition', connected ? 'border border-white/15 bg-transparent text-zinc-300 hover:bg-red-400/10 hover:text-red-100' : 'bg-white text-zinc-950 hover:bg-zinc-200')} variant={connected ? 'outline' : 'default'}>
+              <article key={provider.slug} className="group flex items-center gap-3 rounded-[22px] border border-white/[0.08] bg-white/[0.06] p-3.5 transition hover:border-white/[0.16] hover:bg-white/[0.085] sm:px-4">
+                <div className={cn('flex h-14 w-14 shrink-0 items-center justify-center rounded-[18px] border border-white/10', provider.accent)}><ConnectorLogo slug={provider.slug} name={provider.name} src={provider.logo} className="h-8 w-8" /></div>
+                <div className="min-w-0 flex-1"><div className="flex min-w-0 items-center gap-2"><h4 className="truncate text-[15px] font-semibold tracking-[-0.01em] text-white">{provider.name}</h4>{connected && <span className="inline-flex shrink-0 items-center gap-1 text-[11px] font-medium text-emerald-200"><Check className="h-3 w-3" />Connected</span>}</div><p className="mt-1 line-clamp-2 text-[13px] leading-5 text-zinc-400">{provider.description}</p></div>
+                <Button type="button" size="sm" onClick={connected ? disconnect : connect} disabled={pending} className={cn('h-10 min-w-[92px] shrink-0 rounded-full px-4 text-[14px] font-semibold shadow-none transition active:scale-95', connected ? 'border border-white/15 bg-transparent text-zinc-300 hover:bg-red-400/10 hover:text-red-100' : 'bg-white text-zinc-950 hover:bg-zinc-200')} variant={connected ? 'outline' : 'default'}>
                   {pending ? <Loader2 className="h-4 w-4 animate-spin" /> : connected ? 'Disconnect' : 'Connect'}
                 </Button>
               </article>

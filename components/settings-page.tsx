@@ -451,7 +451,7 @@ export function SettingsPage({ onClose }: SettingsPageProps) {
 
               {/* ── Connectors ──────────────────────────────────────────── */}
               {activeTab === 'connectors' && (
-                <div className="mx-auto w-full max-w-2xl">
+                <div className="mx-auto w-full max-w-2xl px-4 sm:px-0">
                   <OAuthConnectors />
                 </div>
               )}
