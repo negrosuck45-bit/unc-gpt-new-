@@ -189,7 +189,6 @@ export function CameraVoiceMode({ open, onClose, onAsk }: CameraVoiceModeProps) 
     setMuted(nextMuted)
     streamRef.current?.getAudioTracks().forEach((track) => { track.enabled = !nextMuted })
     if (nextMuted) {
-      stopRecognition()
       void askCurrent()
     } else {
       startListening()

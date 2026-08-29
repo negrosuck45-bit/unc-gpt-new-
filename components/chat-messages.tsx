@@ -4,7 +4,7 @@ import { useEffect, useRef, useState, useMemo, useCallback } from 'react';
 import NextImage from 'next/image';
 import { Message, Attachment } from '@/lib/chat-store';
 import { getStoredLanguagePreference } from '@/lib/language-preferences';
-import { playGroqTtsResponse, prepareGroqTtsResponse, speakWithBrowserFallback, stopVoicePlayback, VoicePlaybackCancelledError } from '@/lib/voice-playback';
+import { playGroqTtsResponse, prepareGroqTtsResponse, speakWithBrowserFallback, stopVoicePlayback, unlockVoicePlayback, VoicePlaybackCancelledError } from '@/lib/voice-playback';
 import { useUiText } from '@/lib/ui-translations';
 import { cn } from '@/lib/utils';
 import { motion, AnimatePresence } from 'framer-motion';
@@ -465,6 +465,7 @@ function MessageActions({ message, isAssistant, onCopy, onRegenerate, onEdit, on
       return;
     }
 
+    unlockVoicePlayback();
     setVoiceError(null);
     // Always attempt the server-side Groq Hannah voice first, including on iPhone.
     // Safari speech synthesis is only used if Groq rejects or the audio cannot play.
