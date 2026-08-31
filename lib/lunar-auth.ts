@@ -206,5 +206,7 @@ export function lunarAuthFailure(request: Request, code: "cancelled" | "unavaila
 
 export function lunarAuthSuccess(request: Request, user: LunarSessionUser, accountScope = user.sub) {
   const response = NextResponse.redirect(new URL("/", request.url))
+  response.headers.set("Cache-Control", "private, no-store, max-age=0")
+  response.headers.set("Pragma", "no-cache")
   return attachLunarSession(response, user, accountScope).then(() => response)
 }
