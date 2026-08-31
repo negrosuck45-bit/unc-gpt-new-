@@ -1,4 +1,5 @@
 import { NextRequest } from "next/server"
+import { classifyTranscriptionFailure } from "../../../lib/recovery-failure-state"
 
 export const runtime = "nodejs"
 
@@ -7,13 +8,6 @@ const MAX_AUDIO_BYTES = 25 * 1024 * 1024
 function configuredGroqKeys() {
   const configured = process.env.GROQ_API_KEYS || process.env.GROQ_API_KEY || process.env.GROQ_KEY || process.env.GROQ_TOKEN || ""
   return configured.split(",").map((key) => key.trim()).filter(Boolean)
-}
-
-function transcriptionFailure(status: number, detail: string) {
-  const normalized = detail.toLowerCase()
-  if (status === 429 || normalized.includes("rate limit")) return { status: 429, message: "Speech transcription is at provider capacity. Please try again shortly." }
-  if (normalized.includes("terms acceptance")) return { status: 503, message: "Speech transcription is unavailable until the provider terms are accepted by the workspace administrator." }
-  return { status: 502, message: "Speech transcription is temporarily unavailable." }
 }
 
 export async function POST(request: NextRequest) {
@@ -41,7 +35,7 @@ export async function POST(request: NextRequest) {
           if (!text) return Response.json({ error: "No speech was detected." }, { status: 422 })
           return Response.json({ text })
         }
-        lastFailure = transcriptionFailure(response.status, JSON.stringify(json))
+        lastFailure = classifyTranscriptionFailure(response.status, JSON.stringify(json))
       } catch {
         lastFailure = { status: 502, message: "Speech transcription is temporarily unavailable." }
       }

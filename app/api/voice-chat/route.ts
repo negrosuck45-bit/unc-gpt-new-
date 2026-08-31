@@ -1,4 +1,5 @@
 import { NextRequest } from "next/server"
+import { classifyVoiceFailure } from "../../../lib/recovery-failure-state"
 
 export const runtime = "nodejs"
 
@@ -40,15 +41,6 @@ function voiceForLanguage(language: string) {
 function safeProviderDetail(body: ArrayBuffer) {
   const detail = new TextDecoder().decode(body).replace(/\s+/g, " ").trim()
   return detail ? `: ${detail.slice(0, 180)}` : ""
-}
-
-function voiceFailure(error: unknown) {
-  const detail = error instanceof Error ? error.message : "Voice playback failed"
-  const normalized = detail.toLowerCase()
-  if (normalized.includes("429") || normalized.includes("rate limit")) return { status: 429, message: "Voice playback is at provider capacity. Please try again shortly." }
-  if (normalized.includes("terms acceptance")) return { status: 503, message: "Voice playback is unavailable until the provider terms are accepted by the workspace administrator." }
-  if (normalized.includes("not configured")) return { status: 503, message: "Voice playback is not configured for this workspace." }
-  return { status: 502, message: "Voice playback is temporarily unavailable." }
 }
 
 async function requestGroqSpeech(text: string, language: string) {
@@ -121,7 +113,7 @@ export async function POST(request: NextRequest) {
       },
     })
   } catch (error) {
-    const failure = voiceFailure(error)
+    const failure = classifyVoiceFailure(error)
     console.warn("[Voice] text-to-speech unavailable:", error instanceof Error ? error.message : "Text-to-speech failed")
     return Response.json({ error: failure.message }, { status: failure.status, headers: { "Cache-Control": "private, no-store, max-age=0", "Retry-After": failure.status === 429 ? "60" : "" } })
   }

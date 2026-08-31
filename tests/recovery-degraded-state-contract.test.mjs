@@ -8,13 +8,15 @@ const source = (relativePath) => fs.readFileSync(new URL(relativePath, root), 'u
 test('returns actionable, non-cacheable degraded states for exhausted voice and transcription providers', () => {
   const voice = source('app/api/voice-chat/route.ts')
   const transcribe = source('app/api/transcribe/route.ts')
+  const failureState = source('lib/recovery-failure-state.ts')
 
-  assert.match(voice, /Voice playback is at provider capacity/)
-  assert.match(voice, /Voice playback is unavailable until the provider terms are accepted/)
+  assert.match(failureState, /Voice playback is at provider capacity/)
+  assert.match(failureState, /Voice playback is unavailable until the provider terms are accepted/)
+  assert.match(voice, /classifyVoiceFailure/)
   assert.match(voice, /Retry-After/)
   assert.match(transcribe, /configuredGroqKeys/)
   assert.match(transcribe, /for \(const key of keys\)/)
-  assert.match(transcribe, /Speech transcription is at provider capacity/)
+  assert.match(failureState, /Speech transcription is at provider capacity/)
   assert.match(transcribe, /Retry-After/)
 })
 
