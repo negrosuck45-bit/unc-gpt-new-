@@ -8,6 +8,7 @@ import { executeAgentGateway, gatewayResultText } from "@/lib/agent-gateway";
 import { normalizeConnectorResult } from "@/lib/connector-results";
 import { composioToolkitSlug, connectorKeysMatch, isCalendarSchedulingIntent, isConnectorWriteIntent, isWrappedConnectorFailure, normalizeConnectorKeyForRouting, parseDeterministicCalendarCreate } from "@/lib/connector-action-safety";
 import { languagePreferenceInstruction } from "@/lib/language-preferences";
+import { detectWebsiteFeedbackIntent, websiteFeedbackInstruction } from "@/lib/website-feedback-intent.mjs";
 
 export const runtime = "nodejs";
 
@@ -3286,6 +3287,24 @@ export async function POST(req: NextRequest) {
     const pendingApproval = submittedApprovalToken ? pendingConnectorActionApprovals.get(submittedApprovalToken) : null;
     if (submittedApprovalToken) pendingConnectorActionApprovals.delete(submittedApprovalToken);
     const normalizedRequest = String(userText).replace(/\s+/g, " ").trim();
+    const websiteFeedbackIntent = detectWebsiteFeedbackIntent(normalizedRequest);
+    let websiteFeedbackObservation = "";
+    if (websiteFeedbackIntent && computerUse !== false) {
+      try {
+        const renderedReview = await executeAgentGateway({
+          tool: "browser",
+          args: {
+            url: websiteFeedbackIntent.url,
+            action: "inspect",
+            instruction: websiteFeedbackInstruction(websiteFeedbackIntent),
+          },
+          task: `Read-only public website feedback review of ${websiteFeedbackIntent.url}. Do not sign in, submit forms, send messages, make purchases, change settings, or publish anything.`,
+        });
+        websiteFeedbackObservation = gatewayResultText(renderedReview).replace(/\s+/g, " ").trim().slice(0, 12_000);
+      } catch (error: any) {
+        console.warn("[WebsiteFeedback] Read-only browser review unavailable:", error?.message || error);
+      }
+    }
     const isApprovedConnectorAction = Boolean(pendingApproval && currentUserId && pendingApproval.userId === currentUserId && pendingApproval.expiresAt > Date.now() && pendingApproval.request === normalizedRequest);
 
     // ==================== FAST CONNECTOR READS ====================
@@ -3481,6 +3500,15 @@ export async function POST(req: NextRequest) {
       messagesWithSystem.push({
         role: "assistant",
         content: `Here is the current information I found from web search:\n\n${searchContext}\n\nI will now answer your question based on this up-to-date information.`,
+      });
+    }
+    if (websiteFeedbackIntent) {
+      messagesWithSystem.push({ role: "system", content: websiteFeedbackInstruction(websiteFeedbackIntent) });
+      messagesWithSystem.push({
+        role: "assistant",
+        content: websiteFeedbackObservation
+          ? `Read-only browser observations for ${websiteFeedbackIntent.url}:\n\n${websiteFeedbackObservation}`
+          : `The read-only browser review for ${websiteFeedbackIntent.url} was unavailable. Do not invent visual or interaction findings; explain the limitation and use only evidence in the supplied conversation.`,
       });
     }
 

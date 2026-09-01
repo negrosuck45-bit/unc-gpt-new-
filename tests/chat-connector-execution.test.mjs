@@ -143,6 +143,7 @@ function createRoute({ connectorSession, enabledToolkits, fetchImpl }) {
     '@/lib/connector-results': { normalizeConnectorResult: (value) => typeof value === 'string' ? value : JSON.stringify(value) },
     '@/lib/connector-action-safety': connectorSafety,
     '@/lib/language-preferences': { languagePreferenceInstruction: (value, locale) => `Language preference: ${value || 'auto'} (${locale || 'unknown'}).` },
+    '@/lib/website-feedback-intent.mjs': { detectWebsiteFeedbackIntent: () => null, websiteFeedbackInstruction: () => '' },
   }, {
     fetch: fetchImpl || (async (url) => {
       if (String(url).includes('github.io')) return { ok: true, status: 200 };
