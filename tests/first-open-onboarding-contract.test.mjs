@@ -45,12 +45,11 @@ test('renders a logo-first onboarding sequence that saves profile and language c
   assert.doesNotMatch(onboarding, /Sparkles/)
 })
 
-test('mounts onboarding only after account preferences hydrate and hides it after completion', () => {
+test('opens authenticated users directly into the workspace without a first-open overlay', () => {
   const workspace = source('app/chat-workspace.tsx')
   assert.match(workspace, /await useChatStore\.persist\.rehydrate\(\)/)
-  assert.match(workspace, /shouldShowFirstOpenOnboarding\(\)/)
-  assert.match(workspace, /onboardingReady && onboardingOpen/)
-  assert.match(workspace, /<FirstOpenOnboarding/)
-  assert.match(workspace, /setOnboardingOpen\(false\)/)
-  assert.match(workspace, /settingsOpen && !onboardingOpen/)
+  assert.doesNotMatch(workspace, /shouldShowFirstOpenOnboarding\(\)/)
+  assert.doesNotMatch(workspace, /FirstOpenOnboarding/)
+  assert.doesNotMatch(workspace, /onboardingReady|onboardingOpen|setOnboardingOpen/)
+  assert.match(workspace, /settingsOpen && \(/)
 })

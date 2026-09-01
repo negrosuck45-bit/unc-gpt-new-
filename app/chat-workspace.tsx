@@ -7,8 +7,6 @@ import { SettingsPage } from "@/components/settings-page"
 import { ChatInterface } from "@/components/chat-interface"
 import Imagine from "@/components/imagine"
 import VoiceChat from "@/components/voice-chat"
-import { FirstOpenOnboarding, shouldShowFirstOpenOnboarding } from "@/components/first-open-onboarding"
-import { WebsiteRecoveryAudit } from "@/components/website-recovery-audit"
 
 const MOBILE_QUERY = "(max-width: 767px)"
 
@@ -99,8 +97,6 @@ function useSidebarSwipe({
 export default function Home({ accountScope }: { accountScope: string }) {
   setActiveAccountScope(accountScope)
   const isMobile = useIsMobile()
-  const [onboardingOpen, setOnboardingOpen] = useState(false)
-  const [onboardingReady, setOnboardingReady] = useState(false)
   useEffect(() => {
     let mounted = true
     setActiveAccountScope(accountScope)
@@ -108,14 +104,12 @@ export default function Home({ accountScope }: { accountScope: string }) {
     void (async () => {
       await useChatStore.persist.rehydrate()
       if (!mounted) return
-      setOnboardingOpen(shouldShowFirstOpenOnboarding())
-      setOnboardingReady(true)
     })()
     return () => { mounted = false }
   }, [accountScope])
   const [sidebarPreference, setSidebarPreference] = useState<boolean | null>(null)
   const isSidebarOpen = sidebarPreference ?? !isMobile
-  const [currentMode, setCurrentMode] = useState<"text" | "voice" | "imagine" | "audit">("text")
+  const [currentMode, setCurrentMode] = useState<"text" | "voice" | "imagine">("text")
   const [settingsOpen, setSettingsOpen] = useState(false)
 
   // Single TOGGLE handler — used by every header trigger button.
@@ -162,8 +156,6 @@ export default function Home({ accountScope }: { accountScope: string }) {
         )
       case "voice":
         return <VoiceChat onOpenSidebar={toggleSidebar} isSidebarOpen={isSidebarOpen} />
-      case "audit":
-        return <WebsiteRecoveryAudit onBack={() => setCurrentMode("text")} onOpenSettings={() => setSettingsOpen(true)} />
       default:
         return (
           <ChatInterface
@@ -205,10 +197,6 @@ export default function Home({ accountScope }: { accountScope: string }) {
             setCurrentMode(mode)
             if (isMobile) setSidebarPreference(false)
           }}
-          onOpenAudit={() => {
-            setCurrentMode("audit")
-            if (isMobile) setSidebarPreference(false)
-          }}
           isMobile={isMobile}
           onOpenSettings={() => setSettingsOpen(true)}
         />
@@ -219,14 +207,7 @@ export default function Home({ accountScope }: { accountScope: string }) {
         {renderMainContent()}
       </main>
 
-      {onboardingReady && onboardingOpen && (
-        <FirstOpenOnboarding onComplete={() => {
-          setOnboardingOpen(false)
-          setSettingsOpen(false)
-        }} />
-      )}
-
-      {settingsOpen && !onboardingOpen && (
+      {settingsOpen && (
         <div
           className="fixed inset-0 z-[200] flex items-start justify-center overflow-y-auto bg-[rgba(41,41,41,0.62)] p-0 backdrop-blur-md sm:items-center sm:p-6 lg:p-8"
           role="dialog"
