@@ -50,7 +50,7 @@ function compileModule(relativePath, mocks = {}, extraGlobals = {}) {
     Error,
     TypeError,
     console: { info() {}, warn() {}, error() {}, log() {} },
-    process: { env: { COMPOSIO_API_KEY: 'test-composio-key' } },
+    process: { env: { COMPOSIO_API_KEY: 'test-composio-key', OPENAI_API_KEY: 'test-openai-key' } },
     crypto: { randomUUID: () => '12345678-1234-1234-1234-123456789abc' },
     setTimeout,
     clearTimeout,
@@ -126,7 +126,7 @@ function githubWebsiteSchemas() {
 
 const pagesWorkflowReadBack = Buffer.from('on:\n  workflow_dispatch:\njobs:\n  deploy:\n    steps:\n      - uses: actions/deploy-pages@v4\n').toString('base64');
 
-function createRoute({ connectorSession, enabledToolkits, fetchImpl }) {
+function createRoute({ connectorSession, enabledToolkits, fetchImpl, websiteFeedbackHelper, agentGateway }) {
   return compileModule('../app/api/chat/route.ts', {
     '@/lib/auth': { getSession: async () => ({ user: { sub: 'clerk-user-1' } }) },
     '@/lib/composio': {
@@ -139,11 +139,11 @@ function createRoute({ connectorSession, enabledToolkits, fetchImpl }) {
     },
     '@composio/core': { Composio: class { constructor() { throw new Error('Live account lookup should not be needed in this test'); } } },
     '@/lib/uncgpt-router': { chooseUncGptRoute: () => ({ provider: 'openai', model: 'test-model' }) },
-    '@/lib/agent-gateway': { executeAgentGateway: async () => ({}), gatewayResultText: () => '' },
+    '@/lib/agent-gateway': agentGateway || { executeAgentGateway: async () => ({}), gatewayResultText: () => '' },
     '@/lib/connector-results': { normalizeConnectorResult: (value) => typeof value === 'string' ? value : JSON.stringify(value) },
     '@/lib/connector-action-safety': connectorSafety,
     '@/lib/language-preferences': { languagePreferenceInstruction: (value, locale) => `Language preference: ${value || 'auto'} (${locale || 'unknown'}).` },
-    '@/lib/website-feedback-intent.mjs': { detectWebsiteFeedbackIntent: () => null, websiteFeedbackInstruction: () => '' },
+    '@/lib/website-feedback-intent.mjs': websiteFeedbackHelper || { detectWebsiteFeedbackIntent: () => null, websiteFeedbackInstruction: () => '' },
   }, {
     fetch: fetchImpl || (async (url) => {
       if (String(url).includes('github.io')) return { ok: true, status: 200 };
@@ -583,4 +583,52 @@ test('builds a GTA VI presentation instead of the generic personal portfolio fal
   assert.match(String(indexWrite.args.content), /GRAND[\s\S]*THEFT[\s\S]*AUTO/);
   assert.match(String(indexWrite.args.content), /Unofficial concept presentation/);
   assert.doesNotMatch(String(indexWrite.args.content), /Your Name|Designer, developer, and creative problem solver/);
+});
+
+
+test('routes a normal URL feedback request through read-only browser inspection before chat completion', async () => {
+  const browserCalls = [];
+  const modelRequests = [];
+  const stream = new ReadableStream({
+    start(controller) {
+      controller.enqueue(new TextEncoder().encode('data: {"choices":[{"delta":{"content":"I reviewed the public site and found a clear hero, but the mobile navigation needs attention."}]}]}\n\n'));
+      controller.enqueue(new TextEncoder().encode('data: [DONE]\n\n'));
+      controller.close();
+    },
+  });
+  const { POST } = createRoute({
+    connectorSession: null,
+    enabledToolkits: [],
+    websiteFeedbackHelper: {
+      detectWebsiteFeedbackIntent: (text) => /https:\/\/example\.com/.test(text) && /feedback|review/i.test(text) ? { url: 'https://example.com/', request: text } : null,
+      websiteFeedbackInstruction: () => 'Use the read-only computer_browser capability and report only observable public website feedback.',
+    },
+    agentGateway: {
+      executeAgentGateway: async (request) => { browserCalls.push(request); return { observations: 'Observed public page at desktop and mobile widths; mobile navigation clips at the right edge.' }; },
+      gatewayResultText: (result) => result.observations,
+    },
+    fetchImpl: async (url, options) => {
+      if (String(url).includes('api.openai.com')) {
+        modelRequests.push(JSON.parse(options.body));
+        return new Response(stream, { status: 200, headers: { 'Content-Type': 'text/event-stream' } });
+      }
+      return new Response('', { status: 404 });
+    },
+  });
+
+  const response = await POST(createRequest({
+    messages: [{ role: 'user', content: 'Please review https://example.com and give me feedback on the design and mobile layout.' }],
+    computerUse: true,
+    webSearch: false,
+  }));
+  const text = await responseSseText(response);
+
+  assert.equal(browserCalls.length, 1, JSON.stringify(browserCalls));
+  assert.equal(browserCalls[0].tool, 'browser');
+  assert.equal(browserCalls[0].args.action, 'inspect');
+  assert.equal(browserCalls[0].args.url, 'https://example.com/');
+  assert.match(browserCalls[0].args.instruction, /read-only/i);
+  assert.equal(modelRequests.length, 1);
+  assert.match(JSON.stringify(modelRequests[0].messages), /mobile navigation clips/);
+  assert.match(text, /mobile navigation needs attention/);
 });

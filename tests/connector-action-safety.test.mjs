@@ -29,6 +29,8 @@ test('treats Google connector aliases as the same live account', () => {
   assert.equal(connectorKeysMatch('gmail', 'google_mail'), true);
   assert.equal(connectorKeysMatch('gmail', 'googlemail'), true);
   assert.equal(composioToolkitSlug('google_calendar'), 'googlecalendar');
+  assert.equal(composioToolkitSlug('google_drive'), 'googledrive');
+  assert.equal(composioToolkitSlug('google-drive'), 'googledrive');
   assert.equal(connectorKeysMatch('gmail', 'googlecalendar'), false);
 });
 

@@ -1,6 +1,7 @@
 import { NextRequest } from "next/server";
 import { getSession } from "@/lib/auth";
 import { getComposioSession } from "@/lib/composio";
+import { composioToolkitSlug } from "@/lib/connector-action-safety";
 
 function appCallbackUrl(req: NextRequest) {
   const protocol = req.headers.get("x-forwarded-proto") || "https";
@@ -16,7 +17,7 @@ export async function POST(req: NextRequest) {
 
   let toolkit = "";
   try {
-    toolkit = String((await req.json()).toolkit || "").trim().toLowerCase();
+    toolkit = composioToolkitSlug((await req.json()).toolkit);
   } catch {
     return Response.json({ error: "Choose an app to connect." }, { status: 400 });
   }

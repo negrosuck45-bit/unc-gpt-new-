@@ -1,5 +1,5 @@
 import { Composio } from "@composio/core";
-import { connectorKeysMatch, normalizeConnectorKeyForRouting } from "@/lib/connector-action-safety";
+import { composioToolkitSlug, connectorKeysMatch, normalizeConnectorKeyForRouting } from "@/lib/connector-action-safety";
 
 export type LiveComposioAccount = {
   id: string;
@@ -32,13 +32,13 @@ function isActiveConnectedAccount(account: Pick<LiveComposioAccount, 'status' | 
 function uniqueToolkitSlugs(toolkits: string[]) {
   return [...new Set(
     toolkits
-      .map((toolkit) => String(toolkit || "").trim().toLowerCase())
+      .map((toolkit) => composioToolkitSlug(toolkit))
       .filter((toolkit) => /^[a-z0-9][a-z0-9_-]{1,79}$/.test(toolkit))
   )];
 }
 
 function normalizeAccount(account: any): LiveComposioAccount | null {
-  const toolkit = String(account?.toolkit?.slug || "").trim().toLowerCase();
+  const toolkit = composioToolkitSlug(account?.toolkit?.slug);
   const id = String(account?.id || "").trim();
   if (!toolkit || !id) return null;
   const status = String(account?.status || "").trim().toLowerCase();
