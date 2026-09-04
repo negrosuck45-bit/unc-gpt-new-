@@ -1,5 +1,5 @@
 export type UncGptRoute = {
-  provider: "openai" | "groq" | "openrouter" | "cloudflare";
+  provider: "minimax" | "openai" | "groq" | "openrouter" | "cloudflare";
   model: string;
   reason: "vision" | "reasoning" | "coding-and-connected-tools" | "fast" | "general";
 };
@@ -15,12 +15,18 @@ export function chooseUncGptRoute(messages: any[], hasImage: boolean): UncGptRou
     .join(" ")
     .toLowerCase();
 
+  const agenticIntent = /\b(agent|browser|website|image|screenshot|research|analy[sz]e|long context|multi[- ]step|codebase|refactor|debug|typescript|javascript|python|sql|react|next\.js)\b/.test(text);
+  const connectedToolIntent = /\b(repository|pull request|github|notion|calendar|email|gmail|slack|drive|discord|vercel|mcp|connector|deploy|schedule)\b/.test(text);
+
+  // MiniMax-M2.1 is used for normal text chat. Connected actions and visual
+  // requests stay on providers with verified tool and vision support.
+  if (hasKey("MINIMAX_API_KEY") && !hasImage && !agenticIntent && !connectedToolIntent) {
+    return { provider: "minimax", model: process.env.MINIMAX_CHAT_MODEL || "MiniMax-M2.1", reason: "general" };
+  }
+
   if (hasKey("OPENAI_API_KEY")) {
     return { provider: "openai", model: process.env.OPENAI_CHAT_MODEL || "gpt-4.1-mini", reason: hasImage ? "vision" : "general" };
   }
-
-  const agenticIntent = /\b(agent|browser|website|image|screenshot|research|analy[sz]e|long context|multi[- ]step|codebase|refactor|debug|typescript|javascript|python|sql|react|next\.js)\b/.test(text);
-  const connectedToolIntent = /\b(repository|pull request|github|notion|calendar|email|gmail|slack|drive|discord|vercel|mcp|connector|deploy|schedule)\b/.test(text);
 
   // Kimi has native vision and multi-turn tool calling on Workers AI. If it is unavailable
   // on the configured Cloudflare account, the chat route falls back to GPT-OSS then Llama.

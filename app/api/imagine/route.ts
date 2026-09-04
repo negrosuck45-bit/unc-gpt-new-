@@ -1,205 +1,122 @@
 import type { NextRequest } from "next/server";
+import {
+  generateMiniMaxImage,
+  generateMiniMaxVideo,
+  hasMiniMaxMediaKey,
+} from "@/lib/minimax-media";
 
 export const runtime = "nodejs";
 export const maxDuration = 300;
 
 const IMAGE_VIDEO_WORKER_URL = "https://fragrant-band-d94a.blackmonkey098gg.workers.dev";
-
-// Cloudflare Workers AI image models (ordered by preference)
 const IMAGE_MODELS = [
   "@cf/black-forest-labs/flux-2-dev",
   "@cf/black-forest-labs/flux-1-schnell",
   "@cf/stabilityai/stable-diffusion-xl-base-1.0",
   "@cf/bytedance/stable-diffusion-xl-lightning",
-  "@cf/lykon/dreamshaper-8-lcm",
-  "@cf/leonardo-ai/lucid-origin",
-  "@cf/leonardo-ai/phoenix-1.0",
 ];
 
-async function callWorker(
-  payload: Record<string, unknown>,
-  timeoutMs: number,
-): Promise<{ ok: boolean; blob?: Blob; status: number; errorText?: string }> {
-  const controller = new AbortController();
-  const timeoutId = setTimeout(() => controller.abort(), timeoutMs);
-
-  try {
-    const res = await fetch(IMAGE_VIDEO_WORKER_URL, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify(payload),
-      signal: controller.signal,
-    });
-    clearTimeout(timeoutId);
-
-    if (!res.ok) {
-      const errorText = await res.text().catch(() => "");
-      return { ok: false, status: res.status, errorText };
-    }
-
-    const blob = await res.blob();
-    if (blob.size < 1000) {
-      return {
-        ok: false,
-        status: 500,
-        errorText: `Response too small (${blob.size} bytes)`,
-      };
-    }
-    return { ok: true, blob, status: 200 };
-  } catch (err: unknown) {
-    clearTimeout(timeoutId);
-    const msg = err instanceof Error ? err.message : "Unknown error";
-    return { ok: false, status: 500, errorText: msg };
-  }
+function cleanPrompt(value: unknown) {
+  return String(value || "").trim().replace(/\s+/g, " ").slice(0, 1500);
 }
 
-// Generate video using multiple providers with fallbacks
-async function generateVideo(prompt: string): Promise<{ url: string; model: string }> {
-  const videoProviders = [
-    {
-      name: "Pollinations FastSVD",
-      url: () => `https://video.pollinations.ai/prompt/${encodeURIComponent(prompt)}?model=fast-svd&nologo=true`,
-      timeout: 180000,
-    },
-    {
-      name: "Pollinations SVD-XT",
-      url: () => `https://video.pollinations.ai/prompt/${encodeURIComponent(prompt)}?model=svd-xt&nologo=true`,
-      timeout: 180000,
-    },
-    {
-      name: "HuggingFace Zero-Shot Video",
-      url: () => `https://api-inference.huggingface.co/models/damo-vilab/text-to-video-ms-1.7b`,
-      timeout: 180000,
-      method: "POST",
-      body: { inputs: prompt },
-    },
-  ];
+function safeAspectRatio(value: unknown) {
+  const ratio = String(value || "");
+  return ["1:1", "16:9", "4:3", "3:2", "2:3", "3:4", "9:16", "21:9"].includes(ratio) ? ratio : "1:1";
+}
 
+async function generateFallbackImage(prompt: string, image?: string, aspectRatio?: string) {
   let lastError = "";
-
-  for (const provider of videoProviders) {
+  for (const model of IMAGE_MODELS) {
     try {
-      console.log(`[Imagine API] Trying ${provider.name}...`);
-      
-      const controller = new AbortController();
-      const timeoutId = setTimeout(() => controller.abort(), provider.timeout);
-      
-      const fetchOpts: RequestInit = {
-        signal: controller.signal,
-        method: provider.method || "GET",
+      const response = await fetch(IMAGE_VIDEO_WORKER_URL, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ task: "image", type: "image", prompt, model, image: image || null, aspectRatio }),
+        signal: AbortSignal.timeout(45_000),
+      });
+      if (!response.ok) {
+        lastError = await response.text().catch(() => `HTTP ${response.status}`);
+        continue;
+      }
+      const blob = await response.blob();
+      if (blob.size < 1000) {
+        lastError = "Image provider returned an empty result";
+        continue;
+      }
+      return {
+        url: `data:${blob.type || "image/png"};base64,${Buffer.from(await blob.arrayBuffer()).toString("base64")}`,
+        model,
+        mimeType: blob.type || "image/png",
       };
-
-      if (provider.body) {
-        fetchOpts.headers = { "Content-Type": "application/json" };
-        fetchOpts.body = JSON.stringify(provider.body);
-      }
-
-      const res = await fetch(provider.url(), fetchOpts);
-      clearTimeout(timeoutId);
-      
-      if (res.ok) {
-        const blob = await res.blob();
-        
-        // Check if response is valid video (not error HTML)
-        if (blob.size > 5000 && (blob.type.includes("video") || blob.type.includes("octet"))) {
-          const arrayBuffer = await blob.arrayBuffer();
-          const base64 = Buffer.from(arrayBuffer).toString("base64");
-          console.log(`[Imagine API] ${provider.name} success: ${(blob.size / 1024).toFixed(0)}KB`);
-          return {
-            url: `data:video/mp4;base64,${base64}`,
-            model: provider.name.toLowerCase().replace(/\s+/g, "-"),
-          };
-        }
-      }
-
-      lastError = `${provider.name}: ${res.status}`;
-      console.log(`[Imagine API] ${provider.name} failed: ${res.status}`);
-    } catch (err: any) {
-      lastError = `${provider.name}: ${err.message}`;
-      console.log(`[Imagine API] ${provider.name} error: ${err.message}`);
+    } catch (error) {
+      lastError = error instanceof Error ? error.message : "Image provider request failed";
     }
   }
-  
-  throw new Error(`Video generation failed after trying all providers. Last error: ${lastError}. Please try generating an image instead.`);
+  throw new Error(`Image generation is temporarily unavailable. ${lastError.slice(0, 180)}`);
 }
 
-// Generate image using Cloudflare Workers AI
-async function generateImage(prompt: string, image?: string, aspectRatio?: string): Promise<{ url: string; model: string; size: number; mimeType: string }> {
-  let successBlob: Blob | null = null;
-  let usedModel = "";
+async function generateFallbackVideo(prompt: string) {
   let lastError = "";
-
-  for (const m of IMAGE_MODELS) {
-    const payload: Record<string, unknown> = {
-      task: "image",
-      type: "image",
-      prompt,
-      model: m,
-      image: image || null,
-    };
-    if (aspectRatio) payload.aspectRatio = aspectRatio;
-
-    const result = await callWorker(payload, 45000);
-
-    if (result.ok && result.blob) {
-      successBlob = result.blob;
-      usedModel = m;
-      console.log(`[Imagine API] Image success with ${m}: ${(result.blob.size / 1024).toFixed(0)}KB`);
-      break;
+  for (const model of ["fast-svd", "svd-xt"]) {
+    try {
+      const response = await fetch(`https://video.pollinations.ai/prompt/${encodeURIComponent(prompt)}?model=${model}&nologo=true`, {
+        signal: AbortSignal.timeout(180_000),
+      });
+      if (!response.ok) {
+        lastError = `Pollinations ${response.status}`;
+        continue;
+      }
+      const blob = await response.blob();
+      if (blob.size < 5_000 || (!blob.type.includes("video") && !blob.type.includes("octet"))) {
+        lastError = "Fallback video provider returned an invalid file";
+        continue;
+      }
+      return {
+        url: `data:video/mp4;base64,${Buffer.from(await blob.arrayBuffer()).toString("base64")}`,
+        model: `pollinations-${model}`,
+        mimeType: "video/mp4",
+      };
+    } catch (error) {
+      lastError = error instanceof Error ? error.message : "Fallback video provider request failed";
     }
-
-    lastError = result.errorText || `status ${result.status}`;
   }
-
-  if (!successBlob) {
-    throw new Error(`All image models failed. Last error: ${lastError}`);
-  }
-
-  const arrayBuffer = await successBlob.arrayBuffer();
-  const base64 = Buffer.from(arrayBuffer).toString("base64");
-  const mimeType = successBlob.type || "image/png";
-  
-  return {
-    url: `data:${mimeType};base64,${base64}`,
-    model: usedModel,
-    size: successBlob.size,
-    mimeType,
-  };
+  throw new Error(`Video generation is temporarily unavailable. ${lastError.slice(0, 180)}`);
 }
 
 export async function POST(req: NextRequest) {
   try {
-    const body = await req.json();
-    const { task, prompt, image, aspectRatio } = body;
+    const { task, prompt: rawPrompt, image, aspectRatio } = await req.json();
+    const prompt = cleanPrompt(rawPrompt);
+    const referenceImage = typeof image === "string" && image.trim() ? image.trim() : undefined;
 
-    if (!task || !prompt) {
-      return Response.json(
-        { error: "Missing required fields: task, prompt" },
-        { status: 400 },
-      );
+    if ((task !== "image" && task !== "video") || !prompt) {
+      return Response.json({ error: "Provide a prompt and choose image or video generation." }, { status: 400 });
     }
 
-    console.log(
-      `[Imagine API] task=${task} prompt="${String(prompt).slice(0, 60)}..." hasImage=${!!image}`,
-    );
-    console.log(`[UNCGPT] Generating ${task} | Prompt: "${String(prompt).slice(0, 50)}..."`);
-
-    if (task === "video") {
-      const result = await generateVideo(prompt);
-      console.log(`[UNCGPT] Video generated | Model: ${result.model}`);
-      return Response.json({
-        url: result.url,
-        model: result.model,
-        mimeType: "video/mp4",
-      });
-    } else {
-      const result = await generateImage(prompt, image, aspectRatio);
-      console.log(`[UNCGPT] Image generated | Model: ${result.model}`);
-      return Response.json(result);
+    const ratio = safeAspectRatio(aspectRatio);
+    if (task === "image") {
+      if (hasMiniMaxMediaKey()) {
+        try {
+          return Response.json(await generateMiniMaxImage({ prompt, aspectRatio: ratio, referenceImage }));
+        } catch (error) {
+          console.warn("[Imagine] MiniMax image request failed; using image fallback", error instanceof Error ? error.message : error);
+        }
+      }
+      return Response.json(await generateFallbackImage(prompt, referenceImage, ratio));
     }
-  } catch (err: unknown) {
-    const msg = err instanceof Error ? err.message : "Server error";
-    console.error(`[Imagine API] Error: ${msg}`);
-    return Response.json({ error: msg }, { status: 503 });
+
+    if (hasMiniMaxMediaKey()) {
+      try {
+        return Response.json(await generateMiniMaxVideo({ prompt, aspectRatio: ratio, referenceImage, duration: 5 }));
+      } catch (error) {
+        console.warn("[Imagine] MiniMax video request failed; using video fallback", error instanceof Error ? error.message : error);
+      }
+    }
+    return Response.json(await generateFallbackVideo(prompt));
+  } catch (error) {
+    const message = error instanceof Error ? error.message : "Media generation failed";
+    console.error("[Imagine] Generation error:", message);
+    return Response.json({ error: message }, { status: 503 });
   }
 }

@@ -40,3 +40,12 @@ test('uses fast Llama only for explicitly short requests and preserves an explic
   assert.equal(choose(message('Give a brief answer'), false).model, '@cf/meta/llama-3.3-70b-instruct-fp8-fast');
   assert.equal(router({ OPENAI_API_KEY: 'configured', OPENAI_CHAT_MODEL: 'gpt-5.6-terra' })(message('Use GitHub'), false).model, 'gpt-5.6-terra');
 });
+
+test('routes ordinary text chat to configured MiniMax-M2.1 while preserving tool and vision routes', () => {
+  const choose = router({ MINIMAX_API_KEY: 'configured' });
+  assert.deepEqual(JSON.parse(JSON.stringify(choose(message('Explain how rainbows form'), false))), {
+    provider: 'minimax', model: 'MiniMax-M2.1', reason: 'general',
+  });
+  assert.equal(choose(message('Create a calendar event tomorrow at 8am'), false).provider, 'cloudflare');
+  assert.equal(choose(message('What is in this image?'), true).provider, 'cloudflare');
+});

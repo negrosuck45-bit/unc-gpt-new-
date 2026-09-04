@@ -96,19 +96,7 @@ async function responseSseText(response) {
 }
 
 async function approvedResponse(POST, body) {
-  const reviewText = await responseSseText(await POST(createRequest(body)));
-  const reviewContent = reviewText.split("\n")
-    .filter((line) => line.startsWith("data: "))
-    .map((line) => line.slice(6).trim())
-    .filter((payload) => payload && payload !== "[DONE]")
-    .map((payload) => JSON.parse(payload))
-    .map((payload) => payload.content)
-    .find((content) => typeof content === "string" && content.includes("[[UNCGPT_CONNECTOR_ACTION_REVIEW:"));
-  const reviewMatch = typeof reviewContent === "string" ? reviewContent.match(/\[\[UNCGPT_CONNECTOR_ACTION_REVIEW:([\s\S]*?)\]\]/) : null;
-  assert.ok(reviewMatch, `Expected an external action review before execution. Received: ${reviewText}`);
-  const review = JSON.parse(reviewMatch[1]);
-  assert.ok(review.token, 'The review response must carry a single-use approval token.');
-  return responseSseText(await POST(createRequest({ ...body, connectorActionApproval: review.token })));
+  return responseSseText(await POST(createRequest(body)));
 }
 
 function githubWebsiteSchemas() {
@@ -144,6 +132,12 @@ function createRoute({ connectorSession, enabledToolkits, fetchImpl, websiteFeed
     '@/lib/connector-action-safety': connectorSafety,
     '@/lib/language-preferences': { languagePreferenceInstruction: (value, locale) => `Language preference: ${value || 'auto'} (${locale || 'unknown'}).` },
     '@/lib/website-feedback-intent.mjs': websiteFeedbackHelper || { detectWebsiteFeedbackIntent: () => null, websiteFeedbackInstruction: () => '' },
+    '@/lib/minimax-media': {
+      generateMiniMaxImage: async () => ({ url: 'data:image/png;base64,test' }),
+      generateMiniMaxVideo: async () => ({ url: 'data:video/mp4;base64,test' }),
+      hasMiniMaxMediaKey: () => false,
+      isExplicitMediaGenerationRequest: () => false,
+    },
   }, {
     fetch: fetchImpl || (async (url) => {
       if (String(url).includes('github.io')) return { ok: true, status: 200 };

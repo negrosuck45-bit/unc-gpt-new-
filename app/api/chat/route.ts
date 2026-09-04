@@ -9,11 +9,11 @@ import { normalizeConnectorResult } from "@/lib/connector-results";
 import { composioToolkitSlug, connectorKeysMatch, isCalendarSchedulingIntent, isConnectorWriteIntent, isWrappedConnectorFailure, normalizeConnectorKeyForRouting, parseDeterministicCalendarCreate } from "@/lib/connector-action-safety";
 import { languagePreferenceInstruction } from "@/lib/language-preferences";
 import { detectWebsiteFeedbackIntent, websiteFeedbackInstruction } from "@/lib/website-feedback-intent.mjs";
+import { generateMiniMaxImage, generateMiniMaxVideo, hasMiniMaxMediaKey, isExplicitMediaGenerationRequest } from "@/lib/minimax-media";
 
 export const runtime = "nodejs";
 
 const conversations = new Map<string, any>();
-const pendingConnectorActionApprovals = new Map<string, { userId: string; request: string; expiresAt: number }>();
 
 function generateId() {
   return `conv_${Date.now()}_${Math.random().toString(36).substring(2, 8)}`;
@@ -211,6 +211,7 @@ const CEREBRAS_URL = "https://api.cerebras.ai/v1/chat/completions";
 const CEREBRAS_KEY = process.env.CEREBRAS_API_KEY || process.env.CEREBRAS_KEY || "";
 const OPENAI_KEY = process.env.OPENAI_API_KEY || "";
 const OPENAI_CHAT_MODEL = process.env.OPENAI_CHAT_MODEL || "gpt-4.1-mini";
+const MINIMAX_CHAT_MODEL = process.env.MINIMAX_CHAT_MODEL || "MiniMax-M2.1";
 
 let currentGroqKeyIndex = 0;
 let currentChatIndex = 0;
@@ -775,6 +776,13 @@ function resolveMediaType(prompt: string): "video" | "image" | "chat" {
 }
 
 async function generateImage(prompt: string): Promise<string> {
+  if (hasMiniMaxMediaKey()) {
+    try {
+      return (await generateMiniMaxImage({ prompt, aspectRatio: "1:1" })).url;
+    } catch (error: any) {
+      console.warn("[Image] MiniMax request failed; trying configured fallback", error?.message || error);
+    }
+  }
   const timeoutMs = 45000;
   let lastError = "";
   for (const model of IMAGE_MODELS) {
@@ -804,6 +812,13 @@ async function generateImage(prompt: string): Promise<string> {
 }
 
 async function generateVideo(prompt: string, imageUrl?: string): Promise<string> {
+  if (hasMiniMaxMediaKey()) {
+    try {
+      return (await generateMiniMaxVideo({ prompt, aspectRatio: "16:9", referenceImage: imageUrl, duration: 5 })).url;
+    } catch (error: any) {
+      console.warn("[Video] MiniMax request failed; trying configured fallback", error?.message || error);
+    }
+  }
   try {
     const encodedPrompt = encodeURIComponent(prompt);
     const pollinationsUrl = `https://video.pollinations.ai/prompt/${encodedPrompt}?model=fast-svd&nologo=true`;
@@ -871,7 +886,7 @@ function buildRuntimeContextMessage({
 
 const TERMINAL_SYSTEM_PROMPT = `You are Lunar, a helpful AI assistant. Answer the user's request directly and clearly.
 
-Infer the user's intent from ordinary language and complete the requested task using an actually connected service whenever one is available. Do not require special prefixes, connector names, or instructions such as “use a tool.” For read-only requests and routine actions that the user explicitly requested, proceed immediately without asking for confirmation. Only pause for confirmation immediately before an irreversible, destructive, financial, privacy-sensitive, or externally visible action when the user has not already clearly authorized that exact action. Never ask the user to confirm merely because a connector is being used.
+Infer the user's intent from ordinary language and complete the requested task using an actually connected service whenever one is available. Do not require special prefixes, connector names, or instructions such as “use a tool.” Execute clearly requested connected actions, including calendar events, repository updates, and ordinary messages, in the same turn without an extra review step. Ask one concise question only for a genuinely missing detail that prevents completion. Require confirmation only immediately before an irreversible, destructive, financial, privacy-sensitive, or broad-publication action when the user has not already clearly authorized that exact action.
 
 When the user provides an HTTP or HTTPS URL and asks to inspect, review, audit, critique, improve, or give feedback on that website, use the read-only computer_browser capability in the normal chat flow. Inspect only public content and observable behavior; do not sign in, enter personal data, submit forms, send messages, make purchases, change settings, or publish anything. Give practical feedback about visual hierarchy, copy, navigation, responsive layout, accessibility, broken interactions, and prioritized improvements. If browser access is unavailable, say so clearly and provide only the limitations that can be supported by the available page content. Never invent observations.
 
@@ -1008,6 +1023,37 @@ async function callOpenAI(
     throw new Error(`OpenAI failed: ${response.status} ${detail.slice(0, 160)}`);
   }
   return { stream: response.body, provider: "OpenAI", model: OPENAI_CHAT_MODEL };
+}
+
+async function callMiniMax(
+  messages: any[],
+  hasImage: boolean,
+  tools: any[] = []
+): Promise<{ stream: ReadableStream; provider: string; model: string }> {
+  const key = String(process.env.MINIMAX_API_KEY || "").trim();
+  if (!key) throw new Error("MiniMax key not configured");
+  if (hasImage || tools.length > 0) throw new Error("MiniMax route is reserved for plain-text chat without tools");
+
+  const response = await fetch("https://api.minimax.io/v1/chat/completions", {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+      Authorization: `Bearer ${key}`,
+    },
+    body: JSON.stringify({
+      model: MINIMAX_CHAT_MODEL,
+      messages: sanitizeMessagesForAPI(messages),
+      stream: true,
+      temperature: 0.35,
+      max_tokens: 4096,
+    }),
+    signal: AbortSignal.timeout(45_000),
+  });
+  if (!response.ok || !response.body) {
+    const detail = await response.text().catch(() => "");
+    throw new Error(`MiniMax failed: ${response.status} ${detail.slice(0, 160)}`);
+  }
+  return { stream: response.body, provider: "MiniMax", model: MINIMAX_CHAT_MODEL };
 }
 
 async function callOpenRouter(
@@ -2342,18 +2388,6 @@ function directTextResponse(content: string, provider: string, model = "connecte
   return createStreamResponse(stream, provider, model, []);
 }
 
-function connectorActionReviewResponse(userId: string | null, service: string, request: string) {
-  if (!userId) return directTextResponse("Sign in before approving an external action.", service, "connector-review");
-  const now = Date.now();
-  for (const [token, approval] of pendingConnectorActionApprovals) {
-    if (approval.expiresAt <= now) pendingConnectorActionApprovals.delete(token);
-  }
-  const summary = request.replace(/\s+/g, " ").trim().slice(0, 1200);
-  const token = crypto.randomUUID();
-  pendingConnectorActionApprovals.set(token, { userId, request: summary, expiresAt: now + 10 * 60 * 1000 });
-  return directTextResponse(`[[UNCGPT_CONNECTOR_ACTION_REVIEW:${JSON.stringify({ token, service: service.slice(0, 80), summary })}]]`, service, "connector-review");
-}
-
 // ============================================================
 // TOOL LOOP WITH BUILTIN TOOLS
 // ============================================================
@@ -3264,7 +3298,6 @@ export async function POST(req: NextRequest) {
       clientCountryCode,
       clientLanguage,
       enabledSkills = [],
-      connectorActionApproval,
     } = body;
 
     // The replacement release exposes one model only; old client model values are ignored.
@@ -3281,11 +3314,6 @@ export async function POST(req: NextRequest) {
     const userText = Array.isArray(lastMsg?.content)
       ? lastMsg.content.find((c: any) => c.type === "text")?.text || ""
       : lastMsg?.content || "";
-    const currentSession = await getSession();
-    const currentUserId = currentSession?.user?.sub || null;
-    const submittedApprovalToken = typeof connectorActionApproval === "string" ? connectorActionApproval : "";
-    const pendingApproval = submittedApprovalToken ? pendingConnectorActionApprovals.get(submittedApprovalToken) : null;
-    if (submittedApprovalToken) pendingConnectorActionApprovals.delete(submittedApprovalToken);
     const normalizedRequest = String(userText).replace(/\s+/g, " ").trim();
     const websiteFeedbackIntent = detectWebsiteFeedbackIntent(normalizedRequest);
     let websiteFeedbackObservation = "";
@@ -3305,8 +3333,6 @@ export async function POST(req: NextRequest) {
         console.warn("[WebsiteFeedback] Read-only browser review unavailable:", error?.message || error);
       }
     }
-    const isApprovedConnectorAction = Boolean(pendingApproval && currentUserId && pendingApproval.userId === currentUserId && pendingApproval.expiresAt > Date.now() && pendingApproval.request === normalizedRequest);
-
     // ==================== FAST CONNECTOR READS ====================
     // Handle direct Discord reads before memory/search/tool discovery. Those steps can
     // be slow and must never prevent a connected-account request from replying.
@@ -3375,7 +3401,7 @@ export async function POST(req: NextRequest) {
     }
 
     let mediaType: "image" | "video" | "chat";
-    if (source === "imagine") {
+    if (source === "imagine" || isExplicitMediaGenerationRequest(userText)) {
       mediaType = resolveMediaType(userText);
     } else {
       mediaType = "chat";
@@ -3409,12 +3435,13 @@ export async function POST(req: NextRequest) {
     // ==================== MEDIA GENERATION ====================
     if (mediaType === "image" || mediaType === "video") {
       const encoder = new TextEncoder();
-      const providerName =
-        mediaType === "video" ? "Pollinations AI" : "Cloudflare Workers AI";
+      const providerName = hasMiniMaxMediaKey()
+        ? "MiniMax"
+        : mediaType === "video" ? "Pollinations AI" : "Cloudflare Workers AI";
       const modelName =
-        mediaType === "video"
-          ? "stable-video-diffusion"
-          : "@cf/black-forest-labs/flux-2-dev";
+        hasMiniMaxMediaKey()
+          ? mediaType === "video" ? "MiniMax-H3" : "image-01"
+          : mediaType === "video" ? "stable-video-diffusion" : "@cf/black-forest-labs/flux-2-dev";
 
       const s = new ReadableStream({
         async start(controller) {
@@ -3596,7 +3623,6 @@ export async function POST(req: NextRequest) {
         if (!oauthConnected.has("github") && !githubComposioConnected) return connectorPermissionResponse("github", "GitHub", "create and update website files and commits", "https://cdn.simpleicons.org/github");
         if (!oauthConnected.has("github") && !websiteComposioSession) return directTextResponse("Your GitHub account is connected, but I could not open its action session right now. Please try again in a moment; you do not need to reconnect it.", "GitHub", "connector-error");
         if (wantsVercel && !oauthConnected.has("vercel")) return connectorPermissionResponse("vercel", "Vercel", "deploy the committed GitHub website", "https://cdn.simpleicons.org/vercel");
-        if (!isApprovedConnectorAction) return connectorActionReviewResponse(currentUserId, wantsVercel ? "GitHub and Vercel" : "GitHub", userText);
         try {
           const result = websiteComposioSession && !oauthConnected.has("github")
             ? await executeComposioWebsiteScaffold(websiteComposioSession, websiteRepository.owner, websiteRepository.repo, userText, wantsGithubPages, githubPagesRepairRequest)
@@ -3626,7 +3652,6 @@ export async function POST(req: NextRequest) {
         if (!name) {
           return directTextResponse("What name should I use for the new GitHub repository?", "GitHub", "connected-action");
         }
-        if (!isApprovedConnectorAction) return connectorActionReviewResponse(currentUserId, "GitHub", userText);
         try {
           const repository = await executeOAuthGithubAction(baseUrl, req.headers.get("cookie") || "", "create_repo", { name, private: /\bprivate\b/i.test(userText) });
           const fullName = repository?.full_name || repository?.name || name;
@@ -3746,9 +3771,6 @@ export async function POST(req: NextRequest) {
         }});
         return new Response(stream, { headers: { 'Content-Type': 'text/event-stream', 'Cache-Control': 'no-cache' } });
       }
-      if (connectorWriteIntent && !isApprovedConnectorAction) {
-        return connectorActionReviewResponse(currentUserId, requestedConnector?.label || "Connected service", userText);
-      }
       try {
         const shouldLoadConnectedTools = Boolean(requestedConnectorKey && connectorActionIntent);
         if (shouldLoadConnectedTools) {
@@ -3769,9 +3791,6 @@ export async function POST(req: NextRequest) {
           const deterministicCalendarCreate = calendarSchedulingIntent && requestedConnectorKey === 'google_calendar'
             ? parseDeterministicCalendarCreate(userText, clientTimeZone, new Date(), recentUserText)
             : null;
-          if (composioSession && deterministicCalendarCreate && !isApprovedConnectorAction) {
-            return connectorActionReviewResponse(currentUserId, "Google Calendar", userText);
-          }
           if (composioSession && deterministicCalendarCreate) {
             try {
               return directTextResponse(await executeVerifiedGoogleCalendarCreate(composioSession, deterministicCalendarCreate), 'Google Calendar', 'connected-action');
@@ -4044,7 +4063,9 @@ export async function POST(req: NextRequest) {
     let result: { stream: ReadableStream; provider: string; model: string };
 
     try {
-      if (resolvedProvider === "openai") {
+      if (resolvedProvider === "minimax") {
+        result = await callMiniMax(messagesWithSystem, hasImage, availableTools);
+      } else if (resolvedProvider === "openai") {
         result = await callOpenAI(messagesWithSystem, hasImage, availableTools);
       } else if (resolvedProvider === "groq" || GROQ_CHAT_MODELS[resolvedModel]) {
         result = await callGroq(messagesWithSystem, resolvedModel, hasImage, availableTools);

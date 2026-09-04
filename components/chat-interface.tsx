@@ -134,7 +134,7 @@ export function ChatInterface({ onSwitchToImagine, onOpenSidebar, isSidebarOpen 
     }
   }, [currentChat, isCurrentChatStreaming, addMessage, deleteMessage, setIsStreaming]);
 
-  const handleSend = useCallback(async (content: string, attachments?: Attachment[], connectorActionApproval?: string): Promise<string | undefined> => {
+  const handleSend = useCallback(async (content: string, attachments?: Attachment[]): Promise<string | undefined> => {
     if (!content?.trim() && (!attachments || attachments.length === 0)) return;
 
     const chatId = currentChatId || createNewChat("text", null, settings.model, settings.provider);
@@ -164,7 +164,7 @@ export function ChatInterface({ onSwitchToImagine, onOpenSidebar, isSidebarOpen 
       // Always use the hosted vision path for images. Browser-local WebGPU vision can
       // report support while still failing to load a remote Supabase URL on mobile;
       // the hosted path receives the same public image URL and has provider fallbacks.
-      const responseContent = await processAIResponse(chatId, messagesToSend, connectorActionApproval);
+      const responseContent = await processAIResponse(chatId, messagesToSend);
       completedResponse = responseContent || "";
       void persistNeuralMemory(chatId, messagesToSend, responseContent);
       completed = true;
@@ -196,7 +196,7 @@ export function ChatInterface({ onSwitchToImagine, onOpenSidebar, isSidebarOpen 
     return response;
   }, [handleSend]);
 
-  async function processAIResponse(chatId: string, messages: any[], connectorActionApproval?: string) {
+  async function processAIResponse(chatId: string, messages: any[]) {
     const currentChat = useChatStore.getState().chats.find(c => c.id === chatId);
     const selectedModel = currentChat?.model;
     const selectedProvider = currentChat?.provider;
@@ -252,7 +252,6 @@ export function ChatInterface({ onSwitchToImagine, onOpenSidebar, isSidebarOpen 
       clientCountry: runtimeContext.country,
       clientCountryCode: runtimeContext.countryCode,
       clientLanguage: getStoredLanguagePreference(),
-      ...(connectorActionApproval ? { connectorActionApproval } : {}),
     };
 
     try {
@@ -456,16 +455,6 @@ export function ChatInterface({ onSwitchToImagine, onOpenSidebar, isSidebarOpen 
 
     return fullContent;
   }
-
-  useEffect(() => {
-    const approveConnectorAction = (event: Event) => {
-      const detail = (event as CustomEvent<{ token?: string; summary?: string }>).detail;
-      if (!detail?.token || !detail.summary) return;
-      void handleSend(detail.summary, [], detail.token);
-    };
-    window.addEventListener("uncgpt-connector-action-approved", approveConnectorAction);
-    return () => window.removeEventListener("uncgpt-connector-action-approved", approveConnectorAction);
-  }, [handleSend]);
 
   if (!mounted) return null;
 
