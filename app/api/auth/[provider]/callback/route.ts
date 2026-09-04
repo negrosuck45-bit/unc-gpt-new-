@@ -144,7 +144,13 @@ async function providerUser(provider: LunarOAuthProvider, accessToken: string) {
 
 function oauthFailure(request: Request, provider: LunarOAuthProvider, code: "cancelled" | "unavailable" | "failed" | "unverified", stage = "unknown") {
   console.warn(`[Lunar OAuth] callback failed provider=${provider} code=${code} stage=${stage}`)
-  const response = lunarAuthFailure(request, code)
+  // In an installed/PWA flow the provider can return through a separate
+  // browser context while the original Lunar session is already valid. Do
+  // not replace that valid session with a frightening login error screen.
+  const hasExistingSession = /(?:^|;\s*)lunar_session=/.test(request.headers.get("cookie") || "")
+  const response = hasExistingSession
+    ? NextResponse.redirect(new URL("/", request.url))
+    : lunarAuthFailure(request, code)
   clearLunarOAuthState(response, provider)
   return response
 }
