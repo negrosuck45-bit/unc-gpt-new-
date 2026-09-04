@@ -166,7 +166,7 @@ const CHAT_WORKER_URLS = [
   "https://cf-worker-2.blackmonkey098gg.workers.dev",
   "https://cf-worker-3.blackmonkey098gg.workers.dev",
 ];
-const IMAGE_VIDEO_WORKER_URL = process.env.IMAGE_VIDEO_WORKER_URL || "https://fragrant-band-d94a.blackmonkey098gg.workers.dev";
+const IMAGE_VIDEO_WORKER_URL = process.env.IMAGE_VIDEO_WORKER_URL || "https://old-hat-dab9.gamingac527.workers.dev";
 const IMAGE_MODELS = [
   "@cf/black-forest-labs/flux-1-schnell",
   "@cf/black-forest-labs/flux-2-dev",
@@ -778,7 +778,7 @@ function resolveMediaType(prompt: string): "video" | "image" | "chat" {
 async function generateImage(prompt: string): Promise<string> {
   const cloudflareAccountId = String(process.env.CLOUDFLARE_ACCOUNT_ID || "").trim();
   const cloudflareToken = String(process.env.CLOUDFLARE_API_TOKEN || process.env.CLOUDFLARE_WORKERS_AI_TOKEN || "").trim();
-  if (cloudflareAccountId && cloudflareToken) {
+  if (cloudflareAccountId && cloudflareToken && !IMAGE_VIDEO_WORKER_URL.includes("old-hat-dab9.gamingac527.workers.dev")) {
     try {
       const response = await fetch(`https://api.cloudflare.com/client/v4/accounts/${encodeURIComponent(cloudflareAccountId)}/ai/run`, {
         method: "POST",
@@ -826,6 +826,10 @@ async function generateImage(prompt: string): Promise<string> {
       if (res.ok) {
         const blob = await res.blob();
         const arrayBuffer = await blob.arrayBuffer();
+        if (arrayBuffer.byteLength < 1000 || !(blob.type || "").startsWith("image/")) {
+          lastError = "Configured worker returned an invalid image";
+          continue;
+        }
         const base64 = Buffer.from(arrayBuffer).toString("base64");
         const mimeType = blob.type || "image/png";
         return `data:${mimeType};base64,${base64}`;

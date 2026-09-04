@@ -8,7 +8,7 @@ import {
 export const runtime = "nodejs";
 export const maxDuration = 300;
 
-const IMAGE_VIDEO_WORKER_URL = process.env.IMAGE_VIDEO_WORKER_URL || "https://fragrant-band-d94a.blackmonkey098gg.workers.dev";
+const IMAGE_VIDEO_WORKER_URL = process.env.IMAGE_VIDEO_WORKER_URL || "https://old-hat-dab9.gamingac527.workers.dev";
 const IMAGE_MODELS = [
   "@cf/black-forest-labs/flux-1-schnell",
   "@cf/black-forest-labs/flux-2-dev",
@@ -40,7 +40,7 @@ async function generateFallbackImage(prompt: string, image?: string, aspectRatio
         continue;
       }
       const blob = await response.blob();
-      if (blob.size < 1000) {
+      if (blob.size < 1000 || !(blob.type || "").startsWith("image/")) {
         lastError = "Image provider returned an empty result";
         continue;
       }
