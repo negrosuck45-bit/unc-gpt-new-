@@ -57,3 +57,10 @@ test('prefers OpenRouter MiniMax M3 for ordinary text when its key is configured
   });
   assert.equal(choose(message('Create a calendar event tomorrow at 8am'), false).provider, 'cloudflare');
 });
+
+test('routes ordinary text to Cloudflare-hosted MiniMax M3 when Cloudflare credentials exist', () => {
+  const choose = router({ CLOUDFLARE_ACCOUNT_ID: 'account', CLOUDFLARE_API_TOKEN: 'token' });
+  assert.deepEqual(JSON.parse(JSON.stringify(choose(message('Explain how rainbows form'), false))), {
+    provider: 'cloudflare', model: 'minimax/m3', reason: 'general',
+  });
+});

@@ -24,6 +24,10 @@ export function chooseUncGptRoute(messages: any[], hasImage: boolean): UncGptRou
     return { provider: "minimax", model: process.env.MINIMAX_CHAT_MODEL || "MiniMax-M2.1", reason: "general" };
   }
 
+  if (hasKey("CLOUDFLARE_ACCOUNT_ID") && (hasKey("CLOUDFLARE_API_TOKEN") || hasKey("CLOUDFLARE_WORKERS_AI_TOKEN")) && !hasImage && !agenticIntent && !connectedToolIntent) {
+    return { provider: "cloudflare", model: "minimax/m3", reason: "general" };
+  }
+
   if (hasKey("OPENROUTER_API_KEY") && !hasImage && !agenticIntent && !connectedToolIntent) {
     return { provider: "openrouter", model: process.env.OPENROUTER_CHAT_MODEL || "minimax/minimax-m3", reason: "general" };
   }

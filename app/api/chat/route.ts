@@ -1216,6 +1216,23 @@ async function callChatWorkers(
   hasImage: boolean,
   tools: any[] = []
 ): Promise<{ stream: ReadableStream; provider: string; model: string }> {
+  const cloudflareAccountId = String(process.env.CLOUDFLARE_ACCOUNT_ID || "").trim();
+  const cloudflareToken = String(process.env.CLOUDFLARE_API_TOKEN || process.env.CLOUDFLARE_WORKERS_AI_TOKEN || "").trim();
+  if (model === "minimax/m3" && cloudflareAccountId && cloudflareToken && !hasImage && tools.length === 0) {
+    const response = await fetch(`https://api.cloudflare.com/client/v4/accounts/${encodeURIComponent(cloudflareAccountId)}/ai/v1/chat/completions`, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        Authorization: `Bearer ${cloudflareToken}`,
+      },
+      body: JSON.stringify({ ...body, model: "minimax/m3", stream: true }),
+      signal: AbortSignal.timeout(45_000),
+    });
+    if (response.ok && response.body) return { stream: response.body, provider: "Cloudflare AI", model: "minimax/m3" };
+    const detail = await response.text().catch(() => "");
+    throw new Error(`Cloudflare MiniMax M3 failed: ${response.status} ${detail.slice(0, 180)}`);
+  }
+
   const cfModel = model.startsWith("@cf/") ? model : "@cf/meta/llama-3.3-70b-instruct-fp8-fast";
 
   for (let i = 0; i < CHAT_WORKER_URLS.length; i++) {

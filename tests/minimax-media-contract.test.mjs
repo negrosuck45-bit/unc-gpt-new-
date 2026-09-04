@@ -30,4 +30,6 @@ test('keeps MiniMax configuration out of browser-visible environment variables',
   assert.doesNotMatch(media, /NEXT_PUBLIC_MINIMAX/)
   assert.match(environment, /^MINIMAX_API_KEY=$/m)
   assert.match(environment, /^OPENROUTER_CHAT_MODEL=minimax\/minimax-m3$/m)
+  assert.match(environment, /^CLOUDFLARE_ACCOUNT_ID=$/m)
+  assert.match(environment, /^CLOUDFLARE_API_TOKEN=$/m)
 })
