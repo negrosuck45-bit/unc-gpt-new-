@@ -776,6 +776,33 @@ function resolveMediaType(prompt: string): "video" | "image" | "chat" {
 }
 
 async function generateImage(prompt: string): Promise<string> {
+  const cloudflareAccountId = String(process.env.CLOUDFLARE_ACCOUNT_ID || "").trim();
+  const cloudflareToken = String(process.env.CLOUDFLARE_API_TOKEN || process.env.CLOUDFLARE_WORKERS_AI_TOKEN || "").trim();
+  if (cloudflareAccountId && cloudflareToken) {
+    try {
+      const response = await fetch(`https://api.cloudflare.com/client/v4/accounts/${encodeURIComponent(cloudflareAccountId)}/ai/run`, {
+        method: "POST",
+        headers: { Authorization: `Bearer ${cloudflareToken}`, "Content-Type": "application/json" },
+        body: JSON.stringify({ model: "@cf/black-forest-labs/flux-2-dev", input: { prompt: String(prompt).slice(0, 1500) } }),
+        signal: AbortSignal.timeout(90_000),
+      });
+      if (response.ok) {
+        const contentType = response.headers.get("content-type") || "";
+        if (contentType.includes("image") || contentType.includes("octet-stream")) {
+          const bytes = await response.arrayBuffer();
+          if (bytes.byteLength > 1000) return `data:${contentType.split(";")[0] || "image/png"};base64,${Buffer.from(bytes).toString("base64")}`;
+        } else {
+          const data = await response.json().catch(() => null);
+          const base64 = String(data?.result?.image || data?.image || "").trim();
+          if (base64) return base64.startsWith("data:") ? base64 : `data:image/png;base64,${base64}`;
+        }
+      } else {
+        console.warn(`[Image] Cloudflare FLUX.2 Dev failed: ${response.status}`);
+      }
+    } catch (error: any) {
+      console.warn("[Image] Cloudflare FLUX.2 Dev request failed:", error?.message || error);
+    }
+  }
   if (hasMiniMaxMediaKey()) {
     try {
       return (await generateMiniMaxImage({ prompt, aspectRatio: "1:1" })).url;
@@ -818,6 +845,35 @@ async function generateVideo(prompt: string, imageUrl?: string): Promise<string>
     } catch (error: any) {
       console.warn("[Video] MiniMax request failed; trying configured fallback", error?.message || error);
     }
+  }
+  // Cloudflare AI's current first-party video route. Wan 3.0 returns either a
+  // playable URL in JSON or a video body, depending on the account gateway.
+  try {
+    const accountId = String(process.env.CLOUDFLARE_ACCOUNT_ID || "").trim();
+    const token = String(process.env.CLOUDFLARE_API_TOKEN || process.env.CLOUDFLARE_WORKERS_AI_TOKEN || "").trim();
+    if (accountId && token) {
+      const response = await fetch(`https://api.cloudflare.com/client/v4/accounts/${encodeURIComponent(accountId)}/ai/run`, {
+        method: "POST",
+        headers: { Authorization: `Bearer ${token}`, "Content-Type": "application/json" },
+        body: JSON.stringify({ model: "alibaba/wan-3.0", input: { prompt: String(prompt).slice(0, 2500), resolution: "480P", ratio: "16:9", duration: 5 } }),
+        signal: AbortSignal.timeout(240_000),
+      });
+      if (response.ok) {
+        const contentType = response.headers.get("content-type") || "";
+        if (contentType.includes("video") || contentType.includes("octet-stream")) {
+          const bytes = await response.arrayBuffer();
+          if (bytes.byteLength > 5000) return `data:video/mp4;base64,${Buffer.from(bytes).toString("base64")}`;
+        } else {
+          const data = await response.json().catch(() => null);
+          const url = String(data?.result?.video || data?.video || data?.result?.url || "").trim();
+          if (url) return url;
+        }
+      } else {
+        console.warn(`[Video] Cloudflare Wan 3.0 failed: ${response.status}`);
+      }
+    }
+  } catch (error: any) {
+    console.warn("[Video] Cloudflare Wan 3.0 request failed:", error?.message || error);
   }
   // Prefer the project's configured media worker before the public fallback.
   // It returns the actual encoded video file, which the chat player can stream.
@@ -3482,13 +3538,16 @@ export async function POST(req: NextRequest) {
     // ==================== MEDIA GENERATION ====================
     if (mediaType === "image" || mediaType === "video") {
       const encoder = new TextEncoder();
+      const hasCloudflareMediaKey = Boolean(String(process.env.CLOUDFLARE_ACCOUNT_ID || "").trim() && String(process.env.CLOUDFLARE_API_TOKEN || process.env.CLOUDFLARE_WORKERS_AI_TOKEN || "").trim());
       const providerName = hasMiniMaxMediaKey()
         ? "MiniMax"
-        : mediaType === "video" ? "Pollinations AI" : "Cloudflare Workers AI";
+        : hasCloudflareMediaKey ? "Cloudflare AI" : "Configured media worker";
       const modelName =
         hasMiniMaxMediaKey()
           ? mediaType === "video" ? "MiniMax-H3" : "image-01"
-          : mediaType === "video" ? "stable-video-diffusion" : "@cf/black-forest-labs/flux-2-dev";
+          : hasCloudflareMediaKey
+            ? mediaType === "video" ? "alibaba/wan-3.0" : "@cf/black-forest-labs/flux-2-dev"
+            : mediaType === "video" ? "configured-video-worker" : "configured-image-worker";
 
       const s = new ReadableStream({
         async start(controller) {
