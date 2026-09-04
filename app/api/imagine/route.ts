@@ -58,6 +58,27 @@ async function generateFallbackImage(prompt: string, image?: string, aspectRatio
 
 async function generateFallbackVideo(prompt: string) {
   let lastError = "";
+  try {
+    const response = await fetch(IMAGE_VIDEO_WORKER_URL, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ task: "video", type: "video", prompt, duration: 5, aspectRatio: "16:9" }),
+      signal: AbortSignal.timeout(180_000),
+    });
+    if (response.ok) {
+      const contentType = response.headers.get("content-type") || "";
+      if (contentType.includes("video") || contentType.includes("octet-stream")) {
+        const bytes = await response.arrayBuffer();
+        if (bytes.byteLength > 5000) return { url: `data:video/mp4;base64,${Buffer.from(bytes).toString("base64")}`, model: "configured-video-worker", mimeType: "video/mp4" };
+      } else {
+        const result = await response.json().catch(() => null);
+        const url = String(result?.video || result?.video_url || result?.url || "").trim();
+        if (url) return { url, model: "configured-video-worker", mimeType: "video/mp4" };
+      }
+    }
+  } catch (error) {
+    lastError = error instanceof Error ? error.message : "Configured video worker failed";
+  }
   for (const model of ["fast-svd", "svd-xt"]) {
     try {
       const response = await fetch(`https://video.pollinations.ai/prompt/${encodeURIComponent(prompt)}?model=${model}&nologo=true`, {
