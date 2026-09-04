@@ -8,7 +8,7 @@ import {
 export const runtime = "nodejs";
 export const maxDuration = 300;
 
-const IMAGE_VIDEO_WORKER_URL = "https://fragrant-band-d94a.blackmonkey098gg.workers.dev";
+const IMAGE_VIDEO_WORKER_URL = process.env.IMAGE_VIDEO_WORKER_URL || "https://fragrant-band-d94a.blackmonkey098gg.workers.dev";
 const IMAGE_MODELS = [
   "@cf/black-forest-labs/flux-2-dev",
   "@cf/black-forest-labs/flux-1-schnell",

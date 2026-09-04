@@ -12,7 +12,7 @@ import { detectWebsiteFeedbackIntent, websiteFeedbackInstruction } from "@/lib/w
 import { generateMiniMaxImage, generateMiniMaxVideo, hasMiniMaxMediaKey, isExplicitMediaGenerationRequest } from "@/lib/minimax-media";
 
 export const runtime = "nodejs";
-
+export const maxDuration = 300;
 const conversations = new Map<string, any>();
 
 function generateId() {
@@ -166,7 +166,7 @@ const CHAT_WORKER_URLS = [
   "https://cf-worker-2.blackmonkey098gg.workers.dev",
   "https://cf-worker-3.blackmonkey098gg.workers.dev",
 ];
-const IMAGE_VIDEO_WORKER_URL = "https://fragrant-band-d94a.blackmonkey098gg.workers.dev";
+const IMAGE_VIDEO_WORKER_URL = process.env.IMAGE_VIDEO_WORKER_URL || "https://fragrant-band-d94a.blackmonkey098gg.workers.dev";
 const IMAGE_MODELS = [
   "@cf/black-forest-labs/flux-2-dev",
   "@cf/black-forest-labs/flux-1-schnell",
@@ -758,13 +758,13 @@ function convertMessageWithAttachments(msg: any): any {
 // MEDIA GENERATION
 // ============================================================
 function isVideoRequest(prompt: string): boolean {
-  return /(video|animation|clip|film|movie|motion|footage|reel|short|timelapse|animate|cinematic|slow.?mo)/i.test(
+  return /(video|animation|clip|film|movie|motion|footage|reel|short|timelapse|animate|cinematic|slow.?mo|animato|animata|animazione|vídeo|vidéo)/i.test(
     prompt
   );
 }
 
 function isImageRequest(prompt: string): boolean {
-  return /(image|picture|photo|logo|art|icon|vector|illustration|wallpaper|portrait|poster|banner|thumbnail|drawing|sketch)/i.test(
+  return /(image|picture|photo|logo|art|icon|vector|illustration|wallpaper|portrait|poster|banner|thumbnail|drawing|sketch|immagine|immagini|foto|imagen|bild|illustración)/i.test(
     prompt
   );
 }
@@ -818,6 +818,29 @@ async function generateVideo(prompt: string, imageUrl?: string): Promise<string>
     } catch (error: any) {
       console.warn("[Video] MiniMax request failed; trying configured fallback", error?.message || error);
     }
+  }
+  // Prefer the project's configured media worker before the public fallback.
+  // It returns the actual encoded video file, which the chat player can stream.
+  try {
+    const response = await fetch(IMAGE_VIDEO_WORKER_URL, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ task: "video", type: "video", prompt, image: imageUrl || null, duration: 5, aspectRatio: "16:9" }),
+      signal: AbortSignal.timeout(180_000),
+    });
+    if (response.ok) {
+      const contentType = response.headers.get("content-type") || "";
+      if (contentType.includes("video") || contentType.includes("octet-stream")) {
+        const bytes = await response.arrayBuffer();
+        if (bytes.byteLength > 5000) return `data:video/mp4;base64,${Buffer.from(bytes).toString("base64")}`;
+      } else {
+        const result = await response.json().catch(() => null);
+        const videoUrl = String(result?.video || result?.video_url || result?.url || "").trim();
+        if (videoUrl) return videoUrl;
+      }
+    }
+  } catch (error: any) {
+    console.warn("[Video] Configured media worker failed:", error?.message || error);
   }
   try {
     const encodedPrompt = encodeURIComponent(prompt);

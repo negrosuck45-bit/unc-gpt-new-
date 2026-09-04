@@ -31,9 +31,9 @@ export function hasMiniMaxMediaKey() {
 
 export function isExplicitMediaGenerationRequest(prompt: string) {
   const text = String(prompt || "").toLowerCase();
-  const generationVerb = /\b(generate|create|make|draw|design|produce|render|animate|imagine)\b/;
-  const mediaNoun = /\b(image|picture|photo|artwork|illustration|poster|banner|logo|wallpaper|video|animation|clip|film|movie|motion|footage|reel)\b/;
-  const analysisIntent = /\b(analy[sz]e|describe|explain|summari[sz]e|transcribe|review|watch|what(?:'s| is) in)\b/;
+  const generationVerb = /\b(generate|create|make|draw|design|produce|render|animate|imagine|crea|creare|genera|generare|disegna|disegnare|anima|animare|haz|hacer|génère|générer|crée|créer|erzeuge|erstellen)\b/;
+  const mediaNoun = /\b(image|picture|photo|artwork|illustration|poster|banner|logo|wallpaper|video|animation|clip|film|movie|motion|footage|reel|immagine|immagini|foto|animato|animata|animazione|vídeo|imagen|bild)\b/;
+  const analysisIntent = /\b(analy[sz]e|describe|explain|summari[sz]e|transcribe|review|watch|what(?:'s| is) in|analizza|descrivi|spiega|riassumi|guarda)\b/;
   return generationVerb.test(text) && mediaNoun.test(text) && !analysisIntent.test(text);
 }
 

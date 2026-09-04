@@ -301,10 +301,15 @@ export function ChatInterface({ onSwitchToImagine, onOpenSidebar, isSidebarOpen 
     let timedOut = false;
     const forwardAbort = () => requestController.abort();
     userAbortSignal?.addEventListener("abort", forwardAbort, { once: true });
+    const requestText = String(messages[messages.length - 1]?.content || '').toLowerCase();
+    const isMediaGeneration = /\b(generate|create|make|produce|render|animate|crea|creare|genera|generare|anima|animare|haz|hacer|crée|créer)\b/.test(requestText)
+      && /\b(video|animation|clip|film|movie|motion|footage|reel|animato|animata|animazione|vídeo|vidéo|image|picture|photo|immagine|immagini|foto|imagen|bild)\b/.test(requestText);
+    // Video generation is asynchronous (MiniMax H3 can take several minutes).
+    // Keep normal chat responsive while allowing the actual media job to finish.
     const requestTimeout = window.setTimeout(() => {
       timedOut = true;
       requestController.abort();
-    }, 45000);
+    }, isMediaGeneration ? 300000 : 45000);
 
     let response: Response;
     try {

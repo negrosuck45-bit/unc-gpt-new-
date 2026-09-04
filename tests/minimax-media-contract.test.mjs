@@ -22,6 +22,8 @@ test('uses MiniMax official endpoints with server-side credentials and safe visu
   assert.match(imagine, /generateMiniMaxVideo/)
   assert.match(chat, /isExplicitMediaGenerationRequest/)
   assert.match(chat, /provider: "MiniMax"/)
+  assert.match(chat, /animato\|animata\|animazione/)
+  assert.match(chat, /task: "video"/)
 })
 
 test('keeps MiniMax configuration out of browser-visible environment variables', () => {
