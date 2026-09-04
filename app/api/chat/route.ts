@@ -859,7 +859,7 @@ async function generateVideo(prompt: string, imageUrl?: string): Promise<string>
     console.log("[Video] Pollinations failed:", err.message);
   }
   throw new Error(
-    "Video generation is currently limited. Try generating an image instead by saying 'generate an image of...'"
+    "Video generation failed: the configured video providers did not return a playable video. Please retry once the video provider is available."
   );
 }
 
@@ -2201,7 +2201,11 @@ async function executeVerifiedGoogleCalendarCreate(composioSession: any, args: R
   }
 
   if (!verified) {
-    throw new Error(`Google Calendar created an unconfirmed event response${directVerificationError ? ` (${directVerificationError.slice(0, 120)})` : ''}; it was not reported as scheduled.`);
+    // The create endpoint already returned a concrete event ID. A delayed or
+    // connector-specific read-back failure must not turn a successful create
+    // into a false error or cause the model to retry and create a duplicate.
+    // The event card is built from the provider-confirmed create response.
+    return calendarEventResultCard(created);
   }
   return calendarEventResultCard({ ...created, ...verified, url: verified.url || created.url });
 }
@@ -4000,7 +4004,24 @@ export async function POST(req: NextRequest) {
 
       const calendarStep = toolSteps.find((step) => /GOOGLECALENDAR.*CREATE.*EVENT/i.test(String(step?.tool || '')));
       if (calendarSchedulingIntent) {
-        if (!calendarStep) return directTextResponse('I could not verify a Google Calendar create action, so no event was created. Please retry the schedule request; do not rely on any earlier text response.', 'Google Calendar', 'connector-error');
+        if (!calendarStep) {
+          // Some connected models answer in prose without emitting the create
+          // tool call. If the request is deterministic and the connector is
+          // already available, execute it directly instead of telling the user
+          // to retry and risking duplicate or missing events.
+          const deterministicFallback = requestedConnectorKey === 'google_calendar'
+            ? parseDeterministicCalendarCreate(userText, clientTimeZone, new Date(), recentUserText)
+            : null;
+          if (composioSession && deterministicFallback) {
+            try {
+              return directTextResponse(await executeVerifiedGoogleCalendarCreate(composioSession, deterministicFallback), 'Google Calendar', 'connected-action');
+            } catch (error: any) {
+              const detail = String(error?.message || 'Google Calendar did not confirm the event.').replace(/https?:\/\/\S+/g, '').slice(0, 260);
+              return directTextResponse(`Google Calendar could not create that event. ${detail}`, 'Google Calendar', 'connector-error');
+            }
+          }
+          return directTextResponse('I could not reach Google Calendar’s create action. Reconnect Google Calendar in Settings → Connectors and try again.', 'Google Calendar', 'connector-error');
+        }
         const resultText = String(calendarStep.result || '');
         if (/\[\[UNCGPT_CALENDAR_EVENT:/.test(resultText)) return directTextResponse(resultText, 'Google Calendar', 'connected-action');
         const safeError = resultText.replace(/^Tool error:\s*/i, '').replace(/https?:\/\/\S+/g, '').slice(0, 260);
