@@ -24,6 +24,10 @@ export function chooseUncGptRoute(messages: any[], hasImage: boolean): UncGptRou
     return { provider: "minimax", model: process.env.MINIMAX_CHAT_MODEL || "MiniMax-M2.1", reason: "general" };
   }
 
+  if (hasKey("OPENROUTER_API_KEY") && !hasImage && !agenticIntent && !connectedToolIntent) {
+    return { provider: "openrouter", model: process.env.OPENROUTER_CHAT_MODEL || "minimax/minimax-m3", reason: "general" };
+  }
+
   if (hasKey("OPENAI_API_KEY")) {
     return { provider: "openai", model: process.env.OPENAI_CHAT_MODEL || "gpt-4.1-mini", reason: hasImage ? "vision" : "general" };
   }
@@ -41,10 +45,6 @@ export function chooseUncGptRoute(messages: any[], hasImage: boolean): UncGptRou
 
   if (/\b(quick|brief|short|one sentence|yes or no)\b/.test(text)) {
     return { provider: "cloudflare", model: "@cf/meta/llama-3.3-70b-instruct-fp8-fast", reason: "fast" };
-  }
-
-  if (hasKey("OPENROUTER_API_KEY")) {
-    return { provider: "openrouter", model: "meta-llama/llama-3.1-8b-instruct:free", reason: "general" };
   }
 
   return { provider: "cloudflare", model: "@cf/openai/gpt-oss-120b", reason: "general" };

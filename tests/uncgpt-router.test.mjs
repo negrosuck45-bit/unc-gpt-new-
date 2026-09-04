@@ -49,3 +49,11 @@ test('routes ordinary text chat to configured MiniMax-M2.1 while preserving tool
   assert.equal(choose(message('Create a calendar event tomorrow at 8am'), false).provider, 'cloudflare');
   assert.equal(choose(message('What is in this image?'), true).provider, 'cloudflare');
 });
+
+test('prefers OpenRouter MiniMax M3 for ordinary text when its key is configured', () => {
+  const choose = router({ OPENROUTER_API_KEY: 'configured' });
+  assert.deepEqual(JSON.parse(JSON.stringify(choose(message('Explain how rainbows form'), false))), {
+    provider: 'openrouter', model: 'minimax/minimax-m3', reason: 'general',
+  });
+  assert.equal(choose(message('Create a calendar event tomorrow at 8am'), false).provider, 'cloudflare');
+});

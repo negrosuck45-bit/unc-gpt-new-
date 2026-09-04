@@ -1059,7 +1059,8 @@ async function callMiniMax(
 async function callOpenRouter(
   messages: any[],
   hasImage: boolean,
-  tools: any[] = []
+  tools: any[] = [],
+  preferredModel?: string
 ): Promise<{ stream: ReadableStream; provider: string; model: string }> {
   const cleanMessages = sanitizeMessagesForAPI(messages);
   const visionModels = [
@@ -1073,7 +1074,9 @@ async function callOpenRouter(
     "mistralai/mistral-7b-instruct:free",
   ];
 
-  const modelsToTry = hasImage ? visionModels : textModels;
+  const modelsToTry = hasImage
+    ? visionModels
+    : Array.from(new Set([preferredModel, ...textModels].filter(Boolean) as string[]));
 
   for (const modelId of modelsToTry) {
     try {
@@ -1115,7 +1118,7 @@ async function callOpenRouter(
       });
 
       clearTimeout(timeoutId);
-      if (res.ok) return { stream: res.body!, provider: "OpenRouter (Free)", model: modelId };
+      if (res.ok) return { stream: res.body!, provider: "OpenRouter", model: modelId };
     } catch {}
   }
 
@@ -4070,7 +4073,7 @@ export async function POST(req: NextRequest) {
       } else if (resolvedProvider === "groq" || GROQ_CHAT_MODELS[resolvedModel]) {
         result = await callGroq(messagesWithSystem, resolvedModel, hasImage, availableTools);
       } else if (resolvedProvider === "openrouter") {
-        result = await callOpenRouter(messagesWithSystem, hasImage, availableTools);
+        result = await callOpenRouter(messagesWithSystem, hasImage, availableTools, resolvedModel);
       } else if (resolvedProvider === "cloudflare" || resolvedModel.startsWith("@cf/")) {
         result = await callCloudflareWithFallbacks(
           { task: "chat", messages: messagesWithSystem },
