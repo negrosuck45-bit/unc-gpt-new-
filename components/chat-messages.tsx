@@ -555,10 +555,6 @@ function GlowingThinkingText({ text = "thinking" }: { text?: string }) {
   );
 }
 
-function isImageGenerationRequest(text: string) {
-  return /(?:generate|create|make|draw|design|imagine|render)\b[\s\S]{0,80}\b(?:image|picture|photo|illustration|artwork|logo|portrait)/i.test(text)
-    || /\b(?:image|picture|photo|illustration|artwork|logo|portrait)\b[\s\S]{0,30}\b(?:of|showing|with)/i.test(text);
-}
 
 // ============= THINKING PHRASES =============
 const THINKING_PHRASES = [
@@ -643,7 +639,8 @@ export interface ChatMessagesProps {
   onRetry?: () => void;
   searchInfo?: SearchInfoType | null;
   error?: string | null;
-}
+  thinkingText?: string;
+  }
 
 interface SearchInfoType {
   count: number;
@@ -668,7 +665,7 @@ function getModelFamilyFromModel(model: string | undefined): ModelFamily {
 }
 
 // ============= MAIN COMPONENT =============
-export function ChatMessages({ messages, isStreaming, isThinking, onRegenerate, onEditMessage, onRetry, searchInfo, error }: ChatMessagesProps) {
+export function ChatMessages({ messages, isStreaming, isThinking, onRegenerate, onEditMessage, onRetry, searchInfo, error, thinkingText }: ChatMessagesProps) {
   const { getCurrentChat, settings } = useChatStore();
   const currentChat = getCurrentChat();
   const [viewingAttachment, setViewingAttachment] = useState<Attachment | null>(null);
@@ -676,26 +673,12 @@ export function ChatMessages({ messages, isStreaming, isThinking, onRegenerate, 
   const [feedbackMessage, setFeedbackMessage] = useState<Message | null>(null);
   const [toast, setToast] = useState<string | null>(null);
   const [showThinkingPanel, setShowThinkingPanel] = useState(true);
-  const [thinkingStep, setThinkingStep] = useState(0);
   const [preferences, setPreferences] = useState<UserPreferences>(readUserPreferences());
   const streamingFamily = useMemo(() => getModelFamilyFromModel(currentChat?.model || settings.model), [currentChat?.model, settings.model]);
-  const pendingUserText = [...messages].reverse().find((message) => message.role === 'user')?.content || '';
-  const generatingImage = Boolean(isThinking && isImageGenerationRequest(pendingUserText));
 
   useEffect(() => {
     if (isThinking) setShowThinkingPanel(true);
   }, [isThinking]);
-
-  useEffect(() => {
-    if (!isThinking) return;
-    setThinkingStep(0);
-    const interval = window.setInterval(() => setThinkingStep((step) => (step + 1) % 3), 1800);
-    return () => window.clearInterval(interval);
-  }, [isThinking]);
-
-  const thinkingSteps = generatingImage
-    ? ["Understanding the image request", "Shaping the visual prompt", "Preparing the image result"]
-    : ["Understanding the request", "Reviewing the relevant context", "Preparing the response"];
 
   const downloadGeneratedImage = useCallback((url: string) => {
     const link = document.createElement('a');
@@ -909,21 +892,20 @@ export function ChatMessages({ messages, isStreaming, isThinking, onRegenerate, 
               animate={{ opacity: 1, y: 0 }} 
               className="flex items-start gap-3"
             >
-              <div className="flex h-7 w-7 flex-shrink-0 items-center justify-center overflow-hidden mt-0">
-                <MarsAvatar size={28} family={streamingFamily} useSimpleIcon />
-              </div>
-              <div className="flex min-w-0 flex-col items-start gap-2 py-1">
+              <div className="flex w-full flex-col items-start gap-2">
+                <div className="flex h-7 w-7 flex-shrink-0 items-center justify-center overflow-hidden">
+                  <MarsAvatar size={28} family={streamingFamily} useSimpleIcon />
+                </div>
                 <button
                   type="button"
                   onClick={() => setShowThinkingPanel((open) => !open)}
                   aria-expanded={showThinkingPanel}
                   aria-controls="thinking-details"
-                  className="group inline-flex min-w-0 items-center gap-2 rounded-lg py-1 text-left text-muted-foreground transition hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                  className="group inline-flex min-w-0 items-center gap-1.5 rounded-lg py-0.5 pl-0.5 text-left text-muted-foreground transition hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
                 >
-                  <Lightbulb className="size-5 shrink-0 stroke-[1.7]" aria-hidden="true" />
-                  <span className="shrink-0 text-base font-medium text-foreground/90">Thinking</span>
-                  <span className="truncate text-sm text-muted-foreground" aria-live="polite">{thinkingSteps[thinkingStep]}</span>
-                  <ChevronDownIcon className={cn("size-4 shrink-0 transition-transform", showThinkingPanel && "rotate-180")} aria-hidden="true" />
+                  <Lightbulb className="size-4 shrink-0 stroke-[1.7]" aria-hidden="true" />
+                  <span className="shrink-0 text-sm font-medium text-foreground/80">Thinking</span>
+                  <ChevronDownIcon className={cn("size-3.5 shrink-0 transition-transform", showThinkingPanel && "rotate-180")} aria-hidden="true" />
                 </button>
                 <AnimatePresence initial={false}>
                   {showThinkingPanel && (
@@ -933,11 +915,10 @@ export function ChatMessages({ messages, isStreaming, isThinking, onRegenerate, 
                       animate={{ opacity: 1, height: "auto" }}
                       exit={{ opacity: 0, height: 0 }}
                       transition={{ duration: 0.2 }}
-                      className="max-h-64 w-full max-w-xl overflow-y-auto pl-7 pr-2 text-sm leading-7 text-muted-foreground"
+                      className="max-h-64 w-full max-w-xl overflow-y-auto pl-0.5 pr-2 text-xs leading-6 text-muted-foreground"
                       aria-live="polite"
                     >
-                      <p>{generatingImage ? "I’m interpreting the visual goal, refining the prompt, and preparing the image request." : "I’m identifying what you asked for, reviewing the relevant context, and deciding on the clearest useful response."}</p>
-                      <p className="mt-3 text-foreground/70">{thinkingSteps[thinkingStep]}{thinkingStep < thinkingSteps.length - 1 ? "…" : "."}</p>
+                      {thinkingText || "This model does not expose private chain-of-thought. Only model-provided reasoning is shown here when available."}
                     </motion.div>
                   )}
                 </AnimatePresence>
