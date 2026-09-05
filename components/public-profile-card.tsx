@@ -10,6 +10,7 @@ type ProfileCardProps = {
   username: string
   bio: string | null
   profilePicture: string | null
+  avatarDecorationUrl: string | null
   musicUrl: string | null
   musicName: string | null
   musicThumbnail: string | null
@@ -116,7 +117,7 @@ function ProfileMusicPlayer({ url, name, thumbnail }: { url: string; name: strin
   )
 }
 
-export function PublicProfileCard({ username, bio, profilePicture, musicUrl, musicName, musicThumbnail, profileViews, isVerified = false, connections }: ProfileCardProps) {
+export function PublicProfileCard({ username, bio, profilePicture, avatarDecorationUrl, musicUrl, musicName, musicThumbnail, profileViews, isVerified = false, connections }: ProfileCardProps) {
   const initial = username.slice(0, 1).toUpperCase()
   const [views, setViews] = useState(profileViews)
   const [added, setAdded] = useState(false)
@@ -146,8 +147,9 @@ export function PublicProfileCard({ username, bio, profilePicture, musicUrl, mus
     <div className="relative flex min-h-[calc(100vh-5rem)] w-full items-center justify-center [perspective:1000px]">
       <div ref={cardRef} className="relative w-full max-w-[650px] select-none rounded-[15px] border border-white/20 bg-black/70 px-5 pb-10 pt-5 text-white shadow-2xl shadow-black/40 backdrop-blur-xl sm:px-[30px] sm:pb-[58px] sm:pt-[30px]" style={{ transformStyle: 'preserve-3d', touchAction: 'pan-y' }}>
         <div className="flex flex-col items-center justify-center gap-4 text-center">
-          <div className="pointer-events-none flex h-[120px] w-[120px] shrink-0 items-center justify-center overflow-hidden rounded-full bg-transparent text-4xl font-medium">
+          <div className="relative flex h-[120px] w-[120px] shrink-0 items-center justify-center">
             {profilePicture ? <img src={profilePicture} alt={`@${username}`} className="h-full w-full object-cover" /> : initial}
+            {avatarDecorationUrl && <img src={avatarDecorationUrl} alt="" aria-hidden="true" className="pointer-events-none absolute inset-[-10%] h-[120%] w-[120%] object-contain" />}
           </div>
           <div className="w-full min-w-0 text-center">
             <div className="flex w-full flex-wrap items-center justify-center gap-2">

@@ -69,6 +69,7 @@ async function googleUser(accessToken: string): Promise<LunarSessionUser | null>
     name: normaliseText(profile.name),
     email,
     picture: normaliseText(profile.picture),
+    avatarDecoration: null,
     provider: "google",
   }
 }
@@ -86,11 +87,17 @@ async function discordUser(accessToken: string): Promise<LunarSessionUser | null
   const avatar = normaliseText(profile.avatar)
   const discriminator = normaliseText(profile.discriminator)
   const picture = avatar ? `https://cdn.discordapp.com/avatars/${subject}/${avatar}.${avatar.startsWith("a_") ? "gif" : "png"}` : null
+  const decoration = profile.avatar_decoration_data as { asset?: unknown } | null
+  const decorationAsset = normaliseText(decoration?.asset)
+  const avatarDecoration = decorationAsset
+    ? `https://cdn.discordapp.com/avatar-decoration-presets/${encodeURIComponent(decorationAsset)}.png?size=256`
+    : null
   return {
     sub: `discord:${subject}`,
     name: normaliseText(profile.global_name) ?? normaliseText(profile.username) ?? (discriminator ? `Discord user ${discriminator}` : null),
     email,
     picture,
+    avatarDecoration,
     provider: "discord",
   }
 }
@@ -132,6 +139,7 @@ async function githubUser(accessToken: string): Promise<LunarSessionUser | null>
     name: normaliseText(profile.name) ?? normaliseText(profile.login),
     email,
     picture: normaliseText(profile.avatar_url),
+    avatarDecoration: null,
     provider: "github",
   }
 }

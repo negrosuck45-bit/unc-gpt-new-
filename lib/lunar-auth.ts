@@ -16,6 +16,7 @@ export type LunarSessionUser = {
   name: string | null
   email: string
   picture: string | null
+  avatarDecoration: string | null
   provider: LunarOAuthProvider
 }
 
@@ -151,6 +152,7 @@ export async function signLunarSession(user: LunarSessionUser, accountScope = us
     name: user.name,
     email: user.email,
     picture: user.picture,
+    avatar_decoration: user.avatarDecoration,
     provider: user.provider,
     account_scope: accountScope,
   })
@@ -179,6 +181,7 @@ export async function getLunarSessionFromToken(token: string | undefined): Promi
       name: typeof payload.name === "string" ? payload.name : null,
       email: payload.email,
       picture: typeof payload.picture === "string" ? payload.picture : null,
+      avatarDecoration: typeof payload.avatar_decoration === "string" ? payload.avatar_decoration : null,
       provider,
       accountScope: payload.account_scope,
     }

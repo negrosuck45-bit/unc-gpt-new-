@@ -3423,6 +3423,7 @@ export async function POST(req: NextRequest) {
       clientCountryCode,
       clientLanguage,
       enabledSkills = [],
+      customSkills = [],
     } = body;
 
     // The replacement release exposes one model only; old client model values are ignored.
@@ -3630,6 +3631,14 @@ export async function POST(req: NextRequest) {
       `\n\nWhen a user attaches a video, inspect the supplied media when the selected model supports video input. Answer the specific question about the footage, and do not claim to have seen it if the provider rejects the media format.`,
       `\n\nConnected calendar rule: when the user asks to schedule, add, create, move, or cancel a Google Calendar event and a Google Calendar tool is available, use that tool. Create an event only when the title plus a concrete date and start time are clear; otherwise ask one concise follow-up for the missing detail. Convert natural-language dates using the user’s runtime time zone and pass the calendar tool an exact ISO date-time. Never say an event was scheduled unless the provider tool confirms success. For confirmed events, keep the final reply concise because the interface renders the verified event card.`,
     ];
+    if (Array.isArray(customSkills) && customSkills.length) {
+      const customInstructions = customSkills
+        .filter((skill: any) => skill && typeof skill.id === "string" && typeof skill.instructions === "string")
+        .slice(0, 20)
+        .map((skill: any) => `- ${String(skill.name || skill.id).slice(0, 60)}: ${skill.instructions.slice(0, 1200)}`)
+        .join("\n");
+      if (customInstructions) systemParts.push(`\n\nUser-created skills (follow only when relevant to the current request):\n${customInstructions}`);
+    }
     if (projectInstructions) {
       systemParts.push(`\n\nProject Instructions:\n${projectInstructions}`);
     }

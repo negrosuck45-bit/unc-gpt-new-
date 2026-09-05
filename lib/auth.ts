@@ -5,6 +5,7 @@ export type AppSessionUser = {
   name: string | null
   email: string | null
   picture: string | null
+  avatarDecoration: string | null
 }
 
 export type AppSession = {
@@ -27,6 +28,7 @@ export async function getSession(): Promise<AppSession | null> {
       name: session.name,
       email: session.email,
       picture: session.picture,
+      avatarDecoration: session.avatarDecoration,
     },
   }
 }

@@ -46,9 +46,10 @@ export function SettingsPage({ onClose }: SettingsPageProps) {
   const [messageDensity, setMessageDensity] = useState<MessageDensity>(DEFAULT_USER_PREFERENCES.messageDensity);
   const [debugMode, setDebugMode] = useState(DEFAULT_USER_PREFERENCES.debugMode);
   const [experimentalFeatures, setExperimentalFeatures] = useState(DEFAULT_USER_PREFERENCES.experimentalFeatures);
-  const [authUser, setAuthUser] = useState<{ name?: string | null; email?: string | null; picture?: string | null } | null>(null);
+  const [authUser, setAuthUser] = useState<{ name?: string | null; email?: string | null; picture?: string | null; avatarDecoration?: string | null } | null>(null);
   const [profileName, setProfileName] = useState('');
   const [profilePicture, setProfilePicture] = useState('');
+  const [useDiscordDecoration, setUseDiscordDecoration] = useState(false);
   const [username, setUsername] = useState('');
   const [usernameStatus, setUsernameStatus] = useState<{ type: 'idle' | 'saving' | 'saved' | 'error'; message?: string }>({ type: 'idle' });
   const [profileStatus, setProfileStatus] = useState<{ type: 'idle' | 'saving' | 'saved' | 'error'; message?: string }>({ type: 'idle' });
@@ -206,6 +207,7 @@ export function SettingsPage({ onClose }: SettingsPageProps) {
         if (profile.username) { setUsername(profile.username); writeUserPreferences({ username: profile.username }); }
         if (profile.bio != null) { setBio(profile.bio); writeUserPreferences({ bio: profile.bio }); }
         if (profile.profile_picture) { setProfilePicture(profile.profile_picture); writeUserPreferences({ profilePicture: profile.profile_picture }); }
+        setUseDiscordDecoration(Boolean(profile.avatar_decoration_url));
         if (profile.background_media) { setBackgroundMedia(profile.background_media); writeUserPreferences({ backgroundMedia: profile.background_media }); }
         if (profile.background_media_type) { setBackgroundMediaType(profile.background_media_type); writeUserPreferences({ backgroundMediaType: profile.background_media_type }); }
         if (profile.music_url) { setMusicUrl(profile.music_url); writeUserPreferences({ musicUrl: profile.music_url }); }
@@ -345,9 +347,13 @@ export function SettingsPage({ onClose }: SettingsPageProps) {
                   <div className="rounded-[24px] border border-border bg-card px-5 py-7 text-center shadow-sm sm:px-8">
                     <label className="group mx-auto block w-fit cursor-pointer" title="Change profile photo">
                       {profilePicture ? <img src={profilePicture} alt="Your profile" className="h-20 w-20 rounded-full object-cover" /> : <div className="flex h-20 w-20 items-center justify-center rounded-full bg-emerald-500/80 text-3xl font-medium">{(profileName || authUser?.name || 'U').slice(0, 1).toUpperCase()}</div>}
-                      <input type="file" accept="image/*" className="hidden" onChange={async (event) => { const file = event.target.files?.[0]; if (!file) return; try { const uploaded = await uploadProfileMedia(file); setProfilePicture(uploaded.url); writeUserPreferences({ profilePicture: uploaded.url }); await syncProfile({ profile_picture: uploaded.url }); } catch (error) { setUsernameStatus({ type: 'error', message: error instanceof Error ? error.message : 'Profile photo upload failed.' }); } }} />
+                      <input type="file" accept="image/*,.gif,.webp" className="hidden" onChange={async (event) => { const file = event.target.files?.[0]; event.currentTarget.value = ''; if (!file) return; try { const uploaded = await uploadProfileMedia(file); setProfilePicture(uploaded.url); writeUserPreferences({ profilePicture: uploaded.url }); await syncProfile({ profile_picture: uploaded.url }); } catch (error) { setUsernameStatus({ type: 'error', message: error instanceof Error ? error.message : 'Profile photo upload failed.' }); } }} />
                     </label>
-                    <p className="mt-3 text-xs text-foreground/45">Click photo to change</p>
+                    <p className="mt-3 text-xs text-foreground/45">Click photo to change. GIF and WebP avatars are supported.</p>
+                    <div className="mx-auto mt-4 flex max-w-md items-center justify-between gap-4 rounded-xl border border-border/15 bg-muted/[0.06] px-3 py-2.5 text-left">
+                      <div className="min-w-0"><p className="text-sm font-medium">Discord avatar decoration</p><p className="mt-0.5 text-xs text-muted-foreground">Use the decoration from your connected Discord account.</p></div>
+                      <Switch checked={useDiscordDecoration} disabled={!authUser?.avatarDecoration} onCheckedChange={(value) => { setUseDiscordDecoration(value); void syncProfile({ avatar_decoration_url: value ? (authUser?.avatarDecoration || null) : null }); }} />
+                    </div>
                     <input value={profileName} onChange={(event) => setProfileName(event.target.value)} onBlur={() => writeUserPreferences({ profileName: profileName.trim() })} placeholder={authUser?.name || 'Display name'} className="mt-4 w-full bg-transparent text-center text-lg font-medium text-foreground outline-none placeholder:text-foreground/45" />
                     <div className="mx-auto mt-5 max-w-md">
                       <label htmlFor="profile-username" className="mb-2 block text-xs font-medium uppercase tracking-[0.14em] text-foreground/45">Username</label>

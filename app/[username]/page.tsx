@@ -13,6 +13,7 @@ type Profile = {
   username: string;
   bio: string | null;
   profile_picture: string | null;
+  avatar_decoration_url: string | null;
   background_media: string | null;
   background_media_type: "image" | "video" | null;
   music_url: string | null;
@@ -41,10 +42,10 @@ function getAdminClient() {
 async function getProfile(username: string): Promise<Profile | null> {
   const normalized = username.trim().replace(/^@+/, "");
   if (!/^[A-Za-z0-9_]{1,24}$/.test(normalized)) return null;
-  if (normalized.toLowerCase() === "lunar") return { user_id: null, username: "lunar", bio: "The official Lunar profile.", profile_picture: "/lunar-mark.svg", background_media: null, background_media_type: null, music_url: null, music_name: null, music_thumbnail: null, profile_views: 0, cursor_image: null, is_verified: true };
+  if (normalized.toLowerCase() === "lunar") return { user_id: null, username: "lunar", bio: "The official Lunar profile.", profile_picture: "/lunar-mark.svg", avatar_decoration_url: null, background_media: null, background_media_type: null, music_url: null, music_name: null, music_thumbnail: null, profile_views: 0, cursor_image: null, is_verified: true };
   const supabase = getAdminClient();
   if (!supabase) return null;
-  const selectFields = "user_id,username,bio,profile_picture,background_media,background_media_type,music_url,music_name,music_thumbnail,profile_views,cursor_image";
+  const selectFields = "user_id,username,bio,profile_picture,avatar_decoration_url,background_media,background_media_type,music_url,music_name,music_thumbnail,profile_views,cursor_image";
   const legacyFields = "user_id,username,bio,profile_picture,background_media,background_media_type,music_url,music_name,profile_views";
   const legacyFieldsNoViews = "user_id,username,bio,profile_picture,background_media,background_media_type,music_url,music_name";
   const primary = await supabase.from("user_profiles").select(selectFields).eq("username_lower", normalized.toLowerCase()).maybeSingle();
@@ -107,6 +108,7 @@ export default async function PublicProfilePage({ params }: { params: Promise<{ 
           username={profile.username}
           bio={profile.bio}
           profilePicture={profile.profile_picture}
+          avatarDecorationUrl={profile.avatar_decoration_url}
           musicUrl={profile.music_url}
           musicName={profile.music_name}
           musicThumbnail={profile.music_thumbnail}

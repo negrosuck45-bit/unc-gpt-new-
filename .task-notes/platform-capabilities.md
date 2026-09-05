@@ -1,0 +1,8 @@
+External findings for full-feature build (2026-09-05):
+
+- Discord official OAuth docs: https://docs.discord.com/developers/topics/oauth2. Authorization code grant uses registered client_id/client_secret, redirect_uri, state; `identify` scope reads the user's basic profile. OAuth token endpoint is https://discord.com/api/oauth2/token and requires application/x-www-form-urlencoded.
+- Discord official user docs: https://docs.discord.com/developers/resources/user. User objects expose `avatar` and optional `avatar_decoration_data.asset`, both under the `identify` scope. Existing callback can construct normal avatar CDN URL; decoration preset URL is implemented as https://cdn.discordapp.com/avatar-decoration-presets/{asset}.png?size=256.
+- YouTube official captions docs: https://developers.google.com/youtube/v3/docs/captions. Captions list responses do not contain actual caption text; downloading captions is generally restricted, so public video watching requires transcript/provider handling rather than assuming Data API captions.
+- TikTok official docs: https://developers.tiktok.com/doc/overview and https://developers.tiktok.com/products/content-posting-api/. APIs are app/product-specific and require approved developer setup; do not claim arbitrary account viewing without credentials/approval.
+
+Implementation notes: existing app already supports GIF image MIME uploads server-side and <img> rendering, has Discord OAuth login, chat enabledSkills payload, and an Agent Computer route. Current patches add avatar decoration metadata/session/profile rendering, GIF/WebP input acceptance, and custom skill definitions passed from local storage to the chat system prompt.

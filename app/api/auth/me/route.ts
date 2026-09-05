@@ -12,6 +12,7 @@ export async function GET() {
       name: session.user.name ?? null,
       email: session.user.email ?? null,
       picture: session.user.picture ?? null,
+      avatarDecoration: session.user.avatarDecoration ?? null,
       sub: session.user.sub ?? null,
     },
   })

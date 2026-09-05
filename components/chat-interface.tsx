@@ -238,14 +238,18 @@ export function ChatInterface({ onSwitchToImagine, onOpenSidebar, isSidebarOpen 
     let enabledSkills: string[] = []
     try {
       const saved = JSON.parse(window.localStorage.getItem('skill-toggles') || '{}')
+      const customSkills = JSON.parse(window.localStorage.getItem('lunar-custom-skills') || '[]')
       const defaults = ['web_search', 'image_gen', 'neural_memory', 'file_reading', 'vision']
       enabledSkills = [...new Set([...defaults, ...Object.entries(saved).filter(([, value]) => value === true).map(([id]) => id)])]
         .filter((id) => saved[id] !== false)
+      enabledSkills = [...enabledSkills, ...customSkills.filter((skill: any) => skill?.enabled && typeof skill?.id === 'string').map((skill: any) => skill.id)]
+      window.sessionStorage.setItem('lunar-custom-skill-instructions', JSON.stringify(customSkills.filter((skill: any) => skill?.enabled && typeof skill?.id === 'string').map((skill: any) => ({ id: skill.id, name: String(skill.name || '').slice(0, 60), instructions: String(skill.instructions || '').slice(0, 1200) }))))
     } catch {}
 
     const payload: any = {
       messages: formattedMessages,
       enabledSkills,
+      customSkills: (() => { try { return JSON.parse(window.sessionStorage.getItem('lunar-custom-skill-instructions') || '[]') } catch { return [] } })(),
       preferredModel: selectedModel,
       preferredProvider: selectedProvider,
       // Keep Agent Computer available to the backend without exposing a chat-level toggle.

@@ -6,7 +6,7 @@ import { Switch } from '@/components/ui/switch';
 import {
   Search, Code2, Image, Brain, FileText, Link2,
   Mic, Github, MessageSquare, Database, Globe, Zap,
-  BookOpen, Terminal, Eye, Video
+  BookOpen, Terminal, Eye, Video, Plus, Trash2
 } from 'lucide-react';
 
 // ─── Skill definitions ────────────────────────────────────────────────────────
@@ -204,6 +204,28 @@ export function SkillsPanel() {
     if (typeof window === 'undefined') return {};
     try { return JSON.parse(localStorage.getItem('skill-toggles') || '{}'); } catch { return {}; }
   });
+  const [customSkills, setCustomSkills] = useState<Array<{ id: string; name: string; instructions: string; enabled: boolean }>>(() => {
+    if (typeof window === 'undefined') return [];
+    try { return JSON.parse(localStorage.getItem('lunar-custom-skills') || '[]'); } catch { return []; }
+  });
+  const [draftName, setDraftName] = useState('');
+  const [draftInstructions, setDraftInstructions] = useState('');
+
+  const createCustomSkill = () => {
+    const name = draftName.trim();
+    const instructions = draftInstructions.trim();
+    if (!name || !instructions) return;
+    const next = [...customSkills, { id: `custom_${Date.now()}`, name, instructions, enabled: true }];
+    setCustomSkills(next);
+    localStorage.setItem('lunar-custom-skills', JSON.stringify(next));
+    setDraftName('');
+    setDraftInstructions('');
+  };
+
+  const updateCustomSkills = (next: typeof customSkills) => {
+    setCustomSkills(next);
+    localStorage.setItem('lunar-custom-skills', JSON.stringify(next));
+  };
 
   const toggle = (id: string, defaultEnabled: boolean, alwaysOn: boolean) => {
     if (alwaysOn) return;
@@ -217,6 +239,15 @@ export function SkillsPanel() {
 
   return (
     <div className="space-y-8">
+      <div className="rounded-2xl border border-primary/20 bg-primary/[0.04] p-4">
+        <div className="mb-3 flex items-center gap-2"><Plus className="h-4 w-4 text-primary" /><div><h3 className="text-sm font-medium">Create a skill</h3><p className="text-xs text-muted-foreground">Define reusable instructions for Lunar, such as a YouTube research workflow.</p></div></div>
+        <div className="space-y-2">
+          <input value={draftName} onChange={(event) => setDraftName(event.target.value.slice(0, 60))} placeholder="Skill name" className="h-10 w-full rounded-xl border border-border bg-background/60 px-3 text-sm outline-none focus:ring-2 focus:ring-primary/30" />
+          <textarea value={draftInstructions} onChange={(event) => setDraftInstructions(event.target.value.slice(0, 1200))} placeholder="Instructions: what should the AI do, and how should it respond?" className="min-h-20 w-full resize-y rounded-xl border border-border bg-background/60 p-3 text-sm outline-none focus:ring-2 focus:ring-primary/30" />
+          <button type="button" onClick={createCustomSkill} disabled={!draftName.trim() || !draftInstructions.trim()} className="inline-flex h-9 items-center gap-2 rounded-xl bg-primary px-3 text-xs font-medium text-primary-foreground disabled:cursor-not-allowed disabled:opacity-50"><Plus className="h-3.5 w-3.5" />Add skill</button>
+        </div>
+      </div>
+      {customSkills.length > 0 && <div><h3 className="mb-3 text-xs font-semibold uppercase tracking-wider text-muted-foreground">Custom Skills</h3><div className="space-y-2">{customSkills.map((skill) => <div key={skill.id} className={cn('flex items-center gap-3 rounded-xl border p-3', skill.enabled ? 'border-border bg-muted/30' : 'border-border/50 opacity-60')}><div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-primary/15"><Zap className="h-4 w-4 text-primary" /></div><div className="min-w-0 flex-1"><p className="text-sm font-medium">{skill.name}</p><p className="truncate text-xs text-muted-foreground">{skill.instructions}</p></div><Switch checked={skill.enabled} onCheckedChange={(value) => updateCustomSkills(customSkills.map((item) => item.id === skill.id ? { ...item, enabled: value } : item))} /><button type="button" aria-label={`Delete ${skill.name}`} onClick={() => updateCustomSkills(customSkills.filter((item) => item.id !== skill.id))} className="text-muted-foreground hover:text-destructive"><Trash2 className="h-4 w-4" /></button></div>)}</div></div>}
       {SKILL_CATEGORIES.map(cat => (
         <div key={cat.id}>
           <h3 className="text-xs font-semibold uppercase tracking-wider text-muted-foreground mb-3">
