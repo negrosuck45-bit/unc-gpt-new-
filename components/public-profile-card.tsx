@@ -123,11 +123,17 @@ export function PublicProfileCard({ username, bio, profilePicture, musicUrl, mus
     setViews(profileViews)
     const key = `uncgpt-profile-viewed:${username.toLowerCase()}`
     if (sessionStorage.getItem(key)) return
-    sessionStorage.setItem(key, '1')
+    let cancelled = false
     fetch('/api/profile/view', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ username }) })
-      .then((response) => response.json())
-      .then((data) => { if (typeof data.views === 'number' && data.views > 0) setViews(data.views) })
+      .then(async (response) => {
+        const data = await response.json().catch(() => ({}))
+        if (!response.ok) throw new Error('Unable to record profile view')
+        if (cancelled) return
+        sessionStorage.setItem(key, '1')
+        if (typeof data.views === 'number') setViews(data.views)
+      })
       .catch(() => {})
+    return () => { cancelled = true }
   }, [username, profileViews])
   useEffect(() => { if (isVerified) return; fetch(`/api/social?type=relationship&username=${encodeURIComponent(username)}`).then((response) => response.ok ? response.json() : null).then((data) => { if (data?.following) setAdded(true) }).catch(() => {}) }, [username, isVerified])
   const addPerson = async () => { if (added || addBusy) return; setAddBusy(true); setAddError(''); try { const response = await fetch('/api/social', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ action: 'follow', username }) }); const data = await response.json().catch(() => ({})); if (response.status === 401) { window.location.href = `/login?returnTo=${encodeURIComponent(window.location.pathname)}`; return } if (!response.ok) { setAddError(data.error || 'Could not send request'); return } setAdded(true) } catch { setAddError('Network error — try again') } finally { setAddBusy(false) } }
