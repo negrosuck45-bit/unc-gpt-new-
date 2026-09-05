@@ -26,6 +26,7 @@ import {
   BookOpen,
   Eye,
   ChevronDown as ChevronDownIcon,
+  Lightbulb,
   WifiOff,
   RotateCcw,
   AlertCircle,
@@ -912,17 +913,34 @@ export function ChatMessages({ messages, isStreaming, isThinking, onRegenerate, 
                 <MarsAvatar size={28} family={streamingFamily} useSimpleIcon />
               </div>
               <div className="flex min-w-0 flex-col items-start gap-2 py-1">
-                <GlowingThinkingText text={generatingImage ? "Generating your image" : "Thinking"} />
-                {showThinkingPanel ? (
-                <div className="relative w-full max-w-sm rounded-2xl border border-white/[0.1] bg-black/20 px-4 py-3 shadow-[0_0_28px_rgba(255,255,255,0.05)] backdrop-blur-xl">
-                  <button type="button" onClick={() => setShowThinkingPanel(false)} className="absolute right-3 top-2 rounded-md px-1.5 py-0.5 text-[11px] text-muted-foreground transition hover:bg-white/10 hover:text-foreground" aria-label="Close thinking details" title="Close">
-                    Close
-                  </button>
-                  <div className="pr-12 text-sm leading-6 text-foreground/90" aria-live="polite">{thinkingSteps[thinkingStep]}</div>
-                </div>
-              ) : (
-                <div />
-              )}
+                <button
+                  type="button"
+                  onClick={() => setShowThinkingPanel((open) => !open)}
+                  aria-expanded={showThinkingPanel}
+                  aria-controls="thinking-details"
+                  className="group inline-flex min-w-0 items-center gap-2 rounded-lg py-1 text-left text-muted-foreground transition hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                >
+                  <Lightbulb className="size-5 shrink-0 stroke-[1.7]" aria-hidden="true" />
+                  <span className="shrink-0 text-base font-medium text-foreground/90">Thinking</span>
+                  <span className="truncate text-sm text-muted-foreground" aria-live="polite">{thinkingSteps[thinkingStep]}</span>
+                  <ChevronDownIcon className={cn("size-4 shrink-0 transition-transform", showThinkingPanel && "rotate-180")} aria-hidden="true" />
+                </button>
+                <AnimatePresence initial={false}>
+                  {showThinkingPanel && (
+                    <motion.div
+                      id="thinking-details"
+                      initial={{ opacity: 0, height: 0 }}
+                      animate={{ opacity: 1, height: "auto" }}
+                      exit={{ opacity: 0, height: 0 }}
+                      transition={{ duration: 0.2 }}
+                      className="max-h-64 w-full max-w-xl overflow-y-auto pl-7 pr-2 text-sm leading-7 text-muted-foreground"
+                      aria-live="polite"
+                    >
+                      <p>{generatingImage ? "I’m interpreting the visual goal, refining the prompt, and preparing the image request." : "I’m identifying what you asked for, reviewing the relevant context, and deciding on the clearest useful response."}</p>
+                      <p className="mt-3 text-foreground/70">{thinkingSteps[thinkingStep]}{thinkingStep < thinkingSteps.length - 1 ? "…" : "."}</p>
+                    </motion.div>
+                  )}
+                </AnimatePresence>
               </div>
             </motion.div>
           )}
