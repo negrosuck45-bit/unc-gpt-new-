@@ -3531,21 +3531,11 @@ export async function POST(req: NextRequest) {
               `data: ${JSON.stringify({ provider: providerName, model: modelName })}\n\n`
             )
           );
-          controller.enqueue(
-            encoder.encode(
-              `data: ${JSON.stringify({ content: `Generating your ${mediaType}... please wait.` })}\n\n`
-            )
-          );
           try {
             const url = await generateMedia(mediaType, userText, imageUrl);
             controller.enqueue(
               encoder.encode(
                 `data: ${JSON.stringify({ [mediaType]: url })}\n\n`
-              )
-            );
-            controller.enqueue(
-              encoder.encode(
-                `data: ${JSON.stringify({ content: `\n\nYour ${mediaType} has been generated successfully!` })}\n\n`
               )
             );
           } catch (err: any) {

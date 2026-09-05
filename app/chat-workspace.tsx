@@ -97,6 +97,11 @@ function useSidebarSwipe({
 export default function Home({ accountScope }: { accountScope: string }) {
   setActiveAccountScope(accountScope)
   const isMobile = useIsMobile()
+  const [showStartupGlow, setShowStartupGlow] = useState(true)
+  useEffect(() => {
+    const timer = window.setTimeout(() => setShowStartupGlow(false), 1250)
+    return () => window.clearTimeout(timer)
+  }, [])
   useEffect(() => {
     let mounted = true
     setActiveAccountScope(accountScope)
@@ -171,6 +176,14 @@ export default function Home({ accountScope }: { accountScope: string }) {
     <div
       className="workspace-shell flex overflow-hidden bg-background text-foreground"
     >
+      {showStartupGlow && (
+        <div className="fixed inset-0 z-[700] flex items-center justify-center bg-black" role="status" aria-label="Opening Lunar">
+          <div className="relative h-28 w-28 animate-pulse rounded-full bg-white/[0.96] shadow-[0_0_22px_rgba(255,255,255,0.75),0_0_70px_rgba(255,255,255,0.28)]">
+            <div className="absolute -right-3 -top-3 h-28 w-28 rounded-full bg-black" />
+            <div className="absolute inset-y-0 left-0 w-1/2 rounded-l-full bg-white shadow-[0_0_30px_rgba(255,255,255,0.6)]" />
+          </div>
+        </div>
+      )}
       {/* Mobile overlay backdrop — tap to close sidebar */}
       {isMobile && isSidebarOpen && (
         <div

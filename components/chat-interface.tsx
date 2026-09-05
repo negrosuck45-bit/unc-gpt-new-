@@ -349,6 +349,7 @@ export function ChatInterface({ onSwitchToImagine, onOpenSidebar, isSidebarOpen 
     let assistantMsgId: string | null = null;
     let permissionRequest: any = null;
     let hasStartedStreaming = false;
+    let hasGeneratedMedia = false;
     const streamingPreference = readUserPreferences().streaming;
 
     while (true) {
@@ -406,6 +407,7 @@ export function ChatInterface({ onSwitchToImagine, onOpenSidebar, isSidebarOpen 
               }
             } 
             else if (parsed.image) {
+              hasGeneratedMedia = true;
               if (!hasStartedStreaming) {
                 hasStartedStreaming = true;
                 setIsThinking(false);
@@ -414,6 +416,7 @@ export function ChatInterface({ onSwitchToImagine, onOpenSidebar, isSidebarOpen 
               if (assistantMsgId) updateMessage(chatId, assistantMsgId, fullContent, parsed.image);
             } 
             else if (parsed.video) {
+              hasGeneratedMedia = true;
               if (!hasStartedStreaming) {
                 hasStartedStreaming = true;
                 setIsThinking(false);
@@ -451,7 +454,7 @@ export function ChatInterface({ onSwitchToImagine, onOpenSidebar, isSidebarOpen 
       });
     }
 
-    if (!fullContent.trim() && !permissionRequest) {
+    if (!fullContent.trim() && !permissionRequest && !hasGeneratedMedia) {
       setIsThinking(false);
       const fallback = "I’m sorry, I couldn’t complete that response. Please try again.";
       addMessage(chatId, { role: "assistant", content: fallback });
