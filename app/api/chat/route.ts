@@ -212,6 +212,8 @@ const CEREBRAS_KEY = process.env.CEREBRAS_API_KEY || process.env.CEREBRAS_KEY ||
 const OPENAI_KEY = process.env.OPENAI_API_KEY || "";
 const OPENAI_CHAT_MODEL = process.env.OPENAI_CHAT_MODEL || "gpt-4.1-mini";
 const MINIMAX_CHAT_MODEL = process.env.MINIMAX_CHAT_MODEL || "MiniMax-M2.1";
+const NVIDIA_NIM_KEY = process.env.NVIDIA_NIM_API_KEY || process.env.NVIDIA_API_KEY || "";
+const NVIDIA_NIM_MODEL = process.env.NVIDIA_NIM_MODEL || "moonshotai/kimi-k3";
 
 let currentGroqKeyIndex = 0;
 let currentChatIndex = 0;
@@ -1077,6 +1079,44 @@ async function callOpenAI(
     throw new Error(`OpenAI failed: ${response.status} ${detail.slice(0, 160)}`);
   }
   return { stream: response.body, provider: "OpenAI", model: OPENAI_CHAT_MODEL };
+}
+
+async function callNvidiaNim(
+  messages: any[],
+  hasImage: boolean,
+  tools: any[] = [],
+  preferredModel?: string,
+): Promise<{ stream: ReadableStream; provider: string; model: string }> {
+  if (!NVIDIA_NIM_KEY) throw new Error("NVIDIA NIM key not configured");
+  const model = preferredModel || NVIDIA_NIM_MODEL;
+  const processedMessages = hasImage
+    ? await processAttachmentsForModel(sanitizeMessagesForAPI(messages), model, true)
+    : sanitizeMessagesForAPI(messages);
+  const body: any = {
+    model,
+    messages: [{ role: "system", content: TERMINAL_SYSTEM_PROMPT }, ...processedMessages],
+    stream: true,
+    temperature: 0.35,
+    max_tokens: 4096,
+  };
+  if (tools.length > 0) {
+    body.tools = tools;
+    body.tool_choice = "auto";
+  }
+  const response = await fetch("https://integrate.api.nvidia.com/v1/chat/completions", {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+      Authorization: `Bearer ${NVIDIA_NIM_KEY}`,
+    },
+    body: JSON.stringify(body),
+    signal: AbortSignal.timeout(60_000),
+  });
+  if (!response.ok || !response.body) {
+    const detail = await response.text().catch(() => "");
+    throw new Error(`NVIDIA NIM failed: ${response.status} ${detail.slice(0, 240)}`);
+  }
+  return { stream: response.body, provider: "NVIDIA NIM", model };
 }
 
 async function callMiniMax(
@@ -4151,7 +4191,9 @@ export async function POST(req: NextRequest) {
     let result: { stream: ReadableStream; provider: string; model: string };
 
     try {
-      if (resolvedProvider === "minimax") {
+      if (resolvedProvider === "nvidia") {
+        result = await callNvidiaNim(messagesWithSystem, hasImage, availableTools, resolvedModel);
+      } else if (resolvedProvider === "minimax") {
         result = await callMiniMax(messagesWithSystem, hasImage, availableTools);
       } else if (resolvedProvider === "openai") {
         result = await callOpenAI(messagesWithSystem, hasImage, availableTools);

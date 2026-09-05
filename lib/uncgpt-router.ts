@@ -1,5 +1,5 @@
 export type UncGptRoute = {
-  provider: "minimax" | "openai" | "groq" | "openrouter" | "cloudflare";
+  provider: "nvidia" | "minimax" | "openai" | "groq" | "openrouter" | "cloudflare";
   model: string;
   reason: "vision" | "reasoning" | "coding-and-connected-tools" | "fast" | "general";
 };
@@ -17,6 +17,12 @@ export function chooseUncGptRoute(messages: any[], hasImage: boolean): UncGptRou
 
   const agenticIntent = /\b(agent|browser|website|image|screenshot|research|analy[sz]e|long context|multi[- ]step|codebase|refactor|debug|typescript|javascript|python|sql|react|next\.js)\b/.test(text);
   const connectedToolIntent = /\b(repository|pull request|github|notion|calendar|email|gmail|slack|drive|discord|vercel|mcp|connector|deploy|schedule)\b/.test(text);
+
+  // NVIDIA NIM Kimi K3 is the primary assistant: ordinary chat, vision, coding,
+  // and connected-tool requests all stay on the same model when configured.
+  if (hasKey("NVIDIA_NIM_API_KEY")) {
+    return { provider: "nvidia", model: process.env.NVIDIA_NIM_MODEL || "moonshotai/kimi-k3", reason: hasImage ? "vision" : connectedToolIntent || agenticIntent ? "coding-and-connected-tools" : "general" };
+  }
 
   // MiniMax-M2.1 is used for normal text chat. Connected actions and visual
   // requests stay on providers with verified tool and vision support.
