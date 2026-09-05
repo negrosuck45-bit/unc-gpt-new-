@@ -918,8 +918,7 @@ export function ChatMessages({ messages, isStreaming, isThinking, onRegenerate, 
                   <button type="button" onClick={() => setShowThinkingPanel(false)} className="absolute right-3 top-2 rounded-md px-1.5 py-0.5 text-[11px] text-muted-foreground transition hover:bg-white/10 hover:text-foreground" aria-label="Close thinking details" title="Close">
                     Close
                   </button>
-                  <div className="mb-2 pr-6 text-[11px] font-medium uppercase tracking-[0.16em] text-muted-foreground">What I’m working on</div>
-                  <div className="text-sm leading-6 text-foreground/90" aria-live="polite">{thinkingSteps[thinkingStep]}</div>
+                  <div className="pr-12 text-sm leading-6 text-foreground/90" aria-live="polite">{thinkingSteps[thinkingStep]}</div>
                 </div>
               ) : (
                 <div />

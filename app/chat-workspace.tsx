@@ -178,10 +178,10 @@ export default function Home({ accountScope }: { accountScope: string }) {
       className="workspace-shell flex overflow-hidden bg-background text-foreground"
     >
       {showStartupGlow && (
-        <div className="fixed inset-0 z-[700] flex items-center justify-center bg-black" role="status" aria-label="Opening Lunar">
-          <div className="relative flex h-44 w-44 items-center justify-center">
-            <div className="absolute h-32 w-32 animate-pulse rounded-full bg-white/20 blur-3xl" />
-            <Image src="/lunar-mark.svg" alt="Lunar" width={128} height={128} priority className="relative h-32 w-32 object-contain drop-shadow-[0_0_12px_rgba(255,255,255,0.95)] drop-shadow-[0_0_42px_rgba(187,211,255,0.75)]" />
+        <div className="fixed inset-0 z-[700] h-dvh w-screen bg-black" role="status" aria-label="Opening Lunar">
+          <div className="pointer-events-none absolute left-1/2 top-1/2 h-44 w-44 -translate-x-1/2 -translate-y-1/2">
+            <div className="absolute left-1/2 top-1/2 h-32 w-32 -translate-x-1/2 -translate-y-1/2 animate-pulse rounded-full bg-white/20 blur-3xl" />
+            <Image src="/lunar-mark.svg" alt="Lunar" width={128} height={128} priority className="absolute left-1/2 top-1/2 h-32 w-32 -translate-x-1/2 -translate-y-1/2 object-contain drop-shadow-[0_0_12px_rgba(255,255,255,0.95)] drop-shadow-[0_0_42px_rgba(187,211,255,0.75)]" />
           </div>
         </div>
       )}
