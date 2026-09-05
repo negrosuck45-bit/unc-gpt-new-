@@ -41,58 +41,67 @@ export function ConnectionsRow({ connections }: ConnectionsRowProps) {
     .map((connection) => ({ connection, platform: getConnectionPlatform(connection.platform) }))
     .filter((item): item is { connection: ProfileConnection; platform: NonNullable<ReturnType<typeof getConnectionPlatform>> } => Boolean(item.platform))
 
-  if (!visibleConnections.length) return null
-
   return (
-    <div className="mt-5 flex flex-wrap items-start justify-center gap-3" aria-label="Profile connections">
-      {visibleConnections.map(({ connection, platform }) => {
-        const Icon = platform.icon
-        const copied = copiedId === connection.id
-        const copyError = copyErrorId === connection.id
-        const label = platform.mode === 'username'
-          ? `Copy ${platform.label} username ${connection.value}`
-          : `Open ${platform.label}`
-        const iconClassName = "flex h-11 w-11 items-center justify-center rounded-full border border-white/15 bg-white/[0.07] transition duration-150 hover:-translate-y-0.5 hover:bg-white/[0.14] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white/70 active:scale-95"
+    <section className="mt-5 w-full" aria-labelledby="profile-connections-title">
+      <h2 id="profile-connections-title" className="mb-2 text-center text-[10px] font-semibold uppercase tracking-[0.2em] text-white/45">
+        Connections
+      </h2>
+      {visibleConnections.length ? (
+        <div className="flex flex-wrap items-start justify-center gap-3">
+          {visibleConnections.map(({ connection, platform }) => {
+            const Icon = platform.icon
+            const copied = copiedId === connection.id
+            const copyError = copyErrorId === connection.id
+            const label = platform.mode === 'username'
+              ? `Copy ${platform.label} username ${connection.value}`
+              : `Open ${platform.label}`
+            const iconClassName = "flex h-11 w-11 items-center justify-center rounded-full border border-white/15 bg-white/[0.07] transition duration-150 hover:-translate-y-0.5 hover:bg-white/[0.14] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white/70 active:scale-95"
 
-        return (
-          <div key={connection.id} className="relative flex flex-col items-center">
-            {platform.mode === 'link' ? (
-              <a
-                href={connection.value}
-                target="_blank"
-                rel="noopener noreferrer"
-                aria-label={label}
-                title={platform.label}
-                className={iconClassName}
-              >
-                <Icon aria-hidden="true" className="h-5 w-5" style={{ color: platform.color }} />
-              </a>
-            ) : (
-              <button
-                type="button"
-                aria-label={label}
-                title={platform.label}
-                className={iconClassName}
-                onClick={() => {
-                  void copyConnectionValue(connection.value)
-                    .then(() => setCopiedId(connection.id))
-                    .catch(() => setCopyErrorId(connection.id))
-                }}
-              >
-                <Icon aria-hidden="true" className="h-5 w-5" style={{ color: platform.color }} />
-              </button>
-            )}
-            {(copied || copyError) && (
-              <span
-                role="status"
-                className="absolute top-[calc(100%+0.45rem)] z-20 max-w-40 whitespace-nowrap rounded-md border border-white/10 bg-black/85 px-2 py-1 text-[10px] font-medium text-white shadow-lg backdrop-blur"
-              >
-                {copied ? `Copied ${connection.value}` : 'Could not copy'}
-              </span>
-            )}
-          </div>
-        )
-      })}
-    </div>
+            return (
+              <div key={connection.id} className="relative flex flex-col items-center">
+                {platform.mode === 'link' ? (
+                  <a
+                    href={connection.value}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    aria-label={label}
+                    title={platform.label}
+                    className={iconClassName}
+                  >
+                    <Icon aria-hidden="true" className="h-5 w-5" style={{ color: platform.color }} />
+                  </a>
+                ) : (
+                  <button
+                    type="button"
+                    aria-label={label}
+                    title={platform.label}
+                    className={iconClassName}
+                    onClick={() => {
+                      void copyConnectionValue(connection.value)
+                        .then(() => setCopiedId(connection.id))
+                        .catch(() => setCopyErrorId(connection.id))
+                    }}
+                  >
+                    <Icon aria-hidden="true" className="h-5 w-5" style={{ color: platform.color }} />
+                  </button>
+                )}
+                {(copied || copyError) && (
+                  <span
+                    role="status"
+                    className="absolute top-[calc(100%+0.45rem)] z-20 max-w-40 whitespace-nowrap rounded-md border border-white/10 bg-black/85 px-2 py-1 text-[10px] font-medium text-white shadow-lg backdrop-blur"
+                  >
+                    {copied ? `Copied ${connection.value}` : 'Could not copy'}
+                  </span>
+                )}
+              </div>
+            )
+          })}
+        </div>
+      ) : (
+        <p className="rounded-xl border border-white/10 bg-white/[0.04] px-3 py-2.5 text-center text-xs text-white/45">
+          No connections added yet.
+        </p>
+      )}
+    </section>
   )
 }

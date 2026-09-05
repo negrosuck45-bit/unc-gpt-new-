@@ -10,7 +10,7 @@ test("connections use shared platform metadata, owner-authenticated CRUD, and pu
     read("lib/profile-connections.ts"),
     read("app/api/connections/route.ts"),
     read("app/[username]/page.tsx"),
-    read("components/connections-settings.tsx"),
+    read("components/settings-page.tsx"),
     read("components/connections-row.tsx"),
     read("supabase/migrations/20260905150000_create_connections.sql"),
   ]);
@@ -22,7 +22,9 @@ test("connections use shared platform metadata, owner-authenticated CRUD, and pu
   assert.match(route, /\.eq\("user_id", userId\)/);
   assert.match(profilePage, /async function getConnections/);
   assert.match(profilePage, /connections=\{connections\}/);
-  assert.match(settings, /CONNECTION_PLATFORMS/);
+  assert.match(settings, /<ConnectionsSettings \/>/);
+  assert.match(settings, /activeTab === 'connectors'/);
+  assert.match(publicRow, /id="profile-connections-title"/);
   assert.match(publicRow, /navigator\.clipboard/);
   assert.match(publicRow, /target="_blank"/);
   assert.match(migration, /references auth\.users\(id\) on delete cascade/);
@@ -34,15 +36,19 @@ test("connections use shared platform metadata, owner-authenticated CRUD, and pu
 });
 
 test("chat streaming restores model-provided thinking without private-thought wording", async () => {
-  const [chatRoute, messages, interfaceCode] = await Promise.all([
+  const [chatRoute, messages, interfaceCode, connectionsRow] = await Promise.all([
     read("app/api/chat/route.ts"),
     read("components/chat-messages.tsx"),
     read("components/chat-interface.tsx"),
+    read("components/connections-row.tsx"),
   ]);
 
   assert.match(chatRoute, /JSON\.stringify\(\{ reasoning \}\)/);
   assert.doesNotMatch(messages, /private chain-of-thought/);
-  assert.match(messages, /Thinking/);
+  assert.doesNotMatch(messages, /does not expose private/);
+  assert.match(messages, /Thinking…/);
   assert.match(interfaceCode, /setThinkingText/);
+  assert.match(connectionsRow, /id="profile-connections-title"/);
+  assert.match(connectionsRow, /No connections added yet/);
   assert.match(chatRoute, /reasoning_effort: "low"/);
 });

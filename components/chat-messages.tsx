@@ -918,7 +918,7 @@ export function ChatMessages({ messages, isStreaming, isThinking, onRegenerate, 
                       className="max-h-64 w-full max-w-xl overflow-y-auto pl-0.5 pr-2 text-xs leading-6 text-muted-foreground"
                       aria-live="polite"
                     >
-                      {thinkingText || "Lunar is working on your request…"}
+                      {thinkingText || "Thinking…"}
                     </motion.div>
                   )}
                 </AnimatePresence>
