@@ -1,12 +1,11 @@
 "use client";
-import { useState, useRef, useCallback, useEffect, useSyncExternalStore } from "react";
+import { useState, useRef, useCallback, useEffect } from "react";
 import { useChatStore, type Attachment } from "@/lib/chat-store";
 import { truncateMemory } from "@/lib/memory-parsers";
 import { ChatMessages } from "@/components/chat-messages";
 import { ChatInput } from "@/components/chat-input";
 import { WelcomeScreen } from "@/components/welcome-screen";
 import { ChatHeader } from "@/components/chat-header";
-import { CameraVoiceMode } from "@/components/camera-voice-mode";
 import { playReplySound, unlockReplySound } from "@/lib/notifications";
 import { readUserPreferences } from "@/lib/user-preferences";
 import { triggerHaptic } from "@/lib/haptics";
@@ -15,7 +14,7 @@ import { accountStorageKey } from "@/lib/account-scope";
 import { ConnectionStatusBanner, type ConnectionIssue } from "@/components/connection-status-banner";
 import { getClientRuntimeContext } from "@/lib/client-runtime-context";
 import { getStoredLanguagePreference } from "@/lib/language-preferences";
-import { playGroqTtsResponse, prepareGroqTtsResponse } from "@/lib/voice-playback";
+import { prepareGroqTtsResponse } from "@/lib/voice-playback";
 
 interface ChatInterfaceProps {
   onSwitchToImagine?: () => void;
@@ -68,10 +67,9 @@ async function persistNeuralMemory(chatId: string, messages: any[], responseCont
 }
 
 export function ChatInterface({ onSwitchToImagine, onOpenSidebar, isSidebarOpen }: ChatInterfaceProps) {
-  const mounted = useSyncExternalStore(() => () => {}, () => true, () => false);
+  const [mounted, setMounted] = useState(false);
   const [isThinking, setIsThinking] = useState(false);
   const [connectionIssue, setConnectionIssue] = useState<ConnectionIssue>(null);
-  const [cameraVoiceOpen, setCameraVoiceOpen] = useState(false);
 
   const abortControllerRef = useRef<AbortController | null>(null);
 
@@ -90,6 +88,8 @@ export function ChatInterface({ onSwitchToImagine, onOpenSidebar, isSidebarOpen 
   } = useChatStore();
 
   const isCurrentChatStreaming = currentChatId ? getIsStreamingForChat(currentChatId) : false;
+
+  useEffect(() => { setMounted(true); }, []);
 
   const currentChat = getCurrentChat();
   const currentProject = getProject(currentChat?.projectId);
@@ -113,7 +113,6 @@ export function ChatInterface({ onSwitchToImagine, onOpenSidebar, isSidebarOpen 
     let completed = false;
     try {
       const messagesToSend = messages.slice(0, assistantIndex);
-      // eslint-disable-next-line react-hooks/immutability -- processAIResponse is a hoisted component-local function.
       const responseContent = await processAIResponse(chatId, messagesToSend);
       void persistNeuralMemory(chatId, messagesToSend, responseContent);
       completed = true;
@@ -134,7 +133,7 @@ export function ChatInterface({ onSwitchToImagine, onOpenSidebar, isSidebarOpen 
     }
   }, [currentChat, isCurrentChatStreaming, addMessage, deleteMessage, setIsStreaming]);
 
-  const handleSend = useCallback(async (content: string, attachments?: Attachment[]): Promise<string | undefined> => {
+  const handleSend = useCallback(async (content: string, attachments?: Attachment[]) => {
     if (!content?.trim() && (!attachments || attachments.length === 0)) return;
 
     const chatId = currentChatId || createNewChat("text", null, settings.model, settings.provider);
@@ -158,14 +157,12 @@ export function ChatInterface({ onSwitchToImagine, onOpenSidebar, isSidebarOpen 
     abortControllerRef.current = new AbortController();
 
     let completed = false;
-    let completedResponse = "";
     try {
       const messagesToSend = useChatStore.getState().chats.find((c) => c.id === chatId)?.messages || [];
       // Always use the hosted vision path for images. Browser-local WebGPU vision can
       // report support while still failing to load a remote Supabase URL on mobile;
       // the hosted path receives the same public image URL and has provider fallbacks.
       const responseContent = await processAIResponse(chatId, messagesToSend);
-      completedResponse = responseContent || "";
       void persistNeuralMemory(chatId, messagesToSend, responseContent);
       completed = true;
     } catch (error: any) {
@@ -183,20 +180,9 @@ export function ChatInterface({ onSwitchToImagine, onOpenSidebar, isSidebarOpen 
         playReplySound();
       }
     }
-    return completedResponse || undefined;
   }, [currentChatId, createNewChat, addMessage, updateChatTitle, setIsStreaming, settings]);
 
-  const handleCameraAsk = useCallback(async (text: string): Promise<string | undefined> => {
-    const response = await handleSend(text);
-    if (!response?.trim()) return undefined;
-    const language = getStoredLanguagePreference();
-    const key = `camera-voice-${Date.now()}`;
-    void playGroqTtsResponse({ text: response, language, key })
-      .catch(() => window.dispatchEvent(new CustomEvent("uncgpt-camera-voice-error", { detail: { message: "Hannah voice is unavailable right now." } })));
-    return response;
-  }, [handleSend]);
-
-  async function processAIResponse(chatId: string, messages: any[]) {
+  const processAIResponse = async (chatId: string, messages: any[]) => {
     const currentChat = useChatStore.getState().chats.find(c => c.id === chatId);
     const selectedModel = currentChat?.model;
     const selectedProvider = currentChat?.provider;
@@ -301,15 +287,10 @@ export function ChatInterface({ onSwitchToImagine, onOpenSidebar, isSidebarOpen 
     let timedOut = false;
     const forwardAbort = () => requestController.abort();
     userAbortSignal?.addEventListener("abort", forwardAbort, { once: true });
-    const requestText = String(messages[messages.length - 1]?.content || '').toLowerCase();
-    const isMediaGeneration = /\b(generate|create|make|produce|render|animate|crea|creare|genera|generare|anima|animare|haz|hacer|crée|créer)\b/.test(requestText)
-      && /\b(video|animation|clip|film|movie|motion|footage|reel|animato|animata|animazione|vídeo|vidéo|image|picture|photo|immagine|immagini|foto|imagen|bild)\b/.test(requestText);
-    // Video generation is asynchronous (MiniMax H3 can take several minutes).
-    // Keep normal chat responsive while allowing the actual media job to finish.
     const requestTimeout = window.setTimeout(() => {
       timedOut = true;
       requestController.abort();
-    }, isMediaGeneration ? 300000 : 45000);
+    }, 45000);
 
     let response: Response;
     try {
@@ -349,7 +330,6 @@ export function ChatInterface({ onSwitchToImagine, onOpenSidebar, isSidebarOpen 
     let assistantMsgId: string | null = null;
     let permissionRequest: any = null;
     let hasStartedStreaming = false;
-    let hasGeneratedMedia = false;
     const streamingPreference = readUserPreferences().streaming;
 
     while (true) {
@@ -407,7 +387,6 @@ export function ChatInterface({ onSwitchToImagine, onOpenSidebar, isSidebarOpen 
               }
             } 
             else if (parsed.image) {
-              hasGeneratedMedia = true;
               if (!hasStartedStreaming) {
                 hasStartedStreaming = true;
                 setIsThinking(false);
@@ -416,7 +395,6 @@ export function ChatInterface({ onSwitchToImagine, onOpenSidebar, isSidebarOpen 
               if (assistantMsgId) updateMessage(chatId, assistantMsgId, fullContent, parsed.image);
             } 
             else if (parsed.video) {
-              hasGeneratedMedia = true;
               if (!hasStartedStreaming) {
                 hasStartedStreaming = true;
                 setIsThinking(false);
@@ -436,25 +414,23 @@ export function ChatInterface({ onSwitchToImagine, onOpenSidebar, isSidebarOpen 
       else assistantMsgId = addMessage(chatId, { role: 'assistant', content: cleanContent, connectorPermission: permission });
     } else if (!streamingPreference && fullContent && !assistantMsgId) {
       setIsThinking(false);
-      assistantMsgId = addMessage(chatId, { role: "assistant", content: fullContent });
+      addMessage(chatId, { role: "assistant", content: fullContent });
     } else if (assistantMsgId && fullContent) {
       updateMessage(chatId, assistantMsgId, fullContent);
     }
 
-    // Begin fetching the final reply audio now, while the reply is still settling.
-    // The speaker button then receives the exact same cached promise/object URL instead
-    // of starting a new network request after the user clicks it.
+    // Start preparing Hannah audio as soon as the complete assistant reply exists.
     if (assistantMsgId && fullContent.trim()) {
       void prepareGroqTtsResponse({
         text: fullContent,
         language: getStoredLanguagePreference(),
         key: assistantMsgId,
       }).catch(() => {
-        // Playback immediately uses the device speech fallback if pre-generation fails.
+        // The speaker action retains its browser fallback if Groq is unavailable.
       });
     }
 
-    if (!fullContent.trim() && !permissionRequest && !hasGeneratedMedia) {
+    if (!fullContent.trim() && !permissionRequest) {
       setIsThinking(false);
       const fallback = "I’m sorry, I couldn’t complete that response. Please try again.";
       addMessage(chatId, { role: "assistant", content: fallback });
@@ -462,7 +438,7 @@ export function ChatInterface({ onSwitchToImagine, onOpenSidebar, isSidebarOpen 
     }
 
     return fullContent;
-  }
+  };
 
   if (!mounted) return null;
 
@@ -472,7 +448,6 @@ export function ChatInterface({ onSwitchToImagine, onOpenSidebar, isSidebarOpen 
     <div className="task-chat-surface relative flex h-full flex-col overflow-hidden bg-background text-foreground">
       <ChatHeader
         project={currentProject}
-        onOpenCameraVoice={() => setCameraVoiceOpen(true)}
         chat={currentChat}
         onOpenSidebar={onOpenSidebar}
         isSidebarOpen={isSidebarOpen}
@@ -521,7 +496,6 @@ export function ChatInterface({ onSwitchToImagine, onOpenSidebar, isSidebarOpen 
           </div>
         </div>
       )}
-      <CameraVoiceMode open={cameraVoiceOpen} onClose={() => setCameraVoiceOpen(false)} onAsk={handleCameraAsk} />
     </div>
   );
 }

@@ -1,5 +1,4 @@
 import { NextRequest } from "next/server"
-import { classifyVoiceFailure } from "../../../lib/recovery-failure-state"
 
 export const runtime = "nodejs"
 
@@ -113,9 +112,9 @@ export async function POST(request: NextRequest) {
       },
     })
   } catch (error) {
-    const failure = classifyVoiceFailure(error)
-    console.warn("[Voice] text-to-speech unavailable:", error instanceof Error ? error.message : "Text-to-speech failed")
-    return Response.json({ error: failure.message }, { status: failure.status, headers: { "Cache-Control": "private, no-store, max-age=0", "Retry-After": failure.status === 429 ? "60" : "" } })
+    const message = error instanceof Error ? error.message : "Text-to-speech failed"
+    console.error("[Voice] Groq text-to-speech request failed:", message)
+    return Response.json({ error: "Voice playback is temporarily unavailable." }, { status: 502 })
   }
 }
 
@@ -124,6 +123,6 @@ export async function GET() {
     provider: "groq",
     models: [ENGLISH_MODEL, ARABIC_MODEL],
     output: "audio/wav",
-    fallback: "none",
+    fallback: "browser-speech-synthesis",
   })
 }

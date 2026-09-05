@@ -29,17 +29,17 @@ test('uses direct Groq audio synthesis as the primary voice provider', () => {
   assert.match(messages, /playGroqTtsResponse/)
 })
 
-test('uses Hannah server audio without substituting the browser voice', () => {
-  const route = read('./app/api/voice-chat/route.ts')
+test('uses browser SpeechSynthesis only as an explicit language-aware fallback', () => {
+  const playback = read('./lib/voice-playback.ts')
   const messages = read('./components/chat-messages.tsx')
-  const camera = read('./components/chat-interface.tsx')
 
-  assert.match(route, /const DEFAULT_VOICE = "hannah"/)
-  assert.match(route, /canopylabs\/orpheus-v1-english/)
+  assert.match(playback, /utterance\.lang = voiceLanguage\.locale/)
+  assert.match(playback, /pickBrowserVoice/)
+  assert.match(playback, /window\.speechSynthesis\.speak\(utterance\)/)
   assert.match(messages, /playGroqTtsResponse\([\s\S]*?catch \(error\)/)
-  assert.doesNotMatch(messages, /speakWithBrowserFallback/)
-  assert.doesNotMatch(messages, /speechSynthesis\.speak/)
-  assert.match(camera, /playGroqTtsResponse\([\s\S]*?uncgpt-camera-voice-error/)
+  assert.match(messages, /speakWithBrowserFallback/)
+  assert.match(messages, /primary Groq voice fails/)
+  assert.doesNotMatch(messages, /window\.speechSynthesis\.speak\(new SpeechSynthesisUtterance/)
 })
 
 test('keeps a speaker control beside feedback controls under assistant replies', () => {
@@ -51,17 +51,17 @@ test('keeps a speaker control beside feedback controls under assistant replies',
   assert.match(messages, /VolumeX/)
 })
 
-test('localizes the clean authentication card and keeps it compact and mobile-safe', () => {
+test('localizes the Lunar auth card and keeps the card compact and mobile-safe', () => {
   const auth = read('./components/auth-panel.tsx')
   const settings = read('./components/settings-page.tsx')
   const sidebar = read('./components/chat-sidebar.tsx')
 
   assert.match(auth, /useUiText/)
-  assert.match(auth, /Welcome to Lunar/)
-  assert.match(auth, /t\("lastUsed"\)/)
-  assert.match(auth, /bg-\[#151515\]/)
+  assert.match(auth, /t\("signInTitle"\)/)
+  assert.match(auth, /t\("welcomeBack"\)/)
   assert.match(auth, /max-w-\[480px\]/)
-  assert.match(auth, /min-h-\[100dvh\]/)
+  assert.match(auth, /rounded-\[32px\]/)
+  assert.match(auth, /overflow-x-hidden overflow-y-auto/)
   assert.match(auth, /min-w-0/)
   assert.match(settings, /\{t\('settings'\)\}/)
   assert.match(sidebar, /t\('newChat'\)/)
@@ -79,15 +79,4 @@ test('supports English, Hindi, Italian, and a broad ISO-639-1 language picker', 
   assert.match(translations, /hi: \{/)
   assert.match(translations, /completeTranslations/)
   assert.match(translations, /uncgpt-language-changed/)
-})
-
-test('prepares final assistant audio before the reply leaves the streaming lifecycle', () => {
-  const chatInterface = read('./components/chat-interface.tsx')
-  const messages = read('./components/chat-messages.tsx')
-
-  assert.match(chatInterface, /import \{ playGroqTtsResponse, prepareGroqTtsResponse \} from "@\/lib\/voice-playback"/)
-  assert.match(chatInterface, /void prepareGroqTtsResponse\(\{[\s\S]*?text: fullContent,[\s\S]*?key: assistantMsgId/)
-  assert.match(chatInterface, /assistantMsgId = addMessage\(chatId, \{ role: "assistant", content: fullContent \}\)/)
-  assert.match(chatInterface, /handleCameraAsk[\s\S]*?playGroqTtsResponse[\s\S]*?uncgpt-camera-voice-error/)
-  assert.match(messages, /prepareGroqTtsResponse\([\s\S]*?key: latestAssistant\.id/)
 })
