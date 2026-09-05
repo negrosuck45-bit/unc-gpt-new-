@@ -25,7 +25,9 @@ test("connections use shared platform metadata, owner-authenticated CRUD, and pu
   assert.match(profilePage, /connections=\{connections\}/);
   assert.match(settings, /<ConnectionsSettings \/>/);
   assert.match(settings, /activeTab === 'connectors'/);
-  assert.match(publicRow, /id="profile-connections-title"/);
+  assert.match(publicRow, /aria-label="Profile connections"/);
+  assert.doesNotMatch(publicRow, />Connections</);
+  assert.doesNotMatch(publicRow, new RegExp("rounded-full border border-white/15 bg-white"));
   assert.match(publicRow, /navigator\.clipboard/);
   assert.match(publicRow, /target="_blank"/);
   assert.match(migration, /user_id text not null/);
@@ -52,7 +54,7 @@ test("chat streaming restores model-provided thinking without private-thought wo
   assert.doesNotMatch(messages, /does not expose private/);
   assert.match(messages, /Thinking…/);
   assert.match(interfaceCode, /setThinkingText/);
-  assert.match(connectionsRow, /id="profile-connections-title"/);
+  assert.match(connectionsRow, /aria-label="Profile connections"/);
   assert.match(connectionsRow, /if \(!visibleConnections\.length\) return null/);
   assert.doesNotMatch(connectionsRow, /No connections added yet/);
   assert.match(chatRoute, /reasoning_effort: "high"/);

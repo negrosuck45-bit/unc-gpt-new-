@@ -46,11 +46,8 @@ export function ConnectionsRow({ connections }: ConnectionsRowProps) {
   if (!visibleConnections.length) return null
 
   return (
-    <section className="mt-5 w-full" aria-labelledby="profile-connections-title">
-      <h2 id="profile-connections-title" className="mb-2 text-center text-[10px] font-semibold uppercase tracking-[0.2em] text-white/45">
-        Connections
-      </h2>
-      <div className="flex flex-wrap items-start justify-center gap-3">
+    <section className="mt-5 w-full" aria-label="Profile connections">
+      <div className="flex flex-wrap items-start justify-center gap-4">
         {visibleConnections.map(({ connection, platform }) => {
             const Icon = platform.icon
             const copied = copiedId === connection.id
@@ -58,7 +55,7 @@ export function ConnectionsRow({ connections }: ConnectionsRowProps) {
             const label = platform.mode === 'username'
               ? `Copy ${platform.label} username ${connection.value}`
               : `Open ${platform.label}`
-            const iconClassName = "flex h-11 w-11 items-center justify-center rounded-full border border-white/15 bg-white/[0.07] transition duration-150 hover:-translate-y-0.5 hover:bg-white/[0.14] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white/70 active:scale-95"
+            const iconClassName = "flex items-center justify-center transition duration-150 hover:-translate-y-0.5 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white/70 active:scale-95"
 
             return (
               <div key={connection.id} className="relative flex flex-col items-center">
@@ -71,7 +68,7 @@ export function ConnectionsRow({ connections }: ConnectionsRowProps) {
                     title={platform.label}
                     className={iconClassName}
                   >
-                    <Icon aria-hidden="true" className="h-5 w-5" style={{ color: platform.color }} />
+                    <Icon aria-hidden="true" className="h-8 w-8" style={{ color: platform.color }} />
                   </a>
                 ) : (
                   <button
@@ -85,7 +82,7 @@ export function ConnectionsRow({ connections }: ConnectionsRowProps) {
                         .catch(() => setCopyErrorId(connection.id))
                     }}
                   >
-                    <Icon aria-hidden="true" className="h-5 w-5" style={{ color: platform.color }} />
+                    <Icon aria-hidden="true" className="h-8 w-8" style={{ color: platform.color }} />
                   </button>
                 )}
                 {(copied || copyError) && (
