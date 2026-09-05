@@ -82,6 +82,17 @@ test('protects Lunar sessions and direct callbacks with signed cookies and CSRF 
   assert.match(callback, /clearLunarOAuthState\(response, provider\)/)
 })
 
+test('keeps authenticated API access working for legacy Lunar sessions after the Stram cookie migration', () => {
+  const proxy = source('proxy.ts')
+  const auth = source('lib/lunar-auth.ts')
+  const logout = source('app/api/auth/logout/route.ts')
+  assert.match(proxy, /request\.cookies\.get\(LUNAR_SESSION_COOKIE\)\?\.value \?\? request\.cookies\.get\("lunar_session"\)\?\.value/)
+  assert.match(auth, /LUNAR_SESSION_COOKIE = "stram_session"/)
+  assert.match(auth, /LEGACY_SESSION_COOKIE = "lunar_session"/)
+  assert.match(auth, /response\.cookies\.set\(LEGACY_SESSION_COOKIE/)
+  assert.match(logout, /clearLunarSession\(response\)/)
+})
+
 test('preserves existing user-owned data through a fail-closed legacy account bridge', () => {
   const session = source('lib/auth.ts')
   const bridge = source('lib/legacy-account-bridge.ts')

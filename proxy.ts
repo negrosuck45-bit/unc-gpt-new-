@@ -29,7 +29,7 @@ export async function proxy(request: NextRequest, _event: NextFetchEvent) {
   }
 
   if (isApiRequest && !isMcpOAuthCallback && !isLunarOAuthRoute && !PUBLIC_API_PATHS.has(pathname)) {
-    const token = request.cookies.get(LUNAR_SESSION_COOKIE)?.value
+    const token = request.cookies.get(LUNAR_SESSION_COOKIE)?.value ?? request.cookies.get("lunar_session")?.value
     const session = await getLunarSessionFromToken(token)
     if (!session) return NextResponse.json({ error: "Sign in is required." }, { status: 401 })
   }
