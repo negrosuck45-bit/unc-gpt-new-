@@ -181,7 +181,6 @@ export default function Home({ accountScope }: { accountScope: string }) {
         <div className="fixed inset-0 z-[700] flex items-center justify-center bg-black" role="status" aria-label="Opening Lunar">
           <div className="relative flex h-44 w-44 items-center justify-center">
             <div className="absolute h-32 w-32 animate-pulse rounded-full bg-white/20 blur-3xl" />
-            <div className="absolute inset-x-0 top-1/2 h-px bg-gradient-to-r from-transparent via-white/45 to-transparent blur-[1px]" />
             <Image src="/lunar-mark.svg" alt="Lunar" width={128} height={128} priority className="relative h-32 w-32 object-contain drop-shadow-[0_0_12px_rgba(255,255,255,0.95)] drop-shadow-[0_0_42px_rgba(187,211,255,0.75)]" />
           </div>
         </div>
