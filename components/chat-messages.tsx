@@ -674,10 +674,15 @@ export function ChatMessages({ messages, isStreaming, isThinking, onRegenerate, 
   const [viewingGeneratedImage, setViewingGeneratedImage] = useState<string | null>(null);
   const [feedbackMessage, setFeedbackMessage] = useState<Message | null>(null);
   const [toast, setToast] = useState<string | null>(null);
+  const [showThinkingPanel, setShowThinkingPanel] = useState(true);
   const [preferences, setPreferences] = useState<UserPreferences>(readUserPreferences());
   const streamingFamily = useMemo(() => getModelFamilyFromModel(currentChat?.model || settings.model), [currentChat?.model, settings.model]);
   const pendingUserText = [...messages].reverse().find((message) => message.role === 'user')?.content || '';
   const generatingImage = Boolean(isThinking && isImageGenerationRequest(pendingUserText));
+
+  useEffect(() => {
+    if (isThinking) setShowThinkingPanel(true);
+  }, [isThinking]);
 
   const downloadGeneratedImage = useCallback((url: string) => {
     const link = document.createElement('a');
@@ -894,9 +899,23 @@ export function ChatMessages({ messages, isStreaming, isThinking, onRegenerate, 
               <div className="flex h-7 w-7 flex-shrink-0 items-center justify-center overflow-hidden mt-0">
                 <MarsAvatar size={28} family={streamingFamily} useSimpleIcon />
               </div>
-              <div className="flex items-center py-2">
-                <GlowingThinkingText text={generatingImage ? "Generating your image" : "thinking"} />
-              </div>
+              {showThinkingPanel ? (
+                <div className="relative w-full max-w-sm rounded-2xl border border-white/[0.1] bg-black/20 px-4 py-3 shadow-[0_0_28px_rgba(255,255,255,0.05)] backdrop-blur-xl">
+                  <button type="button" onClick={() => setShowThinkingPanel(false)} className="absolute right-2 top-2 rounded-full p-1 text-muted-foreground transition hover:bg-white/10 hover:text-foreground" aria-label="Close thinking details" title="Close">
+                    <X className="h-3.5 w-3.5" />
+                  </button>
+                  <div className="mb-2 pr-6 text-[11px] font-medium uppercase tracking-[0.16em] text-muted-foreground">What I’m working on</div>
+                  <div className="flex items-center gap-2 text-sm text-foreground/90">
+                    <span className="h-2 w-2 animate-pulse rounded-full bg-white shadow-[0_0_10px_rgba(255,255,255,0.95)]" />
+                    <GlowingThinkingText text={generatingImage ? "Generating your image" : "Thinking"} />
+                  </div>
+                  <div className="mt-2 text-[11px] text-muted-foreground">I’m working through the request and preparing the best result.</div>
+                </div>
+              ) : (
+                <div className="flex items-center py-2">
+                  <GlowingThinkingText text={generatingImage ? "Generating your image" : "Thinking"} />
+                </div>
+              )}
             </motion.div>
           )}
 
