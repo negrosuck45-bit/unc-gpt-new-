@@ -6,13 +6,14 @@ const root = new URL("..", import.meta.url);
 const read = (path) => readFile(new URL(path, root), "utf8");
 
 test("connections use shared platform metadata, owner-authenticated CRUD, and public server-side display", async () => {
-  const [metadata, route, profilePage, settings, publicRow, migration] = await Promise.all([
+  const [metadata, route, profilePage, settings, publicRow, migration, repairMigration] = await Promise.all([
     read("lib/profile-connections.ts"),
     read("app/api/connections/route.ts"),
     read("app/[username]/page.tsx"),
     read("components/settings-page.tsx"),
     read("components/connections-row.tsx"),
     read("supabase/migrations/20260905150000_create_connections.sql"),
+    read("supabase/migrations/20260905210000_repair_connections_owner_key.sql"),
   ]);
 
   for (const platform of ["discord", "instagram", "tiktok", "github", "youtube", "spotify", "website"]) {
@@ -27,12 +28,15 @@ test("connections use shared platform metadata, owner-authenticated CRUD, and pu
   assert.match(publicRow, /id="profile-connections-title"/);
   assert.match(publicRow, /navigator\.clipboard/);
   assert.match(publicRow, /target="_blank"/);
-  assert.match(migration, /references auth\.users\(id\) on delete cascade/);
+  assert.match(migration, /user_id text not null/);
+  assert.doesNotMatch(migration, /references auth\.users\(id\)/);
   assert.match(migration, /enable row level security/);
   assert.match(migration, /Anyone can read public profile connections/);
   assert.match(migration, /Owners can add their own connections/);
   assert.match(migration, /Owners can update their own connections/);
   assert.match(migration, /Owners can remove their own connections/);
+  assert.match(repairMigration, /alter column user_id type text using user_id::text/);
+  assert.match(repairMigration, /drop constraint if exists connections_user_id_fkey/);
 });
 
 test("chat streaming restores model-provided thinking without private-thought wording", async () => {
@@ -49,6 +53,7 @@ test("chat streaming restores model-provided thinking without private-thought wo
   assert.match(messages, /Thinking…/);
   assert.match(interfaceCode, /setThinkingText/);
   assert.match(connectionsRow, /id="profile-connections-title"/);
-  assert.match(connectionsRow, /No connections added yet/);
-  assert.match(chatRoute, /reasoning_effort: "low"/);
+  assert.match(connectionsRow, /if \(!visibleConnections\.length\) return null/);
+  assert.doesNotMatch(connectionsRow, /No connections added yet/);
+  assert.match(chatRoute, /reasoning_effort: "high"/);
 });

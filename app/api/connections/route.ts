@@ -59,6 +59,16 @@ function unavailableResponse(message?: string) {
   return NextResponse.json({ error: message || "Connections storage is not configured." }, { status: 503 });
 }
 
+function connectionDatabaseError(error: { code?: string; message?: string } | null | undefined, fallback: string) {
+  if (error?.code === "22P02") {
+    return NextResponse.json(
+      { error: "Connections storage needs the latest database migration. Run the connections repair migration, then try again." },
+      { status: 500 },
+    );
+  }
+  return unavailableResponse(fallback);
+}
+
 export async function GET() {
   const userId = await getUserId();
   if (!userId) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
@@ -74,7 +84,7 @@ export async function GET() {
 
   if (error) {
     console.error("[connections] load failed", { code: error.code, message: error.message });
-    return unavailableResponse("Unable to load connections.");
+    return connectionDatabaseError(error, "Unable to load connections.");
   }
 
   return NextResponse.json({ connections: data ?? [] });
@@ -95,7 +105,7 @@ export async function POST(request: NextRequest) {
     .from("connections")
     .select("id", { count: "exact", head: true })
     .eq("user_id", userId);
-  if (countError) return unavailableResponse("Unable to create a connection.");
+  if (countError) return connectionDatabaseError(countError, "Unable to create a connection.");
   if ((count ?? 0) >= MAX_CONNECTIONS) return NextResponse.json({ error: `You can add up to ${MAX_CONNECTIONS} connections.` }, { status: 400 });
 
   const { data: latest, error: latestError } = await supabase
@@ -105,7 +115,7 @@ export async function POST(request: NextRequest) {
     .order("position", { ascending: false })
     .limit(1)
     .maybeSingle();
-  if (latestError) return unavailableResponse("Unable to create a connection.");
+  if (latestError) return connectionDatabaseError(latestError, "Unable to create a connection.");
 
   const { data, error } = await supabase
     .from("connections")
@@ -114,7 +124,7 @@ export async function POST(request: NextRequest) {
     .single();
   if (error) {
     console.error("[connections] create failed", { code: error.code, message: error.message });
-    return unavailableResponse("Unable to create a connection.");
+    return connectionDatabaseError(error, "Unable to create a connection.");
   }
 
   return NextResponse.json({ connection: data }, { status: 201 });

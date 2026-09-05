@@ -1097,8 +1097,10 @@ async function callNvidiaNim(
     messages: [{ role: "system", content: TERMINAL_SYSTEM_PROMPT }, ...processedMessages],
     stream: true,
     temperature: 0.35,
-    max_tokens: 4096,
-    reasoning_effort: "low",
+    // Kimi K3 supports a visible reasoning stream. Give difficult requests
+    // enough room to reason before answering instead of forcing brief output.
+    max_tokens: 8192,
+    reasoning_effort: "high",
   };
   if (tools.length > 0) {
     body.tools = tools;

@@ -312,7 +312,9 @@ export function ChatInterface({ onSwitchToImagine, onOpenSidebar, isSidebarOpen 
     const requestTimeout = window.setTimeout(() => {
       timedOut = true;
       requestController.abort();
-    }, isMediaGeneration ? 300000 : 45000);
+    // Reasoning-capable models can take longer before their first answer token.
+    // Keep the client request alive until just before the 60-second server limit.
+    }, isMediaGeneration ? 300000 : 58000);
 
     let response: Response;
     try {

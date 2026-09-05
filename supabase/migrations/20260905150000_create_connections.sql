@@ -5,7 +5,9 @@ create extension if not exists pgcrypto;
 
 create table if not exists public.connections (
   id uuid primary key default gen_random_uuid(),
-  user_id uuid not null references auth.users(id) on delete cascade,
+  -- Lunar accounts are provider-scoped strings such as "google:123...".
+  -- They are deliberately not Supabase auth.users UUIDs.
+  user_id text not null,
   platform text not null check (platform in ('discord', 'x', 'instagram', 'tiktok', 'github', 'youtube', 'spotify', 'website')),
   mode text not null check (mode in ('username', 'link')),
   value text not null check (char_length(trim(value)) between 1 and 512),
@@ -37,19 +39,19 @@ create policy "Owners can add their own connections"
   on public.connections
   for insert
   to authenticated
-  with check (auth.uid() = user_id);
+  with check (auth.uid()::text = user_id);
 
 drop policy if exists "Owners can update their own connections" on public.connections;
 create policy "Owners can update their own connections"
   on public.connections
   for update
   to authenticated
-  using (auth.uid() = user_id)
-  with check (auth.uid() = user_id);
+  using (auth.uid()::text = user_id)
+  with check (auth.uid()::text = user_id);
 
 drop policy if exists "Owners can remove their own connections" on public.connections;
 create policy "Owners can remove their own connections"
   on public.connections
   for delete
   to authenticated
-  using (auth.uid() = user_id);
+  using (auth.uid()::text = user_id);

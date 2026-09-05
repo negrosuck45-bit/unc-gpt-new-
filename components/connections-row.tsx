@@ -41,14 +41,17 @@ export function ConnectionsRow({ connections }: ConnectionsRowProps) {
     .map((connection) => ({ connection, platform: getConnectionPlatform(connection.platform) }))
     .filter((item): item is { connection: ProfileConnection; platform: NonNullable<ReturnType<typeof getConnectionPlatform>> } => Boolean(item.platform))
 
+  // A public profile should not reserve space for a feature the owner has not
+  // configured. The settings screen remains the only empty-state surface.
+  if (!visibleConnections.length) return null
+
   return (
     <section className="mt-5 w-full" aria-labelledby="profile-connections-title">
       <h2 id="profile-connections-title" className="mb-2 text-center text-[10px] font-semibold uppercase tracking-[0.2em] text-white/45">
         Connections
       </h2>
-      {visibleConnections.length ? (
-        <div className="flex flex-wrap items-start justify-center gap-3">
-          {visibleConnections.map(({ connection, platform }) => {
+      <div className="flex flex-wrap items-start justify-center gap-3">
+        {visibleConnections.map(({ connection, platform }) => {
             const Icon = platform.icon
             const copied = copiedId === connection.id
             const copyError = copyErrorId === connection.id
@@ -95,13 +98,8 @@ export function ConnectionsRow({ connections }: ConnectionsRowProps) {
                 )}
               </div>
             )
-          })}
-        </div>
-      ) : (
-        <p className="rounded-xl border border-white/10 bg-white/[0.04] px-3 py-2.5 text-center text-xs text-white/45">
-          No connections added yet.
-        </p>
-      )}
+        })}
+      </div>
     </section>
   )
 }
