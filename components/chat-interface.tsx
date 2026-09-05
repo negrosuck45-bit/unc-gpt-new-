@@ -70,6 +70,7 @@ async function persistNeuralMemory(chatId: string, messages: any[], responseCont
 export function ChatInterface({ onSwitchToImagine, onOpenSidebar, isSidebarOpen }: ChatInterfaceProps) {
   const mounted = useSyncExternalStore(() => () => {}, () => true, () => false);
   const [isThinking, setIsThinking] = useState(false);
+  const [thinkingText, setThinkingText] = useState("");
   const [connectionIssue, setConnectionIssue] = useState<ConnectionIssue>(null);
   const [cameraVoiceOpen, setCameraVoiceOpen] = useState(false);
 
@@ -107,6 +108,7 @@ export function ChatInterface({ onSwitchToImagine, onOpenSidebar, isSidebarOpen 
     triggerHaptic("send");
     unlockReplySound();
     setIsStreaming(true, chatId);
+    setThinkingText("");
     setIsThinking(true);
     abortControllerRef.current = new AbortController();
 
@@ -154,6 +156,7 @@ export function ChatInterface({ onSwitchToImagine, onOpenSidebar, isSidebarOpen 
     triggerHaptic("send");
     unlockReplySound();
     setIsStreaming(true, chatId);
+    setThinkingText("");
     setIsThinking(true);
     abortControllerRef.current = new AbortController();
 
@@ -375,6 +378,10 @@ export function ChatInterface({ onSwitchToImagine, onOpenSidebar, isSidebarOpen 
               throw new Error(String(parsed.error));
             }
 
+            if (parsed.reasoning) {
+              setThinkingText((current) => current + String(parsed.reasoning));
+            }
+
             if (parsed.permission_request) {
               const request = parsed.permission_request;
               permissionRequest = request;
@@ -487,8 +494,9 @@ export function ChatInterface({ onSwitchToImagine, onOpenSidebar, isSidebarOpen 
             <ChatMessages
               messages={currentChat?.messages || []}
               isStreaming={isCurrentChatStreaming}
-              isThinking={isThinking}
-              onRegenerate={handleRegenerate}
+  isThinking={isThinking}
+  thinkingText={thinkingText}
+  onRegenerate={handleRegenerate}
             />
           </div>
 
