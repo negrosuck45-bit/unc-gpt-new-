@@ -34,6 +34,7 @@ import {
   VolumeX,
   Download,
   Share2,
+  Sparkles,
 } from 'lucide-react';
 import { MessageContent } from './message-content';
 import { ComputerUseSteps } from './computer-use-steps';
@@ -504,11 +505,14 @@ function GlowingThinkingText({ text = "thinking" }: { text?: string }) {
     return () => clearInterval(interval);
   }, []);
 
-  const displayText = `${text}${'.'.repeat(dotCount)}`;
+  const displayText = `${text === "thinking" ? "Thinking · planning response" : text}${'.'.repeat(dotCount)}`;
   const letters = displayText.split('');
 
   return (
-    <div className="flex items-center gap-1">
+    <div className="flex items-center gap-2 rounded-full border border-white/[0.08] bg-white/[0.035] px-3 py-1.5 shadow-[0_0_24px_rgba(255,255,255,0.06)]">
+      <motion.span animate={{ rotate: 360 }} transition={{ duration: 2.8, repeat: Infinity, ease: "linear" }} className="flex h-4 w-4 items-center justify-center text-white/70">
+        <Sparkles className="h-3.5 w-3.5" />
+      </motion.span>
       <div className="flex">
         {letters.map((letter, i) => (
           <motion.span

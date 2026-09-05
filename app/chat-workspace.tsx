@@ -1,5 +1,6 @@
 "use client"
 import { useState, useEffect, useCallback, useRef, useSyncExternalStore } from "react"
+import Image from "next/image"
 import { useChatStore } from "@/lib/chat-store"
 import { dispatchAccountScopeChanged, setActiveAccountScope } from "@/lib/account-scope"
 import { ChatSidebar } from "@/components/chat-sidebar"
@@ -178,10 +179,10 @@ export default function Home({ accountScope }: { accountScope: string }) {
     >
       {showStartupGlow && (
         <div className="fixed inset-0 z-[700] flex items-center justify-center bg-black" role="status" aria-label="Opening Lunar">
-          <div className="relative h-36 w-36 animate-pulse rounded-full bg-gradient-to-br from-white via-white/95 to-white/60 shadow-[0_0_28px_rgba(255,255,255,0.95),0_0_90px_rgba(194,219,255,0.55),0_0_160px_rgba(255,255,255,0.22)]">
-            <div className="absolute -right-5 -top-5 h-36 w-36 rounded-full bg-black shadow-[-16px_10px_35px_rgba(255,255,255,0.18)]" />
-            <div className="absolute inset-y-0 left-0 w-[54%] rounded-l-full bg-gradient-to-b from-white via-white/90 to-white/55 shadow-[0_0_34px_rgba(255,255,255,0.9)]" />
-            <div className="absolute -left-10 top-1/2 h-px w-56 -translate-y-1/2 bg-gradient-to-r from-transparent via-white/50 to-transparent blur-[1px]" />
+          <div className="relative flex h-44 w-44 items-center justify-center">
+            <div className="absolute h-32 w-32 animate-pulse rounded-full bg-white/20 blur-3xl" />
+            <div className="absolute inset-x-0 top-1/2 h-px bg-gradient-to-r from-transparent via-white/45 to-transparent blur-[1px]" />
+            <Image src="/lunar-mark.svg" alt="Lunar" width={128} height={128} priority className="relative h-32 w-32 object-contain drop-shadow-[0_0_12px_rgba(255,255,255,0.95)] drop-shadow-[0_0_42px_rgba(187,211,255,0.75)]" />
           </div>
         </div>
       )}
