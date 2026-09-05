@@ -478,8 +478,10 @@ function MessageActions({ message, isAssistant, onCopy, onRegenerate, onEdit, on
     }
   }, [isSpeaking, message.content, message.id, t]);
 
+  const isGeneratedMedia = Boolean(message.image || message.video);
+
   return (
-    <div className={cn('mt-1 flex flex-wrap items-center gap-1 transition-opacity', 'opacity-100 md:opacity-0 md:group-hover:opacity-100', isAssistant ? 'ml-0' : 'mr-0 flex-row-reverse')}>
+    <div className={cn('mt-1 flex flex-wrap items-center gap-1 transition-opacity', isGeneratedMedia || !isAssistant ? 'opacity-100' : 'opacity-100 md:opacity-0 md:group-hover:opacity-100', isAssistant ? 'ml-0' : 'mr-0 flex-row-reverse')}>
       <Button variant="ghost" size="icon" className="h-7 w-7 text-muted-foreground" onClick={handleCopy} aria-label={t('copyResponse')} title={t('copyResponse')}>
         {copied ? <Check className="h-3.5 w-3.5" /> : <Copy className="h-3.5 w-3.5" />}
       </Button>
@@ -526,7 +528,7 @@ function GlowingThinkingText({ text = "thinking" }: { text?: string }) {
               delay: i * 0.08,
               ease: "easeInOut"
             }}
-            className="text-sm text-muted-foreground font-mono tracking-wider"
+            className={cn("text-sm font-mono tracking-wider", text === "Generating your image" ? "text-foreground/90" : "text-muted-foreground")}
             style={{
               textShadow: '0 0 20px rgba(255,255,255,0.3)',
             }}
