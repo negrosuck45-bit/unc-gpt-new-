@@ -3344,6 +3344,10 @@ function createStreamResponse(
                   controller.enqueue(encoder.encode(`data: ${JSON.stringify({ permission_request: data.permission_request })}\n\n`));
                 }
                 const delta = data.choices?.[0]?.delta || {};
+                const reasoning = delta.reasoning_content || delta.reasoning || data.reasoning_content || data.reasoning || "";
+                if (reasoning) {
+                  controller.enqueue(encoder.encode(`data: ${JSON.stringify({ reasoning })}\n\n`));
+                }
                 let content = delta.content || "";
                 if (!content && data.response) content = data.response;
                 if (!content && data.content) content = data.content;

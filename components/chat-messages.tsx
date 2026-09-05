@@ -24,6 +24,7 @@ import {
   Globe,
   ChevronDown,
   ChevronDown as ChevronDownIcon,
+  Lightbulb,
   BookOpen,
   Eye,
   WifiOff,
@@ -664,15 +665,20 @@ function getModelFamilyFromModel(model: string | undefined): ModelFamily {
 }
 
 // ============= MAIN COMPONENT =============
-export function ChatMessages({ messages, isStreaming, onRegenerate, onEditMessage, onRetry, searchInfo, error }: ChatMessagesProps) {
+export function ChatMessages({ messages, isStreaming, isThinking, onRegenerate, onEditMessage, onRetry, searchInfo, error, thinkingText }: ChatMessagesProps) {
   const { getCurrentChat, settings } = useChatStore();
   const currentChat = getCurrentChat();
   const [viewingAttachment, setViewingAttachment] = useState<Attachment | null>(null);
   const [viewingGeneratedImage, setViewingGeneratedImage] = useState<string | null>(null);
   const [feedbackMessage, setFeedbackMessage] = useState<Message | null>(null);
   const [toast, setToast] = useState<string | null>(null);
+  const [showThinkingPanel, setShowThinkingPanel] = useState(true);
   const [preferences, setPreferences] = useState<UserPreferences>(readUserPreferences());
   const streamingFamily = useMemo(() => getModelFamilyFromModel(currentChat?.model || settings.model), [currentChat?.model, settings.model]);
+
+  useEffect(() => {
+    if (isThinking) setShowThinkingPanel(true);
+  }, [isThinking]);
 
   const downloadGeneratedImage = useCallback((url: string) => {
     const link = document.createElement('a');
@@ -879,8 +885,49 @@ export function ChatMessages({ messages, isStreaming, onRegenerate, onEditMessag
           {/* Search indicator */}
           {searchInfo && <SearchIndicator searchInfo={searchInfo} />}
 
-          {/* Immediate status indicator. Model reasoning is intentionally never rendered. */}
-          {isStreaming && messages[messages.length - 1]?.role === 'user' && (
+          {/* Streaming thinking progress. Only provider-supplied reasoning is shown here. */}
+          {isThinking && (
+            <motion.div
+              initial={{ opacity: 0, y: 10 }}
+              animate={{ opacity: 1, y: 0 }}
+              className="flex items-start gap-3"
+            >
+              <div className="flex w-full flex-col items-start gap-2">
+                <div className="flex h-7 w-7 flex-shrink-0 items-center justify-center overflow-hidden">
+                  <MarsAvatar size={28} family={streamingFamily} useSimpleIcon />
+                </div>
+                <button
+                  type="button"
+                  onClick={() => setShowThinkingPanel((open) => !open)}
+                  aria-expanded={showThinkingPanel}
+                  aria-controls="thinking-details"
+                  className="group inline-flex min-w-0 items-center gap-1.5 rounded-lg py-0.5 pl-0.5 text-left text-muted-foreground transition hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                >
+                  <Lightbulb className="size-4 shrink-0 stroke-[1.7]" aria-hidden="true" />
+                  <span className="shrink-0 text-sm font-medium text-foreground/80">Thinking</span>
+                  <ChevronDownIcon className={cn("size-3.5 shrink-0 transition-transform", showThinkingPanel && "rotate-180")} aria-hidden="true" />
+                </button>
+                <AnimatePresence initial={false}>
+                  {showThinkingPanel && (
+                    <motion.div
+                      id="thinking-details"
+                      initial={{ opacity: 0, height: 0 }}
+                      animate={{ opacity: 1, height: "auto" }}
+                      exit={{ opacity: 0, height: 0 }}
+                      transition={{ duration: 0.2 }}
+                      className="max-h-64 w-full max-w-xl overflow-y-auto pl-0.5 pr-2 text-xs leading-6 text-muted-foreground"
+                      aria-live="polite"
+                    >
+                      {thinkingText || "Lunar is working on your request…"}
+                    </motion.div>
+                  )}
+                </AnimatePresence>
+              </div>
+            </motion.div>
+          )}
+
+          {/* Streaming indicator */}
+          {isStreaming && !isThinking && messages[messages.length - 1]?.role === 'user' && (
             <motion.div 
               initial={{ opacity: 0, y: 10 }} 
               animate={{ opacity: 1, y: 0 }} 

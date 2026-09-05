@@ -156,7 +156,7 @@ export function ConnectionsSettings() {
       {requestError && <p role="alert" className="mt-3 text-xs text-red-400">{requestError}</p>}
 
       <Dialog open={dialogOpen} onOpenChange={(open) => { if (!open) closeDialog(); else setDialogOpen(true) }}>
-        <DialogContent className="max-w-md border-white/10 bg-[#202020] text-white">
+        <DialogContent className="z-[250] max-w-md border-white/10 bg-[#202020] text-white">
           {!selectedPlatform ? (
             <>
               <DialogHeader>

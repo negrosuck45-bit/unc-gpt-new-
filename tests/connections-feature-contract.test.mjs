@@ -33,16 +33,16 @@ test("connections use shared platform metadata, owner-authenticated CRUD, and pu
   assert.match(migration, /Owners can remove their own connections/);
 });
 
-test("chat streaming does not forward or render private reasoning", async () => {
+test("chat streaming restores model-provided thinking without private-thought wording", async () => {
   const [chatRoute, messages, interfaceCode] = await Promise.all([
     read("app/api/chat/route.ts"),
     read("components/chat-messages.tsx"),
     read("components/chat-interface.tsx"),
   ]);
 
-  assert.doesNotMatch(chatRoute, /JSON\.stringify\(\{ reasoning \}\)/);
+  assert.match(chatRoute, /JSON\.stringify\(\{ reasoning \}\)/);
   assert.doesNotMatch(messages, /private chain-of-thought/);
-  assert.match(messages, /Responding…/);
-  assert.doesNotMatch(interfaceCode, /setThinkingText/);
+  assert.match(messages, /Thinking/);
+  assert.match(interfaceCode, /setThinkingText/);
   assert.match(chatRoute, /reasoning_effort: "low"/);
 });
