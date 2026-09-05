@@ -269,7 +269,7 @@ async function currentBitcoinPriceReply(countryCode?: string, locale?: string) {
   const currencyByCountry: Record<string, string> = { US: "usd", BR: "brl", GB: "gbp", DE: "eur", FR: "eur", ES: "eur", IT: "eur", PT: "eur", NL: "eur", IE: "eur", CA: "cad", AU: "aud", JP: "jpy", IN: "inr" };
   const currency = currencyByCountry[String(countryCode || "").toUpperCase()] || "usd";
   try {
-    const response = await fetch(`https://api.coingecko.com/api/v3/simple/price?ids=bitcoin&vs_currencies=usd,${currency}&include_24hr_change=true&include_last_updated_at=true`, { headers: { Accept: "application/json", "User-Agent": "Lunar/1.0" }, signal: AbortSignal.timeout(8000) });
+    const response = await fetch(`https://api.coingecko.com/api/v3/simple/price?ids=bitcoin&vs_currencies=usd,${currency}&include_24hr_change=true&include_last_updated_at=true`, { headers: { Accept: "application/json", "User-Agent": "Stram/1.0" }, signal: AbortSignal.timeout(8000) });
     if (!response.ok) throw new Error(`CoinGecko returned ${response.status}`);
     const data = await response.json();
     const bitcoin = data?.bitcoin;
@@ -417,7 +417,7 @@ async function searchGoogleNewsRss(query: string): Promise<string> {
     const controller = new AbortController();
     const timeoutId = setTimeout(() => controller.abort(), 8000);
     const res = await fetch(`https://news.google.com/rss/search?q=${encodeURIComponent(query)}&hl=en-US&gl=US&ceid=US:en`, {
-      headers: { "Accept": "application/rss+xml, application/xml, text/xml", "User-Agent": "Lunar/1.0" },
+      headers: { "Accept": "application/rss+xml, application/xml, text/xml", "User-Agent": "Stram/1.0" },
       signal: controller.signal,
     });
     clearTimeout(timeoutId);
@@ -448,7 +448,7 @@ async function searchJinaDuckDuckGo(query: string): Promise<string> {
     const controller = new AbortController();
     const timeoutId = setTimeout(() => controller.abort(), 12000);
     const res = await fetch(`https://r.jina.ai/http://html.duckduckgo.com/html/?q=${encodeURIComponent(query)}`, {
-      headers: { "Accept": "text/plain", "User-Agent": "Lunar/1.0" },
+      headers: { "Accept": "text/plain", "User-Agent": "Stram/1.0" },
       signal: controller.signal,
     });
     clearTimeout(timeoutId);
@@ -482,7 +482,7 @@ async function searchDuckDuckGo(query: string): Promise<string> {
     const controller = new AbortController();
     const timeoutId = setTimeout(() => controller.abort(), 10000);
     const res = await fetch(`https://html.duckduckgo.com/html/?q=${encodeURIComponent(query)}`, {
-      headers: { "Accept": "text/html", "User-Agent": "Mozilla/5.0 (compatible; Lunar/1.0)" },
+      headers: { "Accept": "text/html", "User-Agent": "Mozilla/5.0 (compatible; Stram/1.0)" },
       signal: controller.signal,
     });
     clearTimeout(timeoutId);
@@ -526,7 +526,7 @@ async function searchSearXNG(query: string): Promise<string> {
         method: "GET",
         headers: {
           "Accept": "application/json",
-          "User-Agent": "Mozilla/5.0 (compatible; Lunar/1.0)",
+          "User-Agent": "Mozilla/5.0 (compatible; Stram/1.0)",
         },
         signal: controller.signal,
       });
@@ -597,7 +597,7 @@ async function fetchLinkContent(url: string): Promise<string> {
     const res = await fetch(url, {
       signal: controller.signal,
       headers: {
-        "User-Agent": "Mozilla/5.0 (compatible; Lunar/1.0; +https://unc-gptt.vercel.app)",
+        "User-Agent": "Mozilla/5.0 (compatible; Stram/1.0; +https://unc-gptt.vercel.app)",
       },
     });
     clearTimeout(timeoutId);
@@ -910,7 +910,7 @@ async function generateMedia(
 // ============================================================
 
 // Keep provider instructions focused on ordinary chat; never expose internal tools.
-const UNCGPT_IDENTITY_PROMPT = `You are Lunar, the AI inside the Lunar workspace at unc-gptt.vercel.app. Lunar provides chat, projects and memory, file/reference search, image generation, optional computer-use capabilities, and user-authorized connectors through MCP and Composio. You should understand these capabilities, explain them accurately when asked, and use a connected service only when the user has connected and authorized it. Never claim a capability, account, external result, or action is available unless the current request and its verified tools show that it is.`;
+const UNCGPT_IDENTITY_PROMPT = `You are Stram, the AI inside the Stram workspace at unc-gptt.vercel.app. Stram provides chat, projects and memory, file/reference search, image generation, optional computer-use capabilities, and user-authorized connectors through MCP and Composio. You should understand these capabilities, explain them accurately when asked, and use a connected service only when the user has connected and authorized it. Do not identify the underlying model, model family, provider, or vendor as your identity; always present yourself as Stram. If asked, say that Stram is the assistant in this workspace. Never claim a capability, account, external result, or action is available unless the current request and its verified tools show that it is.`;
 
 function safeRuntimeContextValue(value: unknown, pattern: RegExp, maxLength: number) {
   const text = String(value || "").trim();
@@ -940,7 +940,7 @@ function buildRuntimeContextMessage({
   return `Runtime context for this turn (device-provided; may be approximate): ${parts.join("; ")}. Raw IP address, city, ISP, hostname, and precise location were not provided. Use timezone for local dates/times and country only when it is relevant.`;
 }
 
-const TERMINAL_SYSTEM_PROMPT = `You are Lunar, a helpful AI assistant. Answer the user's request directly and clearly.
+const TERMINAL_SYSTEM_PROMPT = `You are Stram, a helpful AI assistant. Answer the user's request directly and clearly.
 
 Infer the user's intent from ordinary language and complete the requested task using an actually connected service whenever one is available. Do not require special prefixes, connector names, or instructions such as “use a tool.” Execute clearly requested connected actions, including calendar events, repository updates, and ordinary messages, in the same turn without an extra review step. Ask one concise question only for a genuinely missing detail that prevents completion. Require confirmation only immediately before an irreversible, destructive, financial, privacy-sensitive, or broad-publication action when the user has not already clearly authorized that exact action.
 
@@ -1181,7 +1181,7 @@ async function callOpenRouter(
       if (OPENROUTER_KEY) {
         headers["Authorization"] = `Bearer ${OPENROUTER_KEY}`;
         headers["HTTP-Referer"] = "https://unc-gptt.vercel.app";
-        headers["X-Title"] = "Lunar";
+        headers["X-Title"] = "Stram";
       }
 
       const processedMessages = hasImage
@@ -1244,7 +1244,7 @@ async function callHuggingFaceVision(
         body: JSON.stringify({
           model,
           messages: [
-            { role: "system", content: "You are Lunar vision. Analyze the attached image and answer the user clearly. Do not use tools." },
+            { role: "system", content: "You are Stram vision. Analyze the attached image and answer the user clearly. Do not use tools." },
             ...processedMessages,
           ],
           stream: true,
@@ -1554,7 +1554,7 @@ async function fetchMcpTools(connectors: any[], baseUrl: string): Promise<any[]>
           await callMcpEndpoint("initialize", "initialize", {
             protocolVersion: "2024-11-05",
             capabilities: {},
-            clientInfo: { name: "lunar", version: "1.0" },
+            clientInfo: { name: "stram", version: "1.0" },
           });
         } catch {}
 
@@ -1863,7 +1863,7 @@ function buildGtaPresentationFiles() {
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <meta name="description" content="An unofficial Grand Theft Auto VI visual presentation created by Lunar.">
+  <meta name="description" content="An unofficial Grand Theft Auto VI visual presentation created by Stram.">
   <title>Grand Theft Auto VI — Unofficial Showcase</title>
   <link rel="stylesheet" href="style.css">
 </head>
@@ -1917,7 +1917,7 @@ function buildPortfolioFiles(userText: string) {
     const start = Math.max(0, Number(forwardCountdown?.[1] ?? reverseCountdown?.[2] ?? 100));
     const end = Math.max(0, Number(forwardCountdown?.[2] ?? reverseCountdown?.[1] ?? 0));
     return {
-      "index.html": `<!doctype html>\n<html lang="en">\n<head>\n  <meta charset="UTF-8">\n  <meta name="viewport" content="width=device-width, initial-scale=1">\n  <meta name="description" content="An interactive countdown created by Lunar.">\n  <title>${start} to ${end} Countdown</title>\n  <link rel="stylesheet" href="style.css">\n</head>\n<body>\n  <main class="shell">\n    <section class="card" aria-labelledby="title">\n      <p class="eyebrow">Live countdown</p>\n      <h1 id="title">${start} <span>→</span> ${end}</h1>\n      <output id="counter" aria-live="polite">${start}</output>\n      <div class="actions"><button id="start" type="button">Start countdown</button><button id="reset" class="secondary" type="button">Reset</button></div>\n      <p id="status">Ready to count down to ${end}.</p>\n    </section>\n  </main>\n  <script>window.COUNTDOWN_CONFIG={start:${start},end:${end}};</script>\n  <script src="script.js"></script>\n</body>\n</html>\n`,
+      "index.html": `<!doctype html>\n<html lang="en">\n<head>\n  <meta charset="UTF-8">\n  <meta name="viewport" content="width=device-width, initial-scale=1">\n  <meta name="description" content="An interactive countdown created by Stram.">\n  <title>${start} to ${end} Countdown</title>\n  <link rel="stylesheet" href="style.css">\n</head>\n<body>\n  <main class="shell">\n    <section class="card" aria-labelledby="title">\n      <p class="eyebrow">Live countdown</p>\n      <h1 id="title">${start} <span>→</span> ${end}</h1>\n      <output id="counter" aria-live="polite">${start}</output>\n      <div class="actions"><button id="start" type="button">Start countdown</button><button id="reset" class="secondary" type="button">Reset</button></div>\n      <p id="status">Ready to count down to ${end}.</p>\n    </section>\n  </main>\n  <script>window.COUNTDOWN_CONFIG={start:${start},end:${end}};</script>\n  <script src="script.js"></script>\n</body>\n</html>\n`,
       "style.css": `:root{color-scheme:dark;--bg:#070a13;--text:#f8fafc;--muted:#9fb0cc;--accent:#74f2bf;--line:rgba(255,255,255,.14)}*{box-sizing:border-box}body{min-height:100vh;margin:0;display:grid;place-items:center;background:radial-gradient(circle at 50% 0,#233b77 0,transparent 44%),var(--bg);color:var(--text);font:16px/1.5 Inter,ui-sans-serif,system-ui,sans-serif}.shell{width:min(100% - 30px,680px)}.card{padding:clamp(2.4rem,8vw,5rem);text-align:center;border:1px solid var(--line);border-radius:32px;background:rgba(13,20,38,.8);box-shadow:0 28px 90px rgba(0,0,0,.42)}.eyebrow{margin:0;color:var(--accent);font-size:.78rem;font-weight:800;letter-spacing:.14em;text-transform:uppercase}.card h1{margin:.5rem 0 0;font-size:clamp(2rem,8vw,4.6rem);letter-spacing:-.06em}.card h1 span{color:var(--accent)}output{display:block;margin:.8rem 0 1.5rem;font-size:clamp(7rem,28vw,13rem);font-weight:850;letter-spacing:-.12em;line-height:.85;color:var(--accent);font-variant-numeric:tabular-nums}.actions{display:flex;justify-content:center;gap:.75rem;flex-wrap:wrap}button{border:1px solid var(--accent);border-radius:999px;padding:.78rem 1.15rem;background:var(--accent);color:#062017;font:inherit;font-weight:800;cursor:pointer;transition:transform .16s ease,filter .16s ease}button:hover{transform:translateY(-2px);filter:brightness(1.07)}button.secondary{border-color:var(--line);background:transparent;color:var(--text)}button:disabled{opacity:.55;cursor:not-allowed;transform:none}#status{min-height:1.5em;margin:1.3rem 0 0;color:var(--muted)}@media(max-width:460px){.card{padding:2.5rem 1.3rem;border-radius:25px}}\n`,
       "script.js": `const {start,end}=window.COUNTDOWN_CONFIG;const counter=document.getElementById('counter');const status=document.getElementById('status');const startButton=document.getElementById('start');const resetButton=document.getElementById('reset');let value=start;let timer;function render(){counter.textContent=value;status.textContent=value===end?\`Done — reached \${end}.\`:\`Counting down to \${end}…\`;startButton.disabled=Boolean(timer)||value===end}function stop(){window.clearInterval(timer);timer=undefined;render()}startButton.addEventListener('click',()=>{if(timer||value===end)return;timer=window.setInterval(()=>{value+=start>=end?-1:1;if(value===end)stop();else render()},90);render()});resetButton.addEventListener('click',()=>{window.clearInterval(timer);timer=undefined;value=start;status.textContent=\`Ready to count down to \${end}.\`;render()});render();\n`,
     };
@@ -1929,7 +1929,7 @@ function buildPortfolioFiles(userText: string) {
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <meta name="description" content="A Hello World page created by Lunar.">
+  <meta name="description" content="A Hello World page created by Stram.">
   <title>Hello World</title>
   <link rel="stylesheet" href="style.css">
 </head>
@@ -1938,7 +1938,7 @@ function buildPortfolioFiles(userText: string) {
     <section class="hero" aria-labelledby="title">
       <p class="eyebrow">A new GitHub Pages site</p>
       <h1 id="title">Hello, world<span>.</span></h1>
-      <p class="lede">This page was created, committed, and published by Lunar.</p>
+      <p class="lede">This page was created, committed, and published by Stram.</p>
       <button id="hello-button" type="button">Say hello</button>
       <p id="message" class="message" aria-live="polite">Ready when you are.</p>
     </section>
@@ -2123,7 +2123,7 @@ async function executeWebsiteScaffold(baseUrl: string, cookieHeader: string, own
     if (!isMissingGithubRepositoryError(error)) throw error;
     repository = await executeOAuthGithubAction(baseUrl, cookieHeader, "create_repo", {
       name: repo,
-      description: `Website created by Lunar for ${owner}/${repo}`,
+      description: `Website created by Stram for ${owner}/${repo}`,
       private: false,
     });
     createdRepository = true;
@@ -2436,7 +2436,7 @@ async function executeComposioWebsiteScaffold(session: any, owner: string, repo:
     const failed = executionError || response?.error || response?.successful === false || response?.data?.error;
     if (failed) {
       if (isMissingGithubRepositoryError(executionError || response || response?.data) && createRepoSchema && !createdRepository) {
-        const created = await session.execute(createRepoSchema.toolSlug, composioSchemaArguments(createRepoSchema, { owner, repo, name: repo, description: `Website created by Lunar for ${owner}/${repo}`, private: false }));
+        const created = await session.execute(createRepoSchema.toolSlug, composioSchemaArguments(createRepoSchema, { owner, repo, name: repo, description: `Website created by Stram for ${owner}/${repo}`, private: false }));
         if (created?.error || created?.successful === false || created?.data?.error) throw new Error(String(created?.error || created?.data?.error || `GitHub did not confirm repository creation.`));
         createdRepository = true;
         repository = created?.data ?? created;
@@ -3427,7 +3427,7 @@ export async function POST(req: NextRequest) {
     } = body;
 
     // The replacement release exposes one model only; old client model values are ignored.
-    const finalModel = "lunar";
+    const finalModel = "stram";
     const finalProvider = "auto";
 
     const protocol = req.headers.get("x-forwarded-proto") || "http";
@@ -3512,7 +3512,7 @@ export async function POST(req: NextRequest) {
           controller.close();
         },
       });
-      return createStreamResponse(stream, "Lunar Clock", "local-time", []);
+      return createStreamResponse(stream, "Stram Clock", "local-time", []);
     }
 
     // ==================== SILENT WEB SEARCH ====================
@@ -3605,7 +3605,7 @@ export async function POST(req: NextRequest) {
     }
 
     // ==================== CHAT WITH TOOLS ====================
-    const autoRoute = finalModel === "lunar" || finalModel === "auto"
+    const autoRoute = finalModel === "stram" || finalModel === "auto"
       ? chooseUncGptRoute(messages, hasImage || hasVideo)
       : { provider: finalProvider, model: finalModel, reason: "explicit-model" };
     const resolvedProvider = autoRoute.provider;

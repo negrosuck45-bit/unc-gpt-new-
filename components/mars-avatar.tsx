@@ -9,7 +9,7 @@ import { type ModelFamily } from "@/lib/chat-store";
 
 // ----- Texture mapping by model family -----
 const TEXTURE_MAP: Record<ModelFamily | string, string> = {
-  auto: "/lunar-mark.svg",
+  auto: "/stram-mark.svg",
   claude: "/claude-icon.svg",
   llama: "/llama.png",
   qwen: "/qwen.png",
@@ -18,7 +18,7 @@ const TEXTURE_MAP: Record<ModelFamily | string, string> = {
   gemma: "/gemma.png",
   glm: "/glm.png",
   "gpt-oss": "/gpt-oss.png",
-  default: "/lunar-mark.svg",
+  default: "/stram-mark.svg",
 };
 
 // ----- Sphere with texture loading + fallback -----
@@ -93,16 +93,16 @@ export function MarsAvatar({ model, family, size = 32, useSimpleIcon = false }: 
 
   determinedFamily = determinedFamily ?? "auto";
 
-  // Lunar's brand mark is intentionally a transparent, borderless crescent.
+  // Stram's brand mark is intentionally a transparent, borderless crescent.
   // It must not be rendered as a circular crop or a 3D sphere.
   if (determinedFamily === "auto") {
-    return <Image src="/lunar-mark.svg" alt="Lunar" width={size} height={size} style={{ width: size, height: size }} className="object-contain" />;
+    return <Image src="/stram-mark.svg" alt="Stram" width={size} height={size} style={{ width: size, height: size }} className="object-contain" />;
   }
 
   // Simple icon mode (faster, no 3D rendering)
   if (useSimpleIcon) {
     const iconMap: Record<ModelFamily, string> = {
-      auto: "/lunar-mark.svg",
+      auto: "/stram-mark.svg",
       claude: "/claude-icon.svg",
       llama: "/llama.png",
       qwen: "/qwen.png",

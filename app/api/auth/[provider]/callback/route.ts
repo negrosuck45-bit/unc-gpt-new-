@@ -107,7 +107,7 @@ async function githubUser(accessToken: string): Promise<LunarSessionUser | null>
     headers: {
       Authorization: `Bearer ${accessToken}`,
       Accept: "application/vnd.github+json",
-      "User-Agent": "Lunar",
+      "User-Agent": "Stram",
     },
     cache: "no-store",
   })
@@ -122,7 +122,7 @@ async function githubUser(accessToken: string): Promise<LunarSessionUser | null>
       headers: {
         Authorization: `Bearer ${accessToken}`,
         Accept: "application/vnd.github+json",
-        "User-Agent": "Lunar",
+        "User-Agent": "Stram",
       },
       cache: "no-store",
     })
@@ -151,11 +151,11 @@ async function providerUser(provider: LunarOAuthProvider, accessToken: string) {
 }
 
 function oauthFailure(request: Request, provider: LunarOAuthProvider, code: "cancelled" | "unavailable" | "failed" | "unverified", stage = "unknown") {
-  console.warn(`[Lunar OAuth] callback failed provider=${provider} code=${code} stage=${stage}`)
+  console.warn(`[Stram OAuth] callback failed provider=${provider} code=${code} stage=${stage}`)
   // In an installed/PWA flow the provider can return through a separate
-  // browser context while the original Lunar session is already valid. Do
+  // browser context while the original Stram session is already valid. Do
   // not replace that valid session with a frightening login error screen.
-  const hasExistingSession = /(?:^|;\s*)lunar_session=/.test(request.headers.get("cookie") || "")
+  const hasExistingSession = /(?:^|;\s*)(?:stram_session|lunar_session)=/.test(request.headers.get("cookie") || "")
   const response = hasExistingSession
     ? NextResponse.redirect(new URL("/", request.url))
     : lunarAuthFailure(request, code)
@@ -183,7 +183,7 @@ export async function GET(request: Request, context: { params: Promise<{ provide
   const accountScope = await resolveLunarAccountScope(user)
   if (!accountScope) return oauthFailure(request, provider, "failed", "account_bridge")
 
-  console.info(`[Lunar OAuth] callback success provider=${provider} account_scope=${accountScope.startsWith("user_") ? "legacy" : "new"}`)
+  console.info(`[Stram OAuth] callback success provider=${provider} account_scope=${accountScope.startsWith("user_") ? "legacy" : "new"}`)
   const response = await lunarAuthSuccess(request, user, accountScope)
   clearLunarOAuthState(response, provider)
   return response

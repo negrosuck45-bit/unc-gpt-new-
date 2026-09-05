@@ -3,7 +3,7 @@ import Link from "next/link"
 export const dynamic = "force-dynamic"
 
 const reasonCopy: Record<string, string> = {
-  "the connection is not enabled": "This social connection is not enabled for the Lunar Clerk application yet.",
+  "the connection is not enabled": "This social connection is not enabled for the Stram Clerk application yet.",
   "unauthorized": "This sign-in provider is not authorized for the current application.",
 }
 
@@ -26,7 +26,7 @@ export default async function AuthErrorPage({
         <p className="mt-3 text-sm leading-6 text-white/60">{message}</p>
         <div className="mt-8 grid gap-3">
           <Link href="/" className="flex h-12 items-center justify-center rounded-2xl bg-white px-5 text-sm font-semibold text-black transition hover:bg-white/90">Back to sign in</Link>
-          <a href="mailto:support@Lunar.com?subject=Social%20sign-in%20problem" className="flex h-12 items-center justify-center rounded-2xl border border-white/12 bg-white/[0.045] px-5 text-sm font-medium text-white/85 transition hover:bg-white/[0.09]">Get help</a>
+          <a href="mailto:support@Stram.com?subject=Social%20sign-in%20problem" className="flex h-12 items-center justify-center rounded-2xl border border-white/12 bg-white/[0.045] px-5 text-sm font-medium text-white/85 transition hover:bg-white/[0.09]">Get help</a>
         </div>
       </section>
     </main>

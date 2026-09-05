@@ -2,8 +2,8 @@ import type { MetadataRoute } from "next"
 
 export default function manifest(): MetadataRoute.Manifest {
   return {
-    name: "Lunar",
-    short_name: "Lunar",
+    name: "Stram",
+    short_name: "Stram",
     description: "A clean AI workspace with chat, projects, and memory.",
     start_url: "/",
     scope: "/",

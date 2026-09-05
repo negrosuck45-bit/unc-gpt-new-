@@ -228,7 +228,7 @@ export function OAuthConnectors() {
               <h2 className="text-[21px] font-semibold tracking-[-0.035em] text-white">Connectors</h2>
               {connectedCount > 0 && <span className="rounded-full bg-emerald-400/12 px-2.5 py-1 text-[11px] font-medium text-emerald-200">{connectedCount} active</span>}
             </div>
-            <p className="mt-1.5 max-w-xl text-[13px] leading-5 text-zinc-400">Give Lunar secure access to the tools you use. Disconnect or pause access anytime.</p>
+            <p className="mt-1.5 max-w-xl text-[13px] leading-5 text-zinc-400">Give Stram secure access to the tools you use. Disconnect or pause access anytime.</p>
           </div>
           <button type="button" onClick={() => void refresh()} className="inline-flex h-11 w-11 shrink-0 items-center justify-center rounded-full border border-white/[0.13] bg-white/[0.045] text-zinc-400 transition hover:bg-white/[0.09] hover:text-white active:scale-95" aria-label="Refresh connector status" title="Refresh connector status">
             <RefreshCw className="h-4 w-4" />
@@ -299,7 +299,7 @@ export function OAuthConnectors() {
         {!visibleProviders.length && <div className="rounded-[20px] border border-dashed border-white/10 px-4 py-10 text-center text-sm text-zinc-500">No connectors match “{query}”. Try a different search.</div>}
       </div>
 
-      <div className="flex items-center gap-2 border-t border-white/[0.08] bg-black/15 px-4 py-3 text-xs leading-5 text-zinc-500 sm:px-6"><Network className="h-3.5 w-3.5 shrink-0" /> Connections use secure authorization. Lunar only uses an app when you ask it to.</div>
+      <div className="flex items-center gap-2 border-t border-white/[0.08] bg-black/15 px-4 py-3 text-xs leading-5 text-zinc-500 sm:px-6"><Network className="h-3.5 w-3.5 shrink-0" /> Connections use secure authorization. Stram only uses an app when you ask it to.</div>
     </section>
   );
 }

@@ -10,16 +10,16 @@ import "./globals.css"
 export const dynamic = "force-dynamic"
 
 export const metadata: Metadata = {
-  title: "Lunar",
+  title: "Stram",
   description: "A clean AI workspace with chat, projects, and memory.",
   icons: {
-    icon: "/lunar-mark.svg",
-    shortcut: "/lunar-mark.svg",
+    icon: "/stram-mark.svg",
+    shortcut: "/stram-mark.svg",
     apple: "/apple-touch-icon.png",
   },
   appleWebApp: {
     capable: true,
-    title: "Lunar",
+    title: "Stram",
     statusBarStyle: "black-translucent",
   },
 }

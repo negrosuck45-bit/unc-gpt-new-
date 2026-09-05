@@ -63,7 +63,7 @@ export function ConnectorPermissionCard({ request }: { request: ConnectorPermiss
             <p className="truncate text-sm font-medium text-foreground">{request.label}</p>
             <ShieldCheck className="h-3.5 w-3.5 shrink-0 text-emerald-400/80" />
           </div>
-          <p className="mt-0.5 text-xs leading-5 text-muted-foreground">{request.mode === "connect" ? `Connect ${request.label} to let Lunar ${request.description.toLowerCase()}.` : `Turn on ${request.label} for this chat so Lunar can ${request.description.toLowerCase()}.`}</p>
+          <p className="mt-0.5 text-xs leading-5 text-muted-foreground">{request.mode === "connect" ? `Connect ${request.label} to let Stram ${request.description.toLowerCase()}.` : `Turn on ${request.label} for this chat so Stram can ${request.description.toLowerCase()}.`}</p>
         </div>
       </div>
       <div className="mt-3 flex items-center justify-between gap-3 border-t border-white/10 pt-3">

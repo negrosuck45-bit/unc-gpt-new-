@@ -67,7 +67,7 @@ export function AuthPanel({ mode = "sign-in" }: AuthPanelProps) {
   }, [language])
 
   const isSignUp = mode === "sign-up"
-  const heading = isSignUp ? t("signUpTitle") : "Welcome to Lunar"
+  const heading = isSignUp ? t("signUpTitle") : "Welcome to Stram"
   const subheading = isSignUp ? t("createAccount") : t("welcomeBack")
   const primaryProvider = providers[0]
   const compactProviders = providers.slice(1)

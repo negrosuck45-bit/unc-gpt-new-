@@ -42,7 +42,7 @@ function getAdminClient() {
 async function getProfile(username: string): Promise<Profile | null> {
   const normalized = username.trim().replace(/^@+/, "");
   if (!/^[A-Za-z0-9_]{1,24}$/.test(normalized)) return null;
-  if (normalized.toLowerCase() === "lunar") return { user_id: null, username: "lunar", bio: "The official Lunar profile.", profile_picture: "/lunar-mark.svg", avatar_decoration_url: null, background_media: null, background_media_type: null, music_url: null, music_name: null, music_thumbnail: null, profile_views: 0, cursor_image: null, is_verified: true };
+  if (normalized.toLowerCase() === "stram") return { user_id: null, username: "stram", bio: "The official Stram profile.", profile_picture: "/stram-mark.svg", avatar_decoration_url: null, background_media: null, background_media_type: null, music_url: null, music_name: null, music_thumbnail: null, profile_views: 0, cursor_image: null, is_verified: true };
   const supabase = getAdminClient();
   if (!supabase) return null;
   const selectFields = "user_id,username,bio,profile_picture,avatar_decoration_url,background_media,background_media_type,music_url,music_name,music_thumbnail,profile_views,cursor_image";
@@ -80,10 +80,10 @@ async function getConnections(userId: string | null): Promise<ProfileConnection[
 export async function generateMetadata({ params }: { params: Promise<{ username: string }> }) {
   const { username } = await params;
   const profile = await getProfile(username);
-  if (!profile) return { title: "Profile not found · Lunar" };
+  if (!profile) return { title: "Profile not found · Stram" };
   return {
-    title: `@${profile.username} · Lunar`,
-    description: profile.bio || `Public profile for @${profile.username} on Lunar`,
+    title: `@${profile.username} · Stram`,
+    description: profile.bio || `Public profile for @${profile.username} on Stram`,
   };
 }
 
@@ -113,7 +113,7 @@ export default async function PublicProfilePage({ params }: { params: Promise<{ 
           musicName={profile.music_name}
           musicThumbnail={profile.music_thumbnail}
           profileViews={profile.profile_views ?? 0}
-          isVerified={profile.is_verified ?? profile.username.toLowerCase() === "lunar"}
+          isVerified={profile.is_verified ?? profile.username.toLowerCase() === "stram"}
           connections={connections}
         />
       </section>

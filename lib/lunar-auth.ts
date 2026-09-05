@@ -2,7 +2,8 @@ import { cookies } from "next/headers"
 import { NextResponse } from "next/server"
 import { jwtVerify, SignJWT } from "jose"
 
-export const LUNAR_SESSION_COOKIE = "lunar_session"
+export const LUNAR_SESSION_COOKIE = "stram_session"
+const LEGACY_SESSION_COOKIE = "lunar_session"
 const SESSION_ISSUER = "lunar"
 const SESSION_AUDIENCE = "lunar-web"
 const SESSION_DURATION_SECONDS = 60 * 60 * 24 * 30
@@ -35,7 +36,7 @@ function authSecret() {
 }
 
 function stateCookieName(provider: LunarOAuthProvider) {
-  return `lunar_oauth_state_${provider}`
+  return `stram_oauth_state_${provider}`
 }
 
 function base64Url(bytes: Uint8Array) {
@@ -191,7 +192,8 @@ export async function getLunarSessionFromToken(token: string | undefined): Promi
 }
 
 export async function getLunarSession(): Promise<LunarSession | null> {
-  const token = (await cookies()).get(LUNAR_SESSION_COOKIE)?.value
+  const cookieStore = await cookies()
+  const token = cookieStore.get(LUNAR_SESSION_COOKIE)?.value ?? cookieStore.get(LEGACY_SESSION_COOKIE)?.value
   return getLunarSessionFromToken(token)
 }
 
@@ -201,6 +203,7 @@ export async function attachLunarSession(response: NextResponse, user: LunarSess
 
 export function clearLunarSession(response: NextResponse) {
   response.cookies.set(LUNAR_SESSION_COOKIE, "", { ...sessionCookieOptions(0), maxAge: 0 })
+  response.cookies.set(LEGACY_SESSION_COOKIE, "", { ...sessionCookieOptions(0), maxAge: 0 })
 }
 
 export function lunarAuthFailure(request: Request, code: "cancelled" | "unavailable" | "failed" | "unverified") {
