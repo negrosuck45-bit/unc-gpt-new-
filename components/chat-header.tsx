@@ -1,6 +1,6 @@
 import { type Chat, type Project } from "@/lib/chat-store"
 import { Button } from "@/components/ui/button"
-import { Bell, Menu, PanelLeftClose } from "lucide-react"
+import { Bell, Camera, Menu, PanelLeftClose } from "lucide-react"
 import { useUiText } from "@/lib/ui-translations"
 
 interface ChatHeaderProps {
@@ -8,10 +8,11 @@ interface ChatHeaderProps {
   chat: Chat | null
   activeModelInfo?: { provider: string; model: string } | null
   onOpenSidebar?: () => void
+  onOpenCameraVoice?: () => void
   isSidebarOpen?: boolean
 }
 
-export function ChatHeader({ onOpenSidebar, isSidebarOpen }: ChatHeaderProps) {
+export function ChatHeader({ onOpenSidebar, onOpenCameraVoice, isSidebarOpen }: ChatHeaderProps) {
   const t = useUiText()
   return (
     <header className="task-header flex shrink-0 items-center gap-2 px-4 pb-3 pt-[max(0.75rem,env(safe-area-inset-top))] sm:px-7 sm:pb-4 sm:pt-5">
@@ -38,6 +39,18 @@ export function ChatHeader({ onOpenSidebar, isSidebarOpen }: ChatHeaderProps) {
           <path d="M20.4 14.4a8.5 8.5 0 0 1-10.8-10.8A8.5 8.5 0 1 0 20.4 14.4Z" />
         </svg>
       </span>
+      {onOpenCameraVoice && (
+        <Button
+          variant="ghost"
+          size="icon"
+          onClick={onOpenCameraVoice}
+          aria-label="Open camera voice"
+          title="Open camera voice"
+          className="task-header-icon h-10 w-10 shrink-0 rounded-full"
+        >
+          <Camera className="h-[18px] w-[18px]" strokeWidth={1.8} />
+        </Button>
+      )}
       <Button
         variant="ghost"
         size="icon"

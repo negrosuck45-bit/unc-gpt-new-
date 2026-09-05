@@ -8,9 +8,11 @@ import { executeAgentGateway, gatewayResultText } from "@/lib/agent-gateway";
 import { normalizeConnectorResult } from "@/lib/connector-results";
 import { composioToolkitSlug, connectorKeysMatch, isCalendarSchedulingIntent, isConnectorWriteIntent, isWrappedConnectorFailure, normalizeConnectorKeyForRouting, parseDeterministicCalendarCreate } from "@/lib/connector-action-safety";
 import { languagePreferenceInstruction } from "@/lib/language-preferences";
+import { detectWebsiteFeedbackIntent, websiteFeedbackInstruction } from "@/lib/website-feedback-intent.mjs";
+import { generateMiniMaxImage, generateMiniMaxVideo, hasMiniMaxMediaKey, isExplicitMediaGenerationRequest } from "@/lib/minimax-media";
 
 export const runtime = "nodejs";
-
+export const maxDuration = 300;
 const conversations = new Map<string, any>();
 
 function generateId() {
@@ -164,10 +166,10 @@ const CHAT_WORKER_URLS = [
   "https://cf-worker-2.blackmonkey098gg.workers.dev",
   "https://cf-worker-3.blackmonkey098gg.workers.dev",
 ];
-const IMAGE_VIDEO_WORKER_URL = "https://fragrant-band-d94a.blackmonkey098gg.workers.dev";
+const IMAGE_VIDEO_WORKER_URL = process.env.IMAGE_VIDEO_WORKER_URL || "https://old-hat-dab9.gamingac527.workers.dev";
 const IMAGE_MODELS = [
-  "@cf/black-forest-labs/flux-2-dev",
   "@cf/black-forest-labs/flux-1-schnell",
+  "@cf/black-forest-labs/flux-2-dev",
   "@cf/stabilityai/stable-diffusion-xl-base-1.0",
   "@cf/bytedance/stable-diffusion-xl-lightning",
   "@cf/lykon/dreamshaper-8-lcm",
@@ -209,6 +211,9 @@ const CEREBRAS_URL = "https://api.cerebras.ai/v1/chat/completions";
 const CEREBRAS_KEY = process.env.CEREBRAS_API_KEY || process.env.CEREBRAS_KEY || "";
 const OPENAI_KEY = process.env.OPENAI_API_KEY || "";
 const OPENAI_CHAT_MODEL = process.env.OPENAI_CHAT_MODEL || "gpt-4.1-mini";
+const MINIMAX_CHAT_MODEL = process.env.MINIMAX_CHAT_MODEL || "MiniMax-M2.1";
+const NVIDIA_NIM_KEY = process.env.NVIDIA_NIM_API_KEY || process.env.NVIDIA_API_KEY || "";
+const NVIDIA_NIM_MODEL = process.env.NVIDIA_NIM_MODEL || "moonshotai/kimi-k3";
 
 let currentGroqKeyIndex = 0;
 let currentChatIndex = 0;
@@ -755,13 +760,13 @@ function convertMessageWithAttachments(msg: any): any {
 // MEDIA GENERATION
 // ============================================================
 function isVideoRequest(prompt: string): boolean {
-  return /(video|animation|clip|film|movie|motion|footage|reel|short|timelapse|animate|cinematic|slow.?mo)/i.test(
+  return /(video|animation|clip|film|movie|motion|footage|reel|short|timelapse|animate|cinematic|slow.?mo|animato|animata|animazione|vídeo|vidéo)/i.test(
     prompt
   );
 }
 
 function isImageRequest(prompt: string): boolean {
-  return /(image|picture|photo|logo|art|icon|vector|illustration|wallpaper|portrait|poster|banner|thumbnail|drawing|sketch)/i.test(
+  return /(image|picture|photo|logo|art|icon|vector|illustration|wallpaper|portrait|poster|banner|thumbnail|drawing|sketch|immagine|immagini|foto|imagen|bild|illustración)/i.test(
     prompt
   );
 }
@@ -773,6 +778,40 @@ function resolveMediaType(prompt: string): "video" | "image" | "chat" {
 }
 
 async function generateImage(prompt: string): Promise<string> {
+  const cloudflareAccountId = String(process.env.CLOUDFLARE_ACCOUNT_ID || "").trim();
+  const cloudflareToken = String(process.env.CLOUDFLARE_API_TOKEN || process.env.CLOUDFLARE_WORKERS_AI_TOKEN || "").trim();
+  if (cloudflareAccountId && cloudflareToken && !IMAGE_VIDEO_WORKER_URL.includes("old-hat-dab9.gamingac527.workers.dev")) {
+    try {
+      const response = await fetch(`https://api.cloudflare.com/client/v4/accounts/${encodeURIComponent(cloudflareAccountId)}/ai/run`, {
+        method: "POST",
+        headers: { Authorization: `Bearer ${cloudflareToken}`, "Content-Type": "application/json" },
+        body: JSON.stringify({ model: "@cf/black-forest-labs/flux-1-schnell", input: { prompt: String(prompt).slice(0, 1500) } }),
+        signal: AbortSignal.timeout(90_000),
+      });
+      if (response.ok) {
+        const contentType = response.headers.get("content-type") || "";
+        if (contentType.includes("image") || contentType.includes("octet-stream")) {
+          const bytes = await response.arrayBuffer();
+          if (bytes.byteLength > 1000) return `data:${contentType.split(";")[0] || "image/png"};base64,${Buffer.from(bytes).toString("base64")}`;
+        } else {
+          const data = await response.json().catch(() => null);
+          const base64 = String(data?.result?.image || data?.image || "").trim();
+          if (base64) return base64.startsWith("data:") ? base64 : `data:image/png;base64,${base64}`;
+        }
+      } else {
+        console.warn(`[Image] Cloudflare FLUX.2 Dev failed: ${response.status}`);
+      }
+    } catch (error: any) {
+      console.warn("[Image] Cloudflare FLUX.2 Dev request failed:", error?.message || error);
+    }
+  }
+  if (hasMiniMaxMediaKey()) {
+    try {
+      return (await generateMiniMaxImage({ prompt, aspectRatio: "1:1" })).url;
+    } catch (error: any) {
+      console.warn("[Image] MiniMax request failed; trying configured fallback", error?.message || error);
+    }
+  }
   const timeoutMs = 45000;
   let lastError = "";
   for (const model of IMAGE_MODELS) {
@@ -789,6 +828,10 @@ async function generateImage(prompt: string): Promise<string> {
       if (res.ok) {
         const blob = await res.blob();
         const arrayBuffer = await blob.arrayBuffer();
+        if (arrayBuffer.byteLength < 1000 || !(blob.type || "").startsWith("image/")) {
+          lastError = "Configured worker returned an invalid image";
+          continue;
+        }
         const base64 = Buffer.from(arrayBuffer).toString("base64");
         const mimeType = blob.type || "image/png";
         return `data:${mimeType};base64,${base64}`;
@@ -802,6 +845,36 @@ async function generateImage(prompt: string): Promise<string> {
 }
 
 async function generateVideo(prompt: string, imageUrl?: string): Promise<string> {
+  if (hasMiniMaxMediaKey()) {
+    try {
+      return (await generateMiniMaxVideo({ prompt, aspectRatio: "16:9", referenceImage: imageUrl, duration: 5 })).url;
+    } catch (error: any) {
+      console.warn("[Video] MiniMax request failed; trying configured fallback", error?.message || error);
+    }
+  }
+  // Prefer the project's configured media worker before the public fallback.
+  // It returns the actual encoded video file, which the chat player can stream.
+  try {
+    const response = await fetch(IMAGE_VIDEO_WORKER_URL, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ task: "video", type: "video", prompt, image: imageUrl || null, duration: 5, aspectRatio: "16:9" }),
+      signal: AbortSignal.timeout(180_000),
+    });
+    if (response.ok) {
+      const contentType = response.headers.get("content-type") || "";
+      if (contentType.includes("video") || contentType.includes("octet-stream")) {
+        const bytes = await response.arrayBuffer();
+        if (bytes.byteLength > 5000) return `data:video/mp4;base64,${Buffer.from(bytes).toString("base64")}`;
+      } else {
+        const result = await response.json().catch(() => null);
+        const videoUrl = String(result?.video || result?.video_url || result?.url || "").trim();
+        if (videoUrl) return videoUrl;
+      }
+    }
+  } catch (error: any) {
+    console.warn("[Video] Configured media worker failed:", error?.message || error);
+  }
   try {
     const encodedPrompt = encodeURIComponent(prompt);
     const pollinationsUrl = `https://video.pollinations.ai/prompt/${encodedPrompt}?model=fast-svd&nologo=true`;
@@ -819,7 +892,7 @@ async function generateVideo(prompt: string, imageUrl?: string): Promise<string>
     console.log("[Video] Pollinations failed:", err.message);
   }
   throw new Error(
-    "Video generation is currently limited. Try generating an image instead by saying 'generate an image of...'"
+    "Video generation failed: the configured video providers did not return a playable video. Please retry once the video provider is available."
   );
 }
 
@@ -869,7 +942,9 @@ function buildRuntimeContextMessage({
 
 const TERMINAL_SYSTEM_PROMPT = `You are Lunar, a helpful AI assistant. Answer the user's request directly and clearly.
 
-Infer the user's intent from ordinary language and complete the requested task using an actually connected service whenever one is available. Do not require special prefixes, connector names, or instructions such as “use a tool.” For read-only requests and routine actions that the user explicitly requested, proceed immediately without asking for confirmation. Only pause for confirmation immediately before an irreversible, destructive, financial, privacy-sensitive, or externally visible action when the user has not already clearly authorized that exact action. Never ask the user to confirm merely because a connector is being used.
+Infer the user's intent from ordinary language and complete the requested task using an actually connected service whenever one is available. Do not require special prefixes, connector names, or instructions such as “use a tool.” Execute clearly requested connected actions, including calendar events, repository updates, and ordinary messages, in the same turn without an extra review step. Ask one concise question only for a genuinely missing detail that prevents completion. Require confirmation only immediately before an irreversible, destructive, financial, privacy-sensitive, or broad-publication action when the user has not already clearly authorized that exact action.
+
+When the user provides an HTTP or HTTPS URL and asks to inspect, review, audit, critique, improve, or give feedback on that website, use the read-only computer_browser capability in the normal chat flow. Inspect only public content and observable behavior; do not sign in, enter personal data, submit forms, send messages, make purchases, change settings, or publish anything. Give practical feedback about visual hierarchy, copy, navigation, responsive layout, accessibility, broken interactions, and prioritized improvements. If browser access is unavailable, say so clearly and provide only the limitations that can be supported by the available page content. Never invent observations.
 
 For connected Composio apps, call the matching connected-app function directly with the user’s request and use its real result. This includes create, add, edit, update, modify, send, publish, deploy, commit, and manage requests—not only read requests. Do not answer as a generic bot, do not describe what the app could theoretically do, do not invent sample data, and do not claim access unless the tool result proves it. If a write tool requires a missing value that cannot be inferred safely, ask only for that value. If a needed connector is genuinely not connected, return one concise sentence naming the connector and the single Settings action required; do not repeat setup instructions or ask unnecessary questions.
 
@@ -1006,10 +1081,80 @@ async function callOpenAI(
   return { stream: response.body, provider: "OpenAI", model: OPENAI_CHAT_MODEL };
 }
 
-async function callOpenRouter(
+async function callNvidiaNim(
+  messages: any[],
+  hasImage: boolean,
+  tools: any[] = [],
+  preferredModel?: string,
+): Promise<{ stream: ReadableStream; provider: string; model: string }> {
+  if (!NVIDIA_NIM_KEY) throw new Error("NVIDIA NIM key not configured");
+  const model = preferredModel || NVIDIA_NIM_MODEL;
+  const processedMessages = hasImage
+    ? await processAttachmentsForModel(sanitizeMessagesForAPI(messages), model, true)
+    : sanitizeMessagesForAPI(messages);
+  const body: any = {
+    model,
+    messages: [{ role: "system", content: TERMINAL_SYSTEM_PROMPT }, ...processedMessages],
+    stream: true,
+    temperature: 0.35,
+    max_tokens: 4096,
+  };
+  if (tools.length > 0) {
+    body.tools = tools;
+    body.tool_choice = "auto";
+  }
+  const response = await fetch("https://integrate.api.nvidia.com/v1/chat/completions", {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+      Authorization: `Bearer ${NVIDIA_NIM_KEY}`,
+    },
+    body: JSON.stringify(body),
+    signal: AbortSignal.timeout(60_000),
+  });
+  if (!response.ok || !response.body) {
+    const detail = await response.text().catch(() => "");
+    throw new Error(`NVIDIA NIM failed: ${response.status} ${detail.slice(0, 240)}`);
+  }
+  return { stream: response.body, provider: "NVIDIA NIM", model };
+}
+
+async function callMiniMax(
   messages: any[],
   hasImage: boolean,
   tools: any[] = []
+): Promise<{ stream: ReadableStream; provider: string; model: string }> {
+  const key = String(process.env.MINIMAX_API_KEY || "").trim();
+  if (!key) throw new Error("MiniMax key not configured");
+  if (hasImage || tools.length > 0) throw new Error("MiniMax route is reserved for plain-text chat without tools");
+
+  const response = await fetch("https://api.minimax.io/v1/chat/completions", {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+      Authorization: `Bearer ${key}`,
+    },
+    body: JSON.stringify({
+      model: MINIMAX_CHAT_MODEL,
+      messages: sanitizeMessagesForAPI(messages),
+      stream: true,
+      temperature: 0.35,
+      max_tokens: 4096,
+    }),
+    signal: AbortSignal.timeout(45_000),
+  });
+  if (!response.ok || !response.body) {
+    const detail = await response.text().catch(() => "");
+    throw new Error(`MiniMax failed: ${response.status} ${detail.slice(0, 160)}`);
+  }
+  return { stream: response.body, provider: "MiniMax", model: MINIMAX_CHAT_MODEL };
+}
+
+async function callOpenRouter(
+  messages: any[],
+  hasImage: boolean,
+  tools: any[] = [],
+  preferredModel?: string
 ): Promise<{ stream: ReadableStream; provider: string; model: string }> {
   const cleanMessages = sanitizeMessagesForAPI(messages);
   const visionModels = [
@@ -1023,7 +1168,9 @@ async function callOpenRouter(
     "mistralai/mistral-7b-instruct:free",
   ];
 
-  const modelsToTry = hasImage ? visionModels : textModels;
+  const modelsToTry = hasImage
+    ? visionModels
+    : Array.from(new Set([preferredModel, ...textModels].filter(Boolean) as string[]));
 
   for (const modelId of modelsToTry) {
     try {
@@ -1065,7 +1212,7 @@ async function callOpenRouter(
       });
 
       clearTimeout(timeoutId);
-      if (res.ok) return { stream: res.body!, provider: "OpenRouter (Free)", model: modelId };
+      if (res.ok) return { stream: res.body!, provider: "OpenRouter", model: modelId };
     } catch {}
   }
 
@@ -1163,6 +1310,23 @@ async function callChatWorkers(
   hasImage: boolean,
   tools: any[] = []
 ): Promise<{ stream: ReadableStream; provider: string; model: string }> {
+  const cloudflareAccountId = String(process.env.CLOUDFLARE_ACCOUNT_ID || "").trim();
+  const cloudflareToken = String(process.env.CLOUDFLARE_API_TOKEN || process.env.CLOUDFLARE_WORKERS_AI_TOKEN || "").trim();
+  if (model === "minimax/m3" && cloudflareAccountId && cloudflareToken && !hasImage && tools.length === 0) {
+    const response = await fetch(`https://api.cloudflare.com/client/v4/accounts/${encodeURIComponent(cloudflareAccountId)}/ai/v1/chat/completions`, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        Authorization: `Bearer ${cloudflareToken}`,
+      },
+      body: JSON.stringify({ ...body, model: "minimax/m3", stream: true }),
+      signal: AbortSignal.timeout(45_000),
+    });
+    if (response.ok && response.body) return { stream: response.body, provider: "Cloudflare AI", model: "minimax/m3" };
+    const detail = await response.text().catch(() => "");
+    throw new Error(`Cloudflare MiniMax M3 failed: ${response.status} ${detail.slice(0, 180)}`);
+  }
+
   const cfModel = model.startsWith("@cf/") ? model : "@cf/meta/llama-3.3-70b-instruct-fp8-fast";
 
   for (let i = 0; i < CHAT_WORKER_URLS.length; i++) {
@@ -1300,10 +1464,14 @@ async function fallbackChat(
       errors.push(`OpenAI: ${err.message}`);
     }
   }
-  try {
-    return await callGroq(messages, "llama-3.3-70b-versatile", false, tools);
-  } catch (err: any) {
-    errors.push(`Groq: ${err.message}`);
+  if (GROQ_KEYS.some((_, index) => !deadGroqKeys.has(index))) {
+    try {
+      return await callGroq(messages, "llama-3.3-70b-versatile", false, tools);
+    } catch (err: any) {
+      errors.push(`Groq: ${err.message}`);
+    }
+  } else {
+    errors.push("Groq: all configured keys are unavailable");
   }
   try {
     return await callOpenRouter(messages, false, tools);
@@ -2104,7 +2272,11 @@ async function executeVerifiedGoogleCalendarCreate(composioSession: any, args: R
   }
 
   if (!verified) {
-    throw new Error(`Google Calendar created an unconfirmed event response${directVerificationError ? ` (${directVerificationError.slice(0, 120)})` : ''}; it was not reported as scheduled.`);
+    // The create endpoint already returned a concrete event ID. A delayed or
+    // connector-specific read-back failure must not turn a successful create
+    // into a false error or cause the model to retry and create a duplicate.
+    // The event card is built from the provider-confirmed create response.
+    return calendarEventResultCard(created);
   }
   return calendarEventResultCard({ ...created, ...verified, url: verified.url || created.url });
 }
@@ -3260,7 +3432,25 @@ export async function POST(req: NextRequest) {
     const userText = Array.isArray(lastMsg?.content)
       ? lastMsg.content.find((c: any) => c.type === "text")?.text || ""
       : lastMsg?.content || "";
-
+    const normalizedRequest = String(userText).replace(/\s+/g, " ").trim();
+    const websiteFeedbackIntent = detectWebsiteFeedbackIntent(normalizedRequest);
+    let websiteFeedbackObservation = "";
+    if (websiteFeedbackIntent && computerUse !== false) {
+      try {
+        const renderedReview = await executeAgentGateway({
+          tool: "browser",
+          args: {
+            url: websiteFeedbackIntent.url,
+            action: "inspect",
+            instruction: websiteFeedbackInstruction(websiteFeedbackIntent),
+          },
+          task: `Read-only public website feedback review of ${websiteFeedbackIntent.url}. Do not sign in, submit forms, send messages, make purchases, change settings, or publish anything.`,
+        });
+        websiteFeedbackObservation = gatewayResultText(renderedReview).replace(/\s+/g, " ").trim().slice(0, 12_000);
+      } catch (error: any) {
+        console.warn("[WebsiteFeedback] Read-only browser review unavailable:", error?.message || error);
+      }
+    }
     // ==================== FAST CONNECTOR READS ====================
     // Handle direct Discord reads before memory/search/tool discovery. Those steps can
     // be slow and must never prevent a connected-account request from replying.
@@ -3329,7 +3519,7 @@ export async function POST(req: NextRequest) {
     }
 
     let mediaType: "image" | "video" | "chat";
-    if (source === "imagine") {
+    if (source === "imagine" || isExplicitMediaGenerationRequest(userText)) {
       mediaType = resolveMediaType(userText);
     } else {
       mediaType = "chat";
@@ -3363,12 +3553,16 @@ export async function POST(req: NextRequest) {
     // ==================== MEDIA GENERATION ====================
     if (mediaType === "image" || mediaType === "video") {
       const encoder = new TextEncoder();
-      const providerName =
-        mediaType === "video" ? "Pollinations AI" : "Cloudflare Workers AI";
+      const hasCloudflareMediaKey = Boolean(String(process.env.CLOUDFLARE_ACCOUNT_ID || "").trim() && String(process.env.CLOUDFLARE_API_TOKEN || process.env.CLOUDFLARE_WORKERS_AI_TOKEN || "").trim());
+      const providerName = hasMiniMaxMediaKey()
+        ? "MiniMax"
+        : hasCloudflareMediaKey ? "Cloudflare AI" : "Configured media worker";
       const modelName =
-        mediaType === "video"
-          ? "stable-video-diffusion"
-          : "@cf/black-forest-labs/flux-2-dev";
+        hasMiniMaxMediaKey()
+          ? mediaType === "video" ? "MiniMax-H3" : "image-01"
+          : hasCloudflareMediaKey
+            ? mediaType === "video" ? "configured-video-worker" : "@cf/black-forest-labs/flux-1-schnell"
+            : mediaType === "video" ? "configured-video-worker" : "configured-image-worker";
 
       const s = new ReadableStream({
         async start(controller) {
@@ -3377,21 +3571,11 @@ export async function POST(req: NextRequest) {
               `data: ${JSON.stringify({ provider: providerName, model: modelName })}\n\n`
             )
           );
-          controller.enqueue(
-            encoder.encode(
-              `data: ${JSON.stringify({ content: `Generating your ${mediaType}... please wait.` })}\n\n`
-            )
-          );
           try {
             const url = await generateMedia(mediaType, userText, imageUrl);
             controller.enqueue(
               encoder.encode(
                 `data: ${JSON.stringify({ [mediaType]: url })}\n\n`
-              )
-            );
-            controller.enqueue(
-              encoder.encode(
-                `data: ${JSON.stringify({ content: `\n\nYour ${mediaType} has been generated successfully!` })}\n\n`
               )
             );
           } catch (err: any) {
@@ -3454,6 +3638,15 @@ export async function POST(req: NextRequest) {
       messagesWithSystem.push({
         role: "assistant",
         content: `Here is the current information I found from web search:\n\n${searchContext}\n\nI will now answer your question based on this up-to-date information.`,
+      });
+    }
+    if (websiteFeedbackIntent) {
+      messagesWithSystem.push({ role: "system", content: websiteFeedbackInstruction(websiteFeedbackIntent) });
+      messagesWithSystem.push({
+        role: "assistant",
+        content: websiteFeedbackObservation
+          ? `Read-only browser observations for ${websiteFeedbackIntent.url}:\n\n${websiteFeedbackObservation}`
+          : `The read-only browser review for ${websiteFeedbackIntent.url} was unavailable. Do not invent visual or interaction findings; explain the limitation and use only evidence in the supplied conversation.`,
       });
     }
 
@@ -3875,7 +4068,24 @@ export async function POST(req: NextRequest) {
 
       const calendarStep = toolSteps.find((step) => /GOOGLECALENDAR.*CREATE.*EVENT/i.test(String(step?.tool || '')));
       if (calendarSchedulingIntent) {
-        if (!calendarStep) return directTextResponse('I could not verify a Google Calendar create action, so no event was created. Please retry the schedule request; do not rely on any earlier text response.', 'Google Calendar', 'connector-error');
+        if (!calendarStep) {
+          // Some connected models answer in prose without emitting the create
+          // tool call. If the request is deterministic and the connector is
+          // already available, execute it directly instead of telling the user
+          // to retry and risking duplicate or missing events.
+          const deterministicFallback = requestedConnectorKey === 'google_calendar'
+            ? parseDeterministicCalendarCreate(userText, clientTimeZone, new Date(), recentUserText)
+            : null;
+          if (composioSession && deterministicFallback) {
+            try {
+              return directTextResponse(await executeVerifiedGoogleCalendarCreate(composioSession, deterministicFallback), 'Google Calendar', 'connected-action');
+            } catch (error: any) {
+              const detail = String(error?.message || 'Google Calendar did not confirm the event.').replace(/https?:\/\/\S+/g, '').slice(0, 260);
+              return directTextResponse(`Google Calendar could not create that event. ${detail}`, 'Google Calendar', 'connector-error');
+            }
+          }
+          return directTextResponse('I could not reach Google Calendar’s create action. Reconnect Google Calendar in Settings → Connectors and try again.', 'Google Calendar', 'connector-error');
+        }
         const resultText = String(calendarStep.result || '');
         if (/\[\[UNCGPT_CALENDAR_EVENT:/.test(resultText)) return directTextResponse(resultText, 'Google Calendar', 'connected-action');
         const safeError = resultText.replace(/^Tool error:\s*/i, '').replace(/https?:\/\/\S+/g, '').slice(0, 260);
@@ -3981,12 +4191,16 @@ export async function POST(req: NextRequest) {
     let result: { stream: ReadableStream; provider: string; model: string };
 
     try {
-      if (resolvedProvider === "openai") {
+      if (resolvedProvider === "nvidia") {
+        result = await callNvidiaNim(messagesWithSystem, hasImage, availableTools, resolvedModel);
+      } else if (resolvedProvider === "minimax") {
+        result = await callMiniMax(messagesWithSystem, hasImage, availableTools);
+      } else if (resolvedProvider === "openai") {
         result = await callOpenAI(messagesWithSystem, hasImage, availableTools);
       } else if (resolvedProvider === "groq" || GROQ_CHAT_MODELS[resolvedModel]) {
         result = await callGroq(messagesWithSystem, resolvedModel, hasImage, availableTools);
       } else if (resolvedProvider === "openrouter") {
-        result = await callOpenRouter(messagesWithSystem, hasImage, availableTools);
+        result = await callOpenRouter(messagesWithSystem, hasImage, availableTools, resolvedModel);
       } else if (resolvedProvider === "cloudflare" || resolvedModel.startsWith("@cf/")) {
         result = await callCloudflareWithFallbacks(
           { task: "chat", messages: messagesWithSystem },
@@ -3998,7 +4212,7 @@ export async function POST(req: NextRequest) {
         result = await fallbackChat(messagesWithSystem, hasImage, availableTools);
       }
     } catch (primaryErr: any) {
-      console.error("[Main] Primary provider failed:", primaryErr);
+      console.warn("[Main] Primary provider failed; attempting the configured fallback chain:", primaryErr?.message || primaryErr);
       result = await fallbackChat(messagesWithSystem, hasImage, availableTools);
     }
 
@@ -4013,6 +4227,13 @@ export async function POST(req: NextRequest) {
     );
   } catch (err: any) {
     console.error("[Main] Fatal error:", err);
+    const detail = String(err?.message || "");
+    if (/all providers failed|all groq keys (?:dead|failed)/i.test(detail)) {
+      return Response.json(
+        { error: "The AI response service is temporarily at capacity. No connected action was performed; please try again shortly." },
+        { status: 503, headers: { "Cache-Control": "private, no-store, max-age=0", "Retry-After": "60" } }
+      );
+    }
     return Response.json(
       { error: err.message || "Internal server error" },
       { status: 500 }
