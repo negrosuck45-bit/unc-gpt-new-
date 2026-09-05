@@ -32,6 +32,8 @@ import {
   AudioWaveform,
   Volume2,
   VolumeX,
+  Download,
+  Share2,
 } from 'lucide-react';
 import { MessageContent } from './message-content';
 import { ComputerUseSteps } from './computer-use-steps';
@@ -550,6 +552,11 @@ function GlowingThinkingText({ text = "thinking" }: { text?: string }) {
   );
 }
 
+function isImageGenerationRequest(text: string) {
+  return /(?:generate|create|make|draw|design|imagine|render)\b[\s\S]{0,80}\b(?:image|picture|photo|illustration|artwork|logo|portrait)/i.test(text)
+    || /\b(?:image|picture|photo|illustration|artwork|logo|portrait)\b[\s\S]{0,30}\b(?:of|showing|with)/i.test(text);
+}
+
 // ============= THINKING PHRASES =============
 const THINKING_PHRASES = [
   "Hmm, let me think",
@@ -662,10 +669,33 @@ export function ChatMessages({ messages, isStreaming, isThinking, onRegenerate, 
   const { getCurrentChat, settings } = useChatStore();
   const currentChat = getCurrentChat();
   const [viewingAttachment, setViewingAttachment] = useState<Attachment | null>(null);
+  const [viewingGeneratedImage, setViewingGeneratedImage] = useState<string | null>(null);
   const [feedbackMessage, setFeedbackMessage] = useState<Message | null>(null);
   const [toast, setToast] = useState<string | null>(null);
   const [preferences, setPreferences] = useState<UserPreferences>(readUserPreferences());
   const streamingFamily = useMemo(() => getModelFamilyFromModel(currentChat?.model || settings.model), [currentChat?.model, settings.model]);
+  const pendingUserText = [...messages].reverse().find((message) => message.role === 'user')?.content || '';
+  const generatingImage = Boolean(isThinking && isImageGenerationRequest(pendingUserText));
+
+  const downloadGeneratedImage = useCallback((url: string) => {
+    const link = document.createElement('a');
+    link.href = url;
+    link.download = `unc-gpt-image-${Date.now()}.png`;
+    link.target = '_blank';
+    link.rel = 'noopener';
+    document.body.appendChild(link);
+    link.click();
+    link.remove();
+  }, []);
+
+  const shareGeneratedImage = useCallback(async (url: string) => {
+    try {
+      const canShare = typeof navigator.share === 'function';
+      if (canShare) await navigator.share({ title: 'Generated image', url });
+      else if (navigator.clipboard) await navigator.clipboard.writeText(url);
+      setToast(canShare ? 'Share sheet opened' : 'Image link copied');
+    } catch { /* sharing was cancelled */ }
+  }, []);
 
   useEffect(() => subscribeToUserPreferences(setPreferences), []);
 
@@ -806,12 +836,18 @@ export function ChatMessages({ messages, isStreaming, isThinking, onRegenerate, 
 
                     {/* Generated media */}
                     {message.image && (
-                      <motion.div initial={{ opacity: 0, scale: 0.9 }} animate={{ opacity: 1, scale: 1 }} className="mt-3 rounded-lg overflow-hidden max-w-sm">
-                        {message.image.startsWith('data:') ? (
-                          <img src={message.image} alt="Generated image" className="w-full h-auto object-cover rounded-lg bg-muted" />
-                        ) : (
-                          <NextImage src={message.image} alt="Generated image" width={400} height={300} className="w-full h-auto object-cover rounded-lg" loading="lazy" unoptimized={message.image.includes('blob:')} />
-                        )}
+                      <motion.div initial={{ opacity: 0, scale: 0.9 }} animate={{ opacity: 1, scale: 1 }} className="mt-3 max-w-sm">
+                        <button type="button" className="group block w-full cursor-zoom-in overflow-hidden rounded-2xl border border-white/10 bg-muted/20 text-left shadow-lg shadow-black/10" onClick={() => setViewingGeneratedImage(message.image || null)} aria-label="Open generated image">
+                          {message.image.startsWith('data:') ? (
+                            <img src={message.image} alt="Generated image" className="w-full h-auto object-cover bg-muted transition duration-300 group-hover:scale-[1.02]" />
+                          ) : (
+                            <NextImage src={message.image} alt="Generated image" width={400} height={300} className="w-full h-auto object-cover transition duration-300 group-hover:scale-[1.02]" loading="lazy" unoptimized={message.image.includes('blob:')} />
+                          )}
+                        </button>
+                        <div className="mt-2 flex gap-2">
+                          <button type="button" onClick={() => downloadGeneratedImage(message.image || '')} className="inline-flex h-9 flex-1 items-center justify-center gap-2 rounded-xl border border-white/10 bg-white/[0.06] text-xs font-medium text-foreground transition hover:bg-white/[0.12]"><Download className="h-3.5 w-3.5" />Download</button>
+                          <button type="button" onClick={() => void shareGeneratedImage(message.image || '')} className="inline-flex h-9 flex-1 items-center justify-center gap-2 rounded-xl border border-white/10 bg-white/[0.06] text-xs font-medium text-foreground transition hover:bg-white/[0.12]"><Share2 className="h-3.5 w-3.5" />Share</button>
+                        </div>
                       </motion.div>
                     )}
 
@@ -857,7 +893,7 @@ export function ChatMessages({ messages, isStreaming, isThinking, onRegenerate, 
                 <MarsAvatar size={28} family={streamingFamily} useSimpleIcon />
               </div>
               <div className="flex items-center py-2">
-                <GlowingThinkingText text="thinking" />
+                <GlowingThinkingText text={generatingImage ? "Generating your image" : "thinking"} />
               </div>
             </motion.div>
           )}
@@ -879,6 +915,13 @@ export function ChatMessages({ messages, isStreaming, isThinking, onRegenerate, 
           )}
 
           <AttachmentViewerDialog attachment={viewingAttachment} onClose={() => setViewingAttachment(null)} />
+          <Dialog open={Boolean(viewingGeneratedImage)} onOpenChange={(open) => !open && setViewingGeneratedImage(null)}>
+            <DialogContent className="max-w-[95vw] border-white/10 bg-black/80 p-3 backdrop-blur-xl sm:max-w-4xl">
+              <DialogHeader><DialogTitle>Generated image</DialogTitle><DialogDescription>Tap outside to close.</DialogDescription></DialogHeader>
+              {viewingGeneratedImage && <img src={viewingGeneratedImage} alt="Generated image enlarged" className="max-h-[76vh] w-full rounded-xl object-contain" />}
+              {viewingGeneratedImage && <div className="flex gap-2"><Button className="flex-1 gap-2" onClick={() => downloadGeneratedImage(viewingGeneratedImage)}><Download className="h-4 w-4" />Download</Button><Button variant="secondary" className="flex-1 gap-2" onClick={() => void shareGeneratedImage(viewingGeneratedImage)}><Share2 className="h-4 w-4" />Share</Button></div>}
+            </DialogContent>
+          </Dialog>
         </div>
       </div>
 
