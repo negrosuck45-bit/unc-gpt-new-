@@ -69,8 +69,6 @@ async function persistNeuralMemory(chatId: string, messages: any[], responseCont
 
 export function ChatInterface({ onSwitchToImagine, onOpenSidebar, isSidebarOpen }: ChatInterfaceProps) {
   const mounted = useSyncExternalStore(() => () => {}, () => true, () => false);
-  const [isThinking, setIsThinking] = useState(false);
-  const [thinkingText, setThinkingText] = useState("");
   const [connectionIssue, setConnectionIssue] = useState<ConnectionIssue>(null);
   const [cameraVoiceOpen, setCameraVoiceOpen] = useState(false);
 
@@ -108,8 +106,6 @@ export function ChatInterface({ onSwitchToImagine, onOpenSidebar, isSidebarOpen 
     triggerHaptic("send");
     unlockReplySound();
     setIsStreaming(true, chatId);
-    setThinkingText("");
-    setIsThinking(true);
     abortControllerRef.current = new AbortController();
 
     let completed = false;
@@ -127,8 +123,7 @@ export function ChatInterface({ onSwitchToImagine, onOpenSidebar, isSidebarOpen 
       }
     } finally {
       setIsStreaming(false);
-      setIsThinking(false);
-      abortControllerRef.current = null;
+            abortControllerRef.current = null;
       if (completed) {
         triggerHaptic("reply");
         playReplySound();
@@ -156,8 +151,6 @@ export function ChatInterface({ onSwitchToImagine, onOpenSidebar, isSidebarOpen 
     triggerHaptic("send");
     unlockReplySound();
     setIsStreaming(true, chatId);
-    setThinkingText("");
-    setIsThinking(true);
     abortControllerRef.current = new AbortController();
 
     let completed = false;
@@ -179,8 +172,7 @@ export function ChatInterface({ onSwitchToImagine, onOpenSidebar, isSidebarOpen 
       }
     } finally {
       setIsStreaming(false);
-      setIsThinking(false);
-      abortControllerRef.current = null;
+            abortControllerRef.current = null;
       if (completed) {
         triggerHaptic("reply");
         playReplySound();
@@ -378,10 +370,6 @@ export function ChatInterface({ onSwitchToImagine, onOpenSidebar, isSidebarOpen 
               throw new Error(String(parsed.error));
             }
 
-            if (parsed.reasoning) {
-              setThinkingText((current) => current + String(parsed.reasoning));
-            }
-
             if (parsed.permission_request) {
               const request = parsed.permission_request;
               permissionRequest = request;
@@ -391,8 +379,7 @@ export function ChatInterface({ onSwitchToImagine, onOpenSidebar, isSidebarOpen 
             } else if (parsed.tool_step) {
               const activity = describeToolActivity(parsed.tool_step);
               const activityContent = `[[UNCGPT_ACTION_STATUS:${JSON.stringify(activity)}]]`;
-              setIsThinking(false);
-              if (!assistantMsgId) {
+                            if (!assistantMsgId) {
                 assistantMsgId = addMessage(chatId, { role: 'assistant', content: activityContent });
               } else {
                 updateMessage(chatId, assistantMsgId, activityContent);
@@ -403,8 +390,7 @@ export function ChatInterface({ onSwitchToImagine, onOpenSidebar, isSidebarOpen 
               if (!streamingPreference) continue;
               if (!hasStartedStreaming) {
                 hasStartedStreaming = true;
-                setIsThinking(false);
-                if (assistantMsgId) {
+                                if (assistantMsgId) {
                   updateMessage(chatId, assistantMsgId, fullContent);
                 } else {
                   assistantMsgId = addMessage(chatId, { role: "assistant", content: parsed.content });
@@ -417,8 +403,7 @@ export function ChatInterface({ onSwitchToImagine, onOpenSidebar, isSidebarOpen 
               hasGeneratedMedia = true;
               if (!hasStartedStreaming) {
                 hasStartedStreaming = true;
-                setIsThinking(false);
-                assistantMsgId = addMessage(chatId, { role: "assistant", content: fullContent });
+                                assistantMsgId = addMessage(chatId, { role: "assistant", content: fullContent });
               }
               if (assistantMsgId) updateMessage(chatId, assistantMsgId, fullContent, parsed.image);
             } 
@@ -426,8 +411,7 @@ export function ChatInterface({ onSwitchToImagine, onOpenSidebar, isSidebarOpen 
               hasGeneratedMedia = true;
               if (!hasStartedStreaming) {
                 hasStartedStreaming = true;
-                setIsThinking(false);
-                assistantMsgId = addMessage(chatId, { role: "assistant", content: fullContent });
+                                assistantMsgId = addMessage(chatId, { role: "assistant", content: fullContent });
               }
               if (assistantMsgId) updateMessage(chatId, assistantMsgId, fullContent, undefined, parsed.video);
             }
@@ -442,8 +426,7 @@ export function ChatInterface({ onSwitchToImagine, onOpenSidebar, isSidebarOpen 
       if (assistantMsgId) updateMessage(chatId, assistantMsgId, cleanContent, undefined, undefined, undefined, undefined, permission);
       else assistantMsgId = addMessage(chatId, { role: 'assistant', content: cleanContent, connectorPermission: permission });
     } else if (!streamingPreference && fullContent && !assistantMsgId) {
-      setIsThinking(false);
-      assistantMsgId = addMessage(chatId, { role: "assistant", content: fullContent });
+            assistantMsgId = addMessage(chatId, { role: "assistant", content: fullContent });
     } else if (assistantMsgId && fullContent) {
       updateMessage(chatId, assistantMsgId, fullContent);
     }
@@ -462,8 +445,7 @@ export function ChatInterface({ onSwitchToImagine, onOpenSidebar, isSidebarOpen 
     }
 
     if (!fullContent.trim() && !permissionRequest && !hasGeneratedMedia) {
-      setIsThinking(false);
-      const fallback = "I’m sorry, I couldn’t complete that response. Please try again.";
+            const fallback = "I’m sorry, I couldn’t complete that response. Please try again.";
       addMessage(chatId, { role: "assistant", content: fallback });
       return fallback;
     }
@@ -494,8 +476,6 @@ export function ChatInterface({ onSwitchToImagine, onOpenSidebar, isSidebarOpen 
             <ChatMessages
               messages={currentChat?.messages || []}
               isStreaming={isCurrentChatStreaming}
-  isThinking={isThinking}
-  thinkingText={thinkingText}
   onRegenerate={handleRegenerate}
             />
           </div>

@@ -1,6 +1,7 @@
 import { notFound } from "next/navigation";
 import { createClient } from "@supabase/supabase-js";
 import { PublicProfileCard, PublicProfileCursor } from "@/components/public-profile-card";
+import type { ProfileConnection } from "@/lib/profile-connections";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -8,6 +9,7 @@ export const dynamic = "force-dynamic";
 const THUMBNAIL_MARKER = "__uncgpt_thumbnail__:";
 
 type Profile = {
+  user_id: string | null;
   username: string;
   bio: string | null;
   profile_picture: string | null;
@@ -39,12 +41,12 @@ function getAdminClient() {
 async function getProfile(username: string): Promise<Profile | null> {
   const normalized = username.trim().replace(/^@+/, "");
   if (!/^[A-Za-z0-9_]{1,24}$/.test(normalized)) return null;
-  if (normalized.toLowerCase() === "lunar") return { username: "lunar", bio: "The official Lunar profile.", profile_picture: "/lunar-mark.svg", background_media: null, background_media_type: null, music_url: null, music_name: null, music_thumbnail: null, profile_views: 0, cursor_image: null, is_verified: true };
+  if (normalized.toLowerCase() === "lunar") return { user_id: null, username: "lunar", bio: "The official Lunar profile.", profile_picture: "/lunar-mark.svg", background_media: null, background_media_type: null, music_url: null, music_name: null, music_thumbnail: null, profile_views: 0, cursor_image: null, is_verified: true };
   const supabase = getAdminClient();
   if (!supabase) return null;
-  const selectFields = "username,bio,profile_picture,background_media,background_media_type,music_url,music_name,music_thumbnail,profile_views,cursor_image";
-  const legacyFields = "username,bio,profile_picture,background_media,background_media_type,music_url,music_name,profile_views";
-  const legacyFieldsNoViews = "username,bio,profile_picture,background_media,background_media_type,music_url,music_name";
+  const selectFields = "user_id,username,bio,profile_picture,background_media,background_media_type,music_url,music_name,music_thumbnail,profile_views,cursor_image";
+  const legacyFields = "user_id,username,bio,profile_picture,background_media,background_media_type,music_url,music_name,profile_views";
+  const legacyFieldsNoViews = "user_id,username,bio,profile_picture,background_media,background_media_type,music_url,music_name";
   const primary = await supabase.from("user_profiles").select(selectFields).eq("username_lower", normalized.toLowerCase()).maybeSingle();
   if (primary.data) return normalizeProfile(primary.data);
   const fallback = await supabase.from("user_profiles").select(selectFields).eq("username", normalized).maybeSingle();
@@ -58,6 +60,20 @@ async function getProfile(username: string): Promise<Profile | null> {
   const noViewsFallback = await supabase.from("user_profiles").select(legacyFieldsNoViews).eq("username", normalized).maybeSingle();
   if (!noViewsFallback.data) return null;
   return normalizeProfile(noViewsFallback.data);
+}
+
+async function getConnections(userId: string | null): Promise<ProfileConnection[]> {
+  if (!userId) return [];
+  const supabase = getAdminClient();
+  if (!supabase) return [];
+  const { data, error } = await supabase
+    .from("connections")
+    .select("id,platform,mode,value,position")
+    .eq("user_id", userId)
+    .order("position", { ascending: true })
+    .order("created_at", { ascending: true });
+  if (error) return [];
+  return (data ?? []) as ProfileConnection[];
 }
 
 export async function generateMetadata({ params }: { params: Promise<{ username: string }> }) {
@@ -74,6 +90,7 @@ export default async function PublicProfilePage({ params }: { params: Promise<{ 
   const { username } = await params;
   const profile = await getProfile(username);
   if (!profile) notFound();
+  const connections = await getConnections(profile.user_id);
 
   return (
     <main className="relative min-h-screen overflow-hidden bg-[#050505] px-5 py-10 text-white">
@@ -95,6 +112,7 @@ export default async function PublicProfilePage({ params }: { params: Promise<{ 
           musicThumbnail={profile.music_thumbnail}
           profileViews={profile.profile_views ?? 0}
           isVerified={profile.is_verified ?? profile.username.toLowerCase() === "lunar"}
+          connections={connections}
         />
       </section>
     </main>

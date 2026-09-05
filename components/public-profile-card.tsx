@@ -3,6 +3,8 @@
 import { useEffect, useRef, useState, type RefObject } from 'react'
 import { gsap } from 'gsap'
 import { BadgeCheck, Eye, MessageCircle, Pause, Play, UserPlus } from 'lucide-react'
+import { ConnectionsRow } from '@/components/connections-row'
+import type { ProfileConnection } from '@/lib/profile-connections'
 
 type ProfileCardProps = {
   username: string
@@ -13,6 +15,7 @@ type ProfileCardProps = {
   musicThumbnail: string | null
   profileViews: number
   isVerified?: boolean
+  connections: ProfileConnection[]
 }
 
 function useFizTilt(ref: RefObject<HTMLDivElement | null>) {
@@ -113,7 +116,7 @@ function ProfileMusicPlayer({ url, name, thumbnail }: { url: string; name: strin
   )
 }
 
-export function PublicProfileCard({ username, bio, profilePicture, musicUrl, musicName, musicThumbnail, profileViews, isVerified = false }: ProfileCardProps) {
+export function PublicProfileCard({ username, bio, profilePicture, musicUrl, musicName, musicThumbnail, profileViews, isVerified = false, connections }: ProfileCardProps) {
   const initial = username.slice(0, 1).toUpperCase()
   const [views, setViews] = useState(profileViews)
   const [added, setAdded] = useState(false)
@@ -161,6 +164,7 @@ export function PublicProfileCard({ username, bio, profilePicture, musicUrl, mus
             {bio && <p className="mt-2 whitespace-pre-wrap text-sm leading-6 text-white/70">{bio}</p>}
           </div>
         </div>
+        <ConnectionsRow connections={connections} />
         {musicUrl && <ProfileMusicPlayer url={musicUrl} name={musicName} thumbnail={musicThumbnail} />}
         <div className="mt-5 flex items-center justify-center gap-1.5 text-xs text-white/45"><Eye className="h-3.5 w-3.5" /><span>{views.toLocaleString()} {views === 1 ? 'view' : 'views'}</span></div>
       </div>

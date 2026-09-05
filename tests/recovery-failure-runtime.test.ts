@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import { classifyTranscriptionFailure, classifyVoiceFailure } from "../lib/recovery-failure-state.ts";
+import { classifyTranscriptionFailure, classifyVoiceFailure } from "../lib/recovery-failure-state";
 
 test("provider failure recovery classifiers", async (t) => {
   await t.test("classifies voice rate limits as retryable and non-cacheable", () => {
